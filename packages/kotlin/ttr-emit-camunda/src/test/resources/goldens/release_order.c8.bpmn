@@ -1,0 +1,1899 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions exporter="ttr-emit-camunda" id="n_104787d183374ef9eebb" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.6.0" targetNamespace="https://tatrman.org/schema/automation-export/1" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" xmlns:ttr="https://tatrman.org/schema/automation-export/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0">
+  <bpmn:error errorCode="TTR_STALE" id="stale_export" />
+  <bpmn:error errorCode="TTR_REFUSED" id="run_refused" />
+  <bpmn:process id="release_on_placement" isExecutable="true" name="release_on_placement">
+    <bpmn:extensionElements>
+      <ttr:contract>{&quot;schemaVersion&quot;:1,&quot;target&quot;:&quot;camunda_8&quot;,&quot;deployment&quot;:&quot;release_bpmn&quot;,&quot;recipes&quot;:[&quot;release_order&quot;],&quot;calls&quot;:[{&quot;task&quot;:&quot;n_250cb61d058e161e3e4b&quot;,&quot;name&quot;:&quot;open&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/recipes/release_order/runs&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_c4ec94b7181d57836764&quot;,&quot;name&quot;:&quot;status&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_57859eca3bca5a928377&quot;,&quot;name&quot;:&quot;open&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/recipes/release_order/runs&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_b64ad5ec8bf76c1c94d0&quot;,&quot;name&quot;:&quot;part&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/parts/candidates&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{&quot;part&quot;:&quot;candidates&quot;}},{&quot;task&quot;:&quot;n_e598efcfa1008f61f6f7&quot;,&quot;name&quot;:&quot;part&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/parts/shortfall&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{&quot;part&quot;:&quot;shortfall&quot;}},{&quot;task&quot;:&quot;n_8928f415cce3c85241d6&quot;,&quot;name&quot;:&quot;part&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/parts/price_differences&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{&quot;part&quot;:&quot;price_differences&quot;}},{&quot;task&quot;:&quot;n_9d7810d5a7777f0e4db3&quot;,&quot;name&quot;:&quot;part&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/parts/overdue&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{&quot;part&quot;:&quot;overdue&quot;}},{&quot;task&quot;:&quot;n_52a8658b9724704754f4&quot;,&quot;name&quot;:&quot;part&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/parts/decision&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{&quot;part&quot;:&quot;decision&quot;}},{&quot;task&quot;:&quot;n_9930af4f71285fb073b5&quot;,&quot;name&quot;:&quot;evaluate&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/evaluate&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_a43d3a5e0b8a7f626a59&quot;,&quot;name&quot;:&quot;status&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_840a86ee5dc7c3c49040&quot;,&quot;name&quot;:&quot;status&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_052028bfe62ad65fa919&quot;,&quot;name&quot;:&quot;route&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/routes/hold_sales&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{&quot;route&quot;:&quot;hold_sales&quot;}},{&quot;task&quot;:&quot;n_5dd9cfbd739772935a1b&quot;,&quot;name&quot;:&quot;perform&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/actions/hold/perform&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{&quot;action&quot;:&quot;hold&quot;}},{&quot;task&quot;:&quot;n_5ee95baf32c416ce0706&quot;,&quot;name&quot;:&quot;outcome&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/actions/notify/outcome&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{&quot;action&quot;:&quot;notify&quot;}},{&quot;task&quot;:&quot;n_1a2bfb5358da488d95a2&quot;,&quot;name&quot;:&quot;route&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/routes/hold_ar&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{&quot;route&quot;:&quot;hold_ar&quot;}},{&quot;task&quot;:&quot;n_0d8646f70d1dd01778f0&quot;,&quot;name&quot;:&quot;perform&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/actions/hold/perform&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{&quot;action&quot;:&quot;hold&quot;}},{&quot;task&quot;:&quot;n_3db913ed9b8b85abfe1a&quot;,&quot;name&quot;:&quot;outcome&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/actions/notify/outcome&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{&quot;action&quot;:&quot;notify&quot;}},{&quot;task&quot;:&quot;n_0cf853efb4281e2d7b87&quot;,&quot;name&quot;:&quot;route&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/routes/release_confirmed&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{&quot;route&quot;:&quot;release_confirmed&quot;}},{&quot;task&quot;:&quot;n_793a130591dc45f9af35&quot;,&quot;name&quot;:&quot;route&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/routes/release&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{&quot;route&quot;:&quot;release&quot;}},{&quot;task&quot;:&quot;n_03d431a1dd1765d95032&quot;,&quot;name&quot;:&quot;perform&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/actions/release/perform&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{&quot;action&quot;:&quot;release&quot;}},{&quot;task&quot;:&quot;n_17878958cf865ff5c6d2&quot;,&quot;name&quot;:&quot;close&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/close&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;release_on_placement&quot;,&quot;mode&quot;:&quot;on_event&quot;,&quot;arguments&quot;:{}}],&quot;routes&quot;:[{&quot;recipe&quot;:&quot;release_order&quot;,&quot;route&quot;:&quot;hold_sales&quot;,&quot;flow&quot;:&quot;n_71db0ec5b265db8eaa8a&quot;,&quot;gateway&quot;:&quot;n_be14bcf3ef203eb1da49&quot;,&quot;entry&quot;:&quot;n_fc976e1ea8e2789ef645&quot;,&quot;task&quot;:&quot;n_052028bfe62ad65fa919&quot;},{&quot;recipe&quot;:&quot;release_order&quot;,&quot;route&quot;:&quot;hold_ar&quot;,&quot;flow&quot;:&quot;n_2c6263d6992844f6999e&quot;,&quot;gateway&quot;:&quot;n_be14bcf3ef203eb1da49&quot;,&quot;entry&quot;:&quot;n_a1260e6797efc6b3b218&quot;,&quot;task&quot;:&quot;n_1a2bfb5358da488d95a2&quot;},{&quot;recipe&quot;:&quot;release_order&quot;,&quot;route&quot;:&quot;release_confirmed&quot;,&quot;flow&quot;:&quot;n_128ae562a88bf29a0e30&quot;,&quot;gateway&quot;:&quot;n_be14bcf3ef203eb1da49&quot;,&quot;entry&quot;:&quot;n_8725c2e19a9902f35774&quot;,&quot;task&quot;:&quot;n_0cf853efb4281e2d7b87&quot;},{&quot;recipe&quot;:&quot;release_order&quot;,&quot;route&quot;:&quot;release&quot;,&quot;flow&quot;:&quot;n_f7572d245ccb843854f6&quot;,&quot;gateway&quot;:&quot;n_be14bcf3ef203eb1da49&quot;,&quot;entry&quot;:&quot;n_f8747763f66d3d8ffd3f&quot;,&quot;task&quot;:&quot;n_793a130591dc45f9af35&quot;}]}</ttr:contract>
+    </bpmn:extensionElements>
+    <bpmn:startEvent id="n_0a5e5a3d91720f7b7aca" name="start with ttrInput key">
+      <bpmn:outgoing>n_5259d3e5986c7e980c38</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:endEvent id="n_5ba70c5b463c10d69a46" name="stopped for repair">
+      <bpmn:incoming>n_71501cd1ac2854a052f4</bpmn:incoming>
+      <bpmn:incoming>n_511544d363729c2041fb</bpmn:incoming>
+      <bpmn:terminateEventDefinition />
+    </bpmn:endEvent>
+    <bpmn:userTask id="n_fd7e20a7d7ea8c2cb242" name="export outdated">
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+      </bpmn:extensionElements>
+      <bpmn:incoming>n_00bfb4009d15c2986260</bpmn:incoming>
+      <bpmn:outgoing>n_71501cd1ac2854a052f4</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="n_73c1c7786b308249cd22" name="run refused; inspect evidence">
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+      </bpmn:extensionElements>
+      <bpmn:incoming>n_5e54ce20602ac7e7bf8c</bpmn:incoming>
+      <bpmn:outgoing>n_511544d363729c2041fb</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:subProcess id="n_16a2990f2582a64c7f43" name="release_on_placement">
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:input source="=if ttrInput.at != null then ttrInput.at else string(date and time(now(), &quot;Z&quot;))" target="ttrStepAt" />
+          <zeebe:input source="={&quot;deployment&quot;:&quot;release_bpmn&quot;,&quot;port&quot;:context merge([{&quot;key&quot;:ttrInput.key},{at:ttrStepAt}]),&quot;origin&quot;:&quot;engine&quot;,&quot;dryRun&quot;:true,&quot;recipeFingerprint&quot;:&quot;sha256:text&quot;,&quot;recipeValuesFingerprint&quot;:&quot;sha256:values&quot;}" target="ttrOpenBody" />
+          <zeebe:output source="=ttrOpen.runId" target="ttrPreviousRunId" />
+          <zeebe:output source="=ttrOpen.runId" target="ttrAnchor" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>n_5259d3e5986c7e980c38</bpmn:incoming>
+      <bpmn:outgoing>n_2b4e72a5ed8a6e554e05</bpmn:outgoing>
+      <bpmn:startEvent id="n_c4a921bff393b5a0b3d9" name="start release_on_placement">
+        <bpmn:outgoing>n_227ec1ff92a7e623da83</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:endEvent id="n_437b5da49b2db6483ea5" name="step complete">
+        <bpmn:incoming>n_83bcf8db2fb197d58afb</bpmn:incoming>
+        <bpmn:incoming>n_29c1eb0324e1fd9a42c7</bpmn:incoming>
+        <bpmn:incoming>n_704ee6e42a5aa8c27186</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:endEvent id="n_b8ac3c8d69a88340a70a" name="run refused">
+        <bpmn:incoming>n_b877e9f0e2ba36c0d63e</bpmn:incoming>
+        <bpmn:incoming>n_03ee8fb64233ed5cf87d</bpmn:incoming>
+        <bpmn:incoming>n_6d902cb507dc240698d5</bpmn:incoming>
+        <bpmn:incoming>n_a5d59717bcf3e2888340</bpmn:incoming>
+        <bpmn:errorEventDefinition errorRef="run_refused" />
+      </bpmn:endEvent>
+      <bpmn:serviceTask id="n_250cb61d058e161e3e4b" name="open">
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+          <zeebe:ioMapping>
+            <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/recipes/release_order/runs&quot;" target="url" />
+            <zeebe:input source="POST" target="method" />
+            <zeebe:input source="bearer" target="authentication.type" />
+            <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+            <zeebe:input source="=ttrOpenBody" target="body" />
+          </zeebe:ioMapping>
+          <zeebe:taskHeaders>
+            <zeebe:header key="resultExpression" value="={ttrOpen:response.body,ttrOpenCode:response.status,ttrOpenHeaders:response.headers,ttrOpenRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+            <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+            <zeebe:header key="retryBackoff" value="PT15S" />
+          </zeebe:taskHeaders>
+        </bpmn:extensionElements>
+        <bpmn:incoming>n_227ec1ff92a7e623da83</bpmn:incoming>
+        <bpmn:outgoing>n_d68345b563e1277f81c7</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:exclusiveGateway default="n_b877e9f0e2ba36c0d63e" id="n_a2defd996c1aeabfab61" name="Open ownership">
+        <bpmn:incoming>n_d68345b563e1277f81c7</bpmn:incoming>
+        <bpmn:outgoing>n_83bcf8db2fb197d58afb</bpmn:outgoing>
+        <bpmn:outgoing>n_44bc8f4d4e48331ddfb8</bpmn:outgoing>
+        <bpmn:outgoing>n_3b6ce300061c3b3d3c1c</bpmn:outgoing>
+        <bpmn:outgoing>n_b877e9f0e2ba36c0d63e</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:exclusiveGateway id="n_3b3407559c79762f8864" name="claimed run">
+        <bpmn:incoming>n_44bc8f4d4e48331ddfb8</bpmn:incoming>
+        <bpmn:incoming>n_338966a43f591d5c3bb9</bpmn:incoming>
+        <bpmn:outgoing>n_10111f0611d302c7996e</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:subProcess id="n_92e4c7fed137463eb136" name="await other execution">
+        <bpmn:extensionElements>
+          <zeebe:ioMapping>
+            <zeebe:input source="=ttrOpenRetryAfter" target="ttrHandleRetryAfter" />
+            <zeebe:output source="=ttrHandle" target="ttrHandle" />
+          </zeebe:ioMapping>
+        </bpmn:extensionElements>
+        <bpmn:incoming>n_3b6ce300061c3b3d3c1c</bpmn:incoming>
+        <bpmn:outgoing>n_ffa3817a70edc2663325</bpmn:outgoing>
+        <bpmn:startEvent id="n_c4a7c86402c6f0073129" name="handle start">
+          <bpmn:outgoing>n_8bc37bf9757282b8bcea</bpmn:outgoing>
+        </bpmn:startEvent>
+        <bpmn:endEvent id="n_797229f30932236bae0a" name="handle settled">
+          <bpmn:incoming>n_70f0ab7aeeccd464ba00</bpmn:incoming>
+        </bpmn:endEvent>
+        <bpmn:intermediateCatchEvent id="n_fe72f75b3fe15463f992" name="honour Retry-After">
+          <bpmn:incoming>n_8bc37bf9757282b8bcea</bpmn:incoming>
+          <bpmn:incoming>n_8f9492e23c0c8c7f4bad</bpmn:incoming>
+          <bpmn:outgoing>n_80d913f21bfcf7d5b39e</bpmn:outgoing>
+          <bpmn:timerEventDefinition>
+            <bpmn:timeDuration>=&quot;PT&quot; + string(ttrHandleRetryAfter) + &quot;S&quot;</bpmn:timeDuration>
+          </bpmn:timerEventDefinition>
+        </bpmn:intermediateCatchEvent>
+        <bpmn:serviceTask id="n_c4ec94b7181d57836764" name="handle status">
+          <bpmn:extensionElements>
+            <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+            <zeebe:ioMapping>
+              <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrOpen.runId + &quot;&quot;" target="url" />
+              <zeebe:input source="GET" target="method" />
+              <zeebe:input source="bearer" target="authentication.type" />
+              <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+            </zeebe:ioMapping>
+            <zeebe:taskHeaders>
+              <zeebe:header key="resultExpression" value="={ttrHandle:response.body,ttrHandleCode:response.status,ttrHandleHeaders:response.headers,ttrHandleRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+              <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+              <zeebe:header key="retryBackoff" value="PT15S" />
+            </zeebe:taskHeaders>
+          </bpmn:extensionElements>
+          <bpmn:incoming>n_80d913f21bfcf7d5b39e</bpmn:incoming>
+          <bpmn:outgoing>n_17fc2d11cc165b26aa36</bpmn:outgoing>
+        </bpmn:serviceTask>
+        <bpmn:exclusiveGateway default="n_8f9492e23c0c8c7f4bad" id="n_fe3b000671bc26adaf0d" name="handle terminal">
+          <bpmn:incoming>n_17fc2d11cc165b26aa36</bpmn:incoming>
+          <bpmn:outgoing>n_70f0ab7aeeccd464ba00</bpmn:outgoing>
+          <bpmn:outgoing>n_8f9492e23c0c8c7f4bad</bpmn:outgoing>
+        </bpmn:exclusiveGateway>
+        <bpmn:sequenceFlow id="n_8bc37bf9757282b8bcea" sourceRef="n_c4a7c86402c6f0073129" targetRef="n_fe72f75b3fe15463f992" />
+        <bpmn:sequenceFlow id="n_80d913f21bfcf7d5b39e" sourceRef="n_fe72f75b3fe15463f992" targetRef="n_c4ec94b7181d57836764" />
+        <bpmn:sequenceFlow id="n_17fc2d11cc165b26aa36" sourceRef="n_c4ec94b7181d57836764" targetRef="n_fe3b000671bc26adaf0d" />
+        <bpmn:sequenceFlow id="n_70f0ab7aeeccd464ba00" name="terminal" sourceRef="n_fe3b000671bc26adaf0d" targetRef="n_797229f30932236bae0a">
+          <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=(((ttrHandle.status = &quot;closed&quot;) or (ttrHandle.status = &quot;waiting&quot;)) or (ttrHandle.status = &quot;abandoned&quot;)) or (ttrHandle.status = &quot;failed&quot;)</bpmn:conditionExpression>
+        </bpmn:sequenceFlow>
+        <bpmn:sequenceFlow id="n_8f9492e23c0c8c7f4bad" sourceRef="n_fe3b000671bc26adaf0d" targetRef="n_fe72f75b3fe15463f992" />
+      </bpmn:subProcess>
+      <bpmn:boundaryEvent attachedToRef="n_92e4c7fed137463eb136" cancelActivity="true" id="n_e5ead9734ffcaf9d1bc8" name="handle budget exceeded">
+        <bpmn:outgoing>n_03ee8fb64233ed5cf87d</bpmn:outgoing>
+        <bpmn:timerEventDefinition>
+          <bpmn:timeDuration>PT180S</bpmn:timeDuration>
+        </bpmn:timerEventDefinition>
+      </bpmn:boundaryEvent>
+      <bpmn:exclusiveGateway default="n_6d902cb507dc240698d5" id="n_de34299ce560306c2348" name="bounded restart">
+        <bpmn:incoming>n_ffa3817a70edc2663325</bpmn:incoming>
+        <bpmn:outgoing>n_29c1eb0324e1fd9a42c7</bpmn:outgoing>
+        <bpmn:outgoing>n_2266d79294afb38537d1</bpmn:outgoing>
+        <bpmn:outgoing>n_6d902cb507dc240698d5</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:serviceTask id="n_57859eca3bca5a928377" name="reopen once">
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+          <zeebe:ioMapping>
+            <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/recipes/release_order/runs&quot;" target="url" />
+            <zeebe:input source="POST" target="method" />
+            <zeebe:input source="bearer" target="authentication.type" />
+            <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+            <zeebe:input source="=ttrOpenBody" target="body" />
+          </zeebe:ioMapping>
+          <zeebe:taskHeaders>
+            <zeebe:header key="resultExpression" value="={ttrOpen:response.body,ttrOpenCode:response.status,ttrOpenHeaders:response.headers,ttrOpenRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+            <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+            <zeebe:header key="retryBackoff" value="PT15S" />
+          </zeebe:taskHeaders>
+        </bpmn:extensionElements>
+        <bpmn:incoming>n_2266d79294afb38537d1</bpmn:incoming>
+        <bpmn:outgoing>n_d9c7365129941a28b1c8</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:exclusiveGateway default="n_a5d59717bcf3e2888340" id="n_3cad68a47a8d798fa0ba" name="re-open claimed">
+        <bpmn:incoming>n_d9c7365129941a28b1c8</bpmn:incoming>
+        <bpmn:outgoing>n_338966a43f591d5c3bb9</bpmn:outgoing>
+        <bpmn:outgoing>n_a5d59717bcf3e2888340</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:subProcess id="n_c2b9a5592973d0dcd874" name="Decide">
+        <bpmn:extensionElements>
+          <zeebe:ioMapping>
+            <zeebe:input source="=ttrOpen.runId" target="ttrRunId" />
+          </zeebe:ioMapping>
+        </bpmn:extensionElements>
+        <bpmn:incoming>n_10111f0611d302c7996e</bpmn:incoming>
+        <bpmn:outgoing>n_704ee6e42a5aa8c27186</bpmn:outgoing>
+        <bpmn:startEvent id="n_902e09154eccf0e159bf" name="start evaluation">
+          <bpmn:outgoing>n_b0fea59f2016e25bfd46</bpmn:outgoing>
+        </bpmn:startEvent>
+        <bpmn:subProcess id="n_be72279e7b856b12a137" name="Evaluate within budget">
+          <bpmn:extensionElements>
+            <zeebe:ioMapping>
+              <zeebe:output source="=ttrEvaluation" target="ttrEvaluation" />
+            </zeebe:ioMapping>
+          </bpmn:extensionElements>
+          <bpmn:incoming>n_b0fea59f2016e25bfd46</bpmn:incoming>
+          <bpmn:outgoing>n_67184e039cea93caf5d7</bpmn:outgoing>
+          <bpmn:startEvent id="n_30bce24685f61b21fecf" name="evaluation start">
+            <bpmn:outgoing>n_4bd4b8efd8b2a101a657</bpmn:outgoing>
+          </bpmn:startEvent>
+          <bpmn:serviceTask id="n_b64ad5ec8bf76c1c94d0" name="placed_orders">
+            <bpmn:extensionElements>
+              <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+              <zeebe:ioMapping>
+                <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrRunId + &quot;/parts/candidates&quot;" target="url" />
+                <zeebe:input source="POST" target="method" />
+                <zeebe:input source="bearer" target="authentication.type" />
+                <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+                <zeebe:input source="={}" target="body" />
+              </zeebe:ioMapping>
+              <zeebe:taskHeaders>
+                <zeebe:header key="resultExpression" value="={ttrCandidates:response.body,ttrCandidatesCode:response.status,ttrCandidatesHeaders:response.headers,ttrCandidatesRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+                <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+                <zeebe:header key="retryBackoff" value="PT15S" />
+              </zeebe:taskHeaders>
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_4bd4b8efd8b2a101a657</bpmn:incoming>
+            <bpmn:outgoing>n_13e32a75646a5b2dafc3</bpmn:outgoing>
+          </bpmn:serviceTask>
+          <bpmn:parallelGateway id="n_dbc755a7c33ea5a63a7b" name="contexts fork">
+            <bpmn:incoming>n_13e32a75646a5b2dafc3</bpmn:incoming>
+            <bpmn:outgoing>n_45ec284f34fc3caefa29</bpmn:outgoing>
+            <bpmn:outgoing>n_560108c62dcd4f426ab2</bpmn:outgoing>
+            <bpmn:outgoing>n_529526256f5cdd45b52c</bpmn:outgoing>
+          </bpmn:parallelGateway>
+          <bpmn:parallelGateway id="n_5311346b36d78737c63e" name="contexts join">
+            <bpmn:incoming>n_c6ab0d44cab926942606</bpmn:incoming>
+            <bpmn:incoming>n_330474b2c894dae5654b</bpmn:incoming>
+            <bpmn:incoming>n_687c838ab84594588529</bpmn:incoming>
+            <bpmn:outgoing>n_8432377337b6475b27f4</bpmn:outgoing>
+          </bpmn:parallelGateway>
+          <bpmn:serviceTask id="n_e598efcfa1008f61f6f7" name="context shortfall">
+            <bpmn:extensionElements>
+              <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+              <zeebe:ioMapping>
+                <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrRunId + &quot;/parts/shortfall&quot;" target="url" />
+                <zeebe:input source="POST" target="method" />
+                <zeebe:input source="bearer" target="authentication.type" />
+                <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+                <zeebe:input source="={}" target="body" />
+              </zeebe:ioMapping>
+              <zeebe:taskHeaders>
+                <zeebe:header key="resultExpression" value="={ttrContext_n_f6f3de940289326eb96c:response.body,ttrContext_n_f6f3de940289326eb96cCode:response.status,ttrContext_n_f6f3de940289326eb96cHeaders:response.headers,ttrContext_n_f6f3de940289326eb96cRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+                <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+                <zeebe:header key="retryBackoff" value="PT15S" />
+              </zeebe:taskHeaders>
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_45ec284f34fc3caefa29</bpmn:incoming>
+            <bpmn:outgoing>n_c6ab0d44cab926942606</bpmn:outgoing>
+          </bpmn:serviceTask>
+          <bpmn:serviceTask id="n_8928f415cce3c85241d6" name="context price_differences">
+            <bpmn:extensionElements>
+              <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+              <zeebe:ioMapping>
+                <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrRunId + &quot;/parts/price_differences&quot;" target="url" />
+                <zeebe:input source="POST" target="method" />
+                <zeebe:input source="bearer" target="authentication.type" />
+                <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+                <zeebe:input source="={}" target="body" />
+              </zeebe:ioMapping>
+              <zeebe:taskHeaders>
+                <zeebe:header key="resultExpression" value="={ttrContext_n_176d34e1e7d1dd2a1308:response.body,ttrContext_n_176d34e1e7d1dd2a1308Code:response.status,ttrContext_n_176d34e1e7d1dd2a1308Headers:response.headers,ttrContext_n_176d34e1e7d1dd2a1308RetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+                <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+                <zeebe:header key="retryBackoff" value="PT15S" />
+              </zeebe:taskHeaders>
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_560108c62dcd4f426ab2</bpmn:incoming>
+            <bpmn:outgoing>n_330474b2c894dae5654b</bpmn:outgoing>
+          </bpmn:serviceTask>
+          <bpmn:serviceTask id="n_9d7810d5a7777f0e4db3" name="context overdue">
+            <bpmn:extensionElements>
+              <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+              <zeebe:ioMapping>
+                <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrRunId + &quot;/parts/overdue&quot;" target="url" />
+                <zeebe:input source="POST" target="method" />
+                <zeebe:input source="bearer" target="authentication.type" />
+                <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+                <zeebe:input source="={}" target="body" />
+              </zeebe:ioMapping>
+              <zeebe:taskHeaders>
+                <zeebe:header key="resultExpression" value="={ttrContext_n_ba2fff4051e9f2446636:response.body,ttrContext_n_ba2fff4051e9f2446636Code:response.status,ttrContext_n_ba2fff4051e9f2446636Headers:response.headers,ttrContext_n_ba2fff4051e9f2446636RetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+                <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+                <zeebe:header key="retryBackoff" value="PT15S" />
+              </zeebe:taskHeaders>
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_529526256f5cdd45b52c</bpmn:incoming>
+            <bpmn:outgoing>n_687c838ab84594588529</bpmn:outgoing>
+          </bpmn:serviceTask>
+          <bpmn:serviceTask id="n_52a8658b9724704754f4" name="decision verdict">
+            <bpmn:extensionElements>
+              <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+              <zeebe:ioMapping>
+                <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrRunId + &quot;/parts/decision&quot;" target="url" />
+                <zeebe:input source="POST" target="method" />
+                <zeebe:input source="bearer" target="authentication.type" />
+                <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+                <zeebe:input source="={}" target="body" />
+              </zeebe:ioMapping>
+              <zeebe:taskHeaders>
+                <zeebe:header key="resultExpression" value="={ttrDecision:response.body,ttrDecisionCode:response.status,ttrDecisionHeaders:response.headers,ttrDecisionRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+                <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+                <zeebe:header key="retryBackoff" value="PT15S" />
+              </zeebe:taskHeaders>
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_8432377337b6475b27f4</bpmn:incoming>
+            <bpmn:outgoing>n_f8070e29728bab0c07cf</bpmn:outgoing>
+          </bpmn:serviceTask>
+          <bpmn:serviceTask id="n_9930af4f71285fb073b5" name="evaluate">
+            <bpmn:extensionElements>
+              <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+              <zeebe:ioMapping>
+                <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrRunId + &quot;/evaluate&quot;" target="url" />
+                <zeebe:input source="POST" target="method" />
+                <zeebe:input source="bearer" target="authentication.type" />
+                <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+                <zeebe:input source="={}" target="body" />
+              </zeebe:ioMapping>
+              <zeebe:taskHeaders>
+                <zeebe:header key="resultExpression" value="={ttrEvaluation:response.body,ttrEvaluationCode:response.status,ttrEvaluationHeaders:response.headers,ttrEvaluationRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+                <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+                <zeebe:header key="retryBackoff" value="PT15S" />
+              </zeebe:taskHeaders>
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_f8070e29728bab0c07cf</bpmn:incoming>
+            <bpmn:outgoing>n_5aa6538dbfa0678f84fe</bpmn:outgoing>
+          </bpmn:serviceTask>
+          <bpmn:exclusiveGateway default="n_f24854d660f6ad87c09b" id="n_0dbb4a599d88f3fd7762" name="evaluation complete">
+            <bpmn:incoming>n_fb2e17d088e98f932c0e</bpmn:incoming>
+            <bpmn:outgoing>n_f24854d660f6ad87c09b</bpmn:outgoing>
+            <bpmn:outgoing>n_800cba1a99303a29c1f2</bpmn:outgoing>
+            <bpmn:outgoing>n_592474b950c27ffa6c68</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
+          <bpmn:intermediateCatchEvent id="n_47f629dfaf60e7000209" name="evaluation poll">
+            <bpmn:incoming>n_f24854d660f6ad87c09b</bpmn:incoming>
+            <bpmn:outgoing>n_d3c9dce425254779390e</bpmn:outgoing>
+            <bpmn:timerEventDefinition>
+              <bpmn:timeDuration>=&quot;PT&quot; + string(ttrEvaluationRetryAfter) + &quot;S&quot;</bpmn:timeDuration>
+            </bpmn:timerEventDefinition>
+          </bpmn:intermediateCatchEvent>
+          <bpmn:serviceTask id="n_a43d3a5e0b8a7f626a59" name="evaluation status">
+            <bpmn:extensionElements>
+              <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+              <zeebe:ioMapping>
+                <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrRunId + &quot;&quot;" target="url" />
+                <zeebe:input source="GET" target="method" />
+                <zeebe:input source="bearer" target="authentication.type" />
+                <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+              </zeebe:ioMapping>
+              <zeebe:taskHeaders>
+                <zeebe:header key="resultExpression" value="={ttrEvaluation:response.body,ttrEvaluationCode:response.status,ttrEvaluationHeaders:response.headers,ttrEvaluationRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+                <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+                <zeebe:header key="retryBackoff" value="PT15S" />
+              </zeebe:taskHeaders>
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_5aa6538dbfa0678f84fe</bpmn:incoming>
+            <bpmn:incoming>n_d3c9dce425254779390e</bpmn:incoming>
+            <bpmn:outgoing>n_fb2e17d088e98f932c0e</bpmn:outgoing>
+          </bpmn:serviceTask>
+          <bpmn:endEvent id="n_85070fec16f4e7648b62" name="verdict ready">
+            <bpmn:incoming>n_592474b950c27ffa6c68</bpmn:incoming>
+          </bpmn:endEvent>
+          <bpmn:endEvent id="n_5a7b9b1fe1f0f67af006" name="evaluation failed or abandoned">
+            <bpmn:incoming>n_800cba1a99303a29c1f2</bpmn:incoming>
+            <bpmn:errorEventDefinition errorRef="run_refused" />
+          </bpmn:endEvent>
+          <bpmn:sequenceFlow id="n_4bd4b8efd8b2a101a657" sourceRef="n_30bce24685f61b21fecf" targetRef="n_b64ad5ec8bf76c1c94d0" />
+          <bpmn:sequenceFlow id="n_13e32a75646a5b2dafc3" sourceRef="n_b64ad5ec8bf76c1c94d0" targetRef="n_dbc755a7c33ea5a63a7b" />
+          <bpmn:sequenceFlow id="n_45ec284f34fc3caefa29" sourceRef="n_dbc755a7c33ea5a63a7b" targetRef="n_e598efcfa1008f61f6f7" />
+          <bpmn:sequenceFlow id="n_c6ab0d44cab926942606" sourceRef="n_e598efcfa1008f61f6f7" targetRef="n_5311346b36d78737c63e" />
+          <bpmn:sequenceFlow id="n_560108c62dcd4f426ab2" sourceRef="n_dbc755a7c33ea5a63a7b" targetRef="n_8928f415cce3c85241d6" />
+          <bpmn:sequenceFlow id="n_330474b2c894dae5654b" sourceRef="n_8928f415cce3c85241d6" targetRef="n_5311346b36d78737c63e" />
+          <bpmn:sequenceFlow id="n_529526256f5cdd45b52c" sourceRef="n_dbc755a7c33ea5a63a7b" targetRef="n_9d7810d5a7777f0e4db3" />
+          <bpmn:sequenceFlow id="n_687c838ab84594588529" sourceRef="n_9d7810d5a7777f0e4db3" targetRef="n_5311346b36d78737c63e" />
+          <bpmn:sequenceFlow id="n_8432377337b6475b27f4" sourceRef="n_5311346b36d78737c63e" targetRef="n_52a8658b9724704754f4" />
+          <bpmn:sequenceFlow id="n_f8070e29728bab0c07cf" sourceRef="n_52a8658b9724704754f4" targetRef="n_9930af4f71285fb073b5" />
+          <bpmn:sequenceFlow id="n_f24854d660f6ad87c09b" sourceRef="n_0dbb4a599d88f3fd7762" targetRef="n_47f629dfaf60e7000209" />
+          <bpmn:sequenceFlow id="n_5aa6538dbfa0678f84fe" sourceRef="n_9930af4f71285fb073b5" targetRef="n_a43d3a5e0b8a7f626a59" />
+          <bpmn:sequenceFlow id="n_d3c9dce425254779390e" sourceRef="n_47f629dfaf60e7000209" targetRef="n_a43d3a5e0b8a7f626a59" />
+          <bpmn:sequenceFlow id="n_fb2e17d088e98f932c0e" sourceRef="n_a43d3a5e0b8a7f626a59" targetRef="n_0dbb4a599d88f3fd7762" />
+          <bpmn:sequenceFlow id="n_800cba1a99303a29c1f2" name="failed or abandoned" sourceRef="n_0dbb4a599d88f3fd7762" targetRef="n_5a7b9b1fe1f0f67af006">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=(ttrEvaluation.status = &quot;failed&quot;) or (ttrEvaluation.status = &quot;abandoned&quot;)</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+          <bpmn:sequenceFlow id="n_592474b950c27ffa6c68" name="verdict ready" sourceRef="n_0dbb4a599d88f3fd7762" targetRef="n_85070fec16f4e7648b62">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=(ttrEvaluation.verdict != null) and (not(ttrEvaluation.status = &quot;running&quot;) and not(ttrEvaluation.status = &quot;open&quot;))</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+        </bpmn:subProcess>
+        <bpmn:serviceTask id="n_840a86ee5dc7c3c49040" name="selected actions">
+          <bpmn:extensionElements>
+            <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+            <zeebe:ioMapping>
+              <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrRunId + &quot;&quot;" target="url" />
+              <zeebe:input source="GET" target="method" />
+              <zeebe:input source="bearer" target="authentication.type" />
+              <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+            </zeebe:ioMapping>
+            <zeebe:taskHeaders>
+              <zeebe:header key="resultExpression" value="={ttrStatus:response.body,ttrStatusCode:response.status,ttrStatusHeaders:response.headers,ttrStatusRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+              <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+              <zeebe:header key="retryBackoff" value="PT15S" />
+            </zeebe:taskHeaders>
+          </bpmn:extensionElements>
+          <bpmn:incoming>n_67184e039cea93caf5d7</bpmn:incoming>
+          <bpmn:outgoing>n_b94873a2f15ec7791636</bpmn:outgoing>
+        </bpmn:serviceTask>
+        <bpmn:exclusiveGateway default="n_017e9ba46d396028d5b1" id="n_e1eb2abaaa747bada1a5" name="per-key actions required">
+          <bpmn:incoming>n_b94873a2f15ec7791636</bpmn:incoming>
+          <bpmn:outgoing>n_017e9ba46d396028d5b1</bpmn:outgoing>
+          <bpmn:outgoing>n_fe30f94bb91f6a577d9f</bpmn:outgoing>
+        </bpmn:exclusiveGateway>
+        <bpmn:endEvent id="n_6ebe65f86d86e7935af1" name="missing or failed run evidence">
+          <bpmn:incoming>n_017e9ba46d396028d5b1</bpmn:incoming>
+          <bpmn:incoming>n_6b772068703a0e9e112f</bpmn:incoming>
+          <bpmn:errorEventDefinition errorRef="run_refused" />
+        </bpmn:endEvent>
+        <bpmn:inclusiveGateway default="n_4a246007676e5f3fe26f" id="n_be14bcf3ef203eb1da49" name="routes">
+          <bpmn:incoming>n_fe30f94bb91f6a577d9f</bpmn:incoming>
+          <bpmn:outgoing>n_4a246007676e5f3fe26f</bpmn:outgoing>
+          <bpmn:outgoing>n_71db0ec5b265db8eaa8a</bpmn:outgoing>
+          <bpmn:outgoing>n_2c6263d6992844f6999e</bpmn:outgoing>
+          <bpmn:outgoing>n_128ae562a88bf29a0e30</bpmn:outgoing>
+          <bpmn:outgoing>n_f7572d245ccb843854f6</bpmn:outgoing>
+        </bpmn:inclusiveGateway>
+        <bpmn:inclusiveGateway id="n_1b144a8fc973fc91fe2c" name="routes complete">
+          <bpmn:incoming>n_4a246007676e5f3fe26f</bpmn:incoming>
+          <bpmn:incoming>n_1d14e554e8af3afea4f1</bpmn:incoming>
+          <bpmn:incoming>n_0f399e0eb484a1f48bee</bpmn:incoming>
+          <bpmn:incoming>n_c16500899dc812214e7a</bpmn:incoming>
+          <bpmn:incoming>n_0552eb196f308c39eea6</bpmn:incoming>
+          <bpmn:outgoing>n_805b8e925e15babd7b44</bpmn:outgoing>
+        </bpmn:inclusiveGateway>
+        <bpmn:subProcess id="n_fc976e1ea8e2789ef645" name="page hold_sales rows">
+          <bpmn:extensionElements>
+            <zeebe:ioMapping>
+              <zeebe:input source="={&quot;rows&quot;:[],&quot;offset&quot;:0,&quot;size&quot;:0,&quot;reads&quot;:0}" target="ttrPageState" />
+              <zeebe:input source="={}" target="ttrPage" />
+              <zeebe:input source="=get value(ttrEvaluation.verdict.routes,&quot;hold_sales&quot;).rowCount" target="ttrExpectedRows" />
+              <zeebe:output source="=ttrPageState.rows" target="ttrRows_n_424e4350a604c228eb16" />
+            </zeebe:ioMapping>
+          </bpmn:extensionElements>
+          <bpmn:incoming>n_71db0ec5b265db8eaa8a</bpmn:incoming>
+          <bpmn:outgoing>n_ced0022f23d4e9ebc945</bpmn:outgoing>
+          <bpmn:serviceTask id="n_052028bfe62ad65fa919" name="route hold_sales">
+            <bpmn:extensionElements>
+              <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+              <zeebe:ioMapping>
+                <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrRunId + &quot;/routes/hold_sales&quot; + &quot;?offset=&quot; + string(ttrPageState.offset)" target="url" />
+                <zeebe:input source="GET" target="method" />
+                <zeebe:input source="bearer" target="authentication.type" />
+                <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+              </zeebe:ioMapping>
+              <zeebe:taskHeaders>
+                <zeebe:header key="resultExpression" value="={ttrPage:response.body,ttrPageCode:response.status,ttrPageHeaders:response.headers,ttrPageRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+                <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+                <zeebe:header key="retryBackoff" value="PT15S" />
+              </zeebe:taskHeaders>
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_bf4eccb67dfa3a6cff75</bpmn:incoming>
+            <bpmn:incoming>n_465b3f8b3f8f1a99ae1b</bpmn:incoming>
+            <bpmn:outgoing>n_d243ccb0f2cc3b00453d</bpmn:outgoing>
+          </bpmn:serviceTask>
+          <bpmn:startEvent id="n_4f01654609834911a0ef" name="pages start">
+            <bpmn:outgoing>n_bf4eccb67dfa3a6cff75</bpmn:outgoing>
+          </bpmn:startEvent>
+          <bpmn:exclusiveGateway default="n_f4b376fd1e303c66745e" id="n_54a39b318947d1eb1023" name="route hold_sales page valid">
+            <bpmn:incoming>n_d243ccb0f2cc3b00453d</bpmn:incoming>
+            <bpmn:outgoing>n_f4b376fd1e303c66745e</bpmn:outgoing>
+            <bpmn:outgoing>n_62cc9088f0db8aec94f8</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
+          <bpmn:endEvent id="n_965caa997899fb82d07e" name="route hold_sales evidence truncated">
+            <bpmn:incoming>n_f4b376fd1e303c66745e</bpmn:incoming>
+            <bpmn:incoming>n_68b9aa67263c91e57119</bpmn:incoming>
+            <bpmn:errorEventDefinition errorRef="run_refused" />
+          </bpmn:endEvent>
+          <bpmn:scriptTask id="n_530831f7837d58138c83" name="append hold_sales page">
+            <bpmn:extensionElements>
+              <zeebe:script expression="={rows:concatenate(ttrPageState.rows,ttrPage.rows), offset:ttrPageState.offset+count(ttrPage.rows), size:if ttrPageState.size = 0 then count(ttrPage.rows) else ttrPageState.size, reads:ttrPageState.reads+1}" resultVariable="ttrPageState" />
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_62cc9088f0db8aec94f8</bpmn:incoming>
+            <bpmn:outgoing>n_a3e88a868fcfb670ce4f</bpmn:outgoing>
+          </bpmn:scriptTask>
+          <bpmn:exclusiveGateway default="n_68b9aa67263c91e57119" id="n_8680178daad7e2efb3c8" name="route hold_sales rows complete">
+            <bpmn:incoming>n_a3e88a868fcfb670ce4f</bpmn:incoming>
+            <bpmn:outgoing>n_483ee05f123383ff7d81</bpmn:outgoing>
+            <bpmn:outgoing>n_465b3f8b3f8f1a99ae1b</bpmn:outgoing>
+            <bpmn:outgoing>n_68b9aa67263c91e57119</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
+          <bpmn:endEvent id="n_9ecf82153e5529baadf8" name="all route rows available">
+            <bpmn:incoming>n_483ee05f123383ff7d81</bpmn:incoming>
+          </bpmn:endEvent>
+          <bpmn:sequenceFlow id="n_bf4eccb67dfa3a6cff75" sourceRef="n_4f01654609834911a0ef" targetRef="n_052028bfe62ad65fa919" />
+          <bpmn:sequenceFlow id="n_d243ccb0f2cc3b00453d" sourceRef="n_052028bfe62ad65fa919" targetRef="n_54a39b318947d1eb1023" />
+          <bpmn:sequenceFlow id="n_f4b376fd1e303c66745e" sourceRef="n_54a39b318947d1eb1023" targetRef="n_965caa997899fb82d07e" />
+          <bpmn:sequenceFlow id="n_62cc9088f0db8aec94f8" name="consistent nonempty page" sourceRef="n_54a39b318947d1eb1023" targetRef="n_530831f7837d58138c83">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=if ttrPage.rows instance of list then ttrPage.rowCount = ttrExpectedRows and count(ttrPage.rows) &gt; 0 and count(ttrPage.rows) + ttrPageState.offset &lt;= ttrExpectedRows else false</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+          <bpmn:sequenceFlow id="n_a3e88a868fcfb670ce4f" sourceRef="n_530831f7837d58138c83" targetRef="n_8680178daad7e2efb3c8" />
+          <bpmn:sequenceFlow id="n_483ee05f123383ff7d81" name="all rows available" sourceRef="n_8680178daad7e2efb3c8" targetRef="n_9ecf82153e5529baadf8">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=ttrPageState.offset = ttrExpectedRows</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+          <bpmn:sequenceFlow id="n_465b3f8b3f8f1a99ae1b" name="next full page within bound" sourceRef="n_8680178daad7e2efb3c8" targetRef="n_052028bfe62ad65fa919">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=count(ttrPage.rows) = ttrPageState.size and ttrPageState.offset &lt; ttrExpectedRows and ttrPageState.reads &lt; ceiling(ttrExpectedRows / ttrPageState.size)</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+          <bpmn:sequenceFlow id="n_68b9aa67263c91e57119" sourceRef="n_8680178daad7e2efb3c8" targetRef="n_965caa997899fb82d07e" />
+        </bpmn:subProcess>
+        <bpmn:subProcess id="n_cd63731f22a214a6c60b" name="each hold_sales row">
+          <bpmn:incoming>n_ced0022f23d4e9ebc945</bpmn:incoming>
+          <bpmn:outgoing>n_1d14e554e8af3afea4f1</bpmn:outgoing>
+          <bpmn:multiInstanceLoopCharacteristics isSequential="true">
+            <bpmn:extensionElements>
+              <zeebe:loopCharacteristics inputCollection="=ttrRows_n_424e4350a604c228eb16" inputElement="ttrRow" />
+            </bpmn:extensionElements>
+          </bpmn:multiInstanceLoopCharacteristics>
+          <bpmn:startEvent id="n_0bce29fc018a9ac4feef" name="row start">
+            <bpmn:outgoing>n_abadda62c35a9a71b3fb</bpmn:outgoing>
+          </bpmn:startEvent>
+          <bpmn:serviceTask id="n_5dd9cfbd739772935a1b" name="perform hold">
+            <bpmn:extensionElements>
+              <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+              <zeebe:ioMapping>
+                <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrRunId + &quot;/actions/hold/perform&quot;" target="url" />
+                <zeebe:input source="POST" target="method" />
+                <zeebe:input source="bearer" target="authentication.type" />
+                <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+                <zeebe:input source="={&quot;keys&quot;:[ttrRow.order_number]}" target="body" />
+              </zeebe:ioMapping>
+              <zeebe:taskHeaders>
+                <zeebe:header key="resultExpression" value="={ttrPerformed:response.body,ttrPerformedCode:response.status,ttrPerformedHeaders:response.headers,ttrPerformedRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+                <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+                <zeebe:header key="retryBackoff" value="PT15S" />
+              </zeebe:taskHeaders>
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_abadda62c35a9a71b3fb</bpmn:incoming>
+            <bpmn:outgoing>n_d201f6eb51f20028fefb</bpmn:outgoing>
+          </bpmn:serviceTask>
+          <bpmn:exclusiveGateway default="n_e65284f0571563fef835" id="n_37079c08e700bf4dfbcd" name="notify selected and wet">
+            <bpmn:incoming>n_d201f6eb51f20028fefb</bpmn:incoming>
+            <bpmn:outgoing>n_e65284f0571563fef835</bpmn:outgoing>
+            <bpmn:outgoing>n_10bd8fb57023dca0616a</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
+          <bpmn:exclusiveGateway id="n_283c36e85d87ee8b4cb5" name="notify complete">
+            <bpmn:incoming>n_e65284f0571563fef835</bpmn:incoming>
+            <bpmn:incoming>n_8b6d724f25276b8b09b6</bpmn:incoming>
+            <bpmn:outgoing>n_899afc7df85a261c7653</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
+          <bpmn:sendTask id="n_939876945487ae11bd7f" name="send notify">
+            <bpmn:extensionElements>
+              <zeebe:taskDefinition retries="3" type="TTR_CONN_MAIL" />
+              <zeebe:ioMapping>
+                <zeebe:input source="=get value(TTR_MAIL_RECIPIENTS,&quot;role.sales&quot;)" target="ttrRecipient" />
+                <zeebe:input source="=ttrRow" target="ttrRow" />
+                <zeebe:input source="=&quot;notify&quot;" target="ttrAction" />
+                <zeebe:input source="=ttrRow.order_number" target="ttrKey" />
+              </zeebe:ioMapping>
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_10bd8fb57023dca0616a</bpmn:incoming>
+            <bpmn:outgoing>n_81a889ec5fb2c85f0c90</bpmn:outgoing>
+          </bpmn:sendTask>
+          <bpmn:serviceTask id="n_5ee95baf32c416ce0706" name="notify delivered">
+            <bpmn:extensionElements>
+              <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+              <zeebe:ioMapping>
+                <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrRunId + &quot;/actions/notify/outcome&quot;" target="url" />
+                <zeebe:input source="POST" target="method" />
+                <zeebe:input source="bearer" target="authentication.type" />
+                <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+                <zeebe:input source="={&quot;outcomes&quot;:[{&quot;key&quot;:ttrRow.order_number,&quot;status&quot;:&quot;delivered&quot;,&quot;at&quot;:string(date and time(now(), &quot;Z&quot;))}]}" target="body" />
+              </zeebe:ioMapping>
+              <zeebe:taskHeaders>
+                <zeebe:header key="resultExpression" value="={ttrOutcome:response.body,ttrOutcomeCode:response.status,ttrOutcomeHeaders:response.headers,ttrOutcomeRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+                <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+                <zeebe:header key="retryBackoff" value="PT15S" />
+              </zeebe:taskHeaders>
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_81a889ec5fb2c85f0c90</bpmn:incoming>
+            <bpmn:outgoing>n_8b6d724f25276b8b09b6</bpmn:outgoing>
+          </bpmn:serviceTask>
+          <bpmn:endEvent id="n_728c926c44043272be83" name="row complete">
+            <bpmn:incoming>n_899afc7df85a261c7653</bpmn:incoming>
+          </bpmn:endEvent>
+          <bpmn:sequenceFlow id="n_abadda62c35a9a71b3fb" sourceRef="n_0bce29fc018a9ac4feef" targetRef="n_5dd9cfbd739772935a1b" />
+          <bpmn:sequenceFlow id="n_d201f6eb51f20028fefb" sourceRef="n_5dd9cfbd739772935a1b" targetRef="n_37079c08e700bf4dfbcd" />
+          <bpmn:sequenceFlow id="n_e65284f0571563fef835" sourceRef="n_37079c08e700bf4dfbcd" targetRef="n_283c36e85d87ee8b4cb5" />
+          <bpmn:sequenceFlow id="n_10bd8fb57023dca0616a" name="notify selected and wet" sourceRef="n_37079c08e700bf4dfbcd" targetRef="n_939876945487ae11bd7f">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=(false) and (some a in ttrStatus.actions satisfies a.action = &quot;notify&quot; and (if a.key instance of context then a.key = {&quot;order_number&quot;:ttrRow.order_number} else a.key = ttrRow.order_number))</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+          <bpmn:sequenceFlow id="n_81a889ec5fb2c85f0c90" sourceRef="n_939876945487ae11bd7f" targetRef="n_5ee95baf32c416ce0706" />
+          <bpmn:sequenceFlow id="n_8b6d724f25276b8b09b6" sourceRef="n_5ee95baf32c416ce0706" targetRef="n_283c36e85d87ee8b4cb5" />
+          <bpmn:sequenceFlow id="n_899afc7df85a261c7653" sourceRef="n_283c36e85d87ee8b4cb5" targetRef="n_728c926c44043272be83" />
+        </bpmn:subProcess>
+        <bpmn:subProcess id="n_a1260e6797efc6b3b218" name="page hold_ar rows">
+          <bpmn:extensionElements>
+            <zeebe:ioMapping>
+              <zeebe:input source="={&quot;rows&quot;:[],&quot;offset&quot;:0,&quot;size&quot;:0,&quot;reads&quot;:0}" target="ttrPageState" />
+              <zeebe:input source="={}" target="ttrPage" />
+              <zeebe:input source="=get value(ttrEvaluation.verdict.routes,&quot;hold_ar&quot;).rowCount" target="ttrExpectedRows" />
+              <zeebe:output source="=ttrPageState.rows" target="ttrRows_n_957e2b8409cc49450ca4" />
+            </zeebe:ioMapping>
+          </bpmn:extensionElements>
+          <bpmn:incoming>n_2c6263d6992844f6999e</bpmn:incoming>
+          <bpmn:outgoing>n_0135b291a2e2bf4220fb</bpmn:outgoing>
+          <bpmn:serviceTask id="n_1a2bfb5358da488d95a2" name="route hold_ar">
+            <bpmn:extensionElements>
+              <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+              <zeebe:ioMapping>
+                <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrRunId + &quot;/routes/hold_ar&quot; + &quot;?offset=&quot; + string(ttrPageState.offset)" target="url" />
+                <zeebe:input source="GET" target="method" />
+                <zeebe:input source="bearer" target="authentication.type" />
+                <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+              </zeebe:ioMapping>
+              <zeebe:taskHeaders>
+                <zeebe:header key="resultExpression" value="={ttrPage:response.body,ttrPageCode:response.status,ttrPageHeaders:response.headers,ttrPageRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+                <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+                <zeebe:header key="retryBackoff" value="PT15S" />
+              </zeebe:taskHeaders>
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_e71b0edef92a8d39f4cf</bpmn:incoming>
+            <bpmn:incoming>n_c8fd9c367d83a9d65516</bpmn:incoming>
+            <bpmn:outgoing>n_b4f387984d21a1c71503</bpmn:outgoing>
+          </bpmn:serviceTask>
+          <bpmn:startEvent id="n_aac19f6f37f3cab13ac2" name="pages start">
+            <bpmn:outgoing>n_e71b0edef92a8d39f4cf</bpmn:outgoing>
+          </bpmn:startEvent>
+          <bpmn:exclusiveGateway default="n_40d9de23cc29b74c7fce" id="n_6869a88e407f9a1c0c89" name="route hold_ar page valid">
+            <bpmn:incoming>n_b4f387984d21a1c71503</bpmn:incoming>
+            <bpmn:outgoing>n_40d9de23cc29b74c7fce</bpmn:outgoing>
+            <bpmn:outgoing>n_5b9b16ec9cc1804e6aae</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
+          <bpmn:endEvent id="n_460b57506afac025753c" name="route hold_ar evidence truncated">
+            <bpmn:incoming>n_40d9de23cc29b74c7fce</bpmn:incoming>
+            <bpmn:incoming>n_6ed3e7a95d5f9d0759a7</bpmn:incoming>
+            <bpmn:errorEventDefinition errorRef="run_refused" />
+          </bpmn:endEvent>
+          <bpmn:scriptTask id="n_51a477b1772b5145c999" name="append hold_ar page">
+            <bpmn:extensionElements>
+              <zeebe:script expression="={rows:concatenate(ttrPageState.rows,ttrPage.rows), offset:ttrPageState.offset+count(ttrPage.rows), size:if ttrPageState.size = 0 then count(ttrPage.rows) else ttrPageState.size, reads:ttrPageState.reads+1}" resultVariable="ttrPageState" />
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_5b9b16ec9cc1804e6aae</bpmn:incoming>
+            <bpmn:outgoing>n_2a2416666763f9db6166</bpmn:outgoing>
+          </bpmn:scriptTask>
+          <bpmn:exclusiveGateway default="n_6ed3e7a95d5f9d0759a7" id="n_6e7c697754ed495dd169" name="route hold_ar rows complete">
+            <bpmn:incoming>n_2a2416666763f9db6166</bpmn:incoming>
+            <bpmn:outgoing>n_1796378f4dca65112314</bpmn:outgoing>
+            <bpmn:outgoing>n_c8fd9c367d83a9d65516</bpmn:outgoing>
+            <bpmn:outgoing>n_6ed3e7a95d5f9d0759a7</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
+          <bpmn:endEvent id="n_495045bc75a95a03a1fb" name="all route rows available">
+            <bpmn:incoming>n_1796378f4dca65112314</bpmn:incoming>
+          </bpmn:endEvent>
+          <bpmn:sequenceFlow id="n_e71b0edef92a8d39f4cf" sourceRef="n_aac19f6f37f3cab13ac2" targetRef="n_1a2bfb5358da488d95a2" />
+          <bpmn:sequenceFlow id="n_b4f387984d21a1c71503" sourceRef="n_1a2bfb5358da488d95a2" targetRef="n_6869a88e407f9a1c0c89" />
+          <bpmn:sequenceFlow id="n_40d9de23cc29b74c7fce" sourceRef="n_6869a88e407f9a1c0c89" targetRef="n_460b57506afac025753c" />
+          <bpmn:sequenceFlow id="n_5b9b16ec9cc1804e6aae" name="consistent nonempty page" sourceRef="n_6869a88e407f9a1c0c89" targetRef="n_51a477b1772b5145c999">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=if ttrPage.rows instance of list then ttrPage.rowCount = ttrExpectedRows and count(ttrPage.rows) &gt; 0 and count(ttrPage.rows) + ttrPageState.offset &lt;= ttrExpectedRows else false</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+          <bpmn:sequenceFlow id="n_2a2416666763f9db6166" sourceRef="n_51a477b1772b5145c999" targetRef="n_6e7c697754ed495dd169" />
+          <bpmn:sequenceFlow id="n_1796378f4dca65112314" name="all rows available" sourceRef="n_6e7c697754ed495dd169" targetRef="n_495045bc75a95a03a1fb">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=ttrPageState.offset = ttrExpectedRows</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+          <bpmn:sequenceFlow id="n_c8fd9c367d83a9d65516" name="next full page within bound" sourceRef="n_6e7c697754ed495dd169" targetRef="n_1a2bfb5358da488d95a2">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=count(ttrPage.rows) = ttrPageState.size and ttrPageState.offset &lt; ttrExpectedRows and ttrPageState.reads &lt; ceiling(ttrExpectedRows / ttrPageState.size)</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+          <bpmn:sequenceFlow id="n_6ed3e7a95d5f9d0759a7" sourceRef="n_6e7c697754ed495dd169" targetRef="n_460b57506afac025753c" />
+        </bpmn:subProcess>
+        <bpmn:subProcess id="n_7aaa87f39c56266315f2" name="each hold_ar row">
+          <bpmn:incoming>n_0135b291a2e2bf4220fb</bpmn:incoming>
+          <bpmn:outgoing>n_0f399e0eb484a1f48bee</bpmn:outgoing>
+          <bpmn:multiInstanceLoopCharacteristics isSequential="true">
+            <bpmn:extensionElements>
+              <zeebe:loopCharacteristics inputCollection="=ttrRows_n_957e2b8409cc49450ca4" inputElement="ttrRow" />
+            </bpmn:extensionElements>
+          </bpmn:multiInstanceLoopCharacteristics>
+          <bpmn:startEvent id="n_471948f228bfa0eaab4f" name="row start">
+            <bpmn:outgoing>n_38667e3f0e8d69910885</bpmn:outgoing>
+          </bpmn:startEvent>
+          <bpmn:serviceTask id="n_0d8646f70d1dd01778f0" name="perform hold">
+            <bpmn:extensionElements>
+              <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+              <zeebe:ioMapping>
+                <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrRunId + &quot;/actions/hold/perform&quot;" target="url" />
+                <zeebe:input source="POST" target="method" />
+                <zeebe:input source="bearer" target="authentication.type" />
+                <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+                <zeebe:input source="={&quot;keys&quot;:[ttrRow.order_number]}" target="body" />
+              </zeebe:ioMapping>
+              <zeebe:taskHeaders>
+                <zeebe:header key="resultExpression" value="={ttrPerformed:response.body,ttrPerformedCode:response.status,ttrPerformedHeaders:response.headers,ttrPerformedRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+                <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+                <zeebe:header key="retryBackoff" value="PT15S" />
+              </zeebe:taskHeaders>
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_38667e3f0e8d69910885</bpmn:incoming>
+            <bpmn:outgoing>n_f145648b49f24a02189b</bpmn:outgoing>
+          </bpmn:serviceTask>
+          <bpmn:exclusiveGateway default="n_3921c315a70a9a1c6e15" id="n_bc762cbc1515df761a13" name="notify selected and wet">
+            <bpmn:incoming>n_f145648b49f24a02189b</bpmn:incoming>
+            <bpmn:outgoing>n_3921c315a70a9a1c6e15</bpmn:outgoing>
+            <bpmn:outgoing>n_2c98bce0e0c9a6599f8c</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
+          <bpmn:exclusiveGateway id="n_7953041c28adb958db61" name="notify complete">
+            <bpmn:incoming>n_3921c315a70a9a1c6e15</bpmn:incoming>
+            <bpmn:incoming>n_34ed3c473133e389dcdd</bpmn:incoming>
+            <bpmn:outgoing>n_fd4398ed4c8d9cce665f</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
+          <bpmn:sendTask id="n_d522d3c48ac4d681ab9c" name="send notify">
+            <bpmn:extensionElements>
+              <zeebe:taskDefinition retries="3" type="TTR_CONN_MAIL" />
+              <zeebe:ioMapping>
+                <zeebe:input source="=get value(TTR_MAIL_RECIPIENTS,&quot;role.ar&quot;)" target="ttrRecipient" />
+                <zeebe:input source="=ttrRow" target="ttrRow" />
+                <zeebe:input source="=&quot;notify&quot;" target="ttrAction" />
+                <zeebe:input source="=ttrRow.order_number" target="ttrKey" />
+              </zeebe:ioMapping>
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_2c98bce0e0c9a6599f8c</bpmn:incoming>
+            <bpmn:outgoing>n_a7192a6e1948159e1aae</bpmn:outgoing>
+          </bpmn:sendTask>
+          <bpmn:serviceTask id="n_3db913ed9b8b85abfe1a" name="notify delivered">
+            <bpmn:extensionElements>
+              <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+              <zeebe:ioMapping>
+                <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrRunId + &quot;/actions/notify/outcome&quot;" target="url" />
+                <zeebe:input source="POST" target="method" />
+                <zeebe:input source="bearer" target="authentication.type" />
+                <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+                <zeebe:input source="={&quot;outcomes&quot;:[{&quot;key&quot;:ttrRow.order_number,&quot;status&quot;:&quot;delivered&quot;,&quot;at&quot;:string(date and time(now(), &quot;Z&quot;))}]}" target="body" />
+              </zeebe:ioMapping>
+              <zeebe:taskHeaders>
+                <zeebe:header key="resultExpression" value="={ttrOutcome:response.body,ttrOutcomeCode:response.status,ttrOutcomeHeaders:response.headers,ttrOutcomeRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+                <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+                <zeebe:header key="retryBackoff" value="PT15S" />
+              </zeebe:taskHeaders>
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_a7192a6e1948159e1aae</bpmn:incoming>
+            <bpmn:outgoing>n_34ed3c473133e389dcdd</bpmn:outgoing>
+          </bpmn:serviceTask>
+          <bpmn:endEvent id="n_b5500f4a7a9d17f34a13" name="row complete">
+            <bpmn:incoming>n_fd4398ed4c8d9cce665f</bpmn:incoming>
+          </bpmn:endEvent>
+          <bpmn:sequenceFlow id="n_38667e3f0e8d69910885" sourceRef="n_471948f228bfa0eaab4f" targetRef="n_0d8646f70d1dd01778f0" />
+          <bpmn:sequenceFlow id="n_f145648b49f24a02189b" sourceRef="n_0d8646f70d1dd01778f0" targetRef="n_bc762cbc1515df761a13" />
+          <bpmn:sequenceFlow id="n_3921c315a70a9a1c6e15" sourceRef="n_bc762cbc1515df761a13" targetRef="n_7953041c28adb958db61" />
+          <bpmn:sequenceFlow id="n_2c98bce0e0c9a6599f8c" name="notify selected and wet" sourceRef="n_bc762cbc1515df761a13" targetRef="n_d522d3c48ac4d681ab9c">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=(false) and (some a in ttrStatus.actions satisfies a.action = &quot;notify&quot; and (if a.key instance of context then a.key = {&quot;order_number&quot;:ttrRow.order_number} else a.key = ttrRow.order_number))</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+          <bpmn:sequenceFlow id="n_a7192a6e1948159e1aae" sourceRef="n_d522d3c48ac4d681ab9c" targetRef="n_3db913ed9b8b85abfe1a" />
+          <bpmn:sequenceFlow id="n_34ed3c473133e389dcdd" sourceRef="n_3db913ed9b8b85abfe1a" targetRef="n_7953041c28adb958db61" />
+          <bpmn:sequenceFlow id="n_fd4398ed4c8d9cce665f" sourceRef="n_7953041c28adb958db61" targetRef="n_b5500f4a7a9d17f34a13" />
+        </bpmn:subProcess>
+        <bpmn:subProcess id="n_8725c2e19a9902f35774" name="page release_confirmed rows">
+          <bpmn:extensionElements>
+            <zeebe:ioMapping>
+              <zeebe:input source="={&quot;rows&quot;:[],&quot;offset&quot;:0,&quot;size&quot;:0,&quot;reads&quot;:0}" target="ttrPageState" />
+              <zeebe:input source="={}" target="ttrPage" />
+              <zeebe:input source="=get value(ttrEvaluation.verdict.routes,&quot;release_confirmed&quot;).rowCount" target="ttrExpectedRows" />
+              <zeebe:output source="=ttrPageState.rows" target="ttrRows_n_ce4ac6acfec6dd7be82a" />
+            </zeebe:ioMapping>
+          </bpmn:extensionElements>
+          <bpmn:incoming>n_128ae562a88bf29a0e30</bpmn:incoming>
+          <bpmn:outgoing>n_b2776f409f8157875ea7</bpmn:outgoing>
+          <bpmn:serviceTask id="n_0cf853efb4281e2d7b87" name="route release_confirmed">
+            <bpmn:extensionElements>
+              <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+              <zeebe:ioMapping>
+                <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrRunId + &quot;/routes/release_confirmed&quot; + &quot;?offset=&quot; + string(ttrPageState.offset)" target="url" />
+                <zeebe:input source="GET" target="method" />
+                <zeebe:input source="bearer" target="authentication.type" />
+                <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+              </zeebe:ioMapping>
+              <zeebe:taskHeaders>
+                <zeebe:header key="resultExpression" value="={ttrPage:response.body,ttrPageCode:response.status,ttrPageHeaders:response.headers,ttrPageRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+                <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+                <zeebe:header key="retryBackoff" value="PT15S" />
+              </zeebe:taskHeaders>
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_974158adeb37e882687e</bpmn:incoming>
+            <bpmn:incoming>n_547a632962060366307f</bpmn:incoming>
+            <bpmn:outgoing>n_1c28a6cca2d7d97d66ea</bpmn:outgoing>
+          </bpmn:serviceTask>
+          <bpmn:startEvent id="n_20b5520cf7acc21e6c74" name="pages start">
+            <bpmn:outgoing>n_974158adeb37e882687e</bpmn:outgoing>
+          </bpmn:startEvent>
+          <bpmn:exclusiveGateway default="n_5558eea0bbb0a1e04551" id="n_14d4040b571edeabd116" name="route release_confirmed page valid">
+            <bpmn:incoming>n_1c28a6cca2d7d97d66ea</bpmn:incoming>
+            <bpmn:outgoing>n_5558eea0bbb0a1e04551</bpmn:outgoing>
+            <bpmn:outgoing>n_51e96d582caa3b49c12d</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
+          <bpmn:endEvent id="n_bec7b435ec6ea4afe3a5" name="route release_confirmed evidence truncated">
+            <bpmn:incoming>n_5558eea0bbb0a1e04551</bpmn:incoming>
+            <bpmn:incoming>n_cc308190734acb792873</bpmn:incoming>
+            <bpmn:errorEventDefinition errorRef="run_refused" />
+          </bpmn:endEvent>
+          <bpmn:scriptTask id="n_4d1d5d09c3b45ff79141" name="append release_confirmed page">
+            <bpmn:extensionElements>
+              <zeebe:script expression="={rows:concatenate(ttrPageState.rows,ttrPage.rows), offset:ttrPageState.offset+count(ttrPage.rows), size:if ttrPageState.size = 0 then count(ttrPage.rows) else ttrPageState.size, reads:ttrPageState.reads+1}" resultVariable="ttrPageState" />
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_51e96d582caa3b49c12d</bpmn:incoming>
+            <bpmn:outgoing>n_3a87e0588c197f76a420</bpmn:outgoing>
+          </bpmn:scriptTask>
+          <bpmn:exclusiveGateway default="n_cc308190734acb792873" id="n_49b76f65146400c5ac99" name="route release_confirmed rows complete">
+            <bpmn:incoming>n_3a87e0588c197f76a420</bpmn:incoming>
+            <bpmn:outgoing>n_b5ad1f538d51b507c0bd</bpmn:outgoing>
+            <bpmn:outgoing>n_547a632962060366307f</bpmn:outgoing>
+            <bpmn:outgoing>n_cc308190734acb792873</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
+          <bpmn:endEvent id="n_fab9412b264987f938bd" name="all route rows available">
+            <bpmn:incoming>n_b5ad1f538d51b507c0bd</bpmn:incoming>
+          </bpmn:endEvent>
+          <bpmn:sequenceFlow id="n_974158adeb37e882687e" sourceRef="n_20b5520cf7acc21e6c74" targetRef="n_0cf853efb4281e2d7b87" />
+          <bpmn:sequenceFlow id="n_1c28a6cca2d7d97d66ea" sourceRef="n_0cf853efb4281e2d7b87" targetRef="n_14d4040b571edeabd116" />
+          <bpmn:sequenceFlow id="n_5558eea0bbb0a1e04551" sourceRef="n_14d4040b571edeabd116" targetRef="n_bec7b435ec6ea4afe3a5" />
+          <bpmn:sequenceFlow id="n_51e96d582caa3b49c12d" name="consistent nonempty page" sourceRef="n_14d4040b571edeabd116" targetRef="n_4d1d5d09c3b45ff79141">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=if ttrPage.rows instance of list then ttrPage.rowCount = ttrExpectedRows and count(ttrPage.rows) &gt; 0 and count(ttrPage.rows) + ttrPageState.offset &lt;= ttrExpectedRows else false</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+          <bpmn:sequenceFlow id="n_3a87e0588c197f76a420" sourceRef="n_4d1d5d09c3b45ff79141" targetRef="n_49b76f65146400c5ac99" />
+          <bpmn:sequenceFlow id="n_b5ad1f538d51b507c0bd" name="all rows available" sourceRef="n_49b76f65146400c5ac99" targetRef="n_fab9412b264987f938bd">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=ttrPageState.offset = ttrExpectedRows</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+          <bpmn:sequenceFlow id="n_547a632962060366307f" name="next full page within bound" sourceRef="n_49b76f65146400c5ac99" targetRef="n_0cf853efb4281e2d7b87">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=count(ttrPage.rows) = ttrPageState.size and ttrPageState.offset &lt; ttrExpectedRows and ttrPageState.reads &lt; ceiling(ttrExpectedRows / ttrPageState.size)</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+          <bpmn:sequenceFlow id="n_cc308190734acb792873" sourceRef="n_49b76f65146400c5ac99" targetRef="n_bec7b435ec6ea4afe3a5" />
+        </bpmn:subProcess>
+        <bpmn:subProcess id="n_0eb98a084ec4c796531a" name="each release_confirmed row">
+          <bpmn:incoming>n_b2776f409f8157875ea7</bpmn:incoming>
+          <bpmn:outgoing>n_c16500899dc812214e7a</bpmn:outgoing>
+          <bpmn:multiInstanceLoopCharacteristics isSequential="true">
+            <bpmn:extensionElements>
+              <zeebe:loopCharacteristics inputCollection="=ttrRows_n_ce4ac6acfec6dd7be82a" inputElement="ttrRow" />
+            </bpmn:extensionElements>
+          </bpmn:multiInstanceLoopCharacteristics>
+          <bpmn:startEvent id="n_18cb72a5406212b31c71" name="row start">
+            <bpmn:outgoing>n_a02e154060129291aacd</bpmn:outgoing>
+          </bpmn:startEvent>
+          <bpmn:exclusiveGateway default="n_2ee3e45da813bea78387" id="n_068034157c9a08d1448b" name="approve_release selected and wet">
+            <bpmn:incoming>n_a02e154060129291aacd</bpmn:incoming>
+            <bpmn:outgoing>n_2ee3e45da813bea78387</bpmn:outgoing>
+            <bpmn:outgoing>n_51808c5ed4f5aed3de02</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
+          <bpmn:exclusiveGateway id="n_ee57979254b4b0c1f8b5" name="approve_release complete">
+            <bpmn:incoming>n_2ee3e45da813bea78387</bpmn:incoming>
+            <bpmn:incoming>n_de7d7d80e8cf7702ebaf</bpmn:incoming>
+            <bpmn:outgoing>n_f8b1d8b7685b9847d132</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
+          <bpmn:userTask id="n_65a8a0a949b10342b846" name="approve approve_release">
+            <bpmn:extensionElements>
+              <zeebe:ioMapping>
+                <zeebe:input source="=&quot;approve_release&quot;" target="ttrAction" />
+                <zeebe:input source="=ttrRow.order_number" target="ttrKey" />
+              </zeebe:ioMapping>
+              <zeebe:userTask />
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_51808c5ed4f5aed3de02</bpmn:incoming>
+            <bpmn:outgoing>n_de7d7d80e8cf7702ebaf</bpmn:outgoing>
+          </bpmn:userTask>
+          <bpmn:endEvent id="n_170f1f24797d055b9ed2" name="row complete">
+            <bpmn:incoming>n_f8b1d8b7685b9847d132</bpmn:incoming>
+          </bpmn:endEvent>
+          <bpmn:sequenceFlow id="n_a02e154060129291aacd" sourceRef="n_18cb72a5406212b31c71" targetRef="n_068034157c9a08d1448b" />
+          <bpmn:sequenceFlow id="n_2ee3e45da813bea78387" sourceRef="n_068034157c9a08d1448b" targetRef="n_ee57979254b4b0c1f8b5" />
+          <bpmn:sequenceFlow id="n_51808c5ed4f5aed3de02" name="approve_release selected and wet" sourceRef="n_068034157c9a08d1448b" targetRef="n_65a8a0a949b10342b846">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=(false) and (some a in ttrStatus.actions satisfies a.action = &quot;approve_release&quot; and (if a.key instance of context then a.key = {&quot;order_number&quot;:ttrRow.order_number} else a.key = ttrRow.order_number))</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+          <bpmn:sequenceFlow id="n_de7d7d80e8cf7702ebaf" sourceRef="n_65a8a0a949b10342b846" targetRef="n_ee57979254b4b0c1f8b5" />
+          <bpmn:sequenceFlow id="n_f8b1d8b7685b9847d132" sourceRef="n_ee57979254b4b0c1f8b5" targetRef="n_170f1f24797d055b9ed2" />
+        </bpmn:subProcess>
+        <bpmn:subProcess id="n_f8747763f66d3d8ffd3f" name="page release rows">
+          <bpmn:extensionElements>
+            <zeebe:ioMapping>
+              <zeebe:input source="={&quot;rows&quot;:[],&quot;offset&quot;:0,&quot;size&quot;:0,&quot;reads&quot;:0}" target="ttrPageState" />
+              <zeebe:input source="={}" target="ttrPage" />
+              <zeebe:input source="=get value(ttrEvaluation.verdict.routes,&quot;release&quot;).rowCount" target="ttrExpectedRows" />
+              <zeebe:output source="=ttrPageState.rows" target="ttrRows_n_01f561ac4ab15d6a23a5" />
+            </zeebe:ioMapping>
+          </bpmn:extensionElements>
+          <bpmn:incoming>n_f7572d245ccb843854f6</bpmn:incoming>
+          <bpmn:outgoing>n_3176ab6194265495c1c1</bpmn:outgoing>
+          <bpmn:serviceTask id="n_793a130591dc45f9af35" name="route release">
+            <bpmn:extensionElements>
+              <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+              <zeebe:ioMapping>
+                <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrRunId + &quot;/routes/release&quot; + &quot;?offset=&quot; + string(ttrPageState.offset)" target="url" />
+                <zeebe:input source="GET" target="method" />
+                <zeebe:input source="bearer" target="authentication.type" />
+                <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+              </zeebe:ioMapping>
+              <zeebe:taskHeaders>
+                <zeebe:header key="resultExpression" value="={ttrPage:response.body,ttrPageCode:response.status,ttrPageHeaders:response.headers,ttrPageRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+                <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+                <zeebe:header key="retryBackoff" value="PT15S" />
+              </zeebe:taskHeaders>
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_8df3243d87fae9d369cc</bpmn:incoming>
+            <bpmn:incoming>n_b3e368a85380fa5bae5b</bpmn:incoming>
+            <bpmn:outgoing>n_09ec9e63b5c501232687</bpmn:outgoing>
+          </bpmn:serviceTask>
+          <bpmn:startEvent id="n_266c129c976f7cc2bafc" name="pages start">
+            <bpmn:outgoing>n_8df3243d87fae9d369cc</bpmn:outgoing>
+          </bpmn:startEvent>
+          <bpmn:exclusiveGateway default="n_c1fa2ff8cc5d1e052b05" id="n_9c9bed4a8311f6fb8b18" name="route release page valid">
+            <bpmn:incoming>n_09ec9e63b5c501232687</bpmn:incoming>
+            <bpmn:outgoing>n_c1fa2ff8cc5d1e052b05</bpmn:outgoing>
+            <bpmn:outgoing>n_4b4dc4cb08668c103343</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
+          <bpmn:endEvent id="n_8ca0c96126c433cb46b8" name="route release evidence truncated">
+            <bpmn:incoming>n_c1fa2ff8cc5d1e052b05</bpmn:incoming>
+            <bpmn:incoming>n_6c70b344a96b7b6212a2</bpmn:incoming>
+            <bpmn:errorEventDefinition errorRef="run_refused" />
+          </bpmn:endEvent>
+          <bpmn:scriptTask id="n_3fa289aad0de341fda8a" name="append release page">
+            <bpmn:extensionElements>
+              <zeebe:script expression="={rows:concatenate(ttrPageState.rows,ttrPage.rows), offset:ttrPageState.offset+count(ttrPage.rows), size:if ttrPageState.size = 0 then count(ttrPage.rows) else ttrPageState.size, reads:ttrPageState.reads+1}" resultVariable="ttrPageState" />
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_4b4dc4cb08668c103343</bpmn:incoming>
+            <bpmn:outgoing>n_216e5cb721faaff09130</bpmn:outgoing>
+          </bpmn:scriptTask>
+          <bpmn:exclusiveGateway default="n_6c70b344a96b7b6212a2" id="n_ab93f9ab04803e65fa62" name="route release rows complete">
+            <bpmn:incoming>n_216e5cb721faaff09130</bpmn:incoming>
+            <bpmn:outgoing>n_7f5bef9596bc7a0dffd8</bpmn:outgoing>
+            <bpmn:outgoing>n_b3e368a85380fa5bae5b</bpmn:outgoing>
+            <bpmn:outgoing>n_6c70b344a96b7b6212a2</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
+          <bpmn:endEvent id="n_516ada71456d5e22a90a" name="all route rows available">
+            <bpmn:incoming>n_7f5bef9596bc7a0dffd8</bpmn:incoming>
+          </bpmn:endEvent>
+          <bpmn:sequenceFlow id="n_8df3243d87fae9d369cc" sourceRef="n_266c129c976f7cc2bafc" targetRef="n_793a130591dc45f9af35" />
+          <bpmn:sequenceFlow id="n_09ec9e63b5c501232687" sourceRef="n_793a130591dc45f9af35" targetRef="n_9c9bed4a8311f6fb8b18" />
+          <bpmn:sequenceFlow id="n_c1fa2ff8cc5d1e052b05" sourceRef="n_9c9bed4a8311f6fb8b18" targetRef="n_8ca0c96126c433cb46b8" />
+          <bpmn:sequenceFlow id="n_4b4dc4cb08668c103343" name="consistent nonempty page" sourceRef="n_9c9bed4a8311f6fb8b18" targetRef="n_3fa289aad0de341fda8a">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=if ttrPage.rows instance of list then ttrPage.rowCount = ttrExpectedRows and count(ttrPage.rows) &gt; 0 and count(ttrPage.rows) + ttrPageState.offset &lt;= ttrExpectedRows else false</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+          <bpmn:sequenceFlow id="n_216e5cb721faaff09130" sourceRef="n_3fa289aad0de341fda8a" targetRef="n_ab93f9ab04803e65fa62" />
+          <bpmn:sequenceFlow id="n_7f5bef9596bc7a0dffd8" name="all rows available" sourceRef="n_ab93f9ab04803e65fa62" targetRef="n_516ada71456d5e22a90a">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=ttrPageState.offset = ttrExpectedRows</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+          <bpmn:sequenceFlow id="n_b3e368a85380fa5bae5b" name="next full page within bound" sourceRef="n_ab93f9ab04803e65fa62" targetRef="n_793a130591dc45f9af35">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=count(ttrPage.rows) = ttrPageState.size and ttrPageState.offset &lt; ttrExpectedRows and ttrPageState.reads &lt; ceiling(ttrExpectedRows / ttrPageState.size)</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+          <bpmn:sequenceFlow id="n_6c70b344a96b7b6212a2" sourceRef="n_ab93f9ab04803e65fa62" targetRef="n_8ca0c96126c433cb46b8" />
+        </bpmn:subProcess>
+        <bpmn:subProcess id="n_405a93ab7cd51e83a460" name="each release row">
+          <bpmn:incoming>n_3176ab6194265495c1c1</bpmn:incoming>
+          <bpmn:outgoing>n_0552eb196f308c39eea6</bpmn:outgoing>
+          <bpmn:multiInstanceLoopCharacteristics isSequential="true">
+            <bpmn:extensionElements>
+              <zeebe:loopCharacteristics inputCollection="=ttrRows_n_01f561ac4ab15d6a23a5" inputElement="ttrRow" />
+            </bpmn:extensionElements>
+          </bpmn:multiInstanceLoopCharacteristics>
+          <bpmn:startEvent id="n_db469010c1d1f8b0d824" name="row start">
+            <bpmn:outgoing>n_5a0c4f96b3bfdac9558d</bpmn:outgoing>
+          </bpmn:startEvent>
+          <bpmn:serviceTask id="n_03d431a1dd1765d95032" name="perform release">
+            <bpmn:extensionElements>
+              <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+              <zeebe:ioMapping>
+                <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrRunId + &quot;/actions/release/perform&quot;" target="url" />
+                <zeebe:input source="POST" target="method" />
+                <zeebe:input source="bearer" target="authentication.type" />
+                <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+                <zeebe:input source="={&quot;keys&quot;:[ttrRow.order_number]}" target="body" />
+              </zeebe:ioMapping>
+              <zeebe:taskHeaders>
+                <zeebe:header key="resultExpression" value="={ttrPerformed:response.body,ttrPerformedCode:response.status,ttrPerformedHeaders:response.headers,ttrPerformedRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+                <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+                <zeebe:header key="retryBackoff" value="PT15S" />
+              </zeebe:taskHeaders>
+            </bpmn:extensionElements>
+            <bpmn:incoming>n_5a0c4f96b3bfdac9558d</bpmn:incoming>
+            <bpmn:outgoing>n_1b526f6d699b91c7bfa7</bpmn:outgoing>
+          </bpmn:serviceTask>
+          <bpmn:endEvent id="n_eb1ec3599eee3543691f" name="row complete">
+            <bpmn:incoming>n_1b526f6d699b91c7bfa7</bpmn:incoming>
+          </bpmn:endEvent>
+          <bpmn:sequenceFlow id="n_5a0c4f96b3bfdac9558d" sourceRef="n_db469010c1d1f8b0d824" targetRef="n_03d431a1dd1765d95032" />
+          <bpmn:sequenceFlow id="n_1b526f6d699b91c7bfa7" sourceRef="n_03d431a1dd1765d95032" targetRef="n_eb1ec3599eee3543691f" />
+        </bpmn:subProcess>
+        <bpmn:serviceTask id="n_17878958cf865ff5c6d2" name="close">
+          <bpmn:extensionElements>
+            <zeebe:taskDefinition retries="3" type="io.camunda:http-json:1" />
+            <zeebe:ioMapping>
+              <zeebe:input source="=TTR_AUTOMATION_URL + &quot;/automation/runs/&quot; + ttrRunId + &quot;/close&quot;" target="url" />
+              <zeebe:input source="POST" target="method" />
+              <zeebe:input source="bearer" target="authentication.type" />
+              <zeebe:input source="{{secrets.TTR_CONN_AUTOMATION}}" target="authentication.token" />
+              <zeebe:input source="={}" target="body" />
+            </zeebe:ioMapping>
+            <zeebe:taskHeaders>
+              <zeebe:header key="resultExpression" value="={ttrClosed:response.body,ttrClosedCode:response.status,ttrClosedHeaders:response.headers,ttrClosedRetryAfter:{header:if get value(response.headers,&quot;retry-after&quot;) != null then get value(response.headers,&quot;retry-after&quot;) else get value(response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay}" />
+              <zeebe:header key="errorExpression" value="=if error.code = &quot;409&quot; then bpmnError(&quot;TTR_STALE&quot;, &quot;run API fingerprint refused&quot;) else if number(error.code) &gt;= 400 and number(error.code) &lt; 500 and not(list contains([&quot;408&quot;,&quot;429&quot;],error.code)) then bpmnError(&quot;TTR_REFUSED&quot;, &quot;run API HTTP &quot; + error.code) else if list contains([&quot;408&quot;,&quot;429&quot;],error.code) or number(error.code) &gt;= 500 then jobError(&quot;run API HTTP &quot; + error.code, {}, job.retries - 1, duration(&quot;PT&quot; + string(min([180,max([1,{header:if get value(error.variables.response.headers,&quot;retry-after&quot;) != null then get value(error.variables.response.headers,&quot;retry-after&quot;) else get value(error.variables.response.headers,&quot;Retry-After&quot;), seconds:number(header), delay:if seconds != null and seconds &gt; 0 then seconds else if header != null then {parts:split(header,&quot; &quot;),month:index of([&quot;Jan&quot;,&quot;Feb&quot;,&quot;Mar&quot;,&quot;Apr&quot;,&quot;May&quot;,&quot;Jun&quot;,&quot;Jul&quot;,&quot;Aug&quot;,&quot;Sep&quot;,&quot;Oct&quot;,&quot;Nov&quot;,&quot;Dec&quot;],parts[3])[1],iso:if count(parts) = 6 and month != null and parts[6] = &quot;GMT&quot; then parts[4]+&quot;-&quot;+(if month &lt; 10 then &quot;0&quot; else &quot;&quot;)+string(month)+&quot;-&quot;+parts[2]+&quot;T&quot;+parts[5]+&quot;Z&quot; else null,instant:if iso != null then date and time(iso) else null,delay:if instant != null then max([1,ceiling((instant-now())/duration(&quot;PT1S&quot;))]) else 15}.delay else 15}.delay])])) + &quot;S&quot;)) else null" />
+              <zeebe:header key="retryBackoff" value="PT15S" />
+            </zeebe:taskHeaders>
+          </bpmn:extensionElements>
+          <bpmn:incoming>n_805b8e925e15babd7b44</bpmn:incoming>
+          <bpmn:outgoing>n_29be59b189c9df2bbcf8</bpmn:outgoing>
+        </bpmn:serviceTask>
+        <bpmn:endEvent id="n_7bf370bc972196eef7b3" name="evaluation ended">
+          <bpmn:incoming>n_29be59b189c9df2bbcf8</bpmn:incoming>
+        </bpmn:endEvent>
+        <bpmn:boundaryEvent attachedToRef="n_be72279e7b856b12a137" cancelActivity="true" id="n_e7bbb0013e4a2114abe3" name="evaluation budget exceeded">
+          <bpmn:outgoing>n_6b772068703a0e9e112f</bpmn:outgoing>
+          <bpmn:timerEventDefinition>
+            <bpmn:timeDuration>PT180S</bpmn:timeDuration>
+          </bpmn:timerEventDefinition>
+        </bpmn:boundaryEvent>
+        <bpmn:sequenceFlow id="n_b0fea59f2016e25bfd46" sourceRef="n_902e09154eccf0e159bf" targetRef="n_be72279e7b856b12a137" />
+        <bpmn:sequenceFlow id="n_67184e039cea93caf5d7" sourceRef="n_be72279e7b856b12a137" targetRef="n_840a86ee5dc7c3c49040" />
+        <bpmn:sequenceFlow id="n_b94873a2f15ec7791636" sourceRef="n_840a86ee5dc7c3c49040" targetRef="n_e1eb2abaaa747bada1a5" />
+        <bpmn:sequenceFlow id="n_017e9ba46d396028d5b1" sourceRef="n_e1eb2abaaa747bada1a5" targetRef="n_6ebe65f86d86e7935af1" />
+        <bpmn:sequenceFlow id="n_fe30f94bb91f6a577d9f" name="actions array" sourceRef="n_e1eb2abaaa747bada1a5" targetRef="n_be14bcf3ef203eb1da49">
+          <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=ttrStatus.actions instance of list</bpmn:conditionExpression>
+        </bpmn:sequenceFlow>
+        <bpmn:sequenceFlow id="n_4a246007676e5f3fe26f" sourceRef="n_be14bcf3ef203eb1da49" targetRef="n_1b144a8fc973fc91fe2c" />
+        <bpmn:sequenceFlow id="n_71db0ec5b265db8eaa8a" name="hold_sales" sourceRef="n_be14bcf3ef203eb1da49" targetRef="n_fc976e1ea8e2789ef645">
+          <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=get value(ttrEvaluation.verdict.routes,&quot;hold_sales&quot;).rowCount &gt; 0</bpmn:conditionExpression>
+        </bpmn:sequenceFlow>
+        <bpmn:sequenceFlow id="n_ced0022f23d4e9ebc945" sourceRef="n_fc976e1ea8e2789ef645" targetRef="n_cd63731f22a214a6c60b" />
+        <bpmn:sequenceFlow id="n_1d14e554e8af3afea4f1" sourceRef="n_cd63731f22a214a6c60b" targetRef="n_1b144a8fc973fc91fe2c" />
+        <bpmn:sequenceFlow id="n_2c6263d6992844f6999e" name="hold_ar" sourceRef="n_be14bcf3ef203eb1da49" targetRef="n_a1260e6797efc6b3b218">
+          <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=get value(ttrEvaluation.verdict.routes,&quot;hold_ar&quot;).rowCount &gt; 0</bpmn:conditionExpression>
+        </bpmn:sequenceFlow>
+        <bpmn:sequenceFlow id="n_0135b291a2e2bf4220fb" sourceRef="n_a1260e6797efc6b3b218" targetRef="n_7aaa87f39c56266315f2" />
+        <bpmn:sequenceFlow id="n_0f399e0eb484a1f48bee" sourceRef="n_7aaa87f39c56266315f2" targetRef="n_1b144a8fc973fc91fe2c" />
+        <bpmn:sequenceFlow id="n_128ae562a88bf29a0e30" name="release_confirmed" sourceRef="n_be14bcf3ef203eb1da49" targetRef="n_8725c2e19a9902f35774">
+          <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=get value(ttrEvaluation.verdict.routes,&quot;release_confirmed&quot;).rowCount &gt; 0</bpmn:conditionExpression>
+        </bpmn:sequenceFlow>
+        <bpmn:sequenceFlow id="n_b2776f409f8157875ea7" sourceRef="n_8725c2e19a9902f35774" targetRef="n_0eb98a084ec4c796531a" />
+        <bpmn:sequenceFlow id="n_c16500899dc812214e7a" sourceRef="n_0eb98a084ec4c796531a" targetRef="n_1b144a8fc973fc91fe2c" />
+        <bpmn:sequenceFlow id="n_f7572d245ccb843854f6" name="release" sourceRef="n_be14bcf3ef203eb1da49" targetRef="n_f8747763f66d3d8ffd3f">
+          <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=get value(ttrEvaluation.verdict.routes,&quot;release&quot;).rowCount &gt; 0</bpmn:conditionExpression>
+        </bpmn:sequenceFlow>
+        <bpmn:sequenceFlow id="n_3176ab6194265495c1c1" sourceRef="n_f8747763f66d3d8ffd3f" targetRef="n_405a93ab7cd51e83a460" />
+        <bpmn:sequenceFlow id="n_0552eb196f308c39eea6" sourceRef="n_405a93ab7cd51e83a460" targetRef="n_1b144a8fc973fc91fe2c" />
+        <bpmn:sequenceFlow id="n_805b8e925e15babd7b44" sourceRef="n_1b144a8fc973fc91fe2c" targetRef="n_17878958cf865ff5c6d2" />
+        <bpmn:sequenceFlow id="n_29be59b189c9df2bbcf8" sourceRef="n_17878958cf865ff5c6d2" targetRef="n_7bf370bc972196eef7b3" />
+        <bpmn:sequenceFlow id="n_6b772068703a0e9e112f" sourceRef="n_e7bbb0013e4a2114abe3" targetRef="n_6ebe65f86d86e7935af1" />
+      </bpmn:subProcess>
+      <bpmn:sequenceFlow id="n_227ec1ff92a7e623da83" sourceRef="n_c4a921bff393b5a0b3d9" targetRef="n_250cb61d058e161e3e4b" />
+      <bpmn:sequenceFlow id="n_d68345b563e1277f81c7" sourceRef="n_250cb61d058e161e3e4b" targetRef="n_a2defd996c1aeabfab61" />
+      <bpmn:sequenceFlow id="n_83bcf8db2fb197d58afb" name="200 replayed" sourceRef="n_a2defd996c1aeabfab61" targetRef="n_437b5da49b2db6483ea5">
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=(ttrOpenCode = 200) and (ttrOpen.replayed)</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="n_44bc8f4d4e48331ddfb8" name="201 claimed" sourceRef="n_a2defd996c1aeabfab61" targetRef="n_3b3407559c79762f8864">
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=ttrOpenCode = 201</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="n_3b6ce300061c3b3d3c1c" name="202 handle" sourceRef="n_a2defd996c1aeabfab61" targetRef="n_92e4c7fed137463eb136">
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=ttrOpenCode = 202</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="n_b877e9f0e2ba36c0d63e" sourceRef="n_a2defd996c1aeabfab61" targetRef="n_b8ac3c8d69a88340a70a" />
+      <bpmn:sequenceFlow id="n_03ee8fb64233ed5cf87d" sourceRef="n_e5ead9734ffcaf9d1bc8" targetRef="n_b8ac3c8d69a88340a70a" />
+      <bpmn:sequenceFlow id="n_ffa3817a70edc2663325" sourceRef="n_92e4c7fed137463eb136" targetRef="n_de34299ce560306c2348" />
+      <bpmn:sequenceFlow id="n_29c1eb0324e1fd9a42c7" name="closed or waiting" sourceRef="n_de34299ce560306c2348" targetRef="n_437b5da49b2db6483ea5">
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=(ttrHandle.status = &quot;closed&quot;) or (ttrHandle.status = &quot;waiting&quot;)</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="n_2266d79294afb38537d1" name="abandoned or failed" sourceRef="n_de34299ce560306c2348" targetRef="n_57859eca3bca5a928377">
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=(ttrHandle.status = &quot;abandoned&quot;) or (ttrHandle.status = &quot;failed&quot;)</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="n_6d902cb507dc240698d5" sourceRef="n_de34299ce560306c2348" targetRef="n_b8ac3c8d69a88340a70a" />
+      <bpmn:sequenceFlow id="n_d9c7365129941a28b1c8" sourceRef="n_57859eca3bca5a928377" targetRef="n_3cad68a47a8d798fa0ba" />
+      <bpmn:sequenceFlow id="n_338966a43f591d5c3bb9" name="201 recovered" sourceRef="n_3cad68a47a8d798fa0ba" targetRef="n_3b3407559c79762f8864">
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=ttrOpenCode = 201</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="n_a5d59717bcf3e2888340" sourceRef="n_3cad68a47a8d798fa0ba" targetRef="n_b8ac3c8d69a88340a70a" />
+      <bpmn:sequenceFlow id="n_10111f0611d302c7996e" sourceRef="n_3b3407559c79762f8864" targetRef="n_c2b9a5592973d0dcd874" />
+      <bpmn:sequenceFlow id="n_704ee6e42a5aa8c27186" sourceRef="n_c2b9a5592973d0dcd874" targetRef="n_437b5da49b2db6483ea5" />
+    </bpmn:subProcess>
+    <bpmn:exclusiveGateway id="n_b4702752311d101a12e2" name="release_on_placement step complete">
+      <bpmn:incoming>n_2b4e72a5ed8a6e554e05</bpmn:incoming>
+      <bpmn:outgoing>n_cb470a3ac5d0ce40f0c0</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:boundaryEvent attachedToRef="n_16a2990f2582a64c7f43" cancelActivity="true" id="n_cdcb794800edeefcafe3" name="release_on_placement stale export">
+      <bpmn:outgoing>n_00bfb4009d15c2986260</bpmn:outgoing>
+      <bpmn:errorEventDefinition errorRef="stale_export" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent attachedToRef="n_16a2990f2582a64c7f43" cancelActivity="true" id="n_7f1fb3c8667254cfb779" name="release_on_placement run refused">
+      <bpmn:outgoing>n_5e54ce20602ac7e7bf8c</bpmn:outgoing>
+      <bpmn:errorEventDefinition errorRef="run_refused" />
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="n_b21a05c0ebbc44c9b288" name="complete">
+      <bpmn:incoming>n_cb470a3ac5d0ce40f0c0</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="n_71501cd1ac2854a052f4" sourceRef="n_fd7e20a7d7ea8c2cb242" targetRef="n_5ba70c5b463c10d69a46" />
+    <bpmn:sequenceFlow id="n_511544d363729c2041fb" sourceRef="n_73c1c7786b308249cd22" targetRef="n_5ba70c5b463c10d69a46" />
+    <bpmn:sequenceFlow id="n_5259d3e5986c7e980c38" sourceRef="n_0a5e5a3d91720f7b7aca" targetRef="n_16a2990f2582a64c7f43" />
+    <bpmn:sequenceFlow id="n_2b4e72a5ed8a6e554e05" sourceRef="n_16a2990f2582a64c7f43" targetRef="n_b4702752311d101a12e2" />
+    <bpmn:sequenceFlow id="n_00bfb4009d15c2986260" sourceRef="n_cdcb794800edeefcafe3" targetRef="n_fd7e20a7d7ea8c2cb242" />
+    <bpmn:sequenceFlow id="n_5e54ce20602ac7e7bf8c" sourceRef="n_7f1fb3c8667254cfb779" targetRef="n_73c1c7786b308249cd22" />
+    <bpmn:sequenceFlow id="n_cb470a3ac5d0ce40f0c0" sourceRef="n_b4702752311d101a12e2" targetRef="n_b21a05c0ebbc44c9b288" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="diagram">
+    <bpmndi:BPMNPlane bpmnElement="release_on_placement" id="plane">
+      <bpmndi:BPMNShape bpmnElement="n_0a5e5a3d91720f7b7aca" id="n_0a5e5a3d91720f7b7aca_di">
+        <dc:Bounds height="36" width="36" x="60" y="120" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_5ba70c5b463c10d69a46" id="n_5ba70c5b463c10d69a46_di">
+        <dc:Bounds height="36" width="36" x="9230" y="120" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_fd7e20a7d7ea8c2cb242" id="n_fd7e20a7d7ea8c2cb242_di">
+        <dc:Bounds height="90" width="160" x="8970" y="120" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_73c1c7786b308249cd22" id="n_73c1c7786b308249cd22_di">
+        <dc:Bounds height="90" width="160" x="8970" y="270" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_16a2990f2582a64c7f43" id="n_16a2990f2582a64c7f43_di" isExpanded="true">
+        <dc:Bounds height="2028" width="8538" x="196" y="120" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_c4a921bff393b5a0b3d9" id="n_c4a921bff393b5a0b3d9_di">
+        <dc:Bounds height="36" width="36" x="236" y="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_437b5da49b2db6483ea5" id="n_437b5da49b2db6483ea5_di">
+        <dc:Bounds height="36" width="36" x="8618" y="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_b8ac3c8d69a88340a70a" id="n_b8ac3c8d69a88340a70a_di">
+        <dc:Bounds height="36" width="36" x="2280" y="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_250cb61d058e161e3e4b" id="n_250cb61d058e161e3e4b_di">
+        <dc:Bounds height="90" width="160" x="372" y="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_a2defd996c1aeabfab61" id="n_a2defd996c1aeabfab61_di">
+        <dc:Bounds height="50" width="50" x="632" y="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_3b3407559c79762f8864" id="n_3b3407559c79762f8864_di">
+        <dc:Bounds height="50" width="50" x="2280" y="316" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_92e4c7fed137463eb136" id="n_92e4c7fed137463eb136_di" isExpanded="true">
+        <dc:Bounds height="310" width="838" x="782" y="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_c4a7c86402c6f0073129" id="n_c4a7c86402c6f0073129_di">
+        <dc:Bounds height="36" width="36" x="822" y="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_797229f30932236bae0a" id="n_797229f30932236bae0a_di">
+        <dc:Bounds height="36" width="36" x="1504" y="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_fe72f75b3fe15463f992" id="n_fe72f75b3fe15463f992_di">
+        <dc:Bounds height="36" width="36" x="958" y="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_c4ec94b7181d57836764" id="n_c4ec94b7181d57836764_di">
+        <dc:Bounds height="90" width="160" x="1094" y="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_fe3b000671bc26adaf0d" id="n_fe3b000671bc26adaf0d_di">
+        <dc:Bounds height="50" width="50" x="1354" y="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="n_8bc37bf9757282b8bcea" id="n_8bc37bf9757282b8bcea_di">
+        <di:waypoint x="858" y="338" />
+        <di:waypoint x="958" y="338" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_80d913f21bfcf7d5b39e" id="n_80d913f21bfcf7d5b39e_di">
+        <di:waypoint x="994" y="338" />
+        <di:waypoint x="1094" y="365" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_17fc2d11cc165b26aa36" id="n_17fc2d11cc165b26aa36_di">
+        <di:waypoint x="1254" y="365" />
+        <di:waypoint x="1354" y="345" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_70f0ab7aeeccd464ba00" id="n_70f0ab7aeeccd464ba00_di">
+        <di:waypoint x="1404" y="345" />
+        <di:waypoint x="1504" y="338" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_8f9492e23c0c8c7f4bad" id="n_8f9492e23c0c8c7f4bad_di">
+        <di:waypoint x="1379" y="320" />
+        <di:waypoint x="1379" y="290" />
+        <di:waypoint x="976" y="290" />
+        <di:waypoint x="976" y="320" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape bpmnElement="n_e5ead9734ffcaf9d1bc8" id="n_e5ead9734ffcaf9d1bc8_di">
+        <dc:Bounds height="36" width="36" x="1570" y="512" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_de34299ce560306c2348" id="n_de34299ce560306c2348_di">
+        <dc:Bounds height="50" width="50" x="1720" y="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_57859eca3bca5a928377" id="n_57859eca3bca5a928377_di">
+        <dc:Bounds height="90" width="160" x="1870" y="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_3cad68a47a8d798fa0ba" id="n_3cad68a47a8d798fa0ba_di">
+        <dc:Bounds height="50" width="50" x="2130" y="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_c2b9a5592973d0dcd874" id="n_c2b9a5592973d0dcd874_di" isExpanded="true">
+        <dc:Bounds height="1808" width="6088" x="2430" y="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_902e09154eccf0e159bf" id="n_902e09154eccf0e159bf_di">
+        <dc:Bounds height="36" width="36" x="2470" y="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_be72279e7b856b12a137" id="n_be72279e7b856b12a137_di" isExpanded="true">
+        <dc:Bounds height="610" width="2042" x="2606" y="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_30bce24685f61b21fecf" id="n_30bce24685f61b21fecf_di">
+        <dc:Bounds height="36" width="36" x="2646" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_b64ad5ec8bf76c1c94d0" id="n_b64ad5ec8bf76c1c94d0_di">
+        <dc:Bounds height="90" width="160" x="2782" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_dbc755a7c33ea5a63a7b" id="n_dbc755a7c33ea5a63a7b_di">
+        <dc:Bounds height="50" width="50" x="3042" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_5311346b36d78737c63e" id="n_5311346b36d78737c63e_di">
+        <dc:Bounds height="50" width="50" x="3452" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_e598efcfa1008f61f6f7" id="n_e598efcfa1008f61f6f7_di">
+        <dc:Bounds height="90" width="160" x="3192" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_8928f415cce3c85241d6" id="n_8928f415cce3c85241d6_di">
+        <dc:Bounds height="90" width="160" x="3192" y="570" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_9d7810d5a7777f0e4db3" id="n_9d7810d5a7777f0e4db3_di">
+        <dc:Bounds height="90" width="160" x="3192" y="720" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_52a8658b9724704754f4" id="n_52a8658b9724704754f4_di">
+        <dc:Bounds height="90" width="160" x="3602" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_9930af4f71285fb073b5" id="n_9930af4f71285fb073b5_di">
+        <dc:Bounds height="90" width="160" x="3862" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_0dbb4a599d88f3fd7762" id="n_0dbb4a599d88f3fd7762_di">
+        <dc:Bounds height="50" width="50" x="4382" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_47f629dfaf60e7000209" id="n_47f629dfaf60e7000209_di">
+        <dc:Bounds height="36" width="36" x="4532" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_a43d3a5e0b8a7f626a59" id="n_a43d3a5e0b8a7f626a59_di">
+        <dc:Bounds height="90" width="160" x="4122" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_85070fec16f4e7648b62" id="n_85070fec16f4e7648b62_di">
+        <dc:Bounds height="36" width="36" x="4532" y="516" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_5a7b9b1fe1f0f67af006" id="n_5a7b9b1fe1f0f67af006_di">
+        <dc:Bounds height="36" width="36" x="4532" y="612" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="n_4bd4b8efd8b2a101a657" id="n_4bd4b8efd8b2a101a657_di">
+        <di:waypoint x="2682" y="438" />
+        <di:waypoint x="2782" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_13e32a75646a5b2dafc3" id="n_13e32a75646a5b2dafc3_di">
+        <di:waypoint x="2942" y="465" />
+        <di:waypoint x="3042" y="445" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_45ec284f34fc3caefa29" id="n_45ec284f34fc3caefa29_di">
+        <di:waypoint x="3092" y="445" />
+        <di:waypoint x="3192" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_c6ab0d44cab926942606" id="n_c6ab0d44cab926942606_di">
+        <di:waypoint x="3352" y="465" />
+        <di:waypoint x="3452" y="445" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_560108c62dcd4f426ab2" id="n_560108c62dcd4f426ab2_di">
+        <di:waypoint x="3092" y="445" />
+        <di:waypoint x="3192" y="615" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_330474b2c894dae5654b" id="n_330474b2c894dae5654b_di">
+        <di:waypoint x="3352" y="615" />
+        <di:waypoint x="3452" y="445" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_529526256f5cdd45b52c" id="n_529526256f5cdd45b52c_di">
+        <di:waypoint x="3092" y="445" />
+        <di:waypoint x="3192" y="765" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_687c838ab84594588529" id="n_687c838ab84594588529_di">
+        <di:waypoint x="3352" y="765" />
+        <di:waypoint x="3452" y="445" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_8432377337b6475b27f4" id="n_8432377337b6475b27f4_di">
+        <di:waypoint x="3502" y="445" />
+        <di:waypoint x="3602" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_f8070e29728bab0c07cf" id="n_f8070e29728bab0c07cf_di">
+        <di:waypoint x="3762" y="465" />
+        <di:waypoint x="3862" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_f24854d660f6ad87c09b" id="n_f24854d660f6ad87c09b_di">
+        <di:waypoint x="4432" y="445" />
+        <di:waypoint x="4532" y="438" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_5aa6538dbfa0678f84fe" id="n_5aa6538dbfa0678f84fe_di">
+        <di:waypoint x="4022" y="465" />
+        <di:waypoint x="4122" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_d3c9dce425254779390e" id="n_d3c9dce425254779390e_di">
+        <di:waypoint x="4550" y="420" />
+        <di:waypoint x="4550" y="390" />
+        <di:waypoint x="4202" y="390" />
+        <di:waypoint x="4202" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_fb2e17d088e98f932c0e" id="n_fb2e17d088e98f932c0e_di">
+        <di:waypoint x="4282" y="465" />
+        <di:waypoint x="4382" y="445" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_800cba1a99303a29c1f2" id="n_800cba1a99303a29c1f2_di">
+        <di:waypoint x="4432" y="445" />
+        <di:waypoint x="4532" y="630" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_592474b950c27ffa6c68" id="n_592474b950c27ffa6c68_di">
+        <di:waypoint x="4432" y="445" />
+        <di:waypoint x="4532" y="534" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape bpmnElement="n_840a86ee5dc7c3c49040" id="n_840a86ee5dc7c3c49040_di">
+        <dc:Bounds height="90" width="160" x="4748" y="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_e1eb2abaaa747bada1a5" id="n_e1eb2abaaa747bada1a5_di">
+        <dc:Bounds height="50" width="50" x="5008" y="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_6ebe65f86d86e7935af1" id="n_6ebe65f86d86e7935af1_di">
+        <dc:Bounds height="36" width="36" x="5158" y="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_be14bcf3ef203eb1da49" id="n_be14bcf3ef203eb1da49_di">
+        <dc:Bounds height="50" width="50" x="5158" y="416" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_1b144a8fc973fc91fe2c" id="n_1b144a8fc973fc91fe2c_di">
+        <dc:Bounds height="50" width="50" x="7992" y="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_fc976e1ea8e2789ef645" id="n_fc976e1ea8e2789ef645_di" isExpanded="true">
+        <dc:Bounds height="352" width="1112" x="5308" y="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_052028bfe62ad65fa919" id="n_052028bfe62ad65fa919_di">
+        <dc:Bounds height="90" width="160" x="5484" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_4f01654609834911a0ef" id="n_4f01654609834911a0ef_di">
+        <dc:Bounds height="36" width="36" x="5348" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_54a39b318947d1eb1023" id="n_54a39b318947d1eb1023_di">
+        <dc:Bounds height="50" width="50" x="5744" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_965caa997899fb82d07e" id="n_965caa997899fb82d07e_di">
+        <dc:Bounds height="36" width="36" x="6304" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_530831f7837d58138c83" id="n_530831f7837d58138c83_di">
+        <dc:Bounds height="90" width="160" x="5894" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_8680178daad7e2efb3c8" id="n_8680178daad7e2efb3c8_di">
+        <dc:Bounds height="50" width="50" x="6154" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_9ecf82153e5529baadf8" id="n_9ecf82153e5529baadf8_di">
+        <dc:Bounds height="36" width="36" x="6304" y="516" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="n_bf4eccb67dfa3a6cff75" id="n_bf4eccb67dfa3a6cff75_di">
+        <di:waypoint x="5384" y="438" />
+        <di:waypoint x="5484" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_d243ccb0f2cc3b00453d" id="n_d243ccb0f2cc3b00453d_di">
+        <di:waypoint x="5644" y="465" />
+        <di:waypoint x="5744" y="445" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_f4b376fd1e303c66745e" id="n_f4b376fd1e303c66745e_di">
+        <di:waypoint x="5794" y="445" />
+        <di:waypoint x="6304" y="438" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_62cc9088f0db8aec94f8" id="n_62cc9088f0db8aec94f8_di">
+        <di:waypoint x="5794" y="445" />
+        <di:waypoint x="5894" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_a3e88a868fcfb670ce4f" id="n_a3e88a868fcfb670ce4f_di">
+        <di:waypoint x="6054" y="465" />
+        <di:waypoint x="6154" y="445" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_483ee05f123383ff7d81" id="n_483ee05f123383ff7d81_di">
+        <di:waypoint x="6204" y="445" />
+        <di:waypoint x="6304" y="534" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_465b3f8b3f8f1a99ae1b" id="n_465b3f8b3f8f1a99ae1b_di">
+        <di:waypoint x="6179" y="420" />
+        <di:waypoint x="6179" y="390" />
+        <di:waypoint x="5564" y="390" />
+        <di:waypoint x="5564" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_68b9aa67263c91e57119" id="n_68b9aa67263c91e57119_di">
+        <di:waypoint x="6204" y="445" />
+        <di:waypoint x="6304" y="438" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape bpmnElement="n_cd63731f22a214a6c60b" id="n_cd63731f22a214a6c60b_di" isExpanded="true">
+        <dc:Bounds height="310" width="1372" x="6520" y="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_0bce29fc018a9ac4feef" id="n_0bce29fc018a9ac4feef_di">
+        <dc:Bounds height="36" width="36" x="6560" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_5dd9cfbd739772935a1b" id="n_5dd9cfbd739772935a1b_di">
+        <dc:Bounds height="90" width="160" x="6696" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_37079c08e700bf4dfbcd" id="n_37079c08e700bf4dfbcd_di">
+        <dc:Bounds height="50" width="50" x="6956" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_283c36e85d87ee8b4cb5" id="n_283c36e85d87ee8b4cb5_di">
+        <dc:Bounds height="50" width="50" x="7626" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_939876945487ae11bd7f" id="n_939876945487ae11bd7f_di">
+        <dc:Bounds height="90" width="160" x="7106" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_5ee95baf32c416ce0706" id="n_5ee95baf32c416ce0706_di">
+        <dc:Bounds height="90" width="160" x="7366" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_728c926c44043272be83" id="n_728c926c44043272be83_di">
+        <dc:Bounds height="36" width="36" x="7776" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="n_abadda62c35a9a71b3fb" id="n_abadda62c35a9a71b3fb_di">
+        <di:waypoint x="6596" y="438" />
+        <di:waypoint x="6696" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_d201f6eb51f20028fefb" id="n_d201f6eb51f20028fefb_di">
+        <di:waypoint x="6856" y="465" />
+        <di:waypoint x="6956" y="445" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_e65284f0571563fef835" id="n_e65284f0571563fef835_di">
+        <di:waypoint x="7006" y="445" />
+        <di:waypoint x="7626" y="445" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_10bd8fb57023dca0616a" id="n_10bd8fb57023dca0616a_di">
+        <di:waypoint x="7006" y="445" />
+        <di:waypoint x="7106" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_81a889ec5fb2c85f0c90" id="n_81a889ec5fb2c85f0c90_di">
+        <di:waypoint x="7266" y="465" />
+        <di:waypoint x="7366" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_8b6d724f25276b8b09b6" id="n_8b6d724f25276b8b09b6_di">
+        <di:waypoint x="7526" y="465" />
+        <di:waypoint x="7626" y="445" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_899afc7df85a261c7653" id="n_899afc7df85a261c7653_di">
+        <di:waypoint x="7676" y="445" />
+        <di:waypoint x="7776" y="438" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape bpmnElement="n_a1260e6797efc6b3b218" id="n_a1260e6797efc6b3b218_di" isExpanded="true">
+        <dc:Bounds height="352" width="1112" x="5308" y="732" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_1a2bfb5358da488d95a2" id="n_1a2bfb5358da488d95a2_di">
+        <dc:Bounds height="90" width="160" x="5484" y="832" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_aac19f6f37f3cab13ac2" id="n_aac19f6f37f3cab13ac2_di">
+        <dc:Bounds height="36" width="36" x="5348" y="832" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_6869a88e407f9a1c0c89" id="n_6869a88e407f9a1c0c89_di">
+        <dc:Bounds height="50" width="50" x="5744" y="832" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_460b57506afac025753c" id="n_460b57506afac025753c_di">
+        <dc:Bounds height="36" width="36" x="6304" y="832" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_51a477b1772b5145c999" id="n_51a477b1772b5145c999_di">
+        <dc:Bounds height="90" width="160" x="5894" y="832" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_6e7c697754ed495dd169" id="n_6e7c697754ed495dd169_di">
+        <dc:Bounds height="50" width="50" x="6154" y="832" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_495045bc75a95a03a1fb" id="n_495045bc75a95a03a1fb_di">
+        <dc:Bounds height="36" width="36" x="6304" y="928" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="n_e71b0edef92a8d39f4cf" id="n_e71b0edef92a8d39f4cf_di">
+        <di:waypoint x="5384" y="850" />
+        <di:waypoint x="5484" y="877" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_b4f387984d21a1c71503" id="n_b4f387984d21a1c71503_di">
+        <di:waypoint x="5644" y="877" />
+        <di:waypoint x="5744" y="857" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_40d9de23cc29b74c7fce" id="n_40d9de23cc29b74c7fce_di">
+        <di:waypoint x="5794" y="857" />
+        <di:waypoint x="6304" y="850" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_5b9b16ec9cc1804e6aae" id="n_5b9b16ec9cc1804e6aae_di">
+        <di:waypoint x="5794" y="857" />
+        <di:waypoint x="5894" y="877" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_2a2416666763f9db6166" id="n_2a2416666763f9db6166_di">
+        <di:waypoint x="6054" y="877" />
+        <di:waypoint x="6154" y="857" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_1796378f4dca65112314" id="n_1796378f4dca65112314_di">
+        <di:waypoint x="6204" y="857" />
+        <di:waypoint x="6304" y="946" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_c8fd9c367d83a9d65516" id="n_c8fd9c367d83a9d65516_di">
+        <di:waypoint x="6179" y="832" />
+        <di:waypoint x="6179" y="802" />
+        <di:waypoint x="5564" y="802" />
+        <di:waypoint x="5564" y="832" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_6ed3e7a95d5f9d0759a7" id="n_6ed3e7a95d5f9d0759a7_di">
+        <di:waypoint x="6204" y="857" />
+        <di:waypoint x="6304" y="850" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape bpmnElement="n_7aaa87f39c56266315f2" id="n_7aaa87f39c56266315f2_di" isExpanded="true">
+        <dc:Bounds height="310" width="1372" x="6520" y="690" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_471948f228bfa0eaab4f" id="n_471948f228bfa0eaab4f_di">
+        <dc:Bounds height="36" width="36" x="6560" y="790" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_0d8646f70d1dd01778f0" id="n_0d8646f70d1dd01778f0_di">
+        <dc:Bounds height="90" width="160" x="6696" y="790" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_bc762cbc1515df761a13" id="n_bc762cbc1515df761a13_di">
+        <dc:Bounds height="50" width="50" x="6956" y="790" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_7953041c28adb958db61" id="n_7953041c28adb958db61_di">
+        <dc:Bounds height="50" width="50" x="7626" y="790" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_d522d3c48ac4d681ab9c" id="n_d522d3c48ac4d681ab9c_di">
+        <dc:Bounds height="90" width="160" x="7106" y="790" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_3db913ed9b8b85abfe1a" id="n_3db913ed9b8b85abfe1a_di">
+        <dc:Bounds height="90" width="160" x="7366" y="790" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_b5500f4a7a9d17f34a13" id="n_b5500f4a7a9d17f34a13_di">
+        <dc:Bounds height="36" width="36" x="7776" y="790" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="n_38667e3f0e8d69910885" id="n_38667e3f0e8d69910885_di">
+        <di:waypoint x="6596" y="808" />
+        <di:waypoint x="6696" y="835" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_f145648b49f24a02189b" id="n_f145648b49f24a02189b_di">
+        <di:waypoint x="6856" y="835" />
+        <di:waypoint x="6956" y="815" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_3921c315a70a9a1c6e15" id="n_3921c315a70a9a1c6e15_di">
+        <di:waypoint x="7006" y="815" />
+        <di:waypoint x="7626" y="815" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_2c98bce0e0c9a6599f8c" id="n_2c98bce0e0c9a6599f8c_di">
+        <di:waypoint x="7006" y="815" />
+        <di:waypoint x="7106" y="835" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_a7192a6e1948159e1aae" id="n_a7192a6e1948159e1aae_di">
+        <di:waypoint x="7266" y="835" />
+        <di:waypoint x="7366" y="835" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_34ed3c473133e389dcdd" id="n_34ed3c473133e389dcdd_di">
+        <di:waypoint x="7526" y="835" />
+        <di:waypoint x="7626" y="815" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_fd4398ed4c8d9cce665f" id="n_fd4398ed4c8d9cce665f_di">
+        <di:waypoint x="7676" y="815" />
+        <di:waypoint x="7776" y="808" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape bpmnElement="n_8725c2e19a9902f35774" id="n_8725c2e19a9902f35774_di" isExpanded="true">
+        <dc:Bounds height="352" width="1112" x="5308" y="1144" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_0cf853efb4281e2d7b87" id="n_0cf853efb4281e2d7b87_di">
+        <dc:Bounds height="90" width="160" x="5484" y="1244" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_20b5520cf7acc21e6c74" id="n_20b5520cf7acc21e6c74_di">
+        <dc:Bounds height="36" width="36" x="5348" y="1244" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_14d4040b571edeabd116" id="n_14d4040b571edeabd116_di">
+        <dc:Bounds height="50" width="50" x="5744" y="1244" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_bec7b435ec6ea4afe3a5" id="n_bec7b435ec6ea4afe3a5_di">
+        <dc:Bounds height="36" width="36" x="6304" y="1244" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_4d1d5d09c3b45ff79141" id="n_4d1d5d09c3b45ff79141_di">
+        <dc:Bounds height="90" width="160" x="5894" y="1244" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_49b76f65146400c5ac99" id="n_49b76f65146400c5ac99_di">
+        <dc:Bounds height="50" width="50" x="6154" y="1244" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_fab9412b264987f938bd" id="n_fab9412b264987f938bd_di">
+        <dc:Bounds height="36" width="36" x="6304" y="1340" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="n_974158adeb37e882687e" id="n_974158adeb37e882687e_di">
+        <di:waypoint x="5384" y="1262" />
+        <di:waypoint x="5484" y="1289" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_1c28a6cca2d7d97d66ea" id="n_1c28a6cca2d7d97d66ea_di">
+        <di:waypoint x="5644" y="1289" />
+        <di:waypoint x="5744" y="1269" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_5558eea0bbb0a1e04551" id="n_5558eea0bbb0a1e04551_di">
+        <di:waypoint x="5794" y="1269" />
+        <di:waypoint x="6304" y="1262" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_51e96d582caa3b49c12d" id="n_51e96d582caa3b49c12d_di">
+        <di:waypoint x="5794" y="1269" />
+        <di:waypoint x="5894" y="1289" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_3a87e0588c197f76a420" id="n_3a87e0588c197f76a420_di">
+        <di:waypoint x="6054" y="1289" />
+        <di:waypoint x="6154" y="1269" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_b5ad1f538d51b507c0bd" id="n_b5ad1f538d51b507c0bd_di">
+        <di:waypoint x="6204" y="1269" />
+        <di:waypoint x="6304" y="1358" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_547a632962060366307f" id="n_547a632962060366307f_di">
+        <di:waypoint x="6179" y="1244" />
+        <di:waypoint x="6179" y="1214" />
+        <di:waypoint x="5564" y="1214" />
+        <di:waypoint x="5564" y="1244" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_cc308190734acb792873" id="n_cc308190734acb792873_di">
+        <di:waypoint x="6204" y="1269" />
+        <di:waypoint x="6304" y="1262" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape bpmnElement="n_0eb98a084ec4c796531a" id="n_0eb98a084ec4c796531a_di" isExpanded="true">
+        <dc:Bounds height="310" width="852" x="6520" y="1060" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_18cb72a5406212b31c71" id="n_18cb72a5406212b31c71_di">
+        <dc:Bounds height="36" width="36" x="6560" y="1160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_068034157c9a08d1448b" id="n_068034157c9a08d1448b_di">
+        <dc:Bounds height="50" width="50" x="6696" y="1160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_ee57979254b4b0c1f8b5" id="n_ee57979254b4b0c1f8b5_di">
+        <dc:Bounds height="50" width="50" x="7106" y="1160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_65a8a0a949b10342b846" id="n_65a8a0a949b10342b846_di">
+        <dc:Bounds height="90" width="160" x="6846" y="1160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_170f1f24797d055b9ed2" id="n_170f1f24797d055b9ed2_di">
+        <dc:Bounds height="36" width="36" x="7256" y="1160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="n_a02e154060129291aacd" id="n_a02e154060129291aacd_di">
+        <di:waypoint x="6596" y="1178" />
+        <di:waypoint x="6696" y="1185" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_2ee3e45da813bea78387" id="n_2ee3e45da813bea78387_di">
+        <di:waypoint x="6746" y="1185" />
+        <di:waypoint x="7106" y="1185" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_51808c5ed4f5aed3de02" id="n_51808c5ed4f5aed3de02_di">
+        <di:waypoint x="6746" y="1185" />
+        <di:waypoint x="6846" y="1205" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_de7d7d80e8cf7702ebaf" id="n_de7d7d80e8cf7702ebaf_di">
+        <di:waypoint x="7006" y="1205" />
+        <di:waypoint x="7106" y="1185" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_f8b1d8b7685b9847d132" id="n_f8b1d8b7685b9847d132_di">
+        <di:waypoint x="7156" y="1185" />
+        <di:waypoint x="7256" y="1178" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape bpmnElement="n_f8747763f66d3d8ffd3f" id="n_f8747763f66d3d8ffd3f_di" isExpanded="true">
+        <dc:Bounds height="352" width="1112" x="5308" y="1556" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_793a130591dc45f9af35" id="n_793a130591dc45f9af35_di">
+        <dc:Bounds height="90" width="160" x="5484" y="1656" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_266c129c976f7cc2bafc" id="n_266c129c976f7cc2bafc_di">
+        <dc:Bounds height="36" width="36" x="5348" y="1656" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_9c9bed4a8311f6fb8b18" id="n_9c9bed4a8311f6fb8b18_di">
+        <dc:Bounds height="50" width="50" x="5744" y="1656" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_8ca0c96126c433cb46b8" id="n_8ca0c96126c433cb46b8_di">
+        <dc:Bounds height="36" width="36" x="6304" y="1656" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_3fa289aad0de341fda8a" id="n_3fa289aad0de341fda8a_di">
+        <dc:Bounds height="90" width="160" x="5894" y="1656" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_ab93f9ab04803e65fa62" id="n_ab93f9ab04803e65fa62_di">
+        <dc:Bounds height="50" width="50" x="6154" y="1656" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_516ada71456d5e22a90a" id="n_516ada71456d5e22a90a_di">
+        <dc:Bounds height="36" width="36" x="6304" y="1752" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="n_8df3243d87fae9d369cc" id="n_8df3243d87fae9d369cc_di">
+        <di:waypoint x="5384" y="1674" />
+        <di:waypoint x="5484" y="1701" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_09ec9e63b5c501232687" id="n_09ec9e63b5c501232687_di">
+        <di:waypoint x="5644" y="1701" />
+        <di:waypoint x="5744" y="1681" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_c1fa2ff8cc5d1e052b05" id="n_c1fa2ff8cc5d1e052b05_di">
+        <di:waypoint x="5794" y="1681" />
+        <di:waypoint x="6304" y="1674" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_4b4dc4cb08668c103343" id="n_4b4dc4cb08668c103343_di">
+        <di:waypoint x="5794" y="1681" />
+        <di:waypoint x="5894" y="1701" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_216e5cb721faaff09130" id="n_216e5cb721faaff09130_di">
+        <di:waypoint x="6054" y="1701" />
+        <di:waypoint x="6154" y="1681" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_7f5bef9596bc7a0dffd8" id="n_7f5bef9596bc7a0dffd8_di">
+        <di:waypoint x="6204" y="1681" />
+        <di:waypoint x="6304" y="1770" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_b3e368a85380fa5bae5b" id="n_b3e368a85380fa5bae5b_di">
+        <di:waypoint x="6179" y="1656" />
+        <di:waypoint x="6179" y="1626" />
+        <di:waypoint x="5564" y="1626" />
+        <di:waypoint x="5564" y="1656" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_6c70b344a96b7b6212a2" id="n_6c70b344a96b7b6212a2_di">
+        <di:waypoint x="6204" y="1681" />
+        <di:waypoint x="6304" y="1674" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape bpmnElement="n_405a93ab7cd51e83a460" id="n_405a93ab7cd51e83a460_di" isExpanded="true">
+        <dc:Bounds height="310" width="552" x="6520" y="1430" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_db469010c1d1f8b0d824" id="n_db469010c1d1f8b0d824_di">
+        <dc:Bounds height="36" width="36" x="6560" y="1530" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_03d431a1dd1765d95032" id="n_03d431a1dd1765d95032_di">
+        <dc:Bounds height="90" width="160" x="6696" y="1530" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_eb1ec3599eee3543691f" id="n_eb1ec3599eee3543691f_di">
+        <dc:Bounds height="36" width="36" x="6956" y="1530" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="n_5a0c4f96b3bfdac9558d" id="n_5a0c4f96b3bfdac9558d_di">
+        <di:waypoint x="6596" y="1548" />
+        <di:waypoint x="6696" y="1575" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_1b526f6d699b91c7bfa7" id="n_1b526f6d699b91c7bfa7_di">
+        <di:waypoint x="6856" y="1575" />
+        <di:waypoint x="6956" y="1548" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape bpmnElement="n_17878958cf865ff5c6d2" id="n_17878958cf865ff5c6d2_di">
+        <dc:Bounds height="90" width="160" x="8142" y="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_7bf370bc972196eef7b3" id="n_7bf370bc972196eef7b3_di">
+        <dc:Bounds height="36" width="36" x="8402" y="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_e7bbb0013e4a2114abe3" id="n_e7bbb0013e4a2114abe3_di">
+        <dc:Bounds height="36" width="36" x="4598" y="912" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="n_b0fea59f2016e25bfd46" id="n_b0fea59f2016e25bfd46_di">
+        <di:waypoint x="2506" y="338" />
+        <di:waypoint x="2606" y="625" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_67184e039cea93caf5d7" id="n_67184e039cea93caf5d7_di">
+        <di:waypoint x="4648" y="625" />
+        <di:waypoint x="4748" y="365" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_b94873a2f15ec7791636" id="n_b94873a2f15ec7791636_di">
+        <di:waypoint x="4908" y="365" />
+        <di:waypoint x="5008" y="345" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_017e9ba46d396028d5b1" id="n_017e9ba46d396028d5b1_di">
+        <di:waypoint x="5058" y="345" />
+        <di:waypoint x="5158" y="338" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_fe30f94bb91f6a577d9f" id="n_fe30f94bb91f6a577d9f_di">
+        <di:waypoint x="5058" y="345" />
+        <di:waypoint x="5158" y="441" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_4a246007676e5f3fe26f" id="n_4a246007676e5f3fe26f_di">
+        <di:waypoint x="5208" y="441" />
+        <di:waypoint x="7992" y="345" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_71db0ec5b265db8eaa8a" id="n_71db0ec5b265db8eaa8a_di">
+        <di:waypoint x="5208" y="441" />
+        <di:waypoint x="5308" y="496" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_ced0022f23d4e9ebc945" id="n_ced0022f23d4e9ebc945_di">
+        <di:waypoint x="6420" y="496" />
+        <di:waypoint x="6520" y="475" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_1d14e554e8af3afea4f1" id="n_1d14e554e8af3afea4f1_di">
+        <di:waypoint x="7892" y="475" />
+        <di:waypoint x="7992" y="345" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_2c6263d6992844f6999e" id="n_2c6263d6992844f6999e_di">
+        <di:waypoint x="5208" y="441" />
+        <di:waypoint x="5308" y="908" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_0135b291a2e2bf4220fb" id="n_0135b291a2e2bf4220fb_di">
+        <di:waypoint x="6420" y="908" />
+        <di:waypoint x="6520" y="845" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_0f399e0eb484a1f48bee" id="n_0f399e0eb484a1f48bee_di">
+        <di:waypoint x="7892" y="845" />
+        <di:waypoint x="7992" y="345" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_128ae562a88bf29a0e30" id="n_128ae562a88bf29a0e30_di">
+        <di:waypoint x="5208" y="441" />
+        <di:waypoint x="5308" y="1320" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_b2776f409f8157875ea7" id="n_b2776f409f8157875ea7_di">
+        <di:waypoint x="6420" y="1320" />
+        <di:waypoint x="6520" y="1215" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_c16500899dc812214e7a" id="n_c16500899dc812214e7a_di">
+        <di:waypoint x="7372" y="1215" />
+        <di:waypoint x="7992" y="345" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_f7572d245ccb843854f6" id="n_f7572d245ccb843854f6_di">
+        <di:waypoint x="5208" y="441" />
+        <di:waypoint x="5308" y="1732" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_3176ab6194265495c1c1" id="n_3176ab6194265495c1c1_di">
+        <di:waypoint x="6420" y="1732" />
+        <di:waypoint x="6520" y="1585" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_0552eb196f308c39eea6" id="n_0552eb196f308c39eea6_di">
+        <di:waypoint x="7072" y="1585" />
+        <di:waypoint x="7992" y="345" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_805b8e925e15babd7b44" id="n_805b8e925e15babd7b44_di">
+        <di:waypoint x="8042" y="345" />
+        <di:waypoint x="8142" y="365" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_29be59b189c9df2bbcf8" id="n_29be59b189c9df2bbcf8_di">
+        <di:waypoint x="8302" y="365" />
+        <di:waypoint x="8402" y="338" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_6b772068703a0e9e112f" id="n_6b772068703a0e9e112f_di">
+        <di:waypoint x="4634" y="930" />
+        <di:waypoint x="5158" y="338" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_227ec1ff92a7e623da83" id="n_227ec1ff92a7e623da83_di">
+        <di:waypoint x="272" y="238" />
+        <di:waypoint x="372" y="265" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_d68345b563e1277f81c7" id="n_d68345b563e1277f81c7_di">
+        <di:waypoint x="532" y="265" />
+        <di:waypoint x="632" y="245" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_83bcf8db2fb197d58afb" id="n_83bcf8db2fb197d58afb_di">
+        <di:waypoint x="682" y="245" />
+        <di:waypoint x="8618" y="238" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_44bc8f4d4e48331ddfb8" id="n_44bc8f4d4e48331ddfb8_di">
+        <di:waypoint x="682" y="245" />
+        <di:waypoint x="2280" y="341" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_3b6ce300061c3b3d3c1c" id="n_3b6ce300061c3b3d3c1c_di">
+        <di:waypoint x="682" y="245" />
+        <di:waypoint x="782" y="375" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_b877e9f0e2ba36c0d63e" id="n_b877e9f0e2ba36c0d63e_di">
+        <di:waypoint x="682" y="245" />
+        <di:waypoint x="2280" y="238" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_03ee8fb64233ed5cf87d" id="n_03ee8fb64233ed5cf87d_di">
+        <di:waypoint x="1606" y="530" />
+        <di:waypoint x="2280" y="238" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_ffa3817a70edc2663325" id="n_ffa3817a70edc2663325_di">
+        <di:waypoint x="1620" y="375" />
+        <di:waypoint x="1720" y="245" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_29c1eb0324e1fd9a42c7" id="n_29c1eb0324e1fd9a42c7_di">
+        <di:waypoint x="1770" y="245" />
+        <di:waypoint x="8618" y="238" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_2266d79294afb38537d1" id="n_2266d79294afb38537d1_di">
+        <di:waypoint x="1770" y="245" />
+        <di:waypoint x="1870" y="265" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_6d902cb507dc240698d5" id="n_6d902cb507dc240698d5_di">
+        <di:waypoint x="1770" y="245" />
+        <di:waypoint x="2280" y="238" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_d9c7365129941a28b1c8" id="n_d9c7365129941a28b1c8_di">
+        <di:waypoint x="2030" y="265" />
+        <di:waypoint x="2130" y="245" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_338966a43f591d5c3bb9" id="n_338966a43f591d5c3bb9_di">
+        <di:waypoint x="2180" y="245" />
+        <di:waypoint x="2280" y="341" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_a5d59717bcf3e2888340" id="n_a5d59717bcf3e2888340_di">
+        <di:waypoint x="2180" y="245" />
+        <di:waypoint x="2280" y="238" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_10111f0611d302c7996e" id="n_10111f0611d302c7996e_di">
+        <di:waypoint x="2330" y="341" />
+        <di:waypoint x="2430" y="1124" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_704ee6e42a5aa8c27186" id="n_704ee6e42a5aa8c27186_di">
+        <di:waypoint x="8518" y="1124" />
+        <di:waypoint x="8618" y="238" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape bpmnElement="n_b4702752311d101a12e2" id="n_b4702752311d101a12e2_di">
+        <dc:Bounds height="50" width="50" x="8834" y="120" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_cdcb794800edeefcafe3" id="n_cdcb794800edeefcafe3_di">
+        <dc:Bounds height="36" width="36" x="8684" y="2130" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_7f1fb3c8667254cfb779" id="n_7f1fb3c8667254cfb779_di">
+        <dc:Bounds height="36" width="36" x="8684" y="2130" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_b21a05c0ebbc44c9b288" id="n_b21a05c0ebbc44c9b288_di">
+        <dc:Bounds height="36" width="36" x="8984" y="420" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="n_71501cd1ac2854a052f4" id="n_71501cd1ac2854a052f4_di">
+        <di:waypoint x="9130" y="165" />
+        <di:waypoint x="9230" y="138" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_511544d363729c2041fb" id="n_511544d363729c2041fb_di">
+        <di:waypoint x="9130" y="315" />
+        <di:waypoint x="9230" y="138" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_5259d3e5986c7e980c38" id="n_5259d3e5986c7e980c38_di">
+        <di:waypoint x="96" y="138" />
+        <di:waypoint x="196" y="1134" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_2b4e72a5ed8a6e554e05" id="n_2b4e72a5ed8a6e554e05_di">
+        <di:waypoint x="8734" y="1134" />
+        <di:waypoint x="8834" y="145" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_00bfb4009d15c2986260" id="n_00bfb4009d15c2986260_di">
+        <di:waypoint x="8720" y="2148" />
+        <di:waypoint x="8970" y="165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_5e54ce20602ac7e7bf8c" id="n_5e54ce20602ac7e7bf8c_di">
+        <di:waypoint x="8720" y="2148" />
+        <di:waypoint x="8970" y="315" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_cb470a3ac5d0ce40f0c0" id="n_cb470a3ac5d0ce40f0c0_di">
+        <di:waypoint x="8884" y="145" />
+        <di:waypoint x="8984" y="438" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

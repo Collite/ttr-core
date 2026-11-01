@@ -108,6 +108,8 @@ def er2db_attribute customer_hdemo_map        { attribute: er.entity.customer.hd
 def er2db_attribute customer_birth_year_map   { attribute: er.entity.customer.birth_year,   target: { column: db.dbo.customer.c_birth_year } }
 // AU D-83 — the customer's distribution center.
 def er2db_attribute customer_center_map        { attribute: er.entity.customer.center,       target: { column: db.dbo.customer.c_center_sk } }
+// AU — the customer's mail address (the generated column; data/automation/10-ddl.sql).
+def er2db_attribute customer_email_map         { attribute: er.entity.customer.email,        target: { column: db.dbo.customer.c_email } }
 
 // ===== customer_address =====
 def er2db_entity customer_address_map { entity: er.entity.customer_address, target: { table: db.dbo.customer_address } }

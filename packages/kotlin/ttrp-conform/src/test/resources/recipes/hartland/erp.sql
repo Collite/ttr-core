@@ -19,7 +19,8 @@ CREATE TABLE customer (
     c_current_cdemo_sk integer,
     c_current_hdemo_sk integer,
     c_birth_year integer,
-    c_center_sk integer
+    c_center_sk integer,
+    c_email varchar(64)
 );
 
 CREATE TABLE inventory (
@@ -161,6 +162,8 @@ FROM (SELECT CAST(g.day AS DATE) AS d
 
 INSERT INTO customer (c_customer_sk, c_customer_id, c_birth_year, c_center_sk) VALUES
     (10, 'C10', 1980, 1), (20, 'C20', 1975, 1), (50, 'C50', 1990, 1);
+-- The mail address: Hartland's generated column (data/automation/10-ddl.sql), written out here.
+UPDATE customer SET c_email = 'customer-' || c_customer_sk || '@customers.hartland.example';
 
 INSERT INTO sales_order (so_order_number, so_channel, so_customer_sk, so_placed_date, so_delivered_date, so_warehouse_sk, so_value, so_state) VALUES
     (1, 'web', 10, DATE '2026-11-01', NULL, 1, 100.00, 'placed'),

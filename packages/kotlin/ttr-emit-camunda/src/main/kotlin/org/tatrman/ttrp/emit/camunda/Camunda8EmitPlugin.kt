@@ -4,9 +4,13 @@ package org.tatrman.ttrp.emit.camunda
 import org.tatrman.ttrp.emit.spi.TtrEmitPlugin
 import org.tatrman.ttrp.emit.spi.EmitRequest
 import org.tatrman.ttrp.emit.spi.EmitResult
+import org.tatrman.ttrp.emit.spi.RecipeEmitRequest
 
 class Camunda8EmitPlugin : TtrEmitPlugin {
+    override val spiRevision = TtrEmitPlugin.SPI_REVISION
     override val targetId = "camunda_8"
+    override val supportsRecipes = true
+    override val supportsProcesses = true
 
     override fun executorTypeManifest(): String =
         requireNotNull(
@@ -15,4 +19,6 @@ class Camunda8EmitPlugin : TtrEmitPlugin {
 
     override fun emit(request: EmitRequest): EmitResult =
         throw UnsupportedOperationException("camunda_8: recipe exporter required")
+
+    override fun emitRecipe(request: RecipeEmitRequest): EmitResult = emitCamunda(request, Dialect.C8)
 }

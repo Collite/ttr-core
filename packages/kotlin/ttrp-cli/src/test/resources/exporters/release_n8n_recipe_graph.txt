@@ -162,4 +162,9 @@ outcome=/runs/{id}/actions/{action}/outcome,
 part=/runs/{id}/parts/{part},
 perform=/runs/{id}/actions/{action}/perform,
 route=/runs/{id}/routes/{route},
-status=/runs/{id}}))
+status=/runs/{id}}),
+islandWaves=[[placed_orders],
+[price_differences,
+overdue,
+shortfall],
+[verdict]])

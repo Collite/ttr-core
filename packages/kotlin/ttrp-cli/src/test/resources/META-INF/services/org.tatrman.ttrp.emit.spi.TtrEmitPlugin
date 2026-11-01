@@ -1,2 +1,3 @@
 org.tatrman.ttrp.bundle.legacy.LegacyEmitPlugin
 org.tatrman.ttrp.bundle.legacy.FutureEmitPlugin
+org.tatrman.ttrp.bundle.legacy.OldV2EmitPlugin

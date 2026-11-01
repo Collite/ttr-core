@@ -44,6 +44,12 @@ class EmitPluginLoaderTest :
                 "SPI v99"
         }
 
+        "R16 a pre-D-140 v2 plugin is refused before rendering with a rebuild notice" {
+            val refusal = shouldThrow<IllegalArgumentException> { EmitPluginLoader.builtin("old-v2") }
+            refusal.message!! shouldContain "revision 0"
+            refusal.message!! shouldContain "rebuild the plugin"
+        }
+
         "builtin throws for an unknown target" {
             shouldThrow<IllegalStateException> { EmitPluginLoader.builtin("no-such-target") }
         }

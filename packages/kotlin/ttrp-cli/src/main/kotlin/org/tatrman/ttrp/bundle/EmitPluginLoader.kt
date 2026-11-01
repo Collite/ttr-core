@@ -197,6 +197,17 @@ object EmitPluginLoader {
         require(plugin.spiVersion in TtrEmitPlugin.SUPPORTED_VERSIONS) {
             "emit plugin '$targetId' was built against SPI v${plugin.spiVersion}, host accepts ${TtrEmitPlugin.SUPPORTED_VERSIONS}"
         }
+        if (plugin.spiVersion == 2) {
+            val revision =
+                try {
+                    plugin.spiRevision
+                } catch (_: AbstractMethodError) {
+                    0
+                }
+            require(revision == TtrEmitPlugin.SPI_REVISION) {
+                "emit plugin '$targetId' was built against SPI v2 revision $revision; host requires revision ${TtrEmitPlugin.SPI_REVISION}; rebuild the plugin (D-140 JVM signatures changed)"
+            }
+        }
         return plugin
     }
 }

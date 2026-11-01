@@ -146,7 +146,100 @@ against the bundle's hashes and a complete directory is published only after eve
 An export becomes stale when its recipe text, parameter values, labels, program, deployment, world,
 toolchain or target version differs from the served bundle. Rebuild and export again after such a change.
 Executor manifests are plugin-owned TTR-M resources. All seven target manifests ship with the toolchain;
-n8n, Camunda and Python renderers arrive in their later exporter phases. Process export arrives with P1.
+n8n L1 and Camunda render recipes and processes; Python rendering remains in its planned exporter Stage.
+
+## n8n L1 exports
+
+`ttrp emit --deployment release_n8n --project . --out exports` produces an inactive `workflow.json`,
+credential/import instructions, conformance references and an exact named call list in `manifest.json`.
+`--granularity recipe|parts|islands` selects whole-recipe evaluation, named parts or the verified island waves.
+The exporter carries no SQL. Every Open includes recipe and program/deployment fingerprints; stale refusals
+stop the workflow. A replayed Open skips the action path so a duplicate event does not send mail again.
+
+Batch schedules accept `HH:MM Zone`, `Mon|Tue|Wed|Thu|Fri|Sat|Sun HH:MM Zone`, `1st HH:MM Zone`,
+or `*/N` (1–60 minutes). Unsupported hints refuse export. Named zones use IANA timezone identifiers, while
+key/event programs expose `/webhook/<deployment>`. HTTP nodes use the `tatrman-automation` bearer credential
+and three retries. Engine-side mail uses `tatrman-mail` SMTP, `TTR_MAIL_FROM` and the `TTR_MAIL_RECIPIENTS`
+JSON role-to-address mapping. Missing role mappings fail. A customer-addressed email action instead declares
+`to` typed by an E-R address attribute, wired to a bare route-row column. Rows are grouped by recipient;
+empty addresses fail with the key. Both the deployment and Server must explicitly permit wet delivery.
+The Server must return its per-key `actions` selection array for every run; missing fields fail. Set `TTR_AUTOMATION_URL` to the Server
+origin, without `/automation`. The generated README lists the required n8n worker environment access.
+
+On-event callers must supply a stable `at` ISO instant with an offset to recognise duplicate events. Without
+it every POST is a new run. `at` supplies the port clock and is excluded from event columns; a schema column
+named `at` refuses export. A 202 Open handle is polled without repeating its actions: closed/waiting completes
+the duplicate, failed/abandoned allows one re-open with the saved body. A second 202 refuses. After a lost Open
+response this can wait for the Server's budget plus recovery grace before recovering the orphan.
+
+Process exports verify and fingerprint every step before writing a package, preserve each step's recipe,
+effective port and parent deployment, and save later-step clocks after their waits. Every later step, in either
+mode, uses the first step's run ID plus `:<step name>` as its idempotency key, using its re-opened run ID after
+abandonment. Redeliveries share these keys; a duplicate may claim a later step first, leaving the original to
+handle its 202 response. Step 1 keeps the execution ID for batch and the derived key for on-event.
+Obligation waits require an explicit `obligations` array; missing
+fields fail, and only an empty array means absent. `until` controls fulfilled/due readiness. Webhook waits also
+wake at the nearest future dueAt, capped at an hour. Required task approvals wait again after each resume or
+timeout while the run remains waiting. When status carries `tasks`, resolved task dueAt sets the timeout;
+otherwise ordinary declared due durations apply, with an hourly backstop for calendar-based due rules that lack
+an instant. Evaluation and handle polls honour Retry-After (default 15 s)
+with a program-budget plus two-minute recovery-grace bound.
+
+When supplying `--bundle` for a process, point it at a directory containing one ordinary bundle directory per
+recipe name. A plugin must declare process support; native currently refuses process deployments. SPI v2 JVM
+callers must rebuild with the updated toolchain and explicitly declare `spiRevision = 1`; the host refuses older
+v2 plugins before rendering. SPI v1 remains compatible and the grammar version is unchanged.
+Hartland H-2/winback customer-mail exports refuse until its model supplies the address column. H-2 live
+certification also requires the Server's planned obligations status field.
+
+## Camunda BPMN file exports
+
+`ttrp emit --deployment release_bpmn --project <root> --out <directory>` emits
+`release_order.c8.bpmn` for a `camunda_8` executor; `camunda_7` emits the C7 dialect as
+`release_order.c7.bpmn`. Open the matching file in Camunda Modeler. Both dialects share stable SHA-1-derived
+node IDs and BPMN DI. They contain named run-API calls and fingerprints, with no SQL or credentials.
+The definitions declare Camunda Platform 7.24.0 or Camunda Cloud 8.6.0 for the Modeler. C8 needs at least 8.6 for
+[converging inclusive gateways](https://unsupported.docs.camunda.io/8.6/docs/components/modeler/bpmn/inclusive-gateways/).
+Its [Zeebe user tasks](https://unsupported.docs.camunda.io/8.6/docs/components/modeler/bpmn/user-tasks/) and
+[FEEL timezone conversion](https://unsupported.docs.camunda.io/8.5/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-conversion/)
+are also available by that version. Server clocks use offset ISO instants.
+
+C7 uses Camunda Connect HTTP, Spin JSON and Groovy for response-header and obligation-time handling. Its
+`TTR_CONN_AUTOMATION` runtime bean supplies the Server origin and bearer. C8 uses the standard REST outbound
+connector, the `TTR_AUTOMATION_URL` variable and connector secret `TTR_CONN_AUTOMATION`. The generated README
+names the complete input and adapter requirements. C7 cron schedules require the engine JVM timezone to match
+the authored hint; C8 calendar schedules emit zoned ISO repeating intervals. Minute intervals use ISO cycles.
+
+Only a newly claimed run drives effects. Replays finish that step; live handles poll and permit one re-open
+after abandonment/failure. Later process steps share the first run ID plus the step name as a caller key,
+including after recovery. The diagram includes parallel contexts, route branches, per-row action tasks, bounded
+evaluation, stale-export boundaries and obligation message/timer waits. Missing obligation/action evidence or
+incomplete route pages refuses rather than finishing with partial effects. Every route is paged with offset using
+the Server's default page size, then all rows are processed. Route forks and joins are inclusive in every mode;
+exclusivity is enforced per row by the Server. Camunda refuses digest delivery in any program or process step;
+use `deliver: immediate` or n8n L1 until the digest follow-up is implemented.
+
+HTTP 409 takes the stale boundary; other 4xx except 408/429 take the drawn refusal task. HTTP 408/429, 5xx and
+transport errors retry, then become incidents. C8 error retries honour numeric or HTTP-date Retry-After,
+with a 15 s fallback, a 1 s minimum and a cap of the program budget + 2 min. C7 Connect failed jobs use
+R3/PT15S because an output exception cannot commit a dynamic retry delay. No failed response continues into
+an action outcome or close. C7 `ttrInput` must be a Java Map; the generated README states the REST variable
+contract and the limits of expression-only verification.
+
+Mail and approval nodes are customer integration templates. The mail worker (`TTR_CONN_MAIL`) and the exchange's
+approval integration belong to Platform; this export does not bundle or certify them. The file and its Modeler
+opening are the Camunda acceptance artefacts; no live Camunda deployment is part of this exporter.
+
+Offline structure conformance needs the export directory and a pinned fixture, with no Server or token:
+
+```sh
+ttrp conform --replay replay-release.yaml --cells camunda_8.on_event --export release_bpmn.camunda_8.export
+```
+
+The driver checks the manifest call inventory against actual BPMN tasks, connector paths, route branches and
+graph reachability. Success is `structure-agree`, which makes no verdict/action execution claim. A removed task
+or branch returns exit 3 with a structural diff; malformed/unsafe XML returns driver-error exit 2. XML validation
+uses the bundled standard BPMN schemas and explicitly local schemas for the supported extension subset.
 
 ## Conformance of a recipe
 
@@ -166,6 +259,18 @@ environment variable. The Server must expose exactly one enabled, granted, curre
 for each recipe/mode. Fixture parameters must match the served recipe; replay cannot override approved
 parameter values. On-event fixtures need explicit keys; a batch fixture without `keys` selects all candidates.
 `--world` filters fixtures by their declared world; it does not change the Server's world or deployments.
+
+n8n dry replay interprets the supported generated node types and JavaScript expressions with Node 22+;
+it does not start n8n, send SMTP or wait for a person. Pass `--cells n8n-l1.on-event` and repeat
+`--export <deployment>.n8n_l1.export` for each recipe/mode. The exported deployment must be enabled,
+granted and current. The driver checks the manifest's call list against the actual HTTP parameters,
+executes with `dryRun: true` and the fixture's asOf/origin, and reads exact Server evidence. A keys fixture
+substitutes its batch selection; an all fixture sends the rendered none port unchanged. Observed actions come
+from executed perform/outcome bodies and mail-node rows/recipient, with SMTP replaced by a dry stand-in, then
+are cross-checked against the Server's action selection multiset. Dropped/wrong actions disagree. This proves
+orchestration and dry evidence parity; committed writes, actual SMTP, human timing and a deployed n8n engine
+remain live certification. Use trusted generated exports; arbitrary Code-node workflows are executable artifacts. Process lifecycle
+replay and event-body fixtures remain separate from the H-1 key-based dry replay.
 
 Golden YAML uses `recipe`, `world`, `as_of`, `parameters`, `keys`, `expected`, and optional `pinned_from`
 (`run`, `at`, `by`). A multi-recipe replay uses `recipes: [release_order, settle]` and stores each collection
