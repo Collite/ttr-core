@@ -19,6 +19,13 @@ tasks.test {
 
 dependencies {
     implementation(project(":packages:kotlin:ttrp-emit-spi"))
+    implementation(libs.kotlinx.ser.json)
+    testImplementation(project(":packages:kotlin:ttrp-conform"))
+    // Language parsers/interpreters only in tests; no target engine/SDK in the exporter artifact.
+    testImplementation("org.camunda.feel:feel-engine:1.19.3")
+    testImplementation("org.camunda.bpm.juel:camunda-juel:7.24.0")
+    testImplementation("org.apache.groovy:groovy:5.0.3")
+    testImplementation("org.camunda.spin:camunda-spin-dataformat-json-jackson:7.24.0")
     testImplementation(libs.bundles.kotest)
 }
 

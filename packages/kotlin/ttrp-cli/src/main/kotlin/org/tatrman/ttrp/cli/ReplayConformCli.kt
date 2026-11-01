@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonObject
 import org.tatrman.ttrp.conform.replay.FixtureLoader
 import org.tatrman.ttrp.conform.replay.NativeDriver
 import org.tatrman.ttrp.conform.replay.N8nDryDriver
+import org.tatrman.ttrp.conform.replay.CamundaStructureDriver
 import org.tatrman.ttrp.conform.replay.ReplayRunner
 import java.nio.file.Files
 import java.nio.file.Path
@@ -28,6 +29,9 @@ object ReplayConformCli {
             val fixture = FixtureLoader.load(Path.of(path))
             val report =
                 ReplayRunner.run(fixture, cells, world) { cell ->
+                    if (cell.substringBefore('.').replace('-', '_') in setOf("camunda_7", "camunda_8")) {
+                        return@run CamundaStructureDriver(exports.map { Path.of(it) })
+                    }
                     val url = requireNotNull(server) { "--server required for pinned replays" }
                     val token =
                         requireNotNull(

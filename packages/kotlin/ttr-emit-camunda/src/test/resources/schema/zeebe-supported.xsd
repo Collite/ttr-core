@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Local strict schema for the emitted C8 extension subset, from the official moddle/connector definitions. -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:z="http://camunda.org/schema/zeebe/1.0" targetNamespace="http://camunda.org/schema/zeebe/1.0" elementFormDefault="qualified">
+  <xs:element name="taskDefinition"><xs:complexType><xs:attribute name="type" type="xs:string" use="required"/><xs:attribute name="retries" type="xs:string"/></xs:complexType></xs:element>
+  <xs:element name="ioMapping"><xs:complexType><xs:sequence><xs:element ref="z:input" minOccurs="0" maxOccurs="unbounded"/><xs:element ref="z:output" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType></xs:element>
+  <xs:complexType name="mapping"><xs:attribute name="source" type="xs:string" use="required"/><xs:attribute name="target" type="xs:string" use="required"/></xs:complexType>
+  <xs:element name="input" type="z:mapping"/><xs:element name="output" type="z:mapping"/>
+  <xs:element name="taskHeaders"><xs:complexType><xs:sequence><xs:element ref="z:header" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType></xs:element>
+  <xs:element name="header"><xs:complexType><xs:attribute name="key" type="xs:string" use="required"/><xs:attribute name="value" type="xs:string" use="required"/></xs:complexType></xs:element>
+  <xs:element name="loopCharacteristics"><xs:complexType><xs:attribute name="inputCollection" type="xs:string" use="required"/><xs:attribute name="inputElement" type="xs:string" use="required"/></xs:complexType></xs:element>
+  <xs:element name="userTask"><xs:complexType/></xs:element>
+  <xs:element name="subscription"><xs:complexType><xs:attribute name="correlationKey" type="xs:string" use="required"/></xs:complexType></xs:element>
+</xs:schema>

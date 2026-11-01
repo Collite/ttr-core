@@ -192,6 +192,40 @@ v2 plugins before rendering. SPI v1 remains compatible and the grammar version i
 Hartland H-2/winback customer-mail exports refuse until its model supplies the address column. H-2 live
 certification also requires the Server's planned obligations status field.
 
+## Camunda BPMN file exports
+
+`ttrp emit --deployment release_bpmn --project <root> --out <directory>` emits
+`release_order.c8.bpmn` for a `camunda_8` executor; `camunda_7` emits the C7 dialect as
+`release_order.c7.bpmn`. Open the matching file in Camunda Modeler. Both dialects share stable SHA-1-derived
+node IDs and BPMN DI. They contain named run-API calls and fingerprints, with no SQL or credentials.
+
+C7 uses Camunda Connect HTTP, Spin JSON and Groovy for response-header and obligation-time handling. Its
+`TTR_CONN_AUTOMATION` runtime bean supplies the Server origin and bearer. C8 uses the standard REST outbound
+connector, the `TTR_AUTOMATION_URL` variable and connector secret `TTR_CONN_AUTOMATION`. The generated README
+names the complete input and adapter requirements. C7 cron schedules require the engine JVM timezone to match
+the authored hint; C8 calendar schedules emit zoned ISO repeating intervals. Minute intervals use ISO cycles.
+
+Only a newly claimed run drives effects. Replays finish that step; live handles poll and permit one re-open
+after abandonment/failure. Later process steps share the first run ID plus the step name as a caller key,
+including after recovery. The diagram includes parallel contexts, route branches, per-row action tasks, bounded
+evaluation, stale-export boundaries and obligation message/timer waits. Missing obligation/action evidence or
+truncated route pages refuses rather than finishing with partial effects.
+
+Mail and approval nodes are customer integration templates. The mail worker (`TTR_CONN_MAIL`) and the exchange's
+approval integration belong to Platform; this export does not bundle or certify them. The file and its Modeler
+opening are the Camunda acceptance artefacts; no live Camunda deployment is part of this exporter.
+
+Offline structure conformance needs the export directory and a pinned fixture, with no Server or token:
+
+```sh
+ttrp conform --replay replay-release.yaml --cells camunda_8.on_event --export release_bpmn.camunda_8.export
+```
+
+The driver checks the manifest call inventory against actual BPMN tasks, connector paths, route branches and
+graph reachability. Success is `structure-agree`, which makes no verdict/action execution claim. A removed task
+or branch returns exit 3 with a structural diff; malformed/unsafe XML returns driver-error exit 2. XML validation
+uses the bundled standard BPMN schemas and explicitly local schemas for the supported extension subset.
+
 ## Conformance of a recipe
 
 Replay compares a pinned golden case with native dry-run evidence. Batch opens one `port: keys` run;

@@ -299,6 +299,116 @@ class RecipeExportSpec :
             )
             return project
         }
+        "Camunda CLI exports the real H-1 in both dialects and structural replay needs no Server" {
+            for (target in listOf("camunda_7", "camunda_8")) {
+                val project = exportProject()
+                val worldPath = project.resolve("models/hartland/worlds/demo.ttrm")
+                Files.writeString(
+                    worldPath,
+                    Files.readString(worldPath).replace("extends: camunda_8", "extends: $target"),
+                )
+                val bundleModels = temporaryDirectory("camunda-bundle-models")
+                root.toFile().copyRecursively(bundleModels.toFile(), overwrite = true)
+                Files.writeString(bundleModels.resolve("hartland/worlds/demo.ttrm"), Files.readString(worldPath))
+                val source = locate("packages/kotlin/ttrp-frontend/src/test/resources/recipes/release_order.ttrp")
+                val bundle =
+                    BundleAssembler("test").build(
+                        source = Files.readString(source),
+                        fileName = source.toString(),
+                        recipeDir = source.parent,
+                        pipelineManifest =
+                            org.tatrman.ttrp.project.TtrpManifest(
+                                world = "hartland.worlds.demo",
+                                manifestDir = project,
+                            ),
+                        modelsRoot = bundleModels,
+                        outDir = temporaryDirectory("camunda-h1-bundle"),
+                    )
+                val out = temporaryDirectory("camunda-real-h1")
+                val result =
+                    TtrpCommand()
+                        .subcommands(
+                            EmitCommand(),
+                        ).test(
+                            listOf(
+                                "emit",
+                                "--deployment",
+                                "release_bpmn",
+                                "--project",
+                                project.toString(),
+                                "--bundle",
+                                bundle.dir.toString(),
+                                "--out",
+                                out.toString(),
+                            ),
+                        )
+                io.kotest.assertions.withClue(result.output) { result.statusCode shouldBe 0 }
+                val folder = out.resolve("release_bpmn.$target.export")
+                val suffix = if (target == "camunda_7") "c7" else "c8"
+                val file = folder.resolve("release_order.$suffix.bpmn")
+                val xml = Files.readString(file)
+                val contract =
+                    org.tatrman.ttrp.conform.replay.CamundaStructureDriver
+                        .contract(xml)
+                val manifest =
+                    kotlinx.serialization.json.Json
+                        .parseToJsonElement(
+                            Files.readString(folder.resolve("manifest.json")),
+                        ).jsonObject
+                manifest.getValue("calls") shouldBe contract.getValue("calls")
+                contract
+                    .getValue("calls")
+                    .jsonArray.size
+                    .let { it > 10 } shouldBe true
+                golden("release_bpmn_$suffix", xml.trimEnd())
+                val fixture = out.resolve("structure.yaml")
+                Files.writeString(
+                    fixture,
+                    "recipe: release_order\nas_of: \"2026-11-01\"\nkeys: [4711]\nexpected: {verdicts: [{key: 4711, route: release}]}\npinned_from: {run: prior, at: now, by: test}\n",
+                )
+                val output = mutableListOf<String>()
+                org.tatrman.ttrp.cli.ReplayConformCli.run(
+                    fixture.toString(),
+                    listOf("$target.on_event"),
+                    null,
+                    null,
+                    null,
+                    null,
+                    listOf(folder.toString()),
+                    emptyMap(),
+                    output::add,
+                ) shouldBe
+                    0
+                output.single() shouldContain "structure-agree"
+                val id =
+                    contract
+                        .getValue("calls")
+                        .jsonArray
+                        .first()
+                        .jsonObject
+                        .getValue("task")
+                        .jsonPrimitive.content
+                Files.writeString(
+                    file,
+                    xml.replace(Regex("<bpmn:serviceTask[^>]*id=\"$id\"[\\s\\S]*?</bpmn:serviceTask>"), ""),
+                )
+                org.tatrman.ttrp.cli.ReplayConformCli.run(
+                    fixture.toString(),
+                    listOf(
+                        "$target.on_event",
+                    ),
+                    null,
+                    null,
+                    null,
+                    null,
+                    listOf(folder.toString()),
+                    emptyMap(),
+                    {
+                    },
+                ) shouldBe
+                    3
+            }
+        }
         "n8n CLI export renders the compiled H-1 recipe and publishes the exact workflow calls" {
             val project = exportProject()
             val bundle = build("release_order")

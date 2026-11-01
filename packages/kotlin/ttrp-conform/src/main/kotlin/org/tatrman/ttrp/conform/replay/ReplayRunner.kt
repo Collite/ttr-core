@@ -85,8 +85,23 @@ object ReplayRunner {
                     CellReport(cell, "seed")
                 } else {
                     try {
-                        val diffs = ReplayComparator.compare(fixture, driver(cell).run(fixture, cell))
-                        CellReport(cell, if (diffs.isEmpty()) "agree" else "disagree", diffs)
+                        val selected = driver(cell)
+                        val structural = selected is StructuralDriver
+                        val diffs =
+                            if (selected is StructuralDriver) {
+                                selected.compareStructure(fixture, cell)
+                            } else {
+                                ReplayComparator.compare(fixture, selected.run(fixture, cell))
+                            }
+                        CellReport(
+                            cell,
+                            if (diffs.isEmpty()) {
+                                if (structural) "structure-agree" else "agree"
+                            } else {
+                                "disagree"
+                            },
+                            diffs,
+                        )
                     } catch (e: Exception) {
                         CellReport(cell, "error", error = e.message ?: e.javaClass.simpleName)
                     }

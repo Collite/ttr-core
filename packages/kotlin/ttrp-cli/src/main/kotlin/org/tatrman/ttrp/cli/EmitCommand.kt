@@ -508,13 +508,22 @@ class EmitCommand : CliktCommand(name = "emit") {
                             ?.get("calls")
                             ?.jsonArray
                     }
+                val bpmnCalls =
+                    result.files.entries.singleOrNull { it.key.endsWith(".bpmn") }?.value?.let {
+                        org.tatrman.ttrp.conform.replay.CamundaStructureDriver
+                            .contract(
+                                it.decodeToString(),
+                            ).getValue("calls")
+                            .jsonArray
+                    }
+                val renderedCalls = workflowCalls ?: bpmnCalls
                 val finalManifest =
-                    if (workflowCalls ==
+                    if (renderedCalls ==
                         null
                     ) {
                         exportManifest
                     } else {
-                        JsonObject(exportManifest + ("calls" to workflowCalls))
+                        JsonObject(exportManifest + ("calls" to renderedCalls))
                     }
                 ExportFolderWriter.write(
                     folder,
