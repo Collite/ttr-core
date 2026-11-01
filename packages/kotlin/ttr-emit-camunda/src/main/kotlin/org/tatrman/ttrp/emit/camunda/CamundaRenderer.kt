@@ -446,6 +446,7 @@ internal class CamundaRenderer(
             d.mapping(
                 mapOf(
                     "ttrPageState" to obj("rows" to d.array(), "offset" to "0", "size" to "0", "reads" to "0"),
+                    "ttrPage" to obj(), // Keep connector results inside this route's scope across inclusive branches.
                     "ttrExpectedRows" to expected,
                 ),
                 mapOf(rows to d.field("ttrPageState", "rows")),

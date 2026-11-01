@@ -484,6 +484,63 @@ class CamundaReviewRegressionSpec :
                 }
             }
         }
+        "C5 parallel route responses stay in separate paging scopes" {
+            for (dialect in Dialect.entries) {
+                val root = reviewDocument(releaseGraph(dialect.choose("camunda_7", "camunda_8")), dialect)
+                val expr = ReviewExpressions(dialect)
+                val parent =
+                    mutableMapOf<String, Any?>(
+                        "ttrEvaluation" to
+                            expr.value(
+                                """{"verdict":{"routes":{"release":{"rowCount":1},"hold_sales":{"rowCount":1}}}}""",
+                            ),
+                    )
+
+                fun locals(route: String): MutableMap<String, Any?> {
+                    val pages = root.named("page $route rows")
+                    val inputs =
+                        pages.descendants(
+                            dialect.choose("inputParameter", "input"),
+                            dialect.choose(C7NS, C8NS),
+                        )
+                    return inputs
+                        .filter {
+                            it.getAttribute(dialect.choose("name", "target")) in
+                                setOf("ttrPage", "ttrPageState", "ttrExpectedRows")
+                        }.associate {
+                            it.getAttribute(dialect.choose("name", "target")) to
+                                expr.evaluate(
+                                    if (dialect == Dialect.C7) it.textContent.trim() else it.getAttribute("source"),
+                                    parent,
+                                )
+                        }.toMutableMap()
+                }
+                val a = locals("release")
+                val b = locals("hold_sales")
+
+                // Both engines update the closest existing variable, otherwise creating it at root.
+                // Complete B between A's read and validation, as inclusive branches can do.
+                fun complete(
+                    scope: MutableMap<String, Any?>,
+                    key: Int,
+                ) {
+                    val owner = if ("ttrPage" in scope) scope else parent
+                    owner["ttrPage"] = expr.value("""{"rows":[{"order_number":$key}],"rowCount":1}""")
+                }
+                complete(a, 4711)
+                complete(b, 4712)
+                val key =
+                    dialect.condition(
+                        dialect.choose(
+                            "ttrPage.prop('rows').elements().get(0).prop('order_number').numberValue()",
+                            "ttrPage.rows[1].order_number",
+                        ),
+                    )
+                (expr.evaluate(key, parent + a) as Number).toInt() shouldBe 4711
+                (expr.evaluate(key, parent + b) as Number).toInt() shouldBe 4712
+                parent.containsKey("ttrPage") shouldBe false
+            }
+        }
         "C6 digest delivery refuses in a program or any process step while immediate renders" {
             for (dialect in Dialect.entries) {
                 val graph = releaseGraph(dialect.choose("camunda_7", "camunda_8"), true)

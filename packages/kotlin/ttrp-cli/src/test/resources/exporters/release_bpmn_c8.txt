@@ -431,6 +431,7 @@
           <bpmn:extensionElements>
             <zeebe:ioMapping>
               <zeebe:input source="={&quot;rows&quot;:[],&quot;offset&quot;:0,&quot;size&quot;:0,&quot;reads&quot;:0}" target="ttrPageState" />
+              <zeebe:input source="={}" target="ttrPage" />
               <zeebe:input source="=get value(ttrEvaluation.verdict.routes,&quot;hold_sales&quot;).rowCount" target="ttrExpectedRows" />
               <zeebe:output source="=ttrPageState.rows" target="ttrRows_n_424e4350a604c228eb16" />
             </zeebe:ioMapping>
@@ -589,6 +590,7 @@
           <bpmn:extensionElements>
             <zeebe:ioMapping>
               <zeebe:input source="={&quot;rows&quot;:[],&quot;offset&quot;:0,&quot;size&quot;:0,&quot;reads&quot;:0}" target="ttrPageState" />
+              <zeebe:input source="={}" target="ttrPage" />
               <zeebe:input source="=get value(ttrEvaluation.verdict.routes,&quot;hold_ar&quot;).rowCount" target="ttrExpectedRows" />
               <zeebe:output source="=ttrPageState.rows" target="ttrRows_n_957e2b8409cc49450ca4" />
             </zeebe:ioMapping>
@@ -747,6 +749,7 @@
           <bpmn:extensionElements>
             <zeebe:ioMapping>
               <zeebe:input source="={&quot;rows&quot;:[],&quot;offset&quot;:0,&quot;size&quot;:0,&quot;reads&quot;:0}" target="ttrPageState" />
+              <zeebe:input source="={}" target="ttrPage" />
               <zeebe:input source="=get value(ttrEvaluation.verdict.routes,&quot;release_confirmed&quot;).rowCount" target="ttrExpectedRows" />
               <zeebe:output source="=ttrPageState.rows" target="ttrRows_n_ce4ac6acfec6dd7be82a" />
             </zeebe:ioMapping>
@@ -863,6 +866,7 @@
           <bpmn:extensionElements>
             <zeebe:ioMapping>
               <zeebe:input source="={&quot;rows&quot;:[],&quot;offset&quot;:0,&quot;size&quot;:0,&quot;reads&quot;:0}" target="ttrPageState" />
+              <zeebe:input source="={}" target="ttrPage" />
               <zeebe:input source="=get value(ttrEvaluation.verdict.routes,&quot;release&quot;).rowCount" target="ttrExpectedRows" />
               <zeebe:output source="=ttrPageState.rows" target="ttrRows_n_01f561ac4ab15d6a23a5" />
             </zeebe:ioMapping>
