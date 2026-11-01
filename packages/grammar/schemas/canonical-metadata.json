@@ -3467,7 +3467,7 @@
     "modelDirective": "MODEL modelCode ( SCHEMA id ) ? ( LOCALE id ) ?",
     "modelCode": "DB | ER | BINDING | QUERY | CNC | MD | WORLD | LEXICON | AUTOMATION | CN",
     "definition": "DEF objectDefinition",
-    "objectDefinition": "PROJECT id projectDef | TABLE id tableDef | VIEW id viewDef | COLUMN id columnDef | INDEX id indexDef | CONSTRAINT id constraintDef | FK id fkDef | PROCEDURE id procedureDef | ENTITY id entityDef | ATTRIBUTE id attributeDef | RELATION id relationDef | ER2DB_ENTITY id er2dbEntityDef | ER2DB_ATTRIBUTE id er2dbAttributeDef | ER2DB_RELATION id er2dbRelationDef | QUERY id queryDef | ROLE id roleDef | ER2CNC_ROLE id er2cncRoleDef | DRILL_MAP id drillMapDef | AREA id areaDef | SCHEMA id schemaDef | DOMAIN id mdDomainDef | DIMENSION id dimensionDef | MAP id mdMapDef | HIERARCHY id hierarchyDef | MEASURE id measureDef | CUBELET id cubeletDef | MD2DB_CUBELET id md2dbCubeletDef | MD2DB_DOMAIN id md2dbDomainDef | MD2DB_MAP id md2dbMapDef | MD2ER_DIMENSION id md2erDimensionDef | MD2ER_CUBELET id md2erCubeletDef | WORLD id worldDef | TERM id lexiconEntryDef | PATTERN id lexiconEntryDef | EXAMPLE id lexiconEntryDef | PARAMETER id autoBody | ACTION id autoBody | SERVICE id autoBody | APPROVAL id autoBody | PROGRAM id autoBody | RECIPE id autoBody | SUBKIND id cnBody | KIND id cnBody | EVENT id cnBody | PHASE id cnBody | QUALITY id cnBody | RELATION_TYPE id cnBody | CN2MD_KIND id cnBindingBody | CN2MD_ROLE id cnBindingBody | CN2MD_QUALITY id cnBindingBody | CN2MD_EVENT id cnBindingBody | CN2ER_KIND id cnBindingBody | CN2ER_ROLE id cnBindingBody | CN2ER_EVENT id cnBindingBody | CN2ER_QUALITY id cnBindingBody | CN2ER_PHASE id cnBindingBody | CN2DB_CONCEPT id cnBindingBody",
+    "objectDefinition": "PROJECT id projectDef | TABLE id tableDef | VIEW id viewDef | COLUMN id columnDef | INDEX id indexDef | CONSTRAINT id constraintDef | FK id fkDef | PROCEDURE id procedureDef | ENTITY id entityDef | ATTRIBUTE id attributeDef | RELATION id relationDef | ER2DB_ENTITY id er2dbEntityDef | ER2DB_ATTRIBUTE id er2dbAttributeDef | ER2DB_RELATION id er2dbRelationDef | QUERY id queryDef | ROLE id roleDef | ER2CNC_ROLE id er2cncRoleDef | DRILL_MAP id drillMapDef | AREA id areaDef | SCHEMA id schemaDef | DOMAIN id mdDomainDef | DIMENSION id dimensionDef | MAP id mdMapDef | HIERARCHY id hierarchyDef | MEASURE id measureDef | CUBELET id cubeletDef | MD2DB_CUBELET id md2dbCubeletDef | MD2DB_DOMAIN id md2dbDomainDef | MD2DB_MAP id md2dbMapDef | MD2ER_DIMENSION id md2erDimensionDef | MD2ER_CUBELET id md2erCubeletDef | WORLD id worldDef | TERM id lexiconEntryDef | PATTERN id lexiconEntryDef | EXAMPLE id lexiconEntryDef | PARAMETER id autoBody | ACTION id autoBody | SERVICE id autoBody | APPROVAL id autoBody | PROGRAM id autoBody | RECIPE id autoBody | ( SUBKIND | VARIANT ) id cnBody | KIND id cnBody | EVENT id cnBody | PHASE id cnBody | QUALITY id cnBody | RELATION_TYPE id cnBody | CN2MD_KIND id cnBindingBody | CN2MD_ROLE id cnBindingBody | CN2MD_QUALITY id cnBindingBody | CN2MD_EVENT id cnBindingBody | CN2ER_KIND id cnBindingBody | CN2ER_ROLE id cnBindingBody | CN2ER_EVENT id cnBindingBody | CN2ER_QUALITY id cnBindingBody | CN2ER_PHASE id cnBindingBody | CN2DB_CONCEPT id cnBindingBody",
     "projectDef": "LBRACE ( projectProperty ( COMMA ? projectProperty ) * COMMA ? ) ? RBRACE",
     "tableDef": "LBRACE ( tableProperty ( COMMA ? tableProperty ) * COMMA ? ) ? RBRACE",
     "viewDef": "LBRACE ( viewProperty ( COMMA ? viewProperty ) * COMMA ? ) ? RBRACE",
@@ -3559,7 +3559,7 @@
     "conceptMembersProperty": "MEMBERS propSep ? embeddedBlock",
     "valueSpaceProperty": "VALUE_SPACE propSep ? id",
     "cnEntry": "cnKey propSep ? cnValue",
-    "cnKey": "IDENT | HIERARCHY | VIA | INDEX_SECURITY | SKIP_SECURITY | DEFAULT_VALUE | BINDS",
+    "cnKey": "IDENT | HIERARCHY | VIA | INDEX_SECURITY | SKIP_SECURITY | DEFAULT_VALUE | BINDS | VARIANT",
     "cnValue": "cnObject | cnList | literal | id",
     "cnObject": "LBRACE ( cnObjectEntry ( COMMA ? cnObjectEntry ) * COMMA ? ) ? RBRACE",
     "cnObjectEntry": "( id | DATA_TYPE | PRECISION ) propSep ? cnValue",
@@ -3759,7 +3759,7 @@
     "key": "id",
     "functionCall": "id LPAREN ( value ( COMMA value ) * ) ? RPAREN",
     "id": "idPart ( DOT idPart ) *",
-    "idPart": "IDENT | INDEX_SECURITY | SKIP_SECURITY | DEFAULT_VALUE | BINDS | SUBKIND | PER | UNTIL | DB | ER | BINDING | MAP | QUERY | CNC | ROLE | ER2CNC_ROLE | TABLE | VIEW | COLUMN | INDEX | CONSTRAINT | FK | PROCEDURE | ENTITY | ATTRIBUTE | RELATION | ER2DB_ENTITY | ER2DB_ATTRIBUTE | ER2DB_RELATION | MODEL | SCHEMA | PROJECT | NAME | LABEL | DIRECTION | FROM | TO | PACKAGE | IMPORT | GRAPH | OBJECTS | LAYOUT | TTRL | CANVAS | DRILL_MAP | ARGS | DISPLAY | OVERRIDE | PACKAGES | ENTITIES | AREA | MD | DOMAIN | DIMENSION | HIERARCHY | MEASURE | CUBELET | MD2DB_CUBELET | MD2DB_DOMAIN | MD2DB_MAP | MD2ER_CUBELET | MD2ER_DIMENSION | RESTRICT | MEMBERS | KIND | CALC | KEY | HIERARCHIES | PUBLISH | LEVELS | VIA | CLASS | AGGREGATION | VALID_BY | GRAIN | MEASURES | SHAPE | JOURNALING | SOURCE | ALLOCATION | WORLD | ENGINE | EXECUTOR | STORAGE | VERSION | SEMANTICS | LEXICON | TERM | PATTERN | EXAMPLE | FOR | FORMS | MATCH | LOCALE | PATTERNS | EXAMPLES | ALIASES | MANAGEMENT | CHANGE_SEMANTICS | WRITEBACK | SECURITY | OWN | CLASSIFY | GRANT | MASK | ON | METHOD | AUTOMATION | PARAMETER | ACTION | SERVICE | APPROVAL | PROGRAM | RECIPE | IDENTITY | DEPLOYMENT | PROCESS | STEP | STEPS | TRANSITION | TRANSITIONS | STATES | SET | RESOLVE | DELIVERY | PARAMETERS | CN | EVENT | PHASE | QUALITY | RELATION_TYPE | CONCEPT | CN2MD_KIND | CN2MD_ROLE | CN2MD_QUALITY | CN2MD_EVENT | CN2ER_KIND | CN2ER_ROLE | CN2ER_EVENT | CN2ER_QUALITY | CN2ER_PHASE | CN2DB_CONCEPT | INVOLVES | PERIOD | GROUNDS | DEFINITION | VALUE_SPACE | EXTENT | BASIS | AS | DEFAULT | SENSE_PRIORITY",
+    "idPart": "IDENT | INDEX_SECURITY | SKIP_SECURITY | DEFAULT_VALUE | BINDS | SUBKIND | PER | UNTIL | VARIANT | DB | ER | BINDING | MAP | QUERY | CNC | ROLE | ER2CNC_ROLE | TABLE | VIEW | COLUMN | INDEX | CONSTRAINT | FK | PROCEDURE | ENTITY | ATTRIBUTE | RELATION | ER2DB_ENTITY | ER2DB_ATTRIBUTE | ER2DB_RELATION | MODEL | SCHEMA | PROJECT | NAME | LABEL | DIRECTION | FROM | TO | PACKAGE | IMPORT | GRAPH | OBJECTS | LAYOUT | TTRL | CANVAS | DRILL_MAP | ARGS | DISPLAY | OVERRIDE | PACKAGES | ENTITIES | AREA | MD | DOMAIN | DIMENSION | HIERARCHY | MEASURE | CUBELET | MD2DB_CUBELET | MD2DB_DOMAIN | MD2DB_MAP | MD2ER_CUBELET | MD2ER_DIMENSION | RESTRICT | MEMBERS | KIND | CALC | KEY | HIERARCHIES | PUBLISH | LEVELS | VIA | CLASS | AGGREGATION | VALID_BY | GRAIN | MEASURES | SHAPE | JOURNALING | SOURCE | ALLOCATION | WORLD | ENGINE | EXECUTOR | STORAGE | VERSION | SEMANTICS | LEXICON | TERM | PATTERN | EXAMPLE | FOR | FORMS | MATCH | LOCALE | PATTERNS | EXAMPLES | ALIASES | MANAGEMENT | CHANGE_SEMANTICS | WRITEBACK | SECURITY | OWN | CLASSIFY | GRANT | MASK | ON | METHOD | AUTOMATION | PARAMETER | ACTION | SERVICE | APPROVAL | PROGRAM | RECIPE | IDENTITY | DEPLOYMENT | PROCESS | STEP | STEPS | TRANSITION | TRANSITIONS | STATES | SET | RESOLVE | DELIVERY | PARAMETERS | CN | EVENT | PHASE | QUALITY | RELATION_TYPE | CONCEPT | CN2MD_KIND | CN2MD_ROLE | CN2MD_QUALITY | CN2MD_EVENT | CN2ER_KIND | CN2ER_ROLE | CN2ER_EVENT | CN2ER_QUALITY | CN2ER_PHASE | CN2DB_CONCEPT | INVOLVES | PERIOD | GROUNDS | DEFINITION | VALUE_SPACE | EXTENT | BASIS | AS | DEFAULT | SENSE_PRIORITY",
     "DEF": "'def'",
     "SCHEMA": "'schema'",
     "PROJECT": "'project'",
@@ -3860,6 +3860,7 @@
     "CN": "'cn'",
     "EVENT": "'event'",
     "SUBKIND": "'subkind'",
+    "VARIANT": "'variant'",
     "PER": "'per'",
     "UNTIL": "'until'",
     "PHASE": "'phase'",
@@ -4299,6 +4300,9 @@
     ],
     "SUBKIND": [
       "subkind"
+    ],
+    "VARIANT": [
+      "variant"
     ],
     "PER": [
       "per"
