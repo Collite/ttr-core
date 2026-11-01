@@ -66,7 +66,7 @@ class CanonicalYamlFollowupSpec :
             val hex = "0x" + "F".repeat(1_000_000)
             val cases =
                 listOf(
-                    yaml("a: $decimal", "automation", "program") to false,
+                    yaml("a: $decimal", "automation", "program").replace("id: D", "id: \"D\"") to false,
                     yaml("a: $hex", "automation", "program") to false,
                     "model automation\ndef program D {\n  a: $decimal\n}\n" to true,
                 )
@@ -102,5 +102,38 @@ class CanonicalYamlFollowupSpec :
                 CanonicalYaml.write(CanonicalYaml.read(CanonicalYaml.write(doc))) shouldBe CanonicalYaml.write(doc)
             }
             CanonicalYaml.fromTtr("model automation\ndef program D { a: $decimal }")
+        }
+        test("N3 early refusal never limits numeric-looking strings blocks tags or comments") {
+            val digits = "1".repeat(MAX_NUMBER_LENGTH + 1)
+            for (value in listOf(
+                "'$digits'",
+                "!!str $digits",
+                "|\n  a: $digits",
+                "${digits}suffix",
+                "$digits\n  suffix",
+                "\"text\n  a: $digits\"",
+            )) {
+                val doc = CanonicalYaml.read(yaml("a: $value", "automation", "program"))
+                doc.ast.ok shouldBe true
+            }
+            CanonicalYaml.fromTtr("model automation\ndef program D {\n a: \"$digits\"\n}").ast.ok shouldBe true
+            CanonicalYaml.fromTtr("model automation\ndef program D {\n // a: $digits\n a: 1\n}").ast.ok shouldBe true
+            val flow =
+                "ttr: \"0.21\"\nmodel: automation\ndefs:\n - kind: program\n   id: D\n" +
+                    "   properties: {\n      a: $digits\n      suffix\n   }\n"
+            CanonicalYaml.read(flow).ast.ok shouldBe true
+        }
+        test("N3 simple numeric leaf preflight rejects before the full scanner, including quoted metadata") {
+            val digits = "1".repeat(MAX_NUMBER_LENGTH + 1)
+            for (value in listOf(digits, "0x$digits")) {
+                val source = yaml("a: $value", "automation", "program").replace("id: D", "id: \"D\"")
+                val error =
+                    shouldThrow<CanonicalYamlException> { checkSimpleNumericLines(source, "early.yaml", yaml = true) }
+                error.line shouldBe 7
+                error.column shouldBe 10
+            }
+            shouldThrow<CanonicalYamlException> {
+                checkSimpleNumericLines("model automation\ndef program D {\n a: $digits\n}", "early.ttrm", yaml = false)
+            }.line shouldBe 3
         }
     })

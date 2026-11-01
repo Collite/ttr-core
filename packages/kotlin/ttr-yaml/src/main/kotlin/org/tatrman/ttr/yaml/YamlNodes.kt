@@ -135,6 +135,7 @@ internal class YamlNodes(
 
     fun read(source: String): JsonObject {
         inputText = source
+        checkSimpleNumericLines(source, file, yaml = true)
         val settings =
             LoadSettings
                 .builder()
