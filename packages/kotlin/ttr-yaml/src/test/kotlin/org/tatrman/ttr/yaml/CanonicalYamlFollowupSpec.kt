@@ -36,4 +36,26 @@ class CanonicalYamlFollowupSpec :
                 CanonicalYaml.write(doc) shouldBe CanonicalYaml.write(native)
             }
         }
+        for ((authored, normalized) in listOf(
+            "+1" to "1",
+            ".5" to "0.5",
+            "0x1F" to "31",
+            "0o17" to "15",
+            "5." to "5",
+        )) {
+            test("N2 YAML-only number $authored normalizes to its native spelling") {
+                val doc = CanonicalYaml.read(yaml("a: $authored", "automation", "program"))
+                val native = CanonicalYaml.fromTtr("model automation\ndef program D { a: $normalized }")
+                CanonicalYaml.write(doc) shouldBe CanonicalYaml.write(native)
+                CanonicalYaml.write(CanonicalYaml.fromTtr(CanonicalYaml.toTtr(doc))) shouldBe CanonicalYaml.write(doc)
+            }
+        }
+        for (spelling in listOf("01", "-0.0", "1.0", "1e3", "-2E-2")) {
+            test("N2 native numeric spelling $spelling survives both routes") {
+                val doc = CanonicalYaml.read(yaml("a: $spelling", "automation", "program"))
+                val native = CanonicalYaml.fromTtr("model automation\ndef program D { a: $spelling }")
+                CanonicalYaml.write(doc) shouldBe CanonicalYaml.write(native)
+                CanonicalYaml.write(CanonicalYaml.fromTtr(CanonicalYaml.toTtr(doc))) shouldBe CanonicalYaml.write(doc)
+            }
+        }
     })

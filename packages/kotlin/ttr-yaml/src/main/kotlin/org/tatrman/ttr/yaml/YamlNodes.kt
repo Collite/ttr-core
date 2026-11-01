@@ -324,7 +324,9 @@ internal class YamlNodes(
                             } catch (_: NumberFormatException) {
                                 fail(node, "Expected a finite number")
                             }
-                        number(decimalText) { fail(node, it) }.also { spellings[it] = node.value }
+                        number(decimalText) { fail(node, it) }.also {
+                            if (ttrNumber.matches(node.value)) spellings[it] = node.value
+                        }
                     }
                     else -> fail(node, "Unsupported YAML tag ${node.tag}")
                 }
