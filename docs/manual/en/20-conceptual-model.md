@@ -646,7 +646,7 @@ Each `cn/*` diagnostic fires in one of three places:
 |---|---|---|---|
 | `cn/duplicate-grounding` | error | editor | a second grounding of one concept, or a `concept { }` block restating a cn def differently |
 | `cn/grounding-target-kind` | error | editor | the target is not what the stereotype grounds to on that layer (a kind to a measure, a phase to md, …), or a `concept { }` on a cubelet's inline measure |
-| `concept-bearer-missing` | error | editor | a quality or a phase that names no bearer — `of:` is required (`ttr/required-property-missing` in the Kotlin and Python toolchains) |
+| `concept-bearer-missing` | error | editor | a quality, a phase or a variant that names no bearer — `of:` is required (`ttr/required-property-missing` in the Kotlin and Python toolchains) |
 | `cn/role-no-event` | error | editor | a role names no defining event, or its `event:` is not an event |
 | `cn/phase-double-definition` | error | editor | a phase with both `definition:` and a grounding |
 | `cn/phase-source-conflict` | error | editor | a phase with more than one source (a definition, a grounding, `from:` + `until:`), or a `from:` without its `until:` |
@@ -1115,4 +1115,5 @@ classification `cnc` recorded is derived — fact, dimension and bridge from the
 
 `event`, `period`, `quality`, `phase`, `concept`, `default`, `as` and the other cn keywords remain ordinary names
 everywhere else — a column called `period`, an object key `default:`, a ref part `er.entity.event` all keep working.
-So do grammar 0.20's `subkind`, `until` and `per`, and 0.21.1's `variant`: a quality named `per`, an attribute `until`.
+So do grammar 0.20's `subkind`, `until` and `per`, and 0.21.1's `variant`: a quality named `per`, an attribute `until`,
+a free-form key `variant:` or (since 0.21.2) `subkind:`.

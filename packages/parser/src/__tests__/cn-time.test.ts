@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseString } from '../index.js';
-import { conceptProperty } from '../concept.js';
+import { conceptKeyword, conceptProperty } from '../concept.js';
 import type { ConceptDef } from '../ast.js';
 
 const fixture = readFileSync(new URL('../../../../tests/conformance/fixtures/115-cn-things-in-time.ttrm', import.meta.url), 'utf8');
@@ -62,6 +62,14 @@ describe('CN-P8 S8.6 variant (CN-D32)', () => {
       ['MissingBearer', 'variant'],
     ]);
     expect((result.ast!.definitions as ConceptDef[]).filter((d) => d.stereotype !== 'subkind').every((d) => d.spelling === undefined)).toBe(true);
+  });
+
+  // review-200 N1: one "word as written" rule for the formatter and the LSP outline.
+  it('conceptKeyword prints the recorded word, `variant` for a subkind that records none', () => {
+    expect(conceptKeyword({ stereotype: 'subkind', spelling: 'subkind' })).toBe('subkind');
+    expect(conceptKeyword({ stereotype: 'subkind', spelling: 'variant' })).toBe('variant');
+    expect(conceptKeyword({ stereotype: 'subkind' })).toBe('variant');
+    expect(conceptKeyword({ stereotype: 'phase' })).toBe('phase');
   });
 
   it('keeps `variant` a name outside a cn def head', () => {

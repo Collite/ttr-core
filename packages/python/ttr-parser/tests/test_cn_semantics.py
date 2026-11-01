@@ -148,6 +148,15 @@ def test_two_participants_the_bearer_can_be_are_named_by_label() -> None:
     assert "phase 'Reopening' from bound 'Reopened' has two participants 'Ticket' can be — 'ticket', 'parent'" in messages
 
 
+def test_the_subkind_as_kind_hint_says_def_variant() -> None:
+    """review-200 R4: the one message S8.6 changed below the parser; the TS and Kotlin twins pin the same text."""
+    p = _scenario("123-cn-variant-rules")
+    diagnostics = validate_cn(p.docs, p.resolver).diagnostics
+    assert [d.message for d in diagnostics if d.code == DiagnosticCode.CN_SUBKIND_AS_KIND] == [
+        "kind 'LegacyWeb' with members and is_a is a subkind — use 'def variant'"
+    ]
+
+
 def test_equivalence_fixtures_stay_clean_but_for_the_advisory_db_grounding() -> None:
     assert _cn_sites("81-cn-desugar-top-down") == ["d-concepts.ttrm:28 cn/db-grounding"]
     assert _cn_sites("82-cn-desugar-top-down-authored") == ["e-bindings.ttrm:25 cn/db-grounding"]

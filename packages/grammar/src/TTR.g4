@@ -5,6 +5,7 @@
 // 0.21 (MW-53): lexical indexSecurity; query skipSecurity; parameter
 // defaultValue and binds. Typed optional declarations; execution stays host-owned.
 // 0.21.x (CN-P8 S8.6): variant = subkind alias (CN-D32) — one soft keyword, one stereotype.
+// 0.21.2: subkind is a cn free-form key too, as variant is.
 // 0.20 (CN-P8): subkind; involves/period on kinds; phase episodes
 // (grounds+period, from/until); valued-state projection (per/from).
 // 0.18 (HP-P1): md2er_dimension; structural md2er_cubelet measures.
@@ -758,9 +759,10 @@ valueSpaceProperty     : VALUE_SPACE propSep? id ;
 // of a cn body. Inside a nested object a key is any `id` (every `idPart` word — `to`, `from`, `name`,
 // `default` …, not `cardinality`) or `type` / `precision`. HIERARCHY and VIA are the two pre-0.17 tokens
 // admitted as free-form keys (`hierarchy: { closure: … }`, `via: [ … ]`). The 0.21 soft keywords
-// also remain free-form keys, and so does 0.21.x's `variant`: none starts a typed cn property.
+// also remain free-form keys, and so do 0.20's `subkind` (since 0.21.2) and 0.21.x's `variant`: none
+// starts a typed cn property. (`per` and `until`, 0.20's other soft keywords, do: `per:`, `until:`.)
 cnEntry          : cnKey propSep? cnValue ;
-cnKey            : IDENT | HIERARCHY | VIA | INDEX_SECURITY | SKIP_SECURITY | DEFAULT_VALUE | BINDS | VARIANT ;
+cnKey            : IDENT | HIERARCHY | VIA | INDEX_SECURITY | SKIP_SECURITY | DEFAULT_VALUE | BINDS | SUBKIND | VARIANT ;
 cnValue          : cnObject | cnList | literal | id ;
 cnObject         : LBRACE (cnObjectEntry (COMMA? cnObjectEntry)* COMMA?)? RBRACE ;
 // Nested keys are any word, plus the two type keywords cn spells as keys: `relations: [ { type: supplies,

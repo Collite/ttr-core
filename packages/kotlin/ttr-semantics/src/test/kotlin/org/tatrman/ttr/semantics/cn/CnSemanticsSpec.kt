@@ -199,6 +199,16 @@ class CnSemanticsSpec :
                 "phase 'Reopening' from bound 'Reopened' has two participants 'Ticket' can be — 'ticket', 'parent'"
         }
 
+        // review-200 R4: the one message S8.6 changed below the parser; the TS and Python twins pin the same text.
+        "the subkind-as-kind hint says `def variant` (review-200)" {
+            val p = scenario("123-cn-variant-rules")
+            validateCn(p.docs, p.resolver)
+                .diagnostics
+                .filter { it.code == DiagnosticCode.CnSubkindAsKind }
+                .map { it.message } shouldBe
+                listOf("kind 'LegacyWeb' with members and is_a is a subkind — use 'def variant'")
+        }
+
         // ----- keys and resolution (S2.1's slot table) -----
 
         val er =

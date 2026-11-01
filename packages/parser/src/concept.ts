@@ -8,6 +8,7 @@ import { stringSourcePosition } from './strings.js';
  */
 import type {
   ConceptBody,
+  ConceptDef,
   ConceptEntry,
   ConceptProperty,
   ConceptRefKey,
@@ -15,6 +16,14 @@ import type {
   EmbeddedBlock,
   SourceLocation,
 } from './ast.js';
+
+/**
+ * A concept def's keyword as written: a subkind keeps its author's word, and `variant`, the house spelling, when it
+ * records none (a synthesized def, CN-D32). The formatter prints it and the LSP outline shows it.
+ */
+export function conceptKeyword(def: Pick<ConceptDef, 'stereotype' | 'spelling'>): string {
+  return def.stereotype === 'subkind' ? (def.spelling ?? 'variant') : def.stereotype;
+}
 
 /** The first property of `kind` (a typed property; free-form ones are read with {@link conceptEntry}). */
 export function conceptProperty<K extends Exclude<ConceptProperty['kind'], 'ref' | 'entry'>>(
