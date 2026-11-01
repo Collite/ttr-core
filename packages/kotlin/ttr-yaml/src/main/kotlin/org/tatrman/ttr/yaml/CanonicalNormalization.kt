@@ -19,9 +19,39 @@ internal class CanonicalNormalization(
         result["defs"]?.let { defs -> result["defs"] = JsonArray(defs.jsonArray.map { definition(it.jsonObject) }) }
         result["graph"]?.let { graph ->
             val g = graph.jsonObject
-            result["graph"] = obj("id" to g.getValue("id"), "properties" to data(g.getValue("properties")))
+            result["graph"] =
+                obj(
+                    "id" to g.getValue("id"),
+                    "properties" to
+                        canonicalMap(
+                            g
+                                .getValue("properties")
+                                .jsonObject.entries
+                                .map { it.key to data(it.value) },
+                            listOf("model", "description", "tags", "objects", "layout"),
+                        ),
+                )
         }
-        result["security"]?.let { result["security"] = data(it) }
+        result["security"]?.let { blocks ->
+            result["security"] =
+                JsonArray(
+                    blocks.jsonArray.map { block ->
+                        JsonArray(
+                            block.jsonArray.map { statement ->
+                                val fields = statement.jsonObject
+                                val order =
+                                    when (fields.string("verb")) {
+                                        "own" -> listOf("verb", "object", "owner")
+                                        "classify" -> listOf("verb", "object", "classification")
+                                        "grant" -> listOf("verb", "privilege", "object", "to")
+                                        else -> listOf("verb", "object")
+                                    }
+                                canonicalMap(fields.entries.map { it.key to data(it.value) }, order)
+                            },
+                        )
+                    },
+                )
+        }
         return JsonObject(
             listOf("ttr", "package", "imports", "model", "schema", "locale", "graph", "security", "defs")
                 .mapNotNull { k ->
@@ -48,7 +78,7 @@ internal class CanonicalNormalization(
         value: JsonElement,
     ): JsonElement {
         val shape = CanonicalGrammar.body(name)
-        if ("fields" in shape) return data(value)
+        if ("fields" in shape) return orderedMap(value)
         val props = CanonicalGrammar.properties(name).associateBy { it.string("key") }
         val members = shape.getValue("members").jsonArray.map { it.jsonObject }
         val entries =
@@ -69,7 +99,7 @@ internal class CanonicalNormalization(
                                 v.jsonArray.map { member ->
                                     val m = member.jsonObject
                                     if (name == "storageDef") {
-                                        obj("id" to m["id"], "fields" to data(m.getValue("fields")))
+                                        obj("id" to m["id"], "fields" to orderedMap(m.getValue("fields")))
                                     } else {
                                         val b = members.single { it.string("kind") == m.string("kind") }.string("body")
                                         definition(m, b)
@@ -121,8 +151,25 @@ internal class CanonicalNormalization(
             return JsonArray(value.map { definition(it.jsonObject, "measureDef") })
         }
         if (symbol == "bindingValue" && value is JsonObject) return properties("bindingBlock", value)
+        if (symbol == "restrictBlock") {
+            return JsonObject(
+                value.jsonObject.mapValues { (_, v) ->
+                    if (v is JsonObject &&
+                        !isGenericRecord(v) &&
+                        v.keys != setOf("range") &&
+                        v.keys != setOf("object")
+                    ) {
+                        orderedMap(v)
+                    } else {
+                        data(v)
+                    }
+                },
+            )
+        }
         return data(value)
     }
+
+    private fun orderedMap(value: JsonElement): JsonObject = JsonObject(value.jsonObject.mapValues { data(it.value) })
 
     private fun data(value: JsonElement): JsonElement =
         when (value) {

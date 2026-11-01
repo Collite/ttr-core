@@ -98,9 +98,9 @@ dependencies {
     api(libs.antlr.runtime)
     implementation(libs.slf4j.api)
 
-    // kotlinx-serialization is only used by the test-only conformance dumper
-    // (src/test/.../conformance/ConformanceDump.kt) — keep it off the published
-    // runtime classpath. See contracts.md §1.
+    // ConformanceDump.kt lives in src/testFixtures/.../conformance, published in the
+    // test-fixtures variant. kotlinx-serialization stays off runtimeElements;
+    // parser tests also use it directly. See contracts.md §1.
     testImplementation(libs.json.schema.validator)
     testImplementation(libs.kotlinx.ser.json)
     testImplementation(libs.bundles.kotest)

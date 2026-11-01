@@ -9,6 +9,7 @@ import org.tatrman.ttr.parser.TtrStrings
 import org.tatrman.ttr.parser.generated.TTRLexer
 import org.tatrman.ttr.parser.generated.TTRParser
 import org.tatrman.ttr.parser.walker.Dedent
+import org.tatrman.ttr.parser.walker.resolveExpressionTag
 
 /** The syntax projection retains forms the semantic AST intentionally folds (graph/restrict/ordering). */
 internal class TtrSyntax(
@@ -28,6 +29,38 @@ internal class TtrSyntax(
     fun spelling(value: JsonElement): String? = numbers[value]
 
     private val origins = java.util.IdentityHashMap<JsonElement, Pair<Int, Int>>()
+    private var input = ""
+
+    fun invalid(
+        path: String,
+        message: String,
+    ): Nothing {
+        var p = path
+        while (true) {
+            val span = spans.filter { it.path == p }.minByOrNull { it.start }
+            if (span != null) invalidAt(span.start, message)
+            if (p.isEmpty()) invalidAt(0, message)
+            p = p.substringBeforeLast('/', "")
+        }
+    }
+
+    fun invalid(
+        value: JsonElement,
+        message: String,
+    ): Nothing = invalidAt(origins[value]?.first ?: 0, message)
+
+    private fun invalidAt(
+        offset: Int,
+        message: String,
+    ): Nothing {
+        val prefix = input.take(offset)
+        throw CanonicalYamlException(
+            file,
+            prefix.count { it == '\n' } + 1,
+            prefix.length - prefix.lastIndexOf('\n'),
+            message,
+        )
+    }
 
     private fun recorded(
         tree: ParseTree,
@@ -83,6 +116,7 @@ internal class TtrSyntax(
     }
 
     fun read(source: String): JsonObject {
+        input = source
         val errors = mutableListOf<CanonicalYamlException>()
         val listener =
             object : BaseErrorListener() {
@@ -261,11 +295,22 @@ internal class TtrSyntax(
                         ) {
                             recorded(rawValue, embedded(literal))
                         } else {
-                            value(rawValue)
+                            value(rawValue).let { v ->
+                                if (name == "cnBindingBody" && key == "filter" && v is JsonObject && "block" in v) {
+                                    obj("object" to v)
+                                } else {
+                                    v
+                                }
+                            }
                         }
                     entryTrees += key to node
                 }
-                rule == "worldSchemaField" -> fields.add(node.one("id").text to value(node.one("dataType")))
+                rule == "worldSchemaField" -> {
+                    val key = node.one("id").text
+                    if (fields.any { it.first == key }) fail(node.one("id"), "Duplicate storage field $key")
+                    fields.add(key to value(node.one("dataType")))
+                    entryTrees += key to node
+                }
                 node.nodes().firstOrNull()?.text == "def" -> {
                     val memberBody = node.rules().last { it.name() in CanonicalGrammar.bodies }
                     val kind = node.getChild(1).text
@@ -281,7 +326,11 @@ internal class TtrSyntax(
             }
         }
         tree.rules().forEach(::visit)
-        if (meta["fields"] != null) return canonicalMap(fields)
+        if (meta["fields"] != null) {
+            return JsonObject(fields.toMap()).also { result ->
+                propertyOrigins[result] = entryTrees.map { (key, node) -> "/${pointerKey(key)}" to node }
+            }
+        }
         if (members.isNotEmpty()) entries += (if (name == "storageDef") "schemas" else "members") to JsonArray(members)
         return try {
             CanonicalGrammar.serialize(name, entries, model).also { result ->
@@ -382,12 +431,20 @@ internal class TtrSyntax(
                 else -> {
                     val inner = raw.drop(3).dropLast(3)
                     val tag = inner.substringBefore('\n').trimEnd('\r', ' ', '\t')
-                    val block =
-                        Dedent
-                            .applyTextwrapDedent(
-                                inner.substringAfter('\n'),
-                            ).replace(Regex("\\r?\\n$"), "")
-                    obj("block" to text(block), "tag" to text(tag))
+                    val sourceBlock =
+                        generateSequence(token.parent) { it.parent }.any {
+                            it.name() in setOf("sourceTextProperty", "definitionSqlProperty")
+                        }
+                    if (!sourceBlock && resolveExpressionTag(tag) == null) {
+                        obj("block" to text(Dedent.applyTextwrapDedent(inner)))
+                    } else {
+                        val block =
+                            Dedent
+                                .applyTextwrapDedent(
+                                    inner.substringAfter('\n'),
+                                ).replace(Regex("\\r?\\n$"), "")
+                        obj("block" to text(block), "tag" to text(tag))
+                    }
                 }
             }
         embeddedNodes += result
@@ -416,7 +473,7 @@ internal class TtrSyntax(
                         Dedent.applyTextwrapDedent(tree.text.drop(3).dropLast(3)),
                     )
                 TTRLexer.NUMBER_LITERAL ->
-                    Json.parseToJsonElement(tree.text.toBigDecimal().toPlainString()).also {
+                    number(tree.text) { fail(tree, it) }.also {
                         numbers[it] =
                             tree.text
                     }
@@ -426,17 +483,29 @@ internal class TtrSyntax(
             }
         }
         if (name in maps) {
+            val seen = mutableSetOf<String>()
             val entries =
                 tree.named(maps.getValue(name)).map { entry ->
                     val children = entry.rules().filter { it.name() != "propSep" }
-                    value(children.first()).jsonPrimitive.content to value(children.last())
+                    val key = value(children.first()).jsonPrimitive.content
+                    if (name == "membersBlock" &&
+                        !seen.add(key)
+                    ) {
+                        fail(children.first(), "Duplicate restrict member $key")
+                    }
+                    key to value(children.last())
                 }
             if (name == "membersBlock" &&
-                (entries.any { it.first == "range" } || entries.map { it.first } == listOf("object"))
+                (entries.any { it.first == "range" } || entries.map { it.first }.toSet() == setOf("object"))
             ) {
                 fail(tree, "Reserved restrict members key: range or object-only block")
             }
-            return canonicalMap(entries)
+            return (if (name == "membersBlock") JsonObject(entries.toMap()) else canonicalMap(entries)).also { result ->
+                propertyOrigins[result] =
+                    tree.named(maps.getValue(name)).mapIndexed { i, node ->
+                        "/${pointerKey(entries[i].first)}" to node
+                    }
+            }
         }
         return when (name) {
             "value", "cnValue", "autoValue" -> {

@@ -11,21 +11,23 @@ import org.snakeyaml.engine.v2.api.LoadSettings
 import org.snakeyaml.engine.v2.api.lowlevel.Compose
 import org.snakeyaml.engine.v2.exceptions.MarkedYamlEngineException
 import org.snakeyaml.engine.v2.exceptions.YamlEngineException
+import org.snakeyaml.engine.v2.exceptions.ReaderException
 import org.snakeyaml.engine.v2.nodes.*
 import org.snakeyaml.engine.v2.schema.CoreSchema
-import java.math.BigDecimal
 
 class CanonicalYamlException(
     val file: String,
     val line: Int,
     val column: Int,
-    detail: String,
+    val detail: String,
 ) : IllegalArgumentException("$file:$line:$column: $detail")
 
 internal class YamlNodes(
     private val file: String,
 ) {
     private val locations = mutableMapOf<String, Node>()
+    private val keys = mutableMapOf<String, Node>()
+    private val plNodes = mutableListOf<Node>()
     private var inputText = ""
     private val spellings = java.util.IdentityHashMap<JsonElement, String>()
 
@@ -33,7 +35,7 @@ internal class YamlNodes(
 
     fun numberText(path: String): String? =
         (node(path) as? ScalarNode)?.value?.takeIf {
-            it.matches(Regex("-?[0-9]+(?:\\.[0-9]+)?"))
+            it.matches(ttrNumber)
         }
 
     private fun node(path: String): Node? {
@@ -57,8 +59,11 @@ internal class YamlNodes(
         return locations[current]
     }
 
-    fun source(path: String): org.tatrman.ttr.parser.model.SourceLocation {
-        val node = node(path)
+    fun source(
+        path: String,
+        key: Boolean = false,
+    ): org.tatrman.ttr.parser.model.SourceLocation {
+        val node = if (key) keys[path] ?: node(path) else node(path)
         val a = node?.startMark?.orElse(null)
         val b = node?.endMark?.orElse(a)
         return org.tatrman.ttr.parser.model.SourceLocation(
@@ -135,7 +140,13 @@ internal class YamlNodes(
                 .builder()
                 .setLabel(file)
                 .setSchema(CoreSchema())
-                .setAllowDuplicateKeys(false)
+                .setVersionFunction { version ->
+                    if (version.major != 1 || version.minor != 2) {
+                        val line = source.lineSequence().indexOfFirst { it.startsWith("%YAML") }.coerceAtLeast(0)
+                        throw CanonicalYamlException(file, line + 1, 1, "Unsupported YAML version $version")
+                    }
+                    version
+                }.setAllowDuplicateKeys(false)
                 .setMaxAliasesForCollections(0)
                 .setCodePointLimit(3_000_000)
                 .build()
@@ -152,6 +163,19 @@ internal class YamlNodes(
                     (mark?.column ?: 0) + 1,
                     e.problem ?: "Invalid YAML",
                 )
+            } catch (e: ReaderException) {
+                val offset =
+                    source.offsetByCodePoints(
+                        0,
+                        e.position.coerceAtMost(source.codePointCount(0, source.length)),
+                    )
+                val prefix = source.take(offset)
+                throw CanonicalYamlException(
+                    file,
+                    prefix.count { it == '\n' } + 1,
+                    prefix.length - prefix.lastIndexOf('\n'),
+                    e.message ?: "Invalid YAML character",
+                )
             } catch (e: YamlEngineException) {
                 throw CanonicalYamlException(file, 1, 1, e.message ?: "Invalid YAML")
             }
@@ -160,14 +184,78 @@ internal class YamlNodes(
         return value
     }
 
-    fun validate(value: JsonObject) {
-        val errors = schema.validate(mapper.readTree(value.toString()))
+    fun validate(
+        value: JsonObject,
+        report: (String, String) -> Nothing = { path, message -> fail(node(path), message) },
+    ) {
+        fun jsonNode(
+            v: JsonElement,
+            path: String,
+        ): com.fasterxml.jackson.databind.JsonNode =
+            when (v) {
+                is JsonObject ->
+                    mapper.createObjectNode().also { result ->
+                        v.forEach { (key, child) ->
+                            result.set<com.fasterxml.jackson.databind.JsonNode>(
+                                key,
+                                jsonNode(child, "$path/${pointerKey(key)}"),
+                            )
+                        }
+                    }
+                is JsonArray ->
+                    mapper.createArrayNode().also { result ->
+                        v.forEachIndexed { index, child -> result.add(jsonNode(child, "$path/$index")) }
+                    }
+                else ->
+                    try {
+                        val scalar = v.jsonPrimitive
+                        when {
+                            scalar == JsonNull -> mapper.nodeFactory.nullNode()
+                            scalar.isString -> mapper.nodeFactory.textNode(scalar.content)
+                            scalar.booleanOrNull != null -> mapper.nodeFactory.booleanNode(scalar.boolean)
+                            else -> mapper.nodeFactory.numberNode(scalar.content.toBigDecimal())
+                        }
+                    } catch (e: RuntimeException) {
+                        report(path, e.message ?: "Invalid canonical scalar")
+                    }
+            }
+        val normalized = jsonNode(value, "")
+        val errors =
+            try {
+                schema.validate(normalized)
+            } catch (e: RuntimeException) {
+                report(if (value["defs"] is JsonArray) "/defs/0" else "", e.message ?: "Invalid canonical value")
+            }
         if (errors.isNotEmpty()) {
             val error = errors.maxBy { it.instanceLocation.toString().length }
-            var path = error.instanceLocation.toString()
-            while (path !in locations && path.isNotEmpty()) path = path.substringBeforeLast('/', "")
-            fail(locations[path], error.message)
+            val path =
+                error.instanceLocation.toString() +
+                    if (error.type == "additionalProperties" &&
+                        error.property != null
+                    ) {
+                        "/${pointerKey(error.property)}"
+                    } else {
+                        ""
+                    }
+            report(path, error.message)
         }
+    }
+
+    fun bind(
+        value: JsonElement,
+        path: String = "",
+    ) {
+        node(path)?.let { valueNodes.putIfAbsent(value, it) }
+        when (value) {
+            is JsonObject -> value.forEach { (key, child) -> bind(child, "$path/${pointerKey(key)}") }
+            is JsonArray -> value.forEachIndexed { index, child -> bind(child, "$path/$index") }
+            else -> Unit
+        }
+    }
+
+    fun validateTags(embeddedPaths: Set<String>) {
+        val allowed = embeddedPaths.mapNotNull(::node).toSet()
+        plNodes.forEach { if (it !in allowed) fail(it, "Unsupported YAML tag !pl here") }
     }
 
     private val valueNodes = java.util.IdentityHashMap<JsonElement, Node>()
@@ -188,7 +276,15 @@ internal class YamlNodes(
     ): JsonElement {
         locations[path] = node
         if (node.anchor.isPresent) fail(node, "Anchors and aliases are not supported")
-        if (node.tag.value == "!pl" && node is ScalarNode) return obj("block" to text(node.value), "tag" to text("pl"))
+        if (node.tag.value == "!pl" && node is ScalarNode) {
+            plNodes += node
+            return obj("block" to text(node.value), "tag" to text("pl")).also { record ->
+                record.values.forEach {
+                    valueNodes[it] =
+                        node
+                }
+            }
+        }
         return when (node) {
             is MappingNode -> {
                 if (node.tag != Tag.MAP) fail(node, "Unsupported YAML tag ${node.tag}")
@@ -201,7 +297,9 @@ internal class YamlNodes(
                         fail(key, "Mapping keys must be strings; merge keys are not supported")
                     }
                     if (key.value in result) fail(key, "Duplicate mapping key ${key.value}")
-                    result[key.value] = convert(tuple.valueNode, "$path/${pointerKey(key.value)}")
+                    val childPath = "$path/${pointerKey(key.value)}"
+                    keys[childPath] = key
+                    result[key.value] = convert(tuple.valueNode, childPath)
                 }
                 JsonObject(result)
             }
@@ -216,20 +314,17 @@ internal class YamlNodes(
                     Tag.BOOL -> JsonPrimitive(node.value.lowercase() == "true")
                     Tag.INT, Tag.FLOAT -> {
                         val raw = node.value.replace("_", "")
-                        val decimal =
+                        val decimalText =
                             try {
                                 when {
-                                    raw.startsWith("0x") -> BigDecimal(raw.drop(2).toBigInteger(16))
-                                    raw.startsWith("0o") -> BigDecimal(raw.drop(2).toBigInteger(8))
-                                    else -> BigDecimal(raw)
+                                    raw.startsWith("0x") -> raw.drop(2).toBigInteger(16).toString()
+                                    raw.startsWith("0o") -> raw.drop(2).toBigInteger(8).toString()
+                                    else -> raw
                                 }
                             } catch (_: NumberFormatException) {
                                 fail(node, "Expected a finite number")
                             }
-                        Json.parseToJsonElement(decimal.toPlainString()).also { number ->
-                            if (!decimal.toDouble().isFinite()) fail(node, "Expected a finite number")
-                            if (raw.matches(Regex("-?[0-9]+(?:\\.[0-9]+)?"))) spellings[number] = raw
-                        }
+                        number(decimalText) { fail(node, it) }.also { spellings[it] = node.value }
                     }
                     else -> fail(node, "Unsupported YAML tag ${node.tag}")
                 }
@@ -256,7 +351,46 @@ internal object YamlText {
         spelling: (JsonElement) -> String? = { null },
     ): String = buildString { emit(value, 0, this, spelling) }
 
-    private fun scalar(v: JsonElement): String = if (v is JsonPrimitive && v.isString) v.toString() else v.toString()
+    private fun scalar(v: JsonElement): String =
+        if (v is JsonPrimitive &&
+            v.isString
+        ) {
+            quoted(v.content)
+        } else {
+            v.toString()
+        }
+
+    private fun printable(c: Char): Boolean =
+        c == '\t' ||
+            c == '\n' ||
+            c == '\r' ||
+            c in ' '..'~' ||
+            c == '\u0085' ||
+            c in '\u00a0'..'\ud7ff' ||
+            c in '\ue000'..'\ufffd'
+
+    private fun printableText(value: String): Boolean =
+        value.codePoints().allMatch {
+            it > 0xffff ||
+                printable(it.toChar())
+        }
+
+    private fun quoted(value: String): String {
+        val json = text(value).toString()
+        return buildString {
+            var index = 0
+            while (index < json.length) {
+                val c = json[index++]
+                if (c.isHighSurrogate() && index < json.length && json[index].isLowSurrogate()) {
+                    append(c).append(json[index++])
+                } else if (printable(c)) {
+                    append(c)
+                } else {
+                    append("\\u").append(c.code.toString(16).padStart(4, '0'))
+                }
+            }
+        }
+    }
 
     private fun key(v: String) =
         if (v.matches(Regex("[A-Za-z_][A-Za-z0-9_]*")) &&
@@ -264,7 +398,7 @@ internal object YamlText {
         ) {
             v
         } else {
-            text(v).toString()
+            quoted(v)
         }
 
     private fun leaf(v: JsonElement) =
@@ -286,6 +420,7 @@ internal object YamlText {
                 value.isString &&
                 '\n' in value.content &&
                 '\r' !in value.content &&
+                printableText(value.content) &&
                 value.content.any { !it.isWhitespace() }
             ) {
                 val trailing = value.content.takeLastWhile { it == '\n' }.length

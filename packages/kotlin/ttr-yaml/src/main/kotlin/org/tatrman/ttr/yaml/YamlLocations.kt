@@ -74,8 +74,11 @@ internal class YamlLocations(
         return null
     }
 
-    private fun copy(value: Any?): Any? {
+    internal fun copy(value: Any?): Any? {
         if (value == null) return null
+        if (value is WorldSchemaField) {
+            return value.copy(source = nodes.source(path(value.source.offsetStart, value.source.offsetEnd), key = true))
+        }
         if (value is SourceLocation) return span(value)
         if (value is PropertyValue.StringValue) {
             literal(value.source)?.let { (pointer, syntax) ->
@@ -157,6 +160,7 @@ internal class YamlLocations(
                 else -> {
                     val type = value::class
                     if (!type.isData || !value.javaClass.packageName.startsWith("org.tatrman.ttr.parser")) return value
+                    type.objectInstance?.let { return it }
                     val constructor = requireNotNull(type.primaryConstructor)
                     val properties = type.memberProperties.associateBy { it.name }
                     constructor.callBy(

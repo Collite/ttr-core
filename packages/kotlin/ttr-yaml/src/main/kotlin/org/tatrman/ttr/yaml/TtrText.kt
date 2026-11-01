@@ -15,6 +15,23 @@ internal class TtrText(
 ) {
     private var model: String? = null
 
+    data class Projection(
+        val start: Int,
+        val end: Int,
+        val value: JsonElement,
+    )
+
+    val projections = mutableListOf<Projection>()
+
+    fun origin(
+        source: String,
+        line: Int,
+        column: Int,
+    ): JsonElement? {
+        val offset = source.lineSequence().take((line - 1).coerceAtLeast(0)).sumOf { it.length + 1 } + column - 1
+        return projections.filter { offset in it.start..it.end }.minByOrNull { it.end - it.start }?.value
+    }
+
     fun write(document: JsonObject): String =
         buildString {
             model = document["model"]?.jsonPrimitive?.content
@@ -46,11 +63,13 @@ internal class TtrText(
             document["defs"]?.jsonArray?.forEach { def ->
                 val d = def.jsonObject
                 val kind = d.string("kind")
+                val start = length
                 appendLine(
                     "def $kind ${d.string(
                         "id",
                     )} ${body(CanonicalGrammar.kinds.getValue(kind), d.getValue("properties"))}",
                 )
+                projections += Projection(start, length, def)
             }
             document["security"]?.jsonArray?.forEach { block ->
                 append("security { ")
@@ -124,7 +143,7 @@ internal class TtrText(
                         m.getValue(if (name == "storageDef") "fields" else "properties"),
                     )}"
                 }
-            } else if (name == "cnBindingBody" && key == "filter" && v is JsonObject && "block" in v) {
+            } else if (name == "cnBindingBody" && key == "filter" && isEmbeddedRecord(v)) {
                 "$key: ${render("embeddedBlock", v)}"
             } else {
                 val p = props[key]
@@ -135,7 +154,7 @@ internal class TtrText(
                         } catch (
                             e: CanonicalValueException,
                         ) {
-                            throw e
+                            if (e.fatal) throw e else null
                         } catch (_: RuntimeException) {
                             null
                         }
@@ -143,7 +162,7 @@ internal class TtrText(
                 if (typed != null) {
                     "$key: $typed"
                 } else {
-                    require(free != null) { "No canonical handler for $name.$key" }
+                    if (free == null) throw CanonicalValueException(v, "No canonical handler for $name.$key")
                     "$key: ${render(free, v)}"
                 }
             }
@@ -206,6 +225,18 @@ internal class TtrText(
     private fun render(
         name: String,
         value: JsonElement,
+    ): String =
+        try {
+            renderValue(name, value)
+        } catch (e: CanonicalValueException) {
+            throw e
+        } catch (e: RuntimeException) {
+            throw CanonicalValueException(value, e.message ?: "Invalid $name value", fatal = false)
+        }
+
+    private fun renderValue(
+        name: String,
+        value: JsonElement,
     ): String {
         if (name in CanonicalGrammar.bodies) return body(name, value)
         if (name in setOf("id", "qualifiedName", "key", "cnKey", "autoKey")) {
@@ -233,7 +264,7 @@ internal class TtrText(
                 require(
                     value is JsonPrimitive && !value.isString && value.content.toBigDecimalOrNull() != null,
                 )
-                return spelling(value) ?: value.content.toBigDecimal().toPlainString()
+                return nativeNumber(value)
             }
             "BOOLEAN_LITERAL" -> {
                 require(value is JsonPrimitive && value.booleanOrNull != null)
@@ -334,7 +365,7 @@ internal class TtrText(
                     when {
                         value.keys == setOf("range") -> render("rangeLiteral", value)
                         value.keys == setOf("object") -> render("object_", value)
-                        value.keys.any { it in setOf("ref", "triple", "call") } -> generic(value, "value")
+                        isGenericRecord(value) -> generic(value, "value")
                         else -> render("membersBlock", value)
                     }
                 } else {
@@ -402,7 +433,12 @@ internal class TtrText(
             } else {
                 Dedent.applyTextwrapDedent(content + "\n").removeSuffix("\n")
             }
-        if ("\"\"\"" !in content && body == content) return "\"\"\"$inner\"\"\""
+        if ("\"\"\"" !in content &&
+            (tag != null || !content.endsWith('"')) &&
+            body == content
+        ) {
+            return "\"\"\"$inner\"\"\""
+        }
         if (!projection) {
             throw CanonicalValueException(
                 origin,
@@ -434,13 +470,16 @@ internal class TtrText(
                 removeErrorListeners()
                 addErrorListener(listener)
             }
+        val tokens = CommonTokenStream(lexer)
+        tokens.fill()
         val parser =
-            TTRParser(CommonTokenStream(lexer)).apply {
+            TTRParser(tokens).apply {
                 removeErrorListeners()
                 addErrorListener(listener)
             }
         parser.value()
         if (!valid ||
+            tokens.tokens.any { it.channel != Token.DEFAULT_CHANNEL } ||
             parser.currentToken.type != Token.EOF
         ) {
             throw CanonicalValueException(value, "Calc argument must contain exactly one retained TTR value")
@@ -453,7 +492,16 @@ internal class TtrText(
         mode: String,
     ): String =
         when (value) {
-            is JsonPrimitive -> if (value.isString) quoted(value) else spelling(value) ?: value.toString()
+            is JsonPrimitive ->
+                if (value.isString) {
+                    quoted(value)
+                } else if (value != JsonNull &&
+                    value.booleanOrNull == null
+                ) {
+                    nativeNumber(value)
+                } else {
+                    value.toString()
+                }
             is JsonArray -> array(value) { generic(it, mode) }
             is JsonObject ->
                 when {
@@ -479,8 +527,9 @@ internal class TtrText(
             for (choice in choices.jsonArray) {
                 val attempt = runCatching { expr(choice, value) }
                 if (attempt.isSuccess) return attempt.getOrThrow()
+                (attempt.exceptionOrNull() as? CanonicalValueException)?.takeIf { it.fatal }?.let { throw it }
             }
-            throw IllegalArgumentException("No canonical grammar alternative for $value")
+            throw CanonicalValueException(value, "No canonical grammar alternative for $value", fatal = false)
         }
         e["node"]?.let { return expr(it, value) }
         val seq = e.getValue("seq").jsonArray
@@ -509,4 +558,7 @@ internal class TtrText(
     }
 
     private fun parse(source: String): JsonElement = GrammarExpression.parse(source)
+
+    private fun nativeNumber(value: JsonElement): String =
+        spelling(value)?.takeIf { ttrNumber.matches(it) } ?: value.jsonPrimitive.content
 }

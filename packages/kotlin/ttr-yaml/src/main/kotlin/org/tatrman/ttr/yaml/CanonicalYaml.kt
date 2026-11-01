@@ -27,24 +27,39 @@ object CanonicalYaml {
     ): CanonicalDocument {
         val nodes = YamlNodes(file)
         val input = nodes.read(source)
-        val value = CanonicalNormalization(input["model"]?.jsonPrimitive?.content).document(input)
-        val ttr =
+        try {
+            val value = CanonicalNormalization(input["model"]?.jsonPrimitive?.content).document(input)
+            nodes.bind(value)
+            val writer = TtrText(projection = true, spelling = nodes::spelling)
+            val ttr = writer.write(value)
+            val syntax = TtrSyntax(file)
             try {
-                TtrText(projection = true, spelling = nodes::spelling).write(value)
-            } catch (e: CanonicalValueException) {
-                nodes.invalid(e.value, e.message ?: "Invalid canonical value")
-            } catch (e: IllegalArgumentException) {
-                throw CanonicalYamlException(file, 1, 1, e.message ?: "Invalid canonical value")
+                syntax.read(ttr)
+            } catch (e: CanonicalYamlException) {
+                val offset = ttr.lineSequence().take(e.line - 1).sumOf { it.length + 1 } + e.column - 1
+                val path =
+                    syntax.spans
+                        .filter { offset in it.start..it.end }
+                        .minByOrNull { it.end - it.start }
+                        ?.path
+                val origin = path?.let { atPointer(value, it) } ?: writer.origin(ttr, e.line, e.column)
+                nodes.invalid(origin ?: value, e.detail)
             }
-        val syntax = TtrSyntax(file)
-        syntax.read(ttr)
-        // Schema validation precedes the syntax bridge; normalize mapping shorthand/order once.
-        return CanonicalDocument(
-            value,
-            YamlLocations(syntax, nodes, ttr, value).remap(typed(ttr, file)),
-            nodes::spelling,
-            nodes::invalid,
-        )
+            nodes.validateTags(syntax.embeddedPaths)
+            // Schema validation precedes the syntax bridge; normalize mapping shorthand/order once.
+            return CanonicalDocument(
+                value,
+                YamlLocations(syntax, nodes, ttr, value).remap(typed(ttr, file)),
+                nodes::spelling,
+                nodes::invalid,
+            )
+        } catch (e: CanonicalYamlException) {
+            throw e
+        } catch (e: CanonicalValueException) {
+            nodes.invalid(e.value, e.message ?: "Invalid canonical value")
+        } catch (e: RuntimeException) {
+            nodes.invalid(input["defs"]?.jsonArray?.firstOrNull() ?: input, e.message ?: "Invalid canonical value")
+        }
     }
 
     fun fromTtr(
@@ -53,11 +68,12 @@ object CanonicalYaml {
     ): CanonicalDocument {
         val syntax = TtrSyntax(file)
         val value = syntax.read(source)
-        YamlNodes(file).validate(value)
+        YamlNodes(file).validate(value) { path, message -> syntax.invalid(path, message) }
         return CanonicalDocument(
             CanonicalNormalization(value["model"]?.jsonPrimitive?.content).document(value),
             typed(source, file),
             syntax::spelling,
+            syntax::invalid,
         )
     }
 
@@ -79,4 +95,5 @@ object CanonicalYaml {
 internal class CanonicalValueException(
     val value: JsonElement,
     detail: String,
+    val fatal: Boolean = true,
 ) : IllegalArgumentException(detail)

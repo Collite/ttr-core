@@ -59,7 +59,8 @@ spelling: `er2db_entity`, `domain`, `md2er_cubelet`, `variant`, `subkind`, and s
 slots with a fixed kind use `{id, properties}`. Parameters are property records
 such as `{name: code, type: text, defaultValue: '', binds: [er.entity.Item.code]}`.
 World members have `{kind, id?, properties}`; an unnamed `grant` omits `id`.
-Storage schemas use `{id, fields}` under `schemas`, and process steps stay under
+Storage schemas use `{id, fields}` under `schemas`. Field mappings and restrict member mappings keep
+their authored order, including after YAML read-back. Process steps stay under
 `steps`. The `schemas` key is reserved on a storage; the codec refuses a free-form
 entry with that name with a located diagnostic.
 
@@ -67,6 +68,10 @@ entry with that name with a located diagnostic.
 model/description/tags/objects/layout keys. `schema` and `locale` require `model`.
 Imports retain their terminal wildcard. `security` is an ordered sequence of
 blocks, each an ordered sequence of `own`, `classify`, `grant` or `mask` records.
+
+Graph properties use `model, description, tags, objects, layout` order. Security records put `verb`
+first, followed by `object, owner` (own), `object, classification` (classify),
+`privilege, object, to` (grant), or `object` (mask).
 
 Typed properties are closed. Open keys occur where the grammar declares an
 entry/object body, including semantics, lexicon, manifests, CN and automation.
@@ -94,6 +99,10 @@ Typed references are authored qname strings. Generic values distinguish a quoted
 string from an identifier with `{ref: <qname>}`; triple strings use
 `{triple: <text>}`, calls use `{call: <name>, args: [...]}`. Use the explicit
 `{object: {...}}` escape for generic data colliding with a reserved wrapper.
+At a CN binding `filter`, a generic object containing `block` uses the `{object: {...}}` escape;
+only the exact embedded record shape denotes an expression. Calc argument text must contain one
+TTR value without comments.
+
 Automation objects retain ordered entries inside `{object: [...]}`. Their
 duration, tagged, call, transition, set and wildcard forms have distinct records.
 
@@ -107,7 +116,8 @@ object of strings; the codec refuses that members block with a located diagnosti
 Other generic value forms are unchanged.
 
 Embedded source uses `{block: <text>, tag?: <tag>, form?: string|tripleString}`.
-A tag selects tagged source; an absent tag/form selects untagged triple text.
+A tag selects tagged source; an absent tag/form selects untagged triple text. An unregistered first-line
+word in a native expression triple is plain text, including its indentation.
 `form: string` retains a quoted expression block. Tags and `form` are exclusive.
 
 ## Kotlin codec
@@ -133,7 +143,8 @@ Loading uses YAML 1.2 nodes and the bundled document schema offline. Duplicate
 mapping keys, anchors, aliases, merge keys, multiple documents, custom constructors,
 unknown typed keys, unsupported versions and nonfinite numbers raise
 `CanonicalYamlException` with file, line and column (one-based). Only `!pl` scalar
-sugar is accepted. The typed AST keeps YAML node spans; its `SourceLocation.column`
+sugar at embedded expression/source positions is accepted; other positions refuse it. `%YAML 1.2`
+and an absent directive are accepted; other YAML version directives are refused. The typed AST keeps YAML node spans; its `SourceLocation.column`
 uses the parser's existing zero-based convention. Semantic parser diagnostics,
 including a repeated CN property, remain in `document.ast.errors` rather than
 preventing lossless syntax read/write.
@@ -143,7 +154,10 @@ literal multiline blocks and no anchors/aliases. Ordinary property mappings foll
 the grammar property order, then UTF-8 byte order for retained keys. CN/automation
 properties and automation objects use ordered single-entry sequences. Numeric
 spellings such as `1`, `1.0`, `1.00`, `01` and `-0.0` remain distinguishable where
-automation fingerprints retain their text. Native TTR escape handling follows the
+automation fingerprints retain their text. Exponent spellings (including tiny finite numbers) stay
+compact through validation and retain their spelling; nonfinite values fail at their source token.
+Duplicate storage fields and restrict members are refused at the second key; CN object duplicates
+retain the existing parser last-wins rule. Native TTR escape handling follows the
 grammar string contract.
 
 YAML strings retain their content even if it has no equivalent native triple-string

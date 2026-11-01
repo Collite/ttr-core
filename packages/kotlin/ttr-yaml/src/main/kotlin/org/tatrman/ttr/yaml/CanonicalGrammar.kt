@@ -83,6 +83,42 @@ internal fun obj(vararg fields: Pair<String, JsonElement?>): JsonObject =
 
 internal fun text(value: String) = JsonPrimitive(value)
 
+internal fun isGenericRecord(value: JsonObject): Boolean =
+    (
+        value.keys in setOf(setOf("ref"), setOf("triple")) &&
+            value.values.single().let { it is JsonPrimitive && it.isString }
+    ) ||
+        (
+            value.keys == setOf("call", "args") &&
+                value["call"].let { it is JsonPrimitive && it.isString } &&
+                value["args"] is JsonArray
+        )
+
+internal fun isEmbeddedRecord(value: JsonElement): Boolean =
+    value is JsonObject &&
+        value["block"].let { it is JsonPrimitive && it.isString } &&
+        value.keys.all { it in setOf("block", "tag", "form") } &&
+        (value["tag"] == null || value["tag"].let { it is JsonPrimitive && it.isString }) &&
+        (value["form"] == null || value["form"]?.jsonPrimitive?.content in setOf("string", "tripleString")) &&
+        !("tag" in value && "form" in value)
+
+// Keep exponent notation compact through JSON validation; never allocate its plain decimal expansion.
+internal fun number(
+    raw: String,
+    invalid: (String) -> Nothing,
+): JsonElement {
+    val decimal =
+        try {
+            raw.toBigDecimal()
+        } catch (_: NumberFormatException) {
+            invalid("Expected a finite number")
+        }
+    if (!decimal.toDouble().isFinite()) invalid("Expected a finite number")
+    return Json.parseToJsonElement(decimal.toString())
+}
+
+internal val ttrNumber = Regex("-?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?")
+
 internal fun canonicalMap(
     entries: List<Pair<String, JsonElement>>,
     order: List<String> = emptyList(),

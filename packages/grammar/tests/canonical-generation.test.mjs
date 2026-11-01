@@ -102,6 +102,12 @@ test('body metadata derives literal property keys, distinct contexts and grammar
   assert.equal(metadata.bodies.worldDef.members.find((m) => m.kind === 'grant').named, false);
 });
 
+test('nested definition aliases cannot silently disappear', () => {
+  const amended = source.replace(/(ENGINE\s*:\s*'engine')/, "$1 | 'engine_alias'");
+  assert.notEqual(amended, source);
+  assert.throws(() => generatedFiles(amended), /Unhandled nested definition alias/);
+});
+
 test('identifiers follow lexer keywords and cnKey compatibility rather than accepting arbitrary strings', () => {
   const id = new RegExp(metadata.identifiers.id);
   for (const value of ['Customer', 'er.entity.Customer.code', 'Číslo', 'skipSecurity'])

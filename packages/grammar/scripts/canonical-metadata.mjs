@@ -153,7 +153,9 @@ export function deriveMetadata(source) {
   function member(option) {
     const parts = sequence(option);
     if (parts[0]?.symbol !== 'DEF') return null;
-    const [kind] = tokenKeys(parts[1]);
+    const keys = tokenKeys(parts[1]);
+    if (keys.length !== 1) throw new Error('Unhandled nested definition alias');
+    const [kind] = keys;
     const named = parts[2]?.symbol === 'id';
     const body = parts[named ? 3 : 2]?.symbol;
     if (parts.length !== (named ? 4 : 3) || !body)
