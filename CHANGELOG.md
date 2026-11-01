@@ -6,6 +6,23 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Docs — the conceptual model chapter on grammar 0.20 (CN-P8 S8.4)
+
+- The manual's conceptual-model chapter is rebuilt around the six stereotypes and the four tenses (happens · exists ·
+  holds · varies), with the "can it stop being one?" test between a subkind and a phase. One section per stereotype on
+  the Hartland package: relators and lifetimes on kinds, `subkind` and its partitions, the four phase sources
+  (definition · stacked entity · episode table · `from:` / `until:`), valued-state projections and the DC-13 call beside
+  the relator lookup it equals, instant-only events and the `extent:` retirement.
+- Time drops the durative occurrence: a happening with a duration is a kind with a lifetime two events bound.
+  Bindings show the relator, validity, episode-table and same-row (`order: []`) forms. Assertions name `concept` and
+  carry the state-claim rule, worked on Hartland's `OutOfService` (refused without an as-of, refused before the episode,
+  one row on its first day). A new section, Recipes over concepts, renders `MispricedLine` through the two projections
+  and records the three H-1 islands matching the recipe's own rows.
+- The diagnostics tables in chapters 20 and 14 gain the twelve grammar-0.20 slugs; `cn/not-assertable`,
+  `cn/missing-as-of`, `cn/basis-mismatch` and `cn/missing-time` read the widened assertion. The explanation example
+  says *while* for a phase filter. The grammar README's link and the docs site's layer table and door page follow.
+  No artifact changes.
+
 ### Added — grammar 0.21 canonical metadata carriers (MW-53)
 
 - Lexical entries retain `indexSecurity`; queries retain explicit `skipSecurity`; query/procedure parameters
