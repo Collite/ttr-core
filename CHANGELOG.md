@@ -13,6 +13,8 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   Its lossless syntax tree accompanies the existing typed AST; YAML node spans locate diagnostics.
 - YAML 1.2 loading validates bundled schemas offline and rejects duplicate keys, unsafe YAML forms,
   unsupported versions and unknown typed keys. `!pl` scalar input normalizes to an embedded block record.
+- Canonical model/profile schemas retain every grammar kind alias, including both `variant` and
+  `subkind`; the codec preserves the authored spelling and their shared typed-AST stereotype.
 - C-7 and YAML share lower definition-property serialization. C-7 export bytes and resolved-reference
   behavior stay unchanged. No grammar/dependency pin or artifact version changes; internal release wiring
   remains in MW-P2 certification. Existing JVM rebuild notices remain in force.

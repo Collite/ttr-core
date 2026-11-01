@@ -2,7 +2,7 @@
 
 The grammar package generates a canonical document schema, a profile schema and
 shape metadata from `TTR.g4`. They describe grammar **0.21**, including its exact
-57 top-level definition kinds and nested world/automation declarations. Schema
+58 top-level definition spellings and nested world/automation declarations. Schema
 validation checks syntax and value shapes; required domain fields, reference
 resolution and profile execution belong to semantic validation. The Kotlin YAML
 codec is available in the source module `packages/kotlin/ttr-yaml`; its internal bundle release follows certification.
@@ -54,7 +54,8 @@ defs:
 ```
 
 Definitions preserve order in `defs`. Kind names use the grammar's literal
-spelling: `er2db_entity`, `domain`, `md2er_cubelet`, `subkind`, and so on. Nested
+spelling: `er2db_entity`, `domain`, `md2er_cubelet`, `variant`, `subkind`, and so on. `variant` and `subkind` share the
+`subkind` stereotype in the typed AST; canonical syntax preserves the authored word. Nested
 slots with a fixed kind use `{id, properties}`. Parameters are property records
 such as `{name: code, type: text, defaultValue: '', binds: [er.entity.Item.code]}`.
 World members have `{kind, id?, properties}`; an unnamed `grant` omits `id`.

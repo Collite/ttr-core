@@ -6,6 +6,8 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import kotlinx.serialization.json.*
+import org.tatrman.ttr.parser.model.ConceptDef
+import org.tatrman.ttr.parser.conformance.ConformanceDump
 
 class CanonicalYamlSpec :
     FunSpec({
@@ -58,7 +60,7 @@ class CanonicalYamlSpec :
                 }) {
                 val model =
                     when (kind) {
-                        "role", "kind", "subkind", "event", "phase", "quality", "relation_type" -> "cn"
+                        "role", "kind", "subkind", "variant", "event", "phase", "quality", "relation_type" -> "cn"
                         "term", "pattern", "example" -> "lexicon"
                         else -> "er"
                     }
@@ -82,6 +84,30 @@ class CanonicalYamlSpec :
                 def query customers { parameters: [{ name: p, type: text, defaultValue: "x", binds: [Customer.code] }], skipSecurity: true, sourceText: "select 1" }
                 """.trimIndent(),
             )
+        }
+        test("variant and subkind retain authored spelling, stereotype, soft names and free keys") {
+            val doc =
+                roundTrip(
+                    """
+                    model cn
+                    def kind Sale {}
+                    def variant WebSale { of: Sale, variant: boxed }
+                    def subkind variant { of: Sale }
+                    def quality status { of: variant }
+                    """.trimIndent(),
+                )
+            val concepts = doc.ast.definitions.filterIsInstance<ConceptDef>()
+            concepts.map { it.stereotype } shouldBe listOf("kind", "subkind", "subkind", "quality")
+            concepts.map { it.spelling } shouldBe listOf(null, "variant", "subkind", null)
+            doc.value
+                .getValue("defs")
+                .jsonArray
+                .map { it.jsonObject.string("kind") } shouldBe
+                listOf("kind", "variant", "subkind", "quality")
+            val native = CanonicalYaml.fromTtr(CanonicalYaml.toTtr(doc))
+            ConformanceDump.dumpTree(native.ast) shouldBe ConformanceDump.dumpTree(doc.ast)
+            CanonicalYaml.toTtr(doc) shouldContain "def variant WebSale"
+            CanonicalYaml.toTtr(doc) shouldContain "def subkind variant"
         }
         test("generic wrappers, repeated ordered properties and automation numeric lexemes") {
             roundTrip(

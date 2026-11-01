@@ -24,9 +24,9 @@ const hashes = (values) =>
     ])
   );
 
-test('exact grammar vocabulary includes all 57 top-level kinds and 8 distinct nested-only kinds', () => {
-  assert.equal(metadata.kinds.length, 57);
-  assert.equal(new Set(metadata.kinds.map((k) => k.kind)).size, 57);
+test('exact grammar vocabulary includes all 58 top-level kinds and 8 distinct nested-only kinds', () => {
+  assert.equal(metadata.kinds.length, 58);
+  assert.equal(new Set(metadata.kinds.map((k) => k.kind)).size, 58);
   for (const kind of [
     'domain',
     'map',
@@ -34,6 +34,7 @@ test('exact grammar vocabulary includes all 57 top-level kinds and 8 distinct ne
     'md2er_dimension',
     'md2er_cubelet',
     'subkind',
+    'variant',
     'cn2db_concept',
     'term',
     'pattern',
@@ -58,6 +59,25 @@ test('exact grammar vocabulary includes all 57 top-level kinds and 8 distinct ne
       kind
     );
     assert.ok(!metadata.kinds.some((k) => k.kind === kind), kind);
+  }
+});
+
+test('definition keyword alternatives and token literals retain every alias in both schemas', () => {
+  const amended =
+    source.replace(/SUBKIND\s*\|\s*VARIANT/, 'SUBKIND | VARIANT | FUTURE_ALIAS') +
+    "\nFUTURE_ALIAS: 'future_alias' | 'other_alias';\n";
+  assert.notEqual(amended, source);
+  const next = deriveMetadata(amended);
+  const outputs = generatedFiles(amended);
+  const model = JSON.parse(outputs['model-yaml.schema.json']);
+  const profile = JSON.parse(outputs['profile.schema.json']);
+  for (const kind of ['subkind', 'variant', 'future_alias', 'other_alias']) {
+    assert.deepEqual(
+      next.kinds.find((entry) => entry.kind === kind),
+      { kind, body: 'cnBody' }
+    );
+    assert.equal(model.$defs[`def_${kind}`].properties.kind.const, kind);
+    assert.ok(JSON.stringify(profile).includes(`"const":"${kind}"`), kind);
   }
 });
 
