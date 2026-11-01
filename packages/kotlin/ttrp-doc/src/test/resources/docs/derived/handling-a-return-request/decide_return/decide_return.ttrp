@@ -16,8 +16,9 @@ key:        return_request_line.line_id
 candidates received(out lines) target erp """sql
         SELECT l.line_id, l.request_number, l.item, l.quantity, l.unit_price, l.quantity * l.unit_price AS line_value,
                l.reason, l.requested_resolution, l.requested_variant,
-               r.customer, r.order_number, r.requested_date
+               r.customer, c.email AS customer_email, r.order_number, r.requested_date
         FROM   er.entity.return_request_line l JOIN er.entity.return_request r ON r.request_number = l.request_number
+        LEFT JOIN er.entity.customer c ON c.sk = r.customer
         WHERE  l.state = 'received'
 """
 
@@ -90,7 +91,7 @@ actions {
         way.reject_not_ours, way.reject_late, way.reject_abuse
                                    -> set_state       { line: line_id, to: rejected }
         way.reject_not_ours, way.reject_late, way.reject_abuse
-                                   -> notify_customer { customer: customer, template: "return-rejected" }
+                                   -> notify_customer { customer: customer, to: customer_email, template: "return-rejected" }
         way.to_customer_care       -> ask              { who: role.customer_care, about: request_number, action: set_state,
                                                          group_by: request_number, due: 3 working_days }
         way.refund_no_return       -> set_state        { line: line_id, to: settling, way: refund_no_return }
@@ -102,6 +103,6 @@ actions {
         way.exchange, way.refund_after_return
                                    -> expect           { line: line_id, kind: inbound, due: days(:inbound_reminder) }
         way.exchange, way.refund_after_return
-                                   -> notify_customer  { customer: customer, template: "return-instructions" }
+                                   -> notify_customer  { customer: customer, to: customer_email, template: "return-instructions" }
     }
 }

@@ -42,6 +42,8 @@ class RecipeCrossStorageSpec :
             }
         }
         "the single-database oracle stays byte equal to every pre-cut SQL golden" {
+            // `-DupdateGolden=true` rewrites them (RecipeStatementsSpec writes only the split-storage set); review the diff.
+            val update = System.getProperty("updateGolden") == "true"
             for (name in RecipeFixtures.SEVENTEEN) {
                 RecipeStatements.plan(RecipeFixtures.sharedRecipe(name), splitStorage = false).forEach { s ->
                     val golden =
@@ -50,6 +52,7 @@ class RecipeCrossStorageSpec :
                             name.removeSuffix(".ttrp"),
                             "${s.island}.${s.port}.sql",
                         )
+                    if (update) Files.writeString(golden, s.sql.trimEnd('\n') + "\n")
                     s.sql.trim() shouldBe Files.readString(golden).trim()
                 }
             }
