@@ -20,6 +20,30 @@ on:
     branches: [master, main, v0]
 
 jobs:
+  canonical-yaml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      # Check the committed schemas before a build can refresh generated resources.
+      - run: node packages/grammar/scripts/generate-canonical-schemas.mjs --check
+      - run: node --test packages/grammar/tests/canonical-generation.test.mjs
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tatrman/grammar prebuild
+      # Tests read committed twins, discover the current roster, and exercise missing-twin and
+      # unhandled-shape failures. Do not invoke generateTwins here: expected data must be reviewed.
+      - name: YAML AST and semantics conformance, fixed points and C-7 bytes
+        run: ./gradlew :packages:kotlin:ttr-yaml:test :packages:kotlin:ttr-metadata:test --tests '*DefsJsonRoundTripSpec'
+
   ts-dump:
     runs-on: ubuntu-latest
     steps:
@@ -132,7 +156,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'      # only for the ANTLR generate step; not shipped to consumers
+          java-version: '21' # only for the ANTLR generate step; not shipped to consumers
       - name: Generate the ANTLR Python parser
         run: ./packages/python/ttr-parser/scripts/generate-python-parser.sh
       - name: Install ttr-parser (editable)
