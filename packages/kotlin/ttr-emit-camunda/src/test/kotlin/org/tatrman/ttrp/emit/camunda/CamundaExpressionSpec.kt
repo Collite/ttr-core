@@ -262,7 +262,7 @@ class CamundaExpressionSpec :
                 }
             }
         }
-        "mail predicates in both dialects require the selected key and an explicitly wet Server" {
+        "mail and approval predicates in both dialects require the selected key and an explicitly wet Server" {
             val feel = FeelEngineBuilder.forJava().build()
             val factory = ExpressionFactoryImpl()
             for (dialect in Dialect.entries) {
@@ -278,56 +278,49 @@ class CamundaExpressionSpec :
                         }.newDocumentBuilder()
                         .parse(InputSource(StringReader(xml)))
                 val flows = doc.getElementsByTagNameNS("http://www.omg.org/spec/BPMN/20100524/MODEL", "sequenceFlow")
-                val predicate =
-                    (0 until flows.length)
-                        .map { flows.item(it) as Element }
-                        .first {
-                            it.getAttribute("name") ==
-                                "selected and wet"
-                        }.textContent
-                        .trim()
-                for (selected in listOf(true, false)) {
-                    for (dry in listOf(true, false)) {
-                        val key = if (selected) 4711 else 9
-                        val status = """{"dryRun":$dry,"actions":[{"action":"notify","key":{"order_number":$key}}]}"""
-                        val result: Any? =
-                            if (dialect == Dialect.C7) {
-                                val context = SimpleContext()
-                                context.setVariable(
-                                    "ttrStatus",
-                                    factory.createValueExpression(Spin.JSON(status), Any::class.java),
-                                )
-                                context.setVariable(
-                                    "ttrRow",
-                                    factory.createValueExpression(
-                                        Spin.JSON("""{"order_number":4711}"""),
-                                        Any::class.java,
-                                    ),
-                                )
-                                factory.createValueExpression(context, predicate, Any::class.java).getValue(context)
-                            } else {
-                                val vars =
-                                    mapOf<String, Any>(
-                                        "ttrStatus" to
-                                            mapOf(
-                                                "dryRun" to dry,
-                                                "actions" to
-                                                    listOf(
-                                                        mapOf(
-                                                            "action" to "notify",
-                                                            "key" to mapOf("order_number" to if (selected) 4711 else 9),
-                                                        ),
-                                                    ),
-                                            ),
-                                        "ttrRow" to mapOf("order_number" to 4711),
+                for (action in listOf("notify", "approve_release")) {
+                    val predicate =
+                        (0 until flows.length)
+                            .map { flows.item(it) as Element }
+                            .first {
+                                it.getAttribute("name") ==
+                                    "$action selected and wet"
+                            }.textContent
+                            .trim()
+                    for (selected in listOf(true, false)) {
+                        for (dry in listOf(true, false)) {
+                            val key = if (selected) 4711 else 9
+                            val selectedAction = mapOf("action" to action, "key" to mapOf("order_number" to key))
+                            val status = mapOf("dryRun" to dry, "actions" to listOf(selectedAction))
+                            val result: Any? =
+                                if (dialect == Dialect.C7) {
+                                    val context = SimpleContext()
+                                    context.setVariable(
+                                        "ttrStatus",
+                                        factory.createValueExpression(Spin.JSON(status), Any::class.java),
                                     )
-                                val evaluated = feel.evaluateExpression(predicate.removePrefix("="), vars)
-                                require(evaluated.isSuccess) { evaluated.toString() }
-                                evaluated.result()
+                                    context.setVariable(
+                                        "ttrRow",
+                                        factory.createValueExpression(
+                                            Spin.JSON("""{"order_number":4711}"""),
+                                            Any::class.java,
+                                        ),
+                                    )
+                                    factory.createValueExpression(context, predicate, Any::class.java).getValue(context)
+                                } else {
+                                    val vars =
+                                        mapOf<String, Any>(
+                                            "ttrStatus" to status,
+                                            "ttrRow" to mapOf("order_number" to 4711),
+                                        )
+                                    val evaluated = feel.evaluateExpression(predicate.removePrefix("="), vars)
+                                    require(evaluated.isSuccess) { evaluated.toString() }
+                                    evaluated.result()
+                                }
+                            withClue("$dialect selected=$selected dry=$dry predicate=$predicate") {
+                                result shouldBe
+                                    (selected && !dry)
                             }
-                        withClue("$dialect selected=$selected dry=$dry predicate=$predicate") {
-                            result shouldBe
-                                (selected && !dry)
                         }
                     }
                 }

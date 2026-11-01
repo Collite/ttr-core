@@ -535,7 +535,7 @@
           <bpmn:sequenceFlow id="n_6d71fac98ced2936d701" sourceRef="n_8eb022ffcfb732759a94" targetRef="n_e930bc7f5f3eeb1644dd" />
           <bpmn:sequenceFlow id="n_f7e860571c72883237d2" sourceRef="n_e930bc7f5f3eeb1644dd" targetRef="n_6ebe34bbd8742e41ad82" />
           <bpmn:sequenceFlow id="n_660f236c21b131e5d89e" sourceRef="n_6ebe34bbd8742e41ad82" targetRef="n_66afd65e2b79c397ee9f" />
-          <bpmn:sequenceFlow id="n_d565cb46d10468f1fe94" name="selected and wet" sourceRef="n_6ebe34bbd8742e41ad82" targetRef="n_469b4216293f8cff57f5">
+          <bpmn:sequenceFlow id="n_d565cb46d10468f1fe94" name="notify selected and wet" sourceRef="n_6ebe34bbd8742e41ad82" targetRef="n_469b4216293f8cff57f5">
             <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=(false) and (some a in ttrStatus.actions satisfies a.action = &quot;notify&quot; and (if a.key instance of context then a.key = {&quot;order_number&quot;:ttrRow.order_number} else a.key = ttrRow.order_number))</bpmn:conditionExpression>
           </bpmn:sequenceFlow>
           <bpmn:sequenceFlow id="n_97b43675e1948e0bb5a5" sourceRef="n_469b4216293f8cff57f5" targetRef="n_8f11a0edb57000669571" />
@@ -647,7 +647,7 @@
           <bpmn:sequenceFlow id="n_e5d995ff68cf9cd4ba4c" sourceRef="n_12275411540cd578f7d5" targetRef="n_77aebb526b160cdd4264" />
           <bpmn:sequenceFlow id="n_f96709ab76dc24c0ed12" sourceRef="n_77aebb526b160cdd4264" targetRef="n_b611f33abc1991042f31" />
           <bpmn:sequenceFlow id="n_3b010f34048ea6d8259f" sourceRef="n_b611f33abc1991042f31" targetRef="n_ca9325878fb5558113ce" />
-          <bpmn:sequenceFlow id="n_34e3fc3485eb1393bd41" name="selected and wet" sourceRef="n_b611f33abc1991042f31" targetRef="n_49e7d0430d0ec171e506">
+          <bpmn:sequenceFlow id="n_34e3fc3485eb1393bd41" name="notify selected and wet" sourceRef="n_b611f33abc1991042f31" targetRef="n_49e7d0430d0ec171e506">
             <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=(false) and (some a in ttrStatus.actions satisfies a.action = &quot;notify&quot; and (if a.key instance of context then a.key = {&quot;order_number&quot;:ttrRow.order_number} else a.key = ttrRow.order_number))</bpmn:conditionExpression>
           </bpmn:sequenceFlow>
           <bpmn:sequenceFlow id="n_316cde239d291ac358a4" sourceRef="n_49e7d0430d0ec171e506" targetRef="n_37383c5c7629cca4e767" />
@@ -690,8 +690,18 @@
             </bpmn:extensionElements>
           </bpmn:multiInstanceLoopCharacteristics>
           <bpmn:startEvent id="n_61e344bb61873e954b6d" name="row start">
-            <bpmn:outgoing>n_cc75aa8fc26bb7e74710</bpmn:outgoing>
+            <bpmn:outgoing>n_a19c9508bd94a4c524e8</bpmn:outgoing>
           </bpmn:startEvent>
+          <bpmn:exclusiveGateway default="n_4803b343e653e5548a12" id="n_ddd638476b2fe30cad47" name="approve_release selected and wet">
+            <bpmn:incoming>n_a19c9508bd94a4c524e8</bpmn:incoming>
+            <bpmn:outgoing>n_4803b343e653e5548a12</bpmn:outgoing>
+            <bpmn:outgoing>n_529a8c807d3feb30d66f</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
+          <bpmn:exclusiveGateway id="n_c7bc6e4d5053f4605b99" name="approve_release complete">
+            <bpmn:incoming>n_4803b343e653e5548a12</bpmn:incoming>
+            <bpmn:incoming>n_2b48e0356566be4a663c</bpmn:incoming>
+            <bpmn:outgoing>n_2f2a0f5f189504a225fa</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
           <bpmn:userTask id="n_8fe8781c3b35fe9fbb1f" name="approve approve_release">
             <bpmn:extensionElements>
               <zeebe:ioMapping>
@@ -700,14 +710,19 @@
               </zeebe:ioMapping>
               <zeebe:userTask />
             </bpmn:extensionElements>
-            <bpmn:incoming>n_cc75aa8fc26bb7e74710</bpmn:incoming>
-            <bpmn:outgoing>n_2ff6e4c13c42cd8b39e1</bpmn:outgoing>
+            <bpmn:incoming>n_529a8c807d3feb30d66f</bpmn:incoming>
+            <bpmn:outgoing>n_2b48e0356566be4a663c</bpmn:outgoing>
           </bpmn:userTask>
           <bpmn:endEvent id="n_8832740d2f3edff3d4af" name="row complete">
-            <bpmn:incoming>n_2ff6e4c13c42cd8b39e1</bpmn:incoming>
+            <bpmn:incoming>n_2f2a0f5f189504a225fa</bpmn:incoming>
           </bpmn:endEvent>
-          <bpmn:sequenceFlow id="n_cc75aa8fc26bb7e74710" sourceRef="n_61e344bb61873e954b6d" targetRef="n_8fe8781c3b35fe9fbb1f" />
-          <bpmn:sequenceFlow id="n_2ff6e4c13c42cd8b39e1" sourceRef="n_8fe8781c3b35fe9fbb1f" targetRef="n_8832740d2f3edff3d4af" />
+          <bpmn:sequenceFlow id="n_a19c9508bd94a4c524e8" sourceRef="n_61e344bb61873e954b6d" targetRef="n_ddd638476b2fe30cad47" />
+          <bpmn:sequenceFlow id="n_4803b343e653e5548a12" sourceRef="n_ddd638476b2fe30cad47" targetRef="n_c7bc6e4d5053f4605b99" />
+          <bpmn:sequenceFlow id="n_529a8c807d3feb30d66f" name="approve_release selected and wet" sourceRef="n_ddd638476b2fe30cad47" targetRef="n_8fe8781c3b35fe9fbb1f">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=(false) and (some a in ttrStatus.actions satisfies a.action = &quot;approve_release&quot; and (if a.key instance of context then a.key = {&quot;order_number&quot;:ttrRow.order_number} else a.key = ttrRow.order_number))</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+          <bpmn:sequenceFlow id="n_2b48e0356566be4a663c" sourceRef="n_8fe8781c3b35fe9fbb1f" targetRef="n_c7bc6e4d5053f4605b99" />
+          <bpmn:sequenceFlow id="n_2f2a0f5f189504a225fa" sourceRef="n_c7bc6e4d5053f4605b99" targetRef="n_8832740d2f3edff3d4af" />
         </bpmn:subProcess>
         <bpmn:serviceTask id="n_a4d5a14b9d649a5921eb" name="route release">
           <bpmn:extensionElements>
@@ -1253,24 +1268,42 @@
         <dc:Bounds height="36" width="36" x="5718" y="1252" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_1bd926fb424bf5c74f6f" id="n_1bd926fb424bf5c74f6f_di" isExpanded="true">
-        <dc:Bounds height="310" width="552" x="5718" y="1348" />
+        <dc:Bounds height="310" width="852" x="5718" y="1348" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_61e344bb61873e954b6d" id="n_61e344bb61873e954b6d_di">
         <dc:Bounds height="36" width="36" x="5758" y="1448" />
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_ddd638476b2fe30cad47" id="n_ddd638476b2fe30cad47_di">
+        <dc:Bounds height="50" width="50" x="5894" y="1448" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_c7bc6e4d5053f4605b99" id="n_c7bc6e4d5053f4605b99_di">
+        <dc:Bounds height="50" width="50" x="6304" y="1448" />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_8fe8781c3b35fe9fbb1f" id="n_8fe8781c3b35fe9fbb1f_di">
-        <dc:Bounds height="90" width="160" x="5894" y="1448" />
+        <dc:Bounds height="90" width="160" x="6044" y="1448" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_8832740d2f3edff3d4af" id="n_8832740d2f3edff3d4af_di">
-        <dc:Bounds height="36" width="36" x="6154" y="1448" />
+        <dc:Bounds height="36" width="36" x="6454" y="1448" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNEdge bpmnElement="n_cc75aa8fc26bb7e74710" id="n_cc75aa8fc26bb7e74710_di">
+      <bpmndi:BPMNEdge bpmnElement="n_a19c9508bd94a4c524e8" id="n_a19c9508bd94a4c524e8_di">
         <di:waypoint x="5794" y="1466" />
-        <di:waypoint x="5894" y="1493" />
+        <di:waypoint x="5894" y="1473" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge bpmnElement="n_2ff6e4c13c42cd8b39e1" id="n_2ff6e4c13c42cd8b39e1_di">
-        <di:waypoint x="6054" y="1493" />
-        <di:waypoint x="6154" y="1466" />
+      <bpmndi:BPMNEdge bpmnElement="n_4803b343e653e5548a12" id="n_4803b343e653e5548a12_di">
+        <di:waypoint x="5944" y="1473" />
+        <di:waypoint x="6304" y="1473" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_529a8c807d3feb30d66f" id="n_529a8c807d3feb30d66f_di">
+        <di:waypoint x="5944" y="1473" />
+        <di:waypoint x="6044" y="1493" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_2b48e0356566be4a663c" id="n_2b48e0356566be4a663c_di">
+        <di:waypoint x="6204" y="1493" />
+        <di:waypoint x="6304" y="1473" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_2f2a0f5f189504a225fa" id="n_2f2a0f5f189504a225fa_di">
+        <di:waypoint x="6354" y="1473" />
+        <di:waypoint x="6454" y="1466" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape bpmnElement="n_a4d5a14b9d649a5921eb" id="n_a4d5a14b9d649a5921eb_di">
         <dc:Bounds height="90" width="160" x="5308" y="770" />
@@ -1391,7 +1424,7 @@
         <di:waypoint x="5718" y="1503" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_5b972df5fa9a765c3aed" id="n_5b972df5fa9a765c3aed_di">
-        <di:waypoint x="6270" y="1503" />
+        <di:waypoint x="6570" y="1503" />
         <di:waypoint x="7190" y="345" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_840444b8dd364212674d" id="n_840444b8dd364212674d_di">

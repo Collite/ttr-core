@@ -632,7 +632,7 @@
           <bpmn:sequenceFlow id="n_abadda62c35a9a71b3fb" sourceRef="n_0bce29fc018a9ac4feef" targetRef="n_5dd9cfbd739772935a1b" />
           <bpmn:sequenceFlow id="n_d201f6eb51f20028fefb" sourceRef="n_5dd9cfbd739772935a1b" targetRef="n_37079c08e700bf4dfbcd" />
           <bpmn:sequenceFlow id="n_e65284f0571563fef835" sourceRef="n_37079c08e700bf4dfbcd" targetRef="n_283c36e85d87ee8b4cb5" />
-          <bpmn:sequenceFlow id="n_10bd8fb57023dca0616a" name="selected and wet" sourceRef="n_37079c08e700bf4dfbcd" targetRef="n_939876945487ae11bd7f">
+          <bpmn:sequenceFlow id="n_10bd8fb57023dca0616a" name="notify selected and wet" sourceRef="n_37079c08e700bf4dfbcd" targetRef="n_939876945487ae11bd7f">
             <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${(false) &amp;&amp; (ttrStatus.jsonPath(&quot;$.actions[?(@.action == \&quot;notify\&quot; &amp;&amp; (&quot;.concat(&quot;@.key.order_number == &quot;).concat(ttrRow.prop(&quot;order_number&quot;).toString()).concat(&quot; || @.key == &quot;).concat(ttrRow.prop(&quot;order_number&quot;).toString()).concat(&quot;))]&quot;)).elementList().size() &gt; 0)}</bpmn:conditionExpression>
           </bpmn:sequenceFlow>
           <bpmn:sequenceFlow id="n_81a889ec5fb2c85f0c90" sourceRef="n_939876945487ae11bd7f" targetRef="n_5ee95baf32c416ce0706" />
@@ -763,7 +763,7 @@
           <bpmn:sequenceFlow id="n_38667e3f0e8d69910885" sourceRef="n_471948f228bfa0eaab4f" targetRef="n_0d8646f70d1dd01778f0" />
           <bpmn:sequenceFlow id="n_f145648b49f24a02189b" sourceRef="n_0d8646f70d1dd01778f0" targetRef="n_bc762cbc1515df761a13" />
           <bpmn:sequenceFlow id="n_3921c315a70a9a1c6e15" sourceRef="n_bc762cbc1515df761a13" targetRef="n_7953041c28adb958db61" />
-          <bpmn:sequenceFlow id="n_2c98bce0e0c9a6599f8c" name="selected and wet" sourceRef="n_bc762cbc1515df761a13" targetRef="n_d522d3c48ac4d681ab9c">
+          <bpmn:sequenceFlow id="n_2c98bce0e0c9a6599f8c" name="notify selected and wet" sourceRef="n_bc762cbc1515df761a13" targetRef="n_d522d3c48ac4d681ab9c">
             <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${(false) &amp;&amp; (ttrStatus.jsonPath(&quot;$.actions[?(@.action == \&quot;notify\&quot; &amp;&amp; (&quot;.concat(&quot;@.key.order_number == &quot;).concat(ttrRow.prop(&quot;order_number&quot;).toString()).concat(&quot; || @.key == &quot;).concat(ttrRow.prop(&quot;order_number&quot;).toString()).concat(&quot;))]&quot;)).elementList().size() &gt; 0)}</bpmn:conditionExpression>
           </bpmn:sequenceFlow>
           <bpmn:sequenceFlow id="n_a7192a6e1948159e1aae" sourceRef="n_d522d3c48ac4d681ab9c" targetRef="n_3db913ed9b8b85abfe1a" />
@@ -810,8 +810,18 @@
           <bpmn:outgoing>n_a7301f07cd18d8f6206d</bpmn:outgoing>
           <bpmn:multiInstanceLoopCharacteristics camunda:collection="${ttrRows_n_ce4ac6acfec6dd7be82a.prop('rows').elements()}" camunda:elementVariable="ttrRow" isSequential="true" />
           <bpmn:startEvent id="n_18cb72a5406212b31c71" name="row start">
-            <bpmn:outgoing>n_e3f61a6fbf2804419c48</bpmn:outgoing>
+            <bpmn:outgoing>n_a02e154060129291aacd</bpmn:outgoing>
           </bpmn:startEvent>
+          <bpmn:exclusiveGateway default="n_2ee3e45da813bea78387" id="n_068034157c9a08d1448b" name="approve_release selected and wet">
+            <bpmn:incoming>n_a02e154060129291aacd</bpmn:incoming>
+            <bpmn:outgoing>n_2ee3e45da813bea78387</bpmn:outgoing>
+            <bpmn:outgoing>n_51808c5ed4f5aed3de02</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
+          <bpmn:exclusiveGateway id="n_ee57979254b4b0c1f8b5" name="approve_release complete">
+            <bpmn:incoming>n_2ee3e45da813bea78387</bpmn:incoming>
+            <bpmn:incoming>n_de7d7d80e8cf7702ebaf</bpmn:incoming>
+            <bpmn:outgoing>n_f8b1d8b7685b9847d132</bpmn:outgoing>
+          </bpmn:exclusiveGateway>
           <bpmn:userTask id="n_65a8a0a949b10342b846" name="approve approve_release">
             <bpmn:extensionElements>
               <camunda:inputOutput>
@@ -819,14 +829,19 @@
                 <camunda:inputParameter name="ttrKey">${ttrRow.prop(&quot;order_number&quot;).value()}</camunda:inputParameter>
               </camunda:inputOutput>
             </bpmn:extensionElements>
-            <bpmn:incoming>n_e3f61a6fbf2804419c48</bpmn:incoming>
-            <bpmn:outgoing>n_dceea79c68155582e0ca</bpmn:outgoing>
+            <bpmn:incoming>n_51808c5ed4f5aed3de02</bpmn:incoming>
+            <bpmn:outgoing>n_de7d7d80e8cf7702ebaf</bpmn:outgoing>
           </bpmn:userTask>
           <bpmn:endEvent id="n_170f1f24797d055b9ed2" name="row complete">
-            <bpmn:incoming>n_dceea79c68155582e0ca</bpmn:incoming>
+            <bpmn:incoming>n_f8b1d8b7685b9847d132</bpmn:incoming>
           </bpmn:endEvent>
-          <bpmn:sequenceFlow id="n_e3f61a6fbf2804419c48" sourceRef="n_18cb72a5406212b31c71" targetRef="n_65a8a0a949b10342b846" />
-          <bpmn:sequenceFlow id="n_dceea79c68155582e0ca" sourceRef="n_65a8a0a949b10342b846" targetRef="n_170f1f24797d055b9ed2" />
+          <bpmn:sequenceFlow id="n_a02e154060129291aacd" sourceRef="n_18cb72a5406212b31c71" targetRef="n_068034157c9a08d1448b" />
+          <bpmn:sequenceFlow id="n_2ee3e45da813bea78387" sourceRef="n_068034157c9a08d1448b" targetRef="n_ee57979254b4b0c1f8b5" />
+          <bpmn:sequenceFlow id="n_51808c5ed4f5aed3de02" name="approve_release selected and wet" sourceRef="n_068034157c9a08d1448b" targetRef="n_65a8a0a949b10342b846">
+            <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${(false) &amp;&amp; (ttrStatus.jsonPath(&quot;$.actions[?(@.action == \&quot;approve_release\&quot; &amp;&amp; (&quot;.concat(&quot;@.key.order_number == &quot;).concat(ttrRow.prop(&quot;order_number&quot;).toString()).concat(&quot; || @.key == &quot;).concat(ttrRow.prop(&quot;order_number&quot;).toString()).concat(&quot;))]&quot;)).elementList().size() &gt; 0)}</bpmn:conditionExpression>
+          </bpmn:sequenceFlow>
+          <bpmn:sequenceFlow id="n_de7d7d80e8cf7702ebaf" sourceRef="n_65a8a0a949b10342b846" targetRef="n_ee57979254b4b0c1f8b5" />
+          <bpmn:sequenceFlow id="n_f8b1d8b7685b9847d132" sourceRef="n_ee57979254b4b0c1f8b5" targetRef="n_170f1f24797d055b9ed2" />
         </bpmn:subProcess>
         <bpmn:serviceTask camunda:asyncBefore="true" id="n_4fd59ad61b6ab219bd35" name="route release">
           <bpmn:extensionElements>
@@ -1392,24 +1407,42 @@
         <dc:Bounds height="36" width="36" x="5718" y="1252" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_0eb98a084ec4c796531a" id="n_0eb98a084ec4c796531a_di" isExpanded="true">
-        <dc:Bounds height="310" width="552" x="5718" y="1348" />
+        <dc:Bounds height="310" width="852" x="5718" y="1348" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_18cb72a5406212b31c71" id="n_18cb72a5406212b31c71_di">
         <dc:Bounds height="36" width="36" x="5758" y="1448" />
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_068034157c9a08d1448b" id="n_068034157c9a08d1448b_di">
+        <dc:Bounds height="50" width="50" x="5894" y="1448" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_ee57979254b4b0c1f8b5" id="n_ee57979254b4b0c1f8b5_di">
+        <dc:Bounds height="50" width="50" x="6304" y="1448" />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_65a8a0a949b10342b846" id="n_65a8a0a949b10342b846_di">
-        <dc:Bounds height="90" width="160" x="5894" y="1448" />
+        <dc:Bounds height="90" width="160" x="6044" y="1448" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_170f1f24797d055b9ed2" id="n_170f1f24797d055b9ed2_di">
-        <dc:Bounds height="36" width="36" x="6154" y="1448" />
+        <dc:Bounds height="36" width="36" x="6454" y="1448" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNEdge bpmnElement="n_e3f61a6fbf2804419c48" id="n_e3f61a6fbf2804419c48_di">
+      <bpmndi:BPMNEdge bpmnElement="n_a02e154060129291aacd" id="n_a02e154060129291aacd_di">
         <di:waypoint x="5794" y="1466" />
-        <di:waypoint x="5894" y="1493" />
+        <di:waypoint x="5894" y="1473" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge bpmnElement="n_dceea79c68155582e0ca" id="n_dceea79c68155582e0ca_di">
-        <di:waypoint x="6054" y="1493" />
-        <di:waypoint x="6154" y="1466" />
+      <bpmndi:BPMNEdge bpmnElement="n_2ee3e45da813bea78387" id="n_2ee3e45da813bea78387_di">
+        <di:waypoint x="5944" y="1473" />
+        <di:waypoint x="6304" y="1473" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_51808c5ed4f5aed3de02" id="n_51808c5ed4f5aed3de02_di">
+        <di:waypoint x="5944" y="1473" />
+        <di:waypoint x="6044" y="1493" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_de7d7d80e8cf7702ebaf" id="n_de7d7d80e8cf7702ebaf_di">
+        <di:waypoint x="6204" y="1493" />
+        <di:waypoint x="6304" y="1473" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_f8b1d8b7685b9847d132" id="n_f8b1d8b7685b9847d132_di">
+        <di:waypoint x="6354" y="1473" />
+        <di:waypoint x="6454" y="1466" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape bpmnElement="n_4fd59ad61b6ab219bd35" id="n_4fd59ad61b6ab219bd35_di">
         <dc:Bounds height="90" width="160" x="5308" y="770" />
@@ -1530,7 +1563,7 @@
         <di:waypoint x="5718" y="1503" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_a7301f07cd18d8f6206d" id="n_a7301f07cd18d8f6206d_di">
-        <di:waypoint x="6270" y="1503" />
+        <di:waypoint x="6570" y="1503" />
         <di:waypoint x="7190" y="345" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_b85d1fa81b43aec5a2f4" id="n_b85d1fa81b43aec5a2f4_di">

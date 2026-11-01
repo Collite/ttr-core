@@ -492,12 +492,22 @@ internal class CamundaRenderer(
                         ?: error("missing Camunda sink for ${wiring.action}")
                 when {
                     sink == "user task" || action.approval == "required" && action.sinks["native"] == "task" -> {
+                        val gate = rowScope.node("exclusiveGateway", "${wiring.action} selected and wet")
+                        val done = rowScope.node("exclusiveGateway", "${wiring.action} complete")
+                        rowScope.link(last, gate)
+                        rowScope.default(gate, done)
                         val task = rowScope.node("userTask", "approve ${wiring.action}")
                         task.extensions +=
                             d.mapping(mapOf("ttrAction" to quote(wiring.action), "ttrKey" to rowKey(graph)))
                         if (d == Dialect.C8) task.extensions += Xml("zeebe:userTask")
-                        rowScope.link(last, task)
-                        last = task
+                        rowScope.link(
+                            gate,
+                            task,
+                            "${wiring.action} selected and wet",
+                            d.and(wet(graph), selected(graph, wiring.action)),
+                        )
+                        rowScope.link(task, done)
+                        last = done
                     }
                     sink == "send task" -> {
                         val gate = rowScope.node("exclusiveGateway", "${wiring.action} selected and wet")
@@ -541,16 +551,12 @@ internal class CamundaRenderer(
                                     "ttrKey" to rowKey(graph),
                                 ),
                             )
-                        val wet =
-                            if (graph.deployment.dryRun) {
-                                "false"
-                            } else {
-                                expr(
-                                    "ttrStatus.hasProp('dryRun') && !ttrStatus.prop('dryRun').boolValue()",
-                                    "ttrStatus.dryRun = false",
-                                )
-                            }
-                        rowScope.link(gate, task, "selected and wet", d.and(wet, selected(graph, wiring.action)))
+                        rowScope.link(
+                            gate,
+                            task,
+                            "${wiring.action} selected and wet",
+                            d.and(wet(graph), selected(graph, wiring.action)),
+                        )
                         val outcome =
                             http(
                                 rowScope,
@@ -608,6 +614,16 @@ internal class CamundaRenderer(
             }
         rowScope.link(last, rowScope.node("endEvent", "row complete"))
     }
+
+    private fun wet(graph: RecipeGraph): String =
+        if (graph.deployment.dryRun) {
+            "false"
+        } else {
+            expr(
+                "ttrStatus.hasProp('dryRun') && !ttrStatus.prop('dryRun').boolValue()",
+                "ttrStatus.dryRun = false",
+            )
+        }
 
     private fun selected(
         graph: RecipeGraph,
