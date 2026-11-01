@@ -67,7 +67,9 @@
                 </camunda:map>
               </camunda:inputParameter>
               <camunda:inputParameter name="payload">${(ttrOpenBody).toString()}</camunda:inputParameter>
-              <camunda:outputParameter name="ttrOpen">${S(response)}</camunda:outputParameter>
+              <camunda:outputParameter name="ttrOpen">
+                <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+              </camunda:outputParameter>
               <camunda:outputParameter name="ttrOpenCode">${statusCode}</camunda:outputParameter>
               <camunda:outputParameter name="ttrOpenHeaders">${headers}</camunda:outputParameter>
               <camunda:outputParameter name="ttrOpenRetryAfter">
@@ -129,7 +131,9 @@
                     <camunda:entry key="Content-Type">application/json</camunda:entry>
                   </camunda:map>
                 </camunda:inputParameter>
-                <camunda:outputParameter name="ttrHandle">${S(response)}</camunda:outputParameter>
+                <camunda:outputParameter name="ttrHandle">
+                  <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                </camunda:outputParameter>
                 <camunda:outputParameter name="ttrHandleCode">${statusCode}</camunda:outputParameter>
                 <camunda:outputParameter name="ttrHandleHeaders">${headers}</camunda:outputParameter>
                 <camunda:outputParameter name="ttrHandleRetryAfter">
@@ -181,7 +185,9 @@
                 </camunda:map>
               </camunda:inputParameter>
               <camunda:inputParameter name="payload">${(ttrOpenBody).toString()}</camunda:inputParameter>
-              <camunda:outputParameter name="ttrOpen">${S(response)}</camunda:outputParameter>
+              <camunda:outputParameter name="ttrOpen">
+                <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+              </camunda:outputParameter>
               <camunda:outputParameter name="ttrOpenCode">${statusCode}</camunda:outputParameter>
               <camunda:outputParameter name="ttrOpenHeaders">${headers}</camunda:outputParameter>
               <camunda:outputParameter name="ttrOpenRetryAfter">
@@ -236,7 +242,9 @@
                     </camunda:map>
                   </camunda:inputParameter>
                   <camunda:inputParameter name="payload">${(S('{}')).toString()}</camunda:inputParameter>
-                  <camunda:outputParameter name="ttrCandidates">${S(response)}</camunda:outputParameter>
+                  <camunda:outputParameter name="ttrCandidates">
+                    <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                  </camunda:outputParameter>
                   <camunda:outputParameter name="ttrCandidatesCode">${statusCode}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrCandidatesHeaders">${headers}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrCandidatesRetryAfter">
@@ -275,7 +283,9 @@
                     </camunda:map>
                   </camunda:inputParameter>
                   <camunda:inputParameter name="payload">${(S('{}')).toString()}</camunda:inputParameter>
-                  <camunda:outputParameter name="ttrContext_n_f6f3de940289326eb96c">${S(response)}</camunda:outputParameter>
+                  <camunda:outputParameter name="ttrContext_n_f6f3de940289326eb96c">
+                    <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                  </camunda:outputParameter>
                   <camunda:outputParameter name="ttrContext_n_f6f3de940289326eb96cCode">${statusCode}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrContext_n_f6f3de940289326eb96cHeaders">${headers}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrContext_n_f6f3de940289326eb96cRetryAfter">
@@ -302,7 +312,9 @@
                     </camunda:map>
                   </camunda:inputParameter>
                   <camunda:inputParameter name="payload">${(S('{}')).toString()}</camunda:inputParameter>
-                  <camunda:outputParameter name="ttrContext_n_176d34e1e7d1dd2a1308">${S(response)}</camunda:outputParameter>
+                  <camunda:outputParameter name="ttrContext_n_176d34e1e7d1dd2a1308">
+                    <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                  </camunda:outputParameter>
                   <camunda:outputParameter name="ttrContext_n_176d34e1e7d1dd2a1308Code">${statusCode}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrContext_n_176d34e1e7d1dd2a1308Headers">${headers}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrContext_n_176d34e1e7d1dd2a1308RetryAfter">
@@ -329,7 +341,9 @@
                     </camunda:map>
                   </camunda:inputParameter>
                   <camunda:inputParameter name="payload">${(S('{}')).toString()}</camunda:inputParameter>
-                  <camunda:outputParameter name="ttrContext_n_ba2fff4051e9f2446636">${S(response)}</camunda:outputParameter>
+                  <camunda:outputParameter name="ttrContext_n_ba2fff4051e9f2446636">
+                    <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                  </camunda:outputParameter>
                   <camunda:outputParameter name="ttrContext_n_ba2fff4051e9f2446636Code">${statusCode}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrContext_n_ba2fff4051e9f2446636Headers">${headers}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrContext_n_ba2fff4051e9f2446636RetryAfter">
@@ -356,7 +370,9 @@
                     </camunda:map>
                   </camunda:inputParameter>
                   <camunda:inputParameter name="payload">${(S('{}')).toString()}</camunda:inputParameter>
-                  <camunda:outputParameter name="ttrDecision">${S(response)}</camunda:outputParameter>
+                  <camunda:outputParameter name="ttrDecision">
+                    <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                  </camunda:outputParameter>
                   <camunda:outputParameter name="ttrDecisionCode">${statusCode}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrDecisionHeaders">${headers}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrDecisionRetryAfter">
@@ -383,7 +399,9 @@
                     </camunda:map>
                   </camunda:inputParameter>
                   <camunda:inputParameter name="payload">${(S('{}')).toString()}</camunda:inputParameter>
-                  <camunda:outputParameter name="ttrEvaluation">${S(response)}</camunda:outputParameter>
+                  <camunda:outputParameter name="ttrEvaluation">
+                    <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                  </camunda:outputParameter>
                   <camunda:outputParameter name="ttrEvaluationCode">${statusCode}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrEvaluationHeaders">${headers}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrEvaluationRetryAfter">
@@ -422,7 +440,9 @@
                       <camunda:entry key="Content-Type">application/json</camunda:entry>
                     </camunda:map>
                   </camunda:inputParameter>
-                  <camunda:outputParameter name="ttrEvaluation">${S(response)}</camunda:outputParameter>
+                  <camunda:outputParameter name="ttrEvaluation">
+                    <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                  </camunda:outputParameter>
                   <camunda:outputParameter name="ttrEvaluationCode">${statusCode}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrEvaluationHeaders">${headers}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrEvaluationRetryAfter">
@@ -469,7 +489,9 @@
                     <camunda:entry key="Content-Type">application/json</camunda:entry>
                   </camunda:map>
                 </camunda:inputParameter>
-                <camunda:outputParameter name="ttrStatus">${S(response)}</camunda:outputParameter>
+                <camunda:outputParameter name="ttrStatus">
+                  <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                </camunda:outputParameter>
                 <camunda:outputParameter name="ttrStatusCode">${statusCode}</camunda:outputParameter>
                 <camunda:outputParameter name="ttrStatusHeaders">${headers}</camunda:outputParameter>
                 <camunda:outputParameter name="ttrStatusRetryAfter">
@@ -521,7 +543,9 @@
                     <camunda:entry key="Content-Type">application/json</camunda:entry>
                   </camunda:map>
                 </camunda:inputParameter>
-                <camunda:outputParameter name="ttrRows_n_424e4350a604c228eb16">${S(response)}</camunda:outputParameter>
+                <camunda:outputParameter name="ttrRows_n_424e4350a604c228eb16">
+                  <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                </camunda:outputParameter>
                 <camunda:outputParameter name="ttrRows_n_424e4350a604c228eb16Code">${statusCode}</camunda:outputParameter>
                 <camunda:outputParameter name="ttrRows_n_424e4350a604c228eb16Headers">${headers}</camunda:outputParameter>
                 <camunda:outputParameter name="ttrRows_n_424e4350a604c228eb16RetryAfter">
@@ -564,7 +588,9 @@
                     </camunda:map>
                   </camunda:inputParameter>
                   <camunda:inputParameter name="payload">${(S('{}').prop(&quot;keys&quot;,S('[]').append(ttrRow.prop(&quot;order_number&quot;).value()))).toString()}</camunda:inputParameter>
-                  <camunda:outputParameter name="ttrPerformed">${S(response)}</camunda:outputParameter>
+                  <camunda:outputParameter name="ttrPerformed">
+                    <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                  </camunda:outputParameter>
                   <camunda:outputParameter name="ttrPerformedCode">${statusCode}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrPerformedHeaders">${headers}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrPerformedRetryAfter">
@@ -613,7 +639,9 @@
                     </camunda:map>
                   </camunda:inputParameter>
                   <camunda:inputParameter name="payload">${(S('{}').prop(&quot;outcomes&quot;,S('[]').append(S('{}').prop(&quot;key&quot;,ttrRow.prop(&quot;order_number&quot;).value()).prop(&quot;status&quot;,&quot;delivered&quot;).prop(&quot;at&quot;,dateTime().toString())))).toString()}</camunda:inputParameter>
-                  <camunda:outputParameter name="ttrOutcome">${S(response)}</camunda:outputParameter>
+                  <camunda:outputParameter name="ttrOutcome">
+                    <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                  </camunda:outputParameter>
                   <camunda:outputParameter name="ttrOutcomeCode">${statusCode}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrOutcomeHeaders">${headers}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrOutcomeRetryAfter">
@@ -652,7 +680,9 @@
                     <camunda:entry key="Content-Type">application/json</camunda:entry>
                   </camunda:map>
                 </camunda:inputParameter>
-                <camunda:outputParameter name="ttrRows_n_957e2b8409cc49450ca4">${S(response)}</camunda:outputParameter>
+                <camunda:outputParameter name="ttrRows_n_957e2b8409cc49450ca4">
+                  <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                </camunda:outputParameter>
                 <camunda:outputParameter name="ttrRows_n_957e2b8409cc49450ca4Code">${statusCode}</camunda:outputParameter>
                 <camunda:outputParameter name="ttrRows_n_957e2b8409cc49450ca4Headers">${headers}</camunda:outputParameter>
                 <camunda:outputParameter name="ttrRows_n_957e2b8409cc49450ca4RetryAfter">
@@ -695,7 +725,9 @@
                     </camunda:map>
                   </camunda:inputParameter>
                   <camunda:inputParameter name="payload">${(S('{}').prop(&quot;keys&quot;,S('[]').append(ttrRow.prop(&quot;order_number&quot;).value()))).toString()}</camunda:inputParameter>
-                  <camunda:outputParameter name="ttrPerformed">${S(response)}</camunda:outputParameter>
+                  <camunda:outputParameter name="ttrPerformed">
+                    <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                  </camunda:outputParameter>
                   <camunda:outputParameter name="ttrPerformedCode">${statusCode}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrPerformedHeaders">${headers}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrPerformedRetryAfter">
@@ -744,7 +776,9 @@
                     </camunda:map>
                   </camunda:inputParameter>
                   <camunda:inputParameter name="payload">${(S('{}').prop(&quot;outcomes&quot;,S('[]').append(S('{}').prop(&quot;key&quot;,ttrRow.prop(&quot;order_number&quot;).value()).prop(&quot;status&quot;,&quot;delivered&quot;).prop(&quot;at&quot;,dateTime().toString())))).toString()}</camunda:inputParameter>
-                  <camunda:outputParameter name="ttrOutcome">${S(response)}</camunda:outputParameter>
+                  <camunda:outputParameter name="ttrOutcome">
+                    <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                  </camunda:outputParameter>
                   <camunda:outputParameter name="ttrOutcomeCode">${statusCode}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrOutcomeHeaders">${headers}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrOutcomeRetryAfter">
@@ -783,7 +817,9 @@
                     <camunda:entry key="Content-Type">application/json</camunda:entry>
                   </camunda:map>
                 </camunda:inputParameter>
-                <camunda:outputParameter name="ttrRows_n_ce4ac6acfec6dd7be82a">${S(response)}</camunda:outputParameter>
+                <camunda:outputParameter name="ttrRows_n_ce4ac6acfec6dd7be82a">
+                  <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                </camunda:outputParameter>
                 <camunda:outputParameter name="ttrRows_n_ce4ac6acfec6dd7be82aCode">${statusCode}</camunda:outputParameter>
                 <camunda:outputParameter name="ttrRows_n_ce4ac6acfec6dd7be82aHeaders">${headers}</camunda:outputParameter>
                 <camunda:outputParameter name="ttrRows_n_ce4ac6acfec6dd7be82aRetryAfter">
@@ -856,7 +892,9 @@
                     <camunda:entry key="Content-Type">application/json</camunda:entry>
                   </camunda:map>
                 </camunda:inputParameter>
-                <camunda:outputParameter name="ttrRows_n_01f561ac4ab15d6a23a5">${S(response)}</camunda:outputParameter>
+                <camunda:outputParameter name="ttrRows_n_01f561ac4ab15d6a23a5">
+                  <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                </camunda:outputParameter>
                 <camunda:outputParameter name="ttrRows_n_01f561ac4ab15d6a23a5Code">${statusCode}</camunda:outputParameter>
                 <camunda:outputParameter name="ttrRows_n_01f561ac4ab15d6a23a5Headers">${headers}</camunda:outputParameter>
                 <camunda:outputParameter name="ttrRows_n_01f561ac4ab15d6a23a5RetryAfter">
@@ -899,7 +937,9 @@
                     </camunda:map>
                   </camunda:inputParameter>
                   <camunda:inputParameter name="payload">${(S('{}').prop(&quot;keys&quot;,S('[]').append(ttrRow.prop(&quot;order_number&quot;).value()))).toString()}</camunda:inputParameter>
-                  <camunda:outputParameter name="ttrPerformed">${S(response)}</camunda:outputParameter>
+                  <camunda:outputParameter name="ttrPerformed">
+                    <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                  </camunda:outputParameter>
                   <camunda:outputParameter name="ttrPerformedCode">${statusCode}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrPerformedHeaders">${headers}</camunda:outputParameter>
                   <camunda:outputParameter name="ttrPerformedRetryAfter">
@@ -932,7 +972,9 @@
                   </camunda:map>
                 </camunda:inputParameter>
                 <camunda:inputParameter name="payload">${(S('{}')).toString()}</camunda:inputParameter>
-                <camunda:outputParameter name="ttrClosed">${S(response)}</camunda:outputParameter>
+                <camunda:outputParameter name="ttrClosed">
+                  <camunda:script scriptFormat="groovy">def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;return org.camunda.spin.Spin.JSON(response)</camunda:script>
+                </camunda:outputParameter>
                 <camunda:outputParameter name="ttrClosedCode">${statusCode}</camunda:outputParameter>
                 <camunda:outputParameter name="ttrClosedHeaders">${headers}</camunda:outputParameter>
                 <camunda:outputParameter name="ttrClosedRetryAfter">

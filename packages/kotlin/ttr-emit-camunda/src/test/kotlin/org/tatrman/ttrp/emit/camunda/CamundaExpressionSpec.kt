@@ -102,6 +102,54 @@ class CamundaExpressionSpec :
                 withClue("$expression => $parsed") { parsed.isSuccess shouldBe true }
             }
         }
+        "C7 every HTTP result rejects non-success responses and maps stale to the boundary error" {
+            val xml = CamundaRenderer(RecipeEmitRequest(releaseGraph(), "{}", "", "{}"), Dialect.C7).render()
+            val doc =
+                DocumentBuilderFactory
+                    .newInstance()
+                    .apply {
+                        isNamespaceAware = true
+                    }.newDocumentBuilder()
+                    .parse(InputSource(StringReader(xml)))
+            val outputs = doc.getElementsByTagNameNS("http://camunda.org/schema/1.0/bpmn", "outputParameter")
+            val script =
+                (0 until outputs.length)
+                    .map { outputs.item(it) as Element }
+                    .first {
+                        it.getAttribute("name") ==
+                            "ttrOpen"
+                    }.textContent
+            GroovyClassLoader().use { loader ->
+                loader.parseClass(
+                    "package org.camunda.bpm.engine.delegate; class BpmnError extends RuntimeException { BpmnError(String code, String message) { super(code + ': ' + message) } }",
+                )
+
+                fun run(code: Int) =
+                    GroovyShell(
+                        loader,
+                        Binding(
+                            mapOf(
+                                "statusCode" to code,
+                                "response" to """{"runId":"run"}""",
+                            ),
+                        ),
+                    ).evaluate(script)
+                for (code in listOf(200, 201, 202)) {
+                    (run(code) as org.camunda.spin.json.SpinJsonNode).prop("runId").stringValue() shouldBe
+                        "run"
+                }
+                for (code in listOf(400, 403, 500)) {
+                    io.kotest.assertions.throwables
+                        .shouldThrow<RuntimeException> { run(code) }
+                        .message shouldBe
+                        "run API HTTP $code"
+                }
+                io.kotest.assertions.throwables
+                    .shouldThrow<RuntimeException> { run(409) }
+                    .javaClass.name shouldBe
+                    "org.camunda.bpm.engine.delegate.BpmnError"
+            }
+        }
         "calendar schedules evaluate to zoned ISO cycles and intervals retain their period" {
             val feel = FeelEngineBuilder.forJava().build()
             for (hint in listOf("06:00 Europe/Prague", "Mon 09:00 Europe/Prague", "1st 09:00 Europe/Prague")) {

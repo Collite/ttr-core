@@ -166,7 +166,19 @@ internal enum class Dialect(
                                             Xml(
                                                 "camunda:outputParameter",
                                                 mapOf("name" to result),
-                                                text = "\${S(response)}",
+                                                listOf(
+                                                    Xml(
+                                                        "camunda:script",
+                                                        mapOf("scriptFormat" to "groovy"),
+                                                        text =
+                                                            """
+                                                            def code = ((Number) statusCode).intValue()
+                                                            if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')
+                                                            if (code < 200 || code >= 300) throw new IllegalStateException('run API HTTP ' + code)
+                                                            return org.camunda.spin.Spin.JSON(response)
+                                                            """.trimIndent(),
+                                                    ),
+                                                ),
                                             ),
                                             Xml(
                                                 "camunda:outputParameter",
