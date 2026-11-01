@@ -92,6 +92,21 @@ describe('ttrm.tmLanguage.json — the 0.17 conceptual model', () => {
     expect(tokenIn(lineOf(f76, 'kind: cn.Item'), 'kind').scopes).toContain('keyword.other.property.ttrm');
   });
 
+  // review-200 R1: `variant` (0.21.x) is a def kind only after `def`, like `kind` — a name everywhere else.
+  it('scopes `def variant` as a def kind, and a `variant` table, column or ref part as a name', () => {
+    const f122 = fixture('122-cn-variant.ttrm');
+    const defVariant = lineOf(f122, 'def variant WebSale');
+    expect(tokenIn(defVariant, 'def').scopes).toContain('keyword.control.def.ttrm');
+    expect(tokenIn(defVariant, 'variant').scopes).toContain('keyword.other.kind.ttrm');
+    expect(tokenIn(lineOf(f122, 'def quality variant'), 'variant').scopes).toEqual([]);
+    const f124 = fixture('124-cn-variant-as-id.ttrm');
+    expect(tokenIn(lineOf(f124, 'def table variant'), 'variant').scopes).toEqual([]);
+    const columns = lineOf(f124, 'def column variant');
+    expect(columns.filter(t => t.text.trim() === 'variant').map(t => t.scopes)).toEqual([[]]);
+    const fk = lineOf(f124, 'def fk variant_fk');
+    expect(fk.filter(t => /\bvariant\b/.test(t.text)).flatMap(t => t.scopes)).not.toContain('keyword.other.kind.ttrm');
+  });
+
   it('scopes every concept def noun and every binding kind as a kind', () => {
     const f75 = fixture('75-cn-concepts.ttrm');
     for (const noun of ['role', 'event', 'quality', 'phase', 'relation_type']) {

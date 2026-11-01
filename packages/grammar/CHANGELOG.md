@@ -12,6 +12,16 @@ The canonical version lives in the `// @grammar-version:` marker at the top of
 `src/generated/version.ts`, re-exported from `@tatrman/grammar` as
 `TTR_GRAMMAR_VERSION`.
 
+## 0.21.2 — `variant` follow-ups (review-200)
+
+`SUBKIND` joins `cnKey`, so `subkind:` is a cn free-form key, as `variant:` has been since 0.21.1 (missing since
+0.20; ttr-core#358). No other production changes; every previously-valid file parses unchanged. The canonical
+schemas regenerate accordingly (`subkind` leaves the cn reserved-key lists). Text using `subkind:` as a key needs a
+0.21.2 reader. Outside the grammar: TextMate colours `variant` as a def kind only after `def` (a `variant` column or
+attribute is a name), the `concept-bearer-missing` description names the variant, the three runtimes pin the
+`cn/subkind-as-kind` hint, and `conceptKeyword` (`@tatrman/parser`) is the one "word as written" rule for the
+formatter and the LSP outline. The marker stays 0.21.
+
 ## 0.21.1 — `variant` (CN-P8 S8.6)
 
 `def variant <Name> { … }` is `def subkind` under its house spelling (CN-D32): one new soft keyword, `VARIANT`, beside

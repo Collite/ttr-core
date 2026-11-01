@@ -178,7 +178,7 @@ rows are off under `recommended` and `info` under `strict`.
 |---|---|---|
 | `cn/duplicate-grounding` | Error | A concept grounded twice (binding, `grounds:` or `concept { }`); the first is read. |
 | `cn/grounding-target-kind` | Error | The target is not what the stereotype grounds to on that layer, or a `concept { }` on a cubelet's inline measure. |
-| `concept-bearer-missing` (`ttr/required-property-missing` on Kotlin / Python) | Error | A quality or a phase with no `of:`. |
+| `concept-bearer-missing` (`ttr/required-property-missing` on Kotlin / Python) | Error | A quality, a phase or a variant with no `of:`. |
 | `cn/role-no-event` · `cn/phase-double-definition` | Error | A role with no `event:`, or one that is not an event · a phase with both `definition:` and a grounding. |
 | `cn/subkind-bearer` · `cn/subkind-temporal-definition` · `cn/partition-overlap` | Error | A variant whose `of:` is not a kind, variant, role or event · a variant whose definition reads time, a parameter, a valued state or a phase · two variants on one value of one attribute. |
 | `cn/durative-event` · `cn/lifetime-period` | Error | An event with a `start` / `end` or `extent: durative` · a non-event `period:` that is not a start and an end. |

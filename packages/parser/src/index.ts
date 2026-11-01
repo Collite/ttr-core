@@ -5,7 +5,7 @@ import type { ParseResult } from './ast.js';
 export { parseString, parseFile } from './walker.js';
 export { DiagnosticCode } from './diagnostics.js';
 export { TAG_REGISTRY, resolveTag, EXPRESSION_TAG_REGISTRY, resolveExpressionTag } from './tag-registry.js';
-export { conceptProperty, conceptRef, conceptEntry, embeddedBlockLocation } from './concept.js';
+export { conceptKeyword, conceptProperty, conceptRef, conceptEntry, embeddedBlockLocation } from './concept.js';
 export type { TagEntry } from './tag-registry.js';
 export { sqlPosToFile, fileToSqlOffset } from './sql-position.js';
 export type { SqlTokenPos } from './sql-position.js';

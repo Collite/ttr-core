@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { encodeTtrString } from '@tatrman/parser/layout';
+import { conceptKeyword } from '@tatrman/parser';
 import type {
   Document, Definition, SourceLocation, ParameterDef, GraphBlock, Trivia,
   ConceptBody, ConceptBindingDef, ConceptDef, ConceptParticipant, ConceptProperty, ConceptSugar, ListValue, ObjectValue,
@@ -644,11 +645,6 @@ function cnLayout(ctx: Ctx, body: ConceptBody, properties: ConceptProperty[]): P
   } finally {
     ctx.cn = outer;
   }
-}
-
-/** A concept def's keyword: a subkind keeps its author's word, and `variant` when it records none (CN-D32). */
-function conceptKeyword(def: ConceptDef): string {
-  return def.stereotype === 'subkind' ? (def.spelling ?? 'variant') : def.stereotype;
 }
 
 /** A concept def or a cn binding — always top-level (neither nests in a def list). */

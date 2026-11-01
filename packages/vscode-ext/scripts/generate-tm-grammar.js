@@ -260,12 +260,13 @@ function tokenToScope(name, literal) {
         // `cn.` ref head, like MD/ER; the concept def nouns and the ten binding kinds
         // are kinds; the cn body keys, the `concept { }` sugar and the lexicon
         // `default` / `sense_priority` are body properties. KIND stays a property
-        // (`kind: cn.Item`, md `kind:`) — `def kind` is scoped by the #def-kind rule.
+        // (`kind: cn.Item`, md `kind:`) — `def kind` is scoped by the #def-kind rule, and so is `def variant`
+        // (0.21.x, `subkind`'s house spelling): `variant` is an everyday column / attribute name (review-200 R1).
         // AS (`Warehouse as from`) is an operator word, the TTRP spelling.
         case 'CN': return 'keyword.other.schema.ttrm';
         case 'EVENT': return 'keyword.other.kind.ttrm';
         case 'SUBKIND': return 'keyword.other.kind.ttrm';
-        case 'VARIANT': return 'keyword.other.kind.ttrm'; // 0.21.x — `subkind`'s house spelling
+        case 'VARIANT': return null;
         case 'PER': return 'keyword.other.property.ttrm';
         case 'UNTIL': return 'keyword.other.property.ttrm';
         case 'PHASE': return 'keyword.other.kind.ttrm';
@@ -448,7 +449,7 @@ function buildGrammar(tokens) {
             'pl-expression': PL_EXPRESSION,
             'def-kind': {
                 patterns: [{
-                        match: '\\b(def)\\s+(kind)\\b',
+                        match: '\\b(def)\\s+(kind|variant)\\b',
                         captures: {
                             1: { name: 'keyword.control.def.ttrm' },
                             2: { name: 'keyword.other.kind.ttrm' },
