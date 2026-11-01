@@ -456,7 +456,7 @@ class CnValidator {
     };
     for (const c of this.concepts.values()) {
       if (c.stereotype === 'subkind' && temporal(c, new Set())) emit(c, DiagnosticCode.CnSubkindTemporalDefinition, `subkind '${c.name}' has a temporal or parametric definition`, false, prop(c, 'definition') ? 'definition' : 'members');
-      if (c.stereotype === 'kind' && prop(c, 'members') && prop(c, 'is_a')) emit(c, DiagnosticCode.CnSubkindAsKind, `kind '${c.name}' with members and is_a is a subkind — use 'def subkind'`, true);
+      if (c.stereotype === 'kind' && prop(c, 'members') && prop(c, 'is_a')) emit(c, DiagnosticCode.CnSubkindAsKind, `kind '${c.name}' with members and is_a is a subkind — use 'def variant'`, true);
       if (c.stereotype === 'role' && named(c, 'event') && named(c, 'event')!.stereotype !== 'event') emit(c, DiagnosticCode.CnRoleNoEvent, `role '${c.name}' requires an event as its defining event`, false, 'event');
       if (c.stereotype === 'subkind' && named(c, 'of') && !['kind', 'subkind', 'role', 'event'].includes(named(c, 'of')!.stereotype)) emit(c, DiagnosticCode.CnSubkindBearer, `subkind '${c.name}' requires a rigid bearer — a kind, subkind, role or event, not a ${named(c, 'of')!.stereotype}`, false, 'of');
       const ep = prop(c, 'extent')?.property; const extent = ep?.kind === 'extent' ? ep.value : undefined;
