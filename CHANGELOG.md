@@ -6,6 +6,22 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — Kotlin canonical YAML codec
+
+- Source module `ttr-yaml` reads/writes grammar 0.21 canonical documents, preserving headers, imports,
+  definition/member/security order, graph data, embedded text, generic wrappers and numeric spellings.
+  Its lossless syntax tree accompanies the existing typed AST; YAML node spans locate diagnostics.
+- YAML 1.2 loading validates bundled schemas offline and rejects duplicate keys, unsafe YAML forms,
+  unsupported versions and unknown typed keys. `!pl` scalar input normalizes to an embedded block record.
+- Canonical model/profile schemas retain every grammar kind alias, including both `variant` and
+  `subkind`; the codec preserves the authored spelling and their shared typed-AST stereotype.
+- Codec round trips preserve ordered schema fields/restrict members, literal expression text and exponent
+  spellings. Duplicate ordered-map keys, misplaced `!pl`, calc comments and unsupported YAML directives
+  are refused at source locations; output escapes nonprintable YAML characters.
+- C-7 and YAML share lower definition-property serialization. C-7 export bytes and resolved-reference
+  behavior stay unchanged. No grammar/dependency pin or artifact version changes; internal release wiring
+  remains in MW-P2 certification. Existing JVM rebuild notices remain in force.
+
 ### Added — `variant`, the house spelling of `subkind` (grammar 0.21.1, CN-P8 S8.6)
 
 - `def variant <Name> { … }` is the same construct as `def subkind`: one soft keyword (`variant` stays a name, a
@@ -20,6 +36,7 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   TextMate highlights `variant` as a def kind; the LSP outline shows the word as written.
 - Text written with `variant` needs a 0.21.1 reader. **JVM consumers must rebuild:** `ConceptDef` gains a data-class
   field (`spelling`, defaulted), changing its constructor/copy signature. The grammar marker stays 0.21.
+
 ### Added — generated canonical YAML and profile schemas
 
 - Grammar 0.21 now generates canonical document/profile schemas and exhaustive shape metadata, exported by
@@ -27,7 +44,7 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   bodies, retained value records, profile operations and typed target paths are checked mechanically.
 - Generation fails on unhandled structural forms; CI rejects stale resources. npm consumer and parser-jar
   checks verify byte identity. Standalone JVM source builds use the dependency-free Node.js ≥20 emitter.
-- The grammar marker and producer pins stay unchanged; bundle major/minor remains 0.21. Codec/profile
+- The grammar marker and producer pins stay unchanged; bundle major/minor remains 0.21. Profile
   execution is delivered separately. The existing 0.21 JVM rebuild notice below remains in force.
 
 ### Docs — the conceptual model chapter on grammar 0.20 (CN-P8 S8.4)

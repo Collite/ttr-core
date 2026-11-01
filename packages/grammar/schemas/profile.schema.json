@@ -201,6 +201,7 @@
                           "program",
                           "recipe",
                           "subkind",
+                          "variant",
                           "kind",
                           "event",
                           "phase",
@@ -2041,6 +2042,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -2061,6 +2063,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -4562,6 +4565,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -4582,6 +4586,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -6136,6 +6141,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -6156,6 +6162,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -8237,6 +8244,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -8257,6 +8265,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11287,6 +11296,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11307,6 +11317,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11327,6 +11338,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11347,6 +11359,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11367,6 +11380,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11387,6 +11401,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11407,6 +11422,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11427,6 +11443,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11447,6 +11464,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11467,6 +11485,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11487,6 +11506,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11507,6 +11527,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11527,6 +11548,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11547,6 +11569,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11567,6 +11590,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11587,6 +11611,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11607,6 +11632,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11627,6 +11653,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11647,6 +11674,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11667,6 +11695,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11687,6 +11716,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11707,6 +11737,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11727,6 +11758,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11747,6 +11779,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11767,6 +11800,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -11787,6 +11821,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -22272,6 +22307,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -22292,6 +22328,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -22312,6 +22349,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -22332,6 +22370,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -24052,6 +24091,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -24624,6 +24664,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -24644,6 +24685,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -24664,6 +24706,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -24684,6 +24727,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -25924,6 +25968,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -25944,6 +25989,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -27770,6 +27816,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -27790,6 +27837,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -28000,6 +28048,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -28020,6 +28069,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -28855,6 +28905,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -28875,6 +28926,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -28895,6 +28947,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -28915,6 +28968,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -28935,6 +28989,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -29242,6 +29297,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -29480,6 +29536,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -29500,6 +29557,7 @@
                                 "kind": {
                                   "enum": [
                                     "subkind",
+                                    "variant",
                                     "kind",
                                     "event",
                                     "phase",
@@ -36416,6 +36474,26 @@
       "properties": {
         "kind": {
           "const": "subkind"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cnBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_variant": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "variant"
         },
         "id": {
           "$ref": "#/$defs/identifier"
@@ -66247,6 +66325,7 @@
             "program",
             "recipe",
             "subkind",
+            "variant",
             "kind",
             "event",
             "phase",
@@ -67786,6 +67865,42 @@
             "properties": {
               "kind": {
                 "const": "subkind"
+              },
+              "property": {
+                "$ref": "#/$defs/propertyKey_cnBody"
+              },
+              "path": {
+                "$ref": "#/$defs/targetPath_cnBody"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "additionalProperties": false,
+            "not": {
+              "required": [
+                "property",
+                "path"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "variant"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "variant"
               },
               "property": {
                 "$ref": "#/$defs/propertyKey_cnBody"

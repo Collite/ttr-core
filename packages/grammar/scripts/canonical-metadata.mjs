@@ -153,7 +153,9 @@ export function deriveMetadata(source) {
   function member(option) {
     const parts = sequence(option);
     if (parts[0]?.symbol !== 'DEF') return null;
-    const [kind] = tokenKeys(parts[1]);
+    const keys = tokenKeys(parts[1]);
+    if (keys.length !== 1) throw new Error('Unhandled nested definition alias');
+    const [kind] = keys;
     const named = parts[2]?.symbol === 'id';
     const body = parts[named ? 3 : 2]?.symbol;
     if (parts.length !== (named ? 4 : 3) || !body)
@@ -256,14 +258,14 @@ export function deriveMetadata(source) {
     }
     return result;
   }
-  const kinds = alternatives(parse('objectDefinition')).map((option) => {
+  const kinds = alternatives(parse('objectDefinition')).flatMap((option) => {
     const parts = sequence(option);
     if (parts.length !== 3 || parts[1]?.symbol !== 'id' || !parts[2]?.symbol)
       throw new Error('Unhandled objectDefinition alternative');
-    const [kind] = tokenKeys(parts[0]);
+    const kindKeys = tokenKeys(parts[0]);
     const rule = parts[2].symbol;
     body(rule);
-    return { kind, body: rule };
+    return kindKeys.map((kind) => ({ kind, body: rule }));
   });
   for (const name of ['cnBody', 'bindingBlock', 'searchBlock']) body(name);
   // Parameter records have no outer Definition identity.

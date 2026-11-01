@@ -47,6 +47,11 @@ Open `packages/vscode-ext` in VS Code and press F5 to launch an Extension Develo
 
 ### Kotlin artifacts (Gradle build)
 
+- `packages/kotlin/ttr-yaml` is the canonical YAML 0.21 codec, below metadata. Its `CanonicalDocument`
+  retains syntax that the typed AST folds; keep that document for lossless writing. `DefinitionProperties`
+  in ttr-parser is shared with C-7; metadata owns snapshot/reference-resolution adapters. Codec tests
+  reuse the parser's unchanged conformance dumper from its test fixtures. Release wiring follows certification.
+
 Two build domains coexist in this repo and share **only** `packages/grammar/src/TTR.g4`:
 
 - **pnpm / TypeScript** (`packages/*`, commands above) — LSP, VS Code ext, Designer.

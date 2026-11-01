@@ -258,6 +258,7 @@
                     "program",
                     "recipe",
                     "subkind",
+                    "variant",
                     "kind",
                     "event",
                     "phase",
@@ -926,6 +927,21 @@
                   "if": {
                     "properties": {
                       "kind": {
+                        "const": "variant"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ]
+                  },
+                  "then": {
+                    "$ref": "#/$defs/def_variant"
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
                         "const": "kind"
                       }
                     },
@@ -1203,6 +1219,7 @@
                     "program",
                     "recipe",
                     "subkind",
+                    "variant",
                     "kind",
                     "event",
                     "phase",
@@ -1865,6 +1882,21 @@
                   },
                   "then": {
                     "$ref": "#/$defs/def_subkind"
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "const": "variant"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ]
+                  },
+                  "then": {
+                    "$ref": "#/$defs/def_variant"
                   }
                 },
                 {
@@ -6400,6 +6432,26 @@
       "properties": {
         "kind": {
           "const": "subkind"
+        },
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "properties": {
+          "$ref": "#/$defs/body_cnBody"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "def_variant": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "variant"
         },
         "id": {
           "$ref": "#/$defs/identifier"
