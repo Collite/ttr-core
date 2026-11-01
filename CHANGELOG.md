@@ -20,6 +20,15 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   TextMate highlights `variant` as a def kind; the LSP outline shows the word as written.
 - Text written with `variant` needs a 0.21.1 reader. **JVM consumers must rebuild:** `ConceptDef` gains a data-class
   field (`spelling`, defaulted), changing its constructor/copy signature. The grammar marker stays 0.21.
+### Added — generated canonical YAML and profile schemas
+
+- Grammar 0.21 now generates canonical document/profile schemas and exhaustive shape metadata, exported by
+  `@tatrman/grammar` and bundled under `/schemas/` in `ttr-parser`. Exact kind/property names, nested/open
+  bodies, retained value records, profile operations and typed target paths are checked mechanically.
+- Generation fails on unhandled structural forms; CI rejects stale resources. npm consumer and parser-jar
+  checks verify byte identity. Standalone JVM source builds use the dependency-free Node.js ≥20 emitter.
+- The grammar marker and producer pins stay unchanged; bundle major/minor remains 0.21. Codec/profile
+  execution is delivered separately. The existing 0.21 JVM rebuild notice below remains in force.
 
 ### Docs — the conceptual model chapter on grammar 0.20 (CN-P8 S8.4)
 

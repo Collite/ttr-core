@@ -18,6 +18,20 @@ legal identifier parts. JVM consumers must rebuild against the new parser model.
 
 **0.21.1:** `def variant` is the house spelling of `def subkind` (CN-D32): the same
 construct and stereotype, the word recorded for the writer. `subkind` stays a synonym.
+## Canonical YAML schemas — grammar 0.21
+
+`prebuild` generates `schemas/model-yaml.schema.json`, `schemas/profile.schema.json`
+and `schemas/canonical-metadata.json` from the grammar productions and explicit
+structural value adapters. They are exported at `@tatrman/grammar/schemas/<filename>`
+and packaged at `/schemas/<filename>` in the Kotlin `ttr-parser` jar.
+
+Run `pnpm --filter @tatrman/grammar schemas:check` to reject drift without
+rewriting files, and `pnpm --filter @tatrman/grammar test` for generation checks.
+Both schemas use draft 2020-12 with local references. See the
+[canonical schema manual](../../docs/manual/en/canonical-yaml-schemas.md) for the
+ordered envelope, typed/open bodies, profile targets and resource/build checks.
+The grammar stays 0.21; this delivery adds schema resources. The Kotlin YAML
+codec and profile execution follow in later stages.
 
 ## Files
 

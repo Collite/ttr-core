@@ -16,8 +16,8 @@ import kotlin.io.path.toPath
  * DX-P0 S0.3 T5 — the CN-P3 S3.8 pattern applied to `org.tatrman.concept.extract`: no JDBC or DML, no I/O, no clock
  * or randomness (the module-wide [PuritySpec] rules), and nothing referenced beyond ttr-concept itself, the
  * ttr-metadata model, kotlinx-serialization's JSON tree and the JDK's lang/util/math/digest — so the renderer stays a
- * library function Pinakes can call on a model snapshot; and twenty renderings, over two independent loads, are
- * byte-identical.
+ * library function a document pipeline can call on a model snapshot; and twenty renderings, over two independent
+ * loads, are byte-identical.
  */
 class ExtractPuritySpec :
     FunSpec({

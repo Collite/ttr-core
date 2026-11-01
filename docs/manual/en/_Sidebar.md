@@ -28,6 +28,7 @@
 
 **Tooling**
 - [VS Code experience](13-vscode.md)
+- [Canonical YAML schemas](canonical-yaml-schemas.md)
 
 **Reference**
 - [Reference](14-reference.md)
