@@ -286,7 +286,7 @@ internal class TtrText(
                     if (it["form"]?.jsonPrimitive?.content == "string") {
                         TtrStrings.encode(block)
                     } else {
-                        triple(block, it["tag"]?.jsonPrimitive?.content)
+                        triple(block, it["tag"]?.jsonPrimitive?.content, it.getValue("block"))
                     }
                 }
             "dataType" ->
@@ -391,6 +391,7 @@ internal class TtrText(
     private fun triple(
         content: String,
         tag: String? = null,
+        origin: JsonElement,
     ): String {
         val inner = if (tag == null) "\n$content" else "$tag\n$content\n"
         val body =
@@ -402,7 +403,12 @@ internal class TtrText(
                 Dedent.applyTextwrapDedent(content + "\n").removeSuffix("\n")
             }
         if ("\"\"\"" !in content && body == content) return "\"\"\"$inner\"\"\""
-        require(projection) { "String content cannot be represented by a TTR triple literal" }
+        if (!projection) {
+            throw CanonicalValueException(
+                origin,
+                "String content cannot be represented by a TTR triple literal",
+            )
+        }
         return TtrStrings.encode(content)
     }
 
@@ -452,7 +458,7 @@ internal class TtrText(
             is JsonObject ->
                 when {
                     value.keys == setOf("ref") -> render("id", value.getValue("ref"))
-                    value.keys == setOf("triple") -> triple(value.string("triple"))
+                    value.keys == setOf("triple") -> triple(value.string("triple"), origin = value.getValue("triple"))
                     mode == "autoValue" && value.keys == setOf("star") -> "*"
                     mode == "autoValue" && "entries" in value -> render("callValue", value)
                     mode == "autoValue" && "amount" in value -> render("durationLiteral", value)

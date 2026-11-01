@@ -5,7 +5,7 @@ shape metadata from `TTR.g4`. They describe grammar **0.21**, including its exac
 57 top-level definition kinds and nested world/automation declarations. Schema
 validation checks syntax and value shapes; required domain fields, reference
 resolution and profile execution belong to semantic validation. The Kotlin YAML
-codec is a later delivery.
+codec is available in the source module `packages/kotlin/ttr-yaml`; its internal bundle release follows certification.
 
 ## Resources
 
@@ -109,6 +109,54 @@ Embedded source uses `{block: <text>, tag?: <tag>, form?: string|tripleString}`.
 A tag selects tagged source; an absent tag/form selects untagged triple text.
 `form: string` retains a quoted expression block. Tags and `form` are exclusive.
 
+## Kotlin codec
+
+`org.tatrman.ttr.yaml.CanonicalYaml` reads YAML into a `CanonicalDocument`:
+
+```kotlin
+val document = CanonicalYaml.read(yamlText, "sales.yaml")
+val parsed = document.ast // the same ParseResult/model types as TtrLoader
+val canonicalBytes = CanonicalYaml.write(document).toByteArray(Charsets.UTF_8)
+val nativeText = CanonicalYaml.toTtr(document)
+val converted = CanonicalYaml.fromTtr(nativeText, "sales.ttrm")
+```
+
+Keep the document when writing. Its `value` is the lossless canonical syntax tree;
+the typed `ast` projection intentionally folds some syntax, including graph blocks,
+domain restriction details and ordering between different world-member families.
+The codec preserves these in the syntax tree. It does not resolve or qualify refs.
+C-7 shares the lower `DefinitionProperties` serializer, with reference resolution
+supplied by metadata; its existing projection, headers, connections and bytes stay unchanged.
+
+Loading uses YAML 1.2 nodes and the bundled document schema offline. Duplicate
+mapping keys, anchors, aliases, merge keys, multiple documents, custom constructors,
+unknown typed keys, unsupported versions and nonfinite numbers raise
+`CanonicalYamlException` with file, line and column (one-based). Only `!pl` scalar
+sugar is accepted. The typed AST keeps YAML node spans; its `SourceLocation.column`
+uses the parser's existing zero-based convention. Semantic parser diagnostics,
+including a repeated CN property, remain in `document.ast.errors` rather than
+preventing lossless syntax read/write.
+
+Output uses LF and a final newline, two-space indentation, quoted string values,
+literal multiline blocks and no anchors/aliases. Ordinary property mappings follow
+the grammar property order, then UTF-8 byte order for retained keys. CN/automation
+properties and automation objects use ordered single-entry sequences. Numeric
+spellings such as `1`, `1.0`, `1.00`, `01` and `-0.0` remain distinguishable where
+automation fingerprints retain their text. Native TTR escape handling follows the
+grammar string contract.
+
+YAML strings retain their content even if it has no equivalent native triple-string
+spelling, such as a literal closing fence. Reading and writing YAML still works;
+`toTtr` reports a located error for that conversion. Retained calc argument text must
+parse as exactly one TTR value. A CN binding's expression `filter` uses the same
+`{block, tag?, form?}` record as other embedded expressions.
+
+The module depends on parser/model types, the existing pinned YAML engine, JSON
+schema validator and Kotlin reflection; it has no metadata dependency. The grammar
+metadata supplies the kind/property vocabulary. Structural adapter signatures and
+coverage checks fail when a reached rule needs a new handler. Profile execution,
+committed fixture twins, migration and release wiring are subsequent stages.
+
 ## Profile shape
 
 ```yaml
@@ -157,7 +205,7 @@ From the repository root:
 pnpm --filter @tatrman/grammar build
 pnpm --filter @tatrman/grammar schemas:check
 pnpm --filter @tatrman/grammar test
-./gradlew :packages:kotlin:ttr-parser:test :packages:kotlin:ttr-parser:jar
+./gradlew :packages:kotlin:ttr-parser:test :packages:kotlin:ttr-parser:jar :packages:kotlin:ttr-yaml:test
 node scripts/grammar-consumer-smoke.mjs
 ```
 

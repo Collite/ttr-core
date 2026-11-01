@@ -10,6 +10,10 @@ class CanonicalDocument internal constructor(
     val value: JsonObject,
     val ast: ParseResult,
     internal val spelling: (JsonElement) -> String? = { null },
+    internal val invalid: (
+        JsonElement,
+        String,
+    ) -> Nothing = { _, message -> throw CanonicalYamlException(ast.sourceFile, 1, 1, message) },
 )
 
 object CanonicalYaml {
@@ -39,6 +43,7 @@ object CanonicalYaml {
             value,
             YamlLocations(syntax, nodes, ttr, value).remap(typed(ttr, file)),
             nodes::spelling,
+            nodes::invalid,
         )
     }
 
@@ -58,7 +63,12 @@ object CanonicalYaml {
 
     fun write(document: CanonicalDocument): String = YamlText.write(document.value, document.spelling)
 
-    fun toTtr(document: CanonicalDocument): String = TtrText(spelling = document.spelling).write(document.value)
+    fun toTtr(document: CanonicalDocument): String =
+        try {
+            TtrText(spelling = document.spelling).write(document.value)
+        } catch (e: CanonicalValueException) {
+            document.invalid(e.value, e.message ?: "Cannot write TTR")
+        }
 
     private fun typed(
         source: String,

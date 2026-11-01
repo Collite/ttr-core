@@ -5,6 +5,7 @@ import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import org.tatrman.ttr.parser.model.*
+import org.tatrman.ttr.parser.conformance.ConformanceDump
 import kotlinx.serialization.json.*
 
 class CanonicalYamlEdgeSpec :
@@ -149,5 +150,33 @@ class CanonicalYamlEdgeSpec :
             val original = CanonicalYaml.fromTtr("model automation\ndef program P { True: \"x\", Null: \"y\" }")
             CanonicalYaml.write(CanonicalYaml.read(CanonicalYaml.write(original))) shouldBe
                 CanonicalYaml.write(original)
+        }
+
+        test("ordinary block and triple keys remain generic data") {
+            val original =
+                CanonicalYaml.fromTtr(
+                    "model cn\ndef kind K { custom: { block: \"text\", triple: \"word\", q: \"other\" } }",
+                )
+            val restored = CanonicalYaml.read(CanonicalYaml.write(original))
+            ConformanceDump.dumpTree(restored.ast) shouldBe ConformanceDump.dumpTree(original.ast)
+        }
+        test("TTR emission reports a YAML location for an unrepresentable triple literal") {
+            val doc =
+                CanonicalYaml.read(
+                    """
+                    ttr: "0.21"
+                    model: cn
+                    defs:
+                      - kind: kind
+                        id: K
+                        properties:
+                          definition:
+                            block: 'contains <fence> literal'
+                    """.trimIndent().replace("<fence>", "\"\"\""),
+                    "triple.yaml",
+                )
+            val error = shouldThrowAny { CanonicalYaml.toTtr(doc) } as CanonicalYamlException
+            error.line shouldBe 8
+            error.file shouldBe "triple.yaml"
         }
     })
