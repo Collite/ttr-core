@@ -24,10 +24,13 @@ concepts; the bindings tell them where the data is.
 > phase holds over episodes; a quality's value can be read as of a day
 > ([Six stereotypes, four tenses](#six-stereotypes-four-tenses)). `extent:` is retired. An assertion names a `concept`
 > ([Assertions](#assertions)).
+>
+> **0.21.1 — `variant`.** `def variant` is the house spelling of `def subkind` — one construct
+> ([`variant`](#variant)).
 
 | where | what |
 |---|---|
-| a `model cn` file | the concepts: `def kind` · `def subkind` · `def role` · `def phase` · `def quality` · `def event` · `def relation_type` |
+| a `model cn` file | the concepts: `def kind` · `def variant` · `def role` · `def phase` · `def quality` · `def event` · `def relation_type` |
 | a `model binding` file | the groundings: `def cn2md_*` · `def cn2er_*` · `def cn2db_concept` |
 | inside an md or er def | the `concept { … }` sugar — the def's own concept |
 | a `model lexicon` file | terms and examples whose `for:` is a concept (`for: cn.Customer`) |
@@ -46,11 +49,11 @@ A concept is one of six stereotypes. Two questions place it.
 | tense | stereotype | the time it carries | Hartland |
 |---|---|---|---|
 | **happens** | `event` | an instant: `period: { at }` | `Sale`, `Return`, `Inventory` (a stock reading), and the transitions `OrderPlaced`, `OrderDelivered`, `InvoiceIssued`, `ReturnRequested` |
-| **exists, is valid** | `kind` · `subkind` · `role` | a lifetime or a validity: `period: { start, end }` — or none | `Order`, `OrderLine`, `Invoice`, `ListPrice` (valid from–to), `PriceAgreement` |
+| **exists, is valid** | `kind` · `variant` · `role` | a lifetime or a validity: `period: { start, end }` — or none | `Order`, `OrderLine`, `Invoice`, `ListPrice` (valid from–to), `PriceAgreement` |
 | **holds** | `phase` | an interval per episode | `HeldOrder`, `OverdueInvoice`, `DebtorCustomer`, `OutOfService`, `OpenOrder` |
 | **varies** | `quality` with `valued_state: true` | an interval per value | `channel_price` of an item per channel, `agreed_price` of a customer per item |
 
-**Can it stop being one without ceasing to exist?** A web sale never becomes a store sale: `WebSale` is a `subkind`
+**Can it stop being one without ceasing to exist?** A web sale never becomes a store sale: `WebSale` is a `variant`
 of `Sale`, rigid, one from the start. A held order is released and is still the same order: `HeldOrder` is a `phase`
 of `Order`, anti-rigid, and it is evaluated as of a day. A customer is a party in a part it plays: `Customer` is a
 `role`, defined by the event that makes it one.
@@ -84,7 +87,7 @@ A rigid thing — it is what it is for its whole life: a product, a channel, an 
 - **A lifetime or a validity.** With `period: { start, end, end_open }` a kind carries an object's lifetime (an
   order's, placed → delivered) or a row's validity (a price valid from–to, an SCD2 version). A kind's period is a
   start and an end, never an `at` (`cn/lifetime-period`); `end_open: open` reads a missing end as still running.
-- `abstract: true` — a kind only its subkinds instantiate: `Document`.
+- `abstract: true` — a kind only its variants instantiate: `Document`.
 
 ```ttrm
 def kind Document { abstract: true }
@@ -100,18 +103,18 @@ def kind PriceAgreement {
 }
 ```
 
-### `subkind`
+### `variant`
 
-A rigid specialization: `def subkind X { of: <bearer>, … }`, the bearer a kind, a subkind, a role or an event
-(`cn/subkind-bearer` otherwise). A subkind is defined by a `definition:` with no time in it (or `members:` on a
+A rigid specialization: `def variant X { of: <bearer>, … }`, the bearer a kind, a variant, a role or an event
+(`cn/subkind-bearer` otherwise). A variant is defined by a `definition:` with no time in it (or `members:` on a
 vocabulary kind), or it is a kind of its own, with its own participants and qualities:
 
 ```ttrm
-def subkind StoreSale       { of: Sale, definition: """channel = 'store'""" }
-def subkind WebSale         { of: Sale, definition: """channel = 'web'""" }
-def subkind MarketplaceSale { of: Sale, definition: """channel = 'marketplace'""" }
+def variant StoreSale       { of: Sale, definition: """channel = 'store'""" }
+def variant WebSale         { of: Sale, definition: """channel = 'web'""" }
+def variant MarketplaceSale { of: Sale, definition: """channel = 'marketplace'""" }
 
-def subkind Invoice {
+def variant Invoice {
     of: Document,
     involves: [Customer, Order],
     qualities: [amount, paid, invoice_status, issued, due]
@@ -119,21 +122,23 @@ def subkind Invoice {
 ```
 
 - **No time.** A definition that reads `:as_of` or a `:name` parameter, a temporal word (`before`, `contains`,
-  `within(…)`, `age(…)`, …), a valued-state quality or a phase is `cn/subkind-temporal-definition`. So a subkind is
+  `within(…)`, `age(…)`, …), a valued-state quality or a phase is `cn/subkind-temporal-definition`. So a variant is
   always materializable: `ttr cn materialize` never refuses one for its parameters.
-- **Partitions.** Subkinds of one bearer, each an equality on one attribute (`channel = 'web'`), partition it: two on
-  the same value are `cn/partition-overlap`. When the attribute's value space lists its members, a member no subkind
-  covers is `cn/partition-incomplete` (warning). Hartland's three subkinds cover `channel`'s three members.
-- **Landing.** A subkind with no grounding lands where its bearer lands — `WebSale` on `er.entity.sales` — and a
+- **Partitions.** Variants of one bearer, each an equality on one attribute (`channel = 'web'`), partition it: two on
+  the same value are `cn/partition-overlap`. When the attribute's value space lists its members, a member no variant
+  covers is `cn/partition-incomplete` (warning). Hartland's three variants cover `channel`'s three members.
+- **Landing.** A variant with no grounding lands where its bearer lands — `WebSale` on `er.entity.sales` — and a
   statement filtered by it reads its definition on the bearer's row. Its own `grounds:` is a stacked entity, as a
   phase's is.
-- **The old form.** `def kind X { is_a: Y, members: … }` still reads, as a subkind, with `cn/subkind-as-kind`
+- **The old form.** `def kind X { is_a: Y, members: … }` still reads, as a variant, with `cn/subkind-as-kind`
   (warning).
-- **The word** is OntoUML's. *Cohort* and *segment* were turned down: a cohort is a time-defined group, and customers
-  move between segments.
+- **The word.** `variant` is OntoUML's **subkind** — rigid specialization — and `subkind` is accepted as a synonym:
+  `def subkind X` is the same def. The formatter keeps the word a def was written with, and a def Tatrman writes
+  itself says `variant`. The lints keep OntoUML's word in their names (`cn/subkind-*`). *Cohort* and *segment* were turned down: a cohort is a time-defined group,
+  and customers move between segments.
 
 The author decides which side a concept is on, and the lints check only what its definition reads. `LargeOrder`
-(`order_value > 1000000`) would be a subkind if an order's value never changed; Hartland edits orders while they are
+(`order_value > 1000000`) would be a variant if an order's value never changed; Hartland edits orders while they are
 held, so it is a phase.
 
 ### `role`
@@ -263,7 +268,7 @@ The seventh def, `relation_type`, belongs to [the open tier](#the-open-tier): it
 | `sources` | `["doc://…"]` | compact provenance |
 | `is_a` | a concept, or a list | the super-concept(s) |
 | `abstract` | `true` | a concept only its sub-concepts instantiate |
-| `of` | a concept | the bearer of a quality, a phase or a subkind; a role's base kind |
+| `of` | a concept | the bearer of a quality, a phase or a variant; a role's base kind |
 | `event` | an event | a role's defining event |
 | `grounds` | `md.<X>` · `er.entity.<e>` · `er.entity.<e>.<a>` | shorthand for the concept's one binding |
 | `hierarchy` | `{ closure, ancestor, descendant, ranges: node \| lexical }` | how a vocabulary kind's codes nest (a property of its grounding) |
@@ -276,8 +281,8 @@ The seventh def, `relation_type`, belongs to [the open tier](#the-open-tier): it
 | `qualities` | `[ … ]` | the qualities a concept carries |
 | `value_space` | a kind | the kind a quality's values come from |
 | `valued_state` | `true` | a quality whose value changes over time |
-| `definition` | an expression block | what a defined quality, phase or subkind means |
-| `members` | an expression block | which members a subkind of a vocabulary kind restricts to |
+| `definition` | an expression block | what a defined quality, phase or variant means |
+| `members` | an expression block | which members a variant of a vocabulary kind restricts to |
 | `imprecision` | `certainly` · `possibly` | how a definition reads an imprecise time (default `certainly`) |
 | `basis` | `occurrence` · `current_state` · `past_state` | what a condition phase is evaluated on |
 | `relations` | `[ { type: <relation_type>, to: <concept> } ]` | open-tier relations |
@@ -562,7 +567,7 @@ Where a concept lands on the er layer is its **grade**:
 | `cn2md_*`, and the hop cannot resolve it | md-grounded-hop-missing | — `md/er-unmapped` (`md/er-ambiguous` when two map it and the bearer's entity does not pick one) |
 | `cn2db_concept` | ungrounded | — documentation only |
 
-Some concepts land through another one, with no grounding of their own: a defined phase or subkind takes its bearer's
+Some concepts land through another one, with no grounding of their own: a defined phase or variant takes its bearer's
 grade and landing, an event-bounded phase lands on its bearer's entity, and a projected quality on its relator's
 attribute (`channel_price` on `price_list.price`). The hop first reads explicit `md2er_cubelet` and `md2er_dimension`
 bindings, then derives through shared MD/ER physical bindings and relations. A quality first restricts derived
@@ -647,11 +652,11 @@ Each `cn/*` diagnostic fires in one of three places:
 | `cn/phase-source-conflict` | error | editor | a phase with more than one source (a definition, a grounding, `from:` + `until:`), or a `from:` without its `until:` |
 | `cn/phase-bounds-participant` | error | editor · consumer | a `from:` / `until:` that is not an event with exactly one participant the bearer can be — none, or two (the message names their labels) |
 | `cn/episode-subject-missing` | error | editor · consumer | an episode table with no relation to the phase's bearer |
-| `cn/subkind-bearer` | error | editor | a subkind whose `of:` is not a kind, a subkind, a role or an event |
-| `cn/subkind-temporal-definition` | error | editor · `ttr cn hygiene` | a subkind whose definition reads `:as_of`, a `:name` parameter, a temporal word, a valued-state quality or a phase |
-| `cn/partition-overlap` | error | editor | two subkinds of one bearer defined by the same value of one attribute |
+| `cn/subkind-bearer` | error | editor | a variant whose `of:` is not a kind, a variant, a role or an event |
+| `cn/subkind-temporal-definition` | error | editor · `ttr cn hygiene` | a variant whose definition reads `:as_of`, a `:name` parameter, a temporal word, a valued-state quality or a phase |
+| `cn/partition-overlap` | error | editor | two variants of one bearer defined by the same value of one attribute |
 | `cn/durative-event` | error | editor | an event with `period: { start, end }` or `extent: durative` — model a kind with a lifetime, or an episode phase |
-| `cn/lifetime-period` | error | editor | a kind's, a role's, a subkind's or a phase's `period:` that is not a `start` and an `end` |
+| `cn/lifetime-period` | error | editor | a kind's, a role's, a variant's or a phase's `period:` that is not a `start` and an `end` |
 | `cn/projection-source` | error | editor | a valued-state `from:` that is not a quality of a kind involving the bearer and the `per:` concept, or a `per:` that leaves another of its participants uncovered, or two participants the bearer can be |
 | `cn/hierarchy-shape` | error | editor | a `hierarchy:` closure entity lacks its two named attributes or a key |
 | `cn/participant-path-broken` | error | editor | a `participants:` relation path does not chain from the binding's entity to the participant's, or an empty path names a participant that does not land on that entity |
@@ -659,8 +664,8 @@ Each `cn/*` diagnostic fires in one of three places:
 | `cn/unknown-relation-type` | error | editor | an open-tier edge's `type:` names no `def relation_type` |
 | `cn/duplicate-default-sense` | error | editor | two defaults for one bare form and locale |
 | `cn/antirigid-supertype` | warning | editor | a kind `is_a` a role or a phase |
-| `cn/partition-incomplete` | warning | editor | subkinds partition an attribute whose value space lists a member none of them covers |
-| `cn/subkind-as-kind` | warning | editor | the legacy `def kind X { is_a: …, members: … }` — read as a subkind |
+| `cn/partition-incomplete` | warning | editor | variants partition an attribute whose value space lists a member none of them covers |
+| `cn/subkind-as-kind` | warning | editor | the legacy `def kind X { is_a: …, members: … }` — read as a variant |
 | `cn/extent-retired` | warning | editor | `extent:` on an event — retired, every event is an instant |
 | `cn/phase-as-default` | warning | editor · report | a phase as the default sense of a form its bearer's term also has |
 | `cn/cnc-deprecated` | warning | editor | `model cnc` or an entity's `roles:` |
@@ -679,7 +684,7 @@ Each `cn/*` diagnostic fires in one of three places:
 | `cn/retired-code` | warning | report | a textual code no longer valid in the current vocabulary — not checked yet: versions register, but only a code-system importer knows which codes a version retires |
 | `cn/not-analytically-reachable` | error | consumer | an aggregating statement slot that neither lane reads: md cannot reach it and E-R does not read the statement (when E-R does, it is `cn/lowered-on-er` instead), or E-R refuses the slot |
 | `cn/not-recipe-reachable` | error | consumer | a recipe's concept with no landing on the er layer |
-| `cn/not-assertable` | error | consumer | an asserted concept with no row to write: no landing on the er layer, a defined phase, or a subkind whose definition is not a settable discriminator |
+| `cn/not-assertable` | error | consumer | an asserted concept with no row to write: no landing on the er layer, a defined phase, or a variant whose definition is not a settable discriminator |
 | `cn/unit-mismatch` | error | consumer | an asserted value's unit differs from the attribute's |
 | `cn/ambiguous-statement` · `cn/ambiguous-assertion` | error | consumer | a statement or assertion with unresolved candidates |
 | `cn/missing-time` | error | consumer | a statement with no time and not `all_time`, or an assertion with no period where its concept declares one |
@@ -723,7 +728,7 @@ when the frame names its day.
 |---|---|---|---|
 | statement (read) | `statementValidate` | `statementLower` → a `plan.v1` through the md path, else SQL over entities (the er lane) | `statementExplain` |
 | assertion (write) | `assertionValidate` | `assertionLower` → the E-R row payload | `assertionExplain` |
-| a phase, a subkind or a defined quality, by name | — | `definitionRender` → md predicate or er SQL; `materialize` → model text | — |
+| a phase, a variant or a defined quality, by name | — | `definitionRender` → md predicate or er SQL; `materialize` → model text | — |
 
 A frame that cannot be served is refused with its findings (`cn/missing-time`, `cn/ambiguous-statement`,
 `cn/not-analytically-reachable`, `cn/not-assertable`, `cn/slot-mismatch`, …, see [Diagnostics](#diagnostics)) and
@@ -732,7 +737,7 @@ nothing else: no plan, no rows, no text.
 ### Statements
 
 A statement names measures, filters, grouping, a time and optionally an `as_of`, all as concepts. Each slot goes
-through its `cn2md` grounding; a phase or subkind filter's definition is inlined (and phases inside it, transitively); `:name`
+through its `cn2md` grounding; a phase or variant filter's definition is inlined (and phases inside it, transitively); `:name`
 parameters take the world's values, `:as_of` the statement's day. "Net revenue for Kaufland in January 2026":
 
 ```json
@@ -758,7 +763,7 @@ JOIN date_dim ON date_dim.sk = sales.sold_date
 WHERE sales.channel = 'web' AND date_dim.cal_date >= DATE '2026-01-01' AND date_dim.cal_date < DATE '2026-02-01'
 ```
 
-`WebSale` is a subkind of `Sale`; the filter is its definition on the sale's row.
+`WebSale` is a variant of `Sale`; the filter is its definition on the sale's row.
 
 - **md first.** E-R reads a statement only when md cannot place it: no carrier, several, or a slot md cannot reach. The
   result then carries SQL over entities (`erSql`) instead of a plan, and the advisory `cn/lowered-on-er` says why md did
@@ -772,7 +777,7 @@ WHERE sales.channel = 'web' AND date_dim.cal_date >= DATE '2026-01-01' AND date_
   - a **negated phase whose definition joins** another entity (G-MD-1).
 - **Measures** aggregate by their md measure's aggregation: a declared default (`sum`, `avg`, `min`, `max`, `count`),
   else `sum` for an additive measure. A quality with no md measure has no aggregation to take.
-- **Phase and subkind filters** inline their definition on the event's row, while the rows stay the event's: a phase that joins a
+- **Phase and variant filters** inline their definition on the event's row, while the rows stay the event's: a phase that joins a
   relation from its many side (each sale's shipments, say) is refused — the sum would count a sale once per shipment. A
   negated phase is read `NOT COALESCE((…), FALSE)`: two-valued, so a row where the phase is NULL (no channel) counts as
   "not web", and `revenue where WebSale` plus `revenue where not WebSale` is the total.
@@ -805,7 +810,7 @@ stores; cn itself never writes. The frame names the `concept`, its participants,
 | a row of a kind, with its validity | a kind with a `period:` (`cn.ListPrice`) | a row of the kind's entity, its validity as `start` / `end` |
 | an episode of a phase | a phase with an episode table (`cn.OutOfService`) | a row of the episode table |
 
-A defined phase has no row to write (`cn/not-assertable`). A subkind claim lands on its bearer's row and writes the
+A defined phase has no row to write (`cn/not-assertable`). A variant claim lands on its bearer's row and writes the
 value its definition fixes (`channel = 'web'`), and each such value up its `of:` chain.
 
 **A state claim needs an as-of.** An episode says a state holds, so the frame carries `assertedAsOf` — the instant
@@ -862,13 +867,13 @@ Transfer · patient: Patient P-1001 · from: Encounter E-501 · to: Encounter E-
 
 A concept reads as its label in the locale, else its lexicon term in the locale, else its English label, else its
 name in words (`LargeSale` → `large sale`); a parameter as `name (= value)`. A phase filter says its definition after
-*while* (*dokud*), a subkind filter after a colon; a
+*while* (*dokud*), a variant filter after a colon; a
 construct the explanation cannot put into words is quoted from the source, never guessed. A refused frame is still
 explained and ends `— refused: <slug> (<subject>)`. Another locale reads English, with `cn/explain-locale-fallback`.
 
 ### Rendering a definition
 
-`definitionRender` renders a phase, a defined quality or a subkind on the **md** layer (a predicate
+`definitionRender` renders a phase, a defined quality or a variant on the **md** layer (a predicate
 over the carrying cubelet's attributes, for TTR-P) or the **er** layer (SQL over entities). `PREDICATE` mode selects
 the bearer's key:
 
@@ -1030,7 +1035,7 @@ badly* finds no concept for the phrase, though the model has one for the idea; t
 
 A concept proposal carries `stereo`, `name`, `of` / `event` / `involves` as its stereotype takes them, and either a
 `definition_text` or a `suggested_grounding`. `cn-candidate.v1` predates grammar 0.20: its `stereo` is `kind`, `role`,
-`phase`, `quality` or `event`, and a kind proposal carries no `involves`, so a subkind or a relator is not proposed
+`phase`, `quality` or `event`, and a kind proposal carries no `involves`, so a variant or a relator is not proposed
 yet — a steward writes it.
 
 A **steward** rejects it or promotes it. Promotion writes model text, never a model object: the def, the term or the
@@ -1110,4 +1115,4 @@ classification `cnc` recorded is derived — fact, dimension and bridge from the
 
 `event`, `period`, `quality`, `phase`, `concept`, `default`, `as` and the other cn keywords remain ordinary names
 everywhere else — a column called `period`, an object key `default:`, a ref part `er.entity.event` all keep working.
-So do grammar 0.20's `subkind`, `until` and `per`: a quality named `per`, an attribute `until`.
+So do grammar 0.20's `subkind`, `until` and `per`, and 0.21.1's `variant`: a quality named `per`, an attribute `until`.

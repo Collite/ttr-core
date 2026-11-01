@@ -16,6 +16,9 @@ permissive: required bearers and valid source combinations are semantic checks.
 `extent:` still parses during its retirement window. The new keywords remain
 legal identifier parts. JVM consumers must rebuild against the new parser model.
 
+**0.21.1:** `def variant` is the house spelling of `def subkind` (CN-D32): the same
+construct and stereotype, the word recorded for the writer. `subkind` stays a synonym.
+
 ## Files
 
 - `src/TTR.g4` — ANTLR4 grammar file (canonical source)
