@@ -178,7 +178,7 @@ describe('review-125 explicit hop precedence and visibility', () => {
   });
   it('R11 respects wildcard and named imports and excludes unrelated packages', () => {
     const root = join(__dirname, '../../../../tests/conformance/fixtures/111-md2er-path-ambiguous');
-    const hop = explicitHop(readdirSync(root).map(uri => ({ uri, src: readFileSync(join(root, uri), 'utf8') })));
+    const hop = explicitHop(readdirSync(root).filter(uri => uri.endsWith('.ttrm')).map(uri => ({ uri, src: readFileSync(join(root, uri), 'utf8') })));
     expect(hop.erTargetOf('md.dimension.Customer.code').slug).toBe('md/er-ambiguous');
     expect(hop.erTargetOf('md.dimension.CustomerEast.code').erTarget).toBe('er.entity.addr.state');
     expect(hop.erTargetOf('md.dimension.CustomerNamed.code').erTarget).toBe('er.entity.addr.state');
