@@ -29,7 +29,7 @@ to 64 MiB; the codec's existing 3,000,000-code-point YAML limit also applies. No
 All input files are validated before staging any change. Dry-run validates and prints diffs without
 writes. Successful writes use same-directory temporary files and atomic replacement per file,
 preserving permissions; unchanged files are untouched. Symlinks and hard-linked inputs are refused.
-A concurrent input content change aborts before replacements. This is not a filesystem transaction
+All inputs are checked before replacements, and each is checked again immediately before its own replacement; an edit that lands while that same file is being replaced can still be lost. This is not a filesystem transaction
 across a batch: an I/O failure during the replacement phase is reported and may leave earlier files
 migrated; re-running is safe. Temporary files are removed on failure.
 
@@ -42,3 +42,5 @@ node --test scripts/yaml-migration.integration.test.mjs
 
 The second command runs the real built CLI and packaged JVM bridge. Conformance CI builds both and
 runs it, alongside the codec's full fixture-roster migration, AST and semantics checks.
+
+A file whose typed parse reports errors (for example a repeated property) is refused; fix it first.

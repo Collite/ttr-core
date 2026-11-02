@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   chmodSync,
   mkdtempSync,
+  linkSync,
   readFileSync,
   readdirSync,
   rmSync,
@@ -13,6 +14,18 @@ import {
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { runYamlMigration } from '../yaml-migrate.js';
+
+const race = vi.hoisted(() => ({ afterRename: undefined as (() => void) | undefined }));
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return {
+    ...actual,
+    rename: async (...args: Parameters<typeof actual.rename>) => {
+      await actual.rename(...args);
+      race.afterRename?.();
+    },
+  };
+});
 
 // File policy tests use a protocol peer; the real Kotlin bridge is tested in canonical-yaml CI.
 describe('canonical YAML migration file policy', () => {
@@ -40,7 +53,10 @@ process.stdout.write(JSON.stringify({ source, changed: source !== r.source }));
     );
     chmodSync(bridge, 0o755);
   });
-  afterEach(() => rmSync(root, { recursive: true, force: true }));
+  afterEach(() => {
+    race.afterRename = undefined;
+    rmSync(root, { recursive: true, force: true });
+  });
   const options = () => ({ from: '0.21', to: '0.21', bridge });
 
   it('dry-run validates via bridge and returns a diff without writes or metadata changes', async () => {
@@ -53,13 +69,20 @@ process.stdout.write(JSON.stringify({ source, changed: source !== r.source }));
     expect(readdirSync(root).sort()).toEqual(['bridge with spaces', 'model.yaml']);
   });
   it('writes only changed files, preserves permissions and is idempotent', async () => {
-    chmodSync(file, 0o640);
-    expect((await runYamlMigration([file], options())).writes).toHaveLength(1);
-    expect(readFileSync(file, 'utf8')).toBe(after);
-    expect(statSync(file).mode & 0o777).toBe(0o640);
-    const stat = statSync(file);
-    expect((await runYamlMigration([file], options())).writes).toEqual([]);
-    expect(statSync(file).mtimeMs).toBe(stat.mtimeMs);
+    const mask = process.umask(0o022);
+    try {
+      chmodSync(file, 0o664);
+      const result = await runYamlMigration([file], options());
+      expect(result.writes).toHaveLength(1);
+      expect(result.writes[0].diff).toBe('');
+      expect(readFileSync(file, 'utf8')).toBe(after);
+      expect(statSync(file).mode & 0o777).toBe(0o664);
+      const stat = statSync(file);
+      expect((await runYamlMigration([file], options())).writes).toEqual([]);
+      expect(statSync(file).mtimeMs).toBe(stat.mtimeMs);
+    } finally {
+      process.umask(mask);
+    }
   });
   it('refuses the entire batch before writes when any marker or version fails', async () => {
     const other = join(root, 'foreign.yaml');
@@ -118,7 +141,69 @@ process.stdout.write(JSON.stringify({ source: ${JSON.stringify(after)}, changed:
     await expect(runYamlMigration([link], options())).rejects.toThrow('regular file');
     const bad = join(root, 'bad.yaml');
     writeFileSync(bad, Buffer.from([0xc3, 0x28]));
-    await expect(runYamlMigration([file, bad], options())).rejects.toThrow();
+    await expect(runYamlMigration([file, bad], options())).rejects.toThrow(bad);
     expect(readFileSync(file, 'utf8')).toBe(before);
+  });
+  it('rejects alias identities before any bridge call', async () => {
+    const alias = join(root, 'alias');
+    symlinkSync(root, alias);
+    writeFileSync(
+      bridge,
+      `#!/usr/bin/env node\nrequire('node:fs').writeFileSync(${JSON.stringify(file)}, 'bridge called');`
+    );
+    await expect(runYamlMigration([file, join(alias, 'model.yaml')], options())).rejects.toThrow(
+      `Duplicate migration file: ${file} and ${join(alias, 'model.yaml')}`
+    );
+    expect(readFileSync(file, 'utf8')).toBe(before);
+  });
+  it('refuses hard links through either name', async () => {
+    const hard = join(root, 'hard.yaml');
+    linkSync(file, hard);
+    for (const path of [file, hard])
+      await expect(runYamlMigration([path], options())).rejects.toThrow('one link');
+    expect(readFileSync(file, 'utf8')).toBe(before);
+  });
+  it('names a file corrupted to invalid UTF-8 during planning', async () => {
+    writeFileSync(
+      bridge,
+      `#!/usr/bin/env node
+require('node:fs').writeFileSync(${JSON.stringify(file)}, Buffer.from([0xc3, 0x28]));
+process.stdout.write(JSON.stringify({source: ${JSON.stringify(after)}, changed: true}));`
+    );
+    await expect(runYamlMigration([file], options())).rejects.toThrow(`${file}: not valid UTF-8`);
+    expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
+  });
+  it('keeps bridge stderr and abnormal termination cause', async () => {
+    writeFileSync(
+      bridge,
+      `#!/usr/bin/env node
+require('node:fs').writeSync(2, 'bridge diagnostic\\n');
+process.kill(process.pid, 'SIGKILL');`
+    );
+    await expect(runYamlMigration([file], options())).rejects.toThrow(/bridge diagnostic.*SIGKILL/);
+    expect(readFileSync(file, 'utf8')).toBe(before);
+  });
+  it('keeps bridge stderr and timeout cause', async () => {
+    writeFileSync(
+      bridge,
+      `#!/usr/bin/env node
+require('node:fs').writeSync(2, 'waiting');
+setInterval(() => {}, 1000);`
+    );
+    await expect(runYamlMigration([file], { ...options(), timeoutMs: 500 })).rejects.toThrow(
+      /waiting.*timed out after 0.5 s/
+    );
+  });
+  it('stops remaining replacements when an edit lands between two renames', async () => {
+    const second = join(root, 'second.yaml');
+    writeFileSync(second, before);
+    race.afterRename = () => {
+      writeFileSync(second, 'editor save');
+      race.afterRename = undefined;
+    };
+    await expect(runYamlMigration([file, second], options())).rejects.toThrow(second);
+    expect(readFileSync(file, 'utf8')).toBe(after);
+    expect(readFileSync(second, 'utf8')).toBe('editor save');
+    expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
   });
 });
