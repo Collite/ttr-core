@@ -28,7 +28,8 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   refuse an action they have no sink for.
 - The recipe checker refuses a removed construct anywhere in the model the recipe is checked against (every
   program, action and role, every world's members and deployments), once per recipe check; the TTR-P editor shows one
-  made in a model file on the recipe's header, prefixed with its `<file>:<line>:<col>`.
+  made in a model file on the recipe's header, prefixed with its `<file>:<line>:<col>`. A literate (`.md`) recipe
+  shows every finding made in another file (the manifest's as well) on its skeleton, with the same prefix.
 - Exports: `ttrp emit` exports one program per deployment (no process exports). SPI v2 is unchanged —
   `ProgramMeta2.deliver/schedule` and `RecipeGraph.process` are null and `DeploymentMeta.connectors` is empty — so a
   batch n8n or Camunda export now refuses ("needs a schedule hint") until the exporters take the timer from the engine.

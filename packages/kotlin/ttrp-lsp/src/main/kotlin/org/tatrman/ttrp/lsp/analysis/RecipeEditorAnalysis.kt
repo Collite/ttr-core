@@ -120,12 +120,22 @@ object RecipeEditorAnalysis {
                         finding.copy(location = location(doc.text, doc.uri, span))
                     }
                 }
+        // A finding made in another file (the manifest's TTRP-CFG) sits on the first recipe's skeleton, else the
+        // document start, as the model-file findings above do: every literate finding leaves here at this document,
+        // so the scheduler's re-anchoring (header positions of the EXTRACTED text) never applies to it.
+        val elsewhere =
+            recipes.firstOrNull()?.extracted?.let { location(doc.text, doc.uri, it.skeletonSpan) }
+                ?: location(doc.text, doc.uri, listOf(0, 0))
+        val manifest =
+            ctx.manifestDiagnostics.map { d ->
+                if (d.location.file == doc.uri) d else FragmentLinks.elsewhere(d, d.location.file, elsewhere)
+            }
         // Features still need imported metadata, but navigation never consumes canonical positions (R1).
         val report = recipes.firstOrNull()?.plan?.frontendReport ?: emptyReport(doc)
         return Analysis(
             doc.uri,
             doc.version,
-            report.copy(diagnostics = (ctx.manifestDiagnostics + findings).distinct()),
+            report.copy(diagnostics = (manifest + findings).distinct()),
             extraction,
             recipes,
         )
