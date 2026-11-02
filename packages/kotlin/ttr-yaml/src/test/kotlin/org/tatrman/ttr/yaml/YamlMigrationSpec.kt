@@ -62,6 +62,19 @@ class YamlMigrationSpec :
                 .getValue("source")
                 .jsonPrimitive.content shouldBe "ttr: \"0.22\"\nmodel: \"er\"\n"
         }
+        test("the 0.21 marker is found by its position in the text, whatever the line breaks or its own lines") {
+            for (source in listOf(
+                "# c\rttr: '0.21'\rmodel: er\r",
+                "# 🐈\r\nttr: '0.21'\r\nmodel: er\r\n",
+                "\uFEFFttr: '0.21'\nmodel: er\n",
+                "ttr: \"0.\\\n  21\"\nmodel: er\n",
+            )) {
+                YamlMigration
+                    .migrate(request(source, "0.21", "0.22"))
+                    .getValue("source")
+                    .jsonPrimitive.content shouldBe "ttr: \"0.22\"\nmodel: \"er\"\n"
+            }
+        }
         for (source in listOf("ttr: '0.20'\nmodel: er\n", "ttr: '0.22'\nmodel: er\n", "model: er\n")) {
             test("a 0.21 migration refuses a document not marked 0.21: ${JsonPrimitive(source)}") {
                 val (status, stdout, stderr) = invoke(request(source, "0.21", "0.22").toString().toByteArray())

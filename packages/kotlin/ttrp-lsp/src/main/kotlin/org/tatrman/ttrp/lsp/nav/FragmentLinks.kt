@@ -72,14 +72,14 @@ object FragmentLinks {
 
     /**
      * [d], made in [file], shown [at]: its message prefixed with `<file name>:<line>:<col>:`. A finding
-     * with no position of its own (`SourceLocation.UNKNOWN`) is returned unchanged.
+     * with no position of its own (`SourceLocation.UNKNOWN`) is shown [at] unprefixed.
      */
     fun elsewhere(
         d: TtrpDiagnostic,
         file: String,
         at: SourceLocation,
     ): TtrpDiagnostic {
-        if (d.location.line < 1) return d
+        if (d.location.line < 1) return d.copy(location = at)
         val name = file.substringAfterLast('/')
         val decoded = runCatching { java.net.URLDecoder.decode(name, Charsets.UTF_8) }.getOrDefault(name)
         return d.copy(

@@ -161,18 +161,23 @@ class CanonicalYamlDepthSpec :
                 }
             }
         }
-        test("streaming guard refuses 100,000 levels before composition or recursion") {
-            val request =
-                obj(
-                    "operation" to text("migrate"),
-                    "from" to text("0.22"),
-                    "to" to text("0.22"),
-                    "source" to text(yaml(100_000, false)),
-                )
-            val stdout = java.io.ByteArrayOutputStream()
-            val stderr = java.io.ByteArrayOutputStream()
-            YamlMigrationCli.run(request.toString().byteInputStream(), stdout, stderr) shouldBe 2
-            stdout.size() shouldBe 0
-            stderr.toString() shouldBe "<yaml>:7:70: nesting too deep (limit 64)\n"
+        // the 0.21 pair finds its marker in the event stream as well, before the reader's guard
+        for (from in listOf("0.22", "0.21")) {
+            test("streaming guard refuses 100,000 levels before composition or recursion (from $from)") {
+                val request =
+                    obj(
+                        "operation" to text("migrate"),
+                        "from" to text(from),
+                        "to" to text("0.22"),
+                        "source" to text(yaml(100_000, false).replaceFirst("'0.22'", "'$from'")),
+                    )
+                val stdout = java.io.ByteArrayOutputStream()
+                val stderr = java.io.ByteArrayOutputStream()
+                smallStack {
+                    YamlMigrationCli.run(request.toString().byteInputStream(), stdout, stderr)
+                } shouldBe 2
+                stdout.size() shouldBe 0
+                stderr.toString() shouldBe "<yaml>:7:70: nesting too deep (limit 64)\n"
+            }
         }
     })

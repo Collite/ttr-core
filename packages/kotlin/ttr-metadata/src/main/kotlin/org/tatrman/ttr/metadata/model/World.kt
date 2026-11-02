@@ -53,7 +53,10 @@ data class World(
     val grants: List<WorldGrant> = emptyList(),
     /** Grammar 0.16 — `def deployment` objects (D-107). */
     val deployments: List<WorldDeployment> = emptyList(),
-    /** Grammar 0.22 — the members D-142 removed (`def process`), recognised for one release only to be refused. */
+    /**
+     * Grammar 0.22 — every construct D-142 removed from the world, kept for one release only to be refused: a `def
+     * process`, and each removed entry of a `def deployment`, loaded or not (see [RemovedWorldMember]).
+     */
     val removed: List<RemovedWorldMember> = emptyList(),
 ) : ModelObject {
     override val kind: String = "world"
