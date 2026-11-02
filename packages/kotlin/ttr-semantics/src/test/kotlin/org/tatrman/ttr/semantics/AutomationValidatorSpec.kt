@@ -31,7 +31,7 @@ class AutomationValidatorSpec :
 
         fun cutIds(diags: List<AutomationDiagnostic>): List<String> =
             diags.filter { it.code == RemovedConstructs.CODE }.map {
-                Regex("TTRP-CUT-\\d{3}").find(it.message)?.value ?: error("no TTRP-CUT id in ${it.message}")
+                Regex("CUT-\\d{3}").find(it.message)?.value ?: error("no TTRP-CUT id in ${it.message}")
             }
 
         "D-142: 17 §1–§2 as written refuse exactly their removed constructs, one finding each" {
@@ -40,20 +40,20 @@ class AutomationValidatorSpec :
             diags.filter { it.code == RemovedConstructs.CODE }.forEach { it.severity shouldBe "error" }
             cutIds(diags).groupingBy { it }.eachCount() shouldBe
                 mapOf(
-                    "TTRP-CUT-001" to 1, // def process return_line_flow
-                    "TTRP-CUT-002" to 1, // returns_n8n { process: … }
-                    "TTRP-CUT-003" to 4, // trigger: schedule … on four deployments
-                    "TTRP-CUT-004" to 8, // target: native
-                    "TTRP-CUT-006" to 2, // deliver: (digest, immediate)
-                    "TTRP-CUT-007" to 4, // schedule:
-                    "TTRP-CUT-009" to 3, // port: event
-                    "TTRP-CUT-010" to 3, // event: schema.…
-                    "TTRP-CUT-011" to 2, // sinks.native: deliver
-                    "TTRP-CUT-012" to 2, // sinks.native: task
-                    "TTRP-CUT-013" to 1, // sinks.native: start
-                    "TTRP-CUT-016" to 2, // role delivery:
+                    "CUT-001" to 1, // def process return_line_flow
+                    "CUT-002" to 1, // returns_n8n { process: … }
+                    "CUT-003" to 4, // trigger: schedule … on four deployments
+                    "CUT-004" to 8, // target: native
+                    "CUT-006" to 2, // deliver: (digest, immediate)
+                    "CUT-007" to 4, // schedule:
+                    "CUT-009" to 3, // port: event
+                    "CUT-010" to 3, // event: schema.…
+                    "CUT-011" to 2, // sinks.native: deliver
+                    "CUT-012" to 2, // sinks.native: task
+                    "CUT-013" to 1, // sinks.native: start
+                    "CUT-016" to 2, // role delivery:
                 )
-            val process = diags.single { it.message.contains("TTRP-CUT-001") }
+            val process = diags.single { it.message.contains("CUT-001") }
             process.message shouldContain "process 'return_line_flow'"
             process.message shouldContain "model it in the process engine"
         }
@@ -69,7 +69,7 @@ class AutomationValidatorSpec :
             val diags = AutomationValidator.validate(project)
             diags.filter { it.severity != "info" }.map { it.code }.toSet() shouldBe setOf(RemovedConstructs.CODE)
             cutIds(diags) shouldContainExactlyInAnyOrder
-                listOf("TTRP-CUT-008", "TTRP-CUT-014", "TTRP-CUT-015", "TTRP-CUT-005", "TTRP-CUT-005")
+                listOf("CUT-008", "CUT-014", "CUT-015", "CUT-005")
         }
 
         "the Core fixture model as cut validates clean: only the pre-catalog recipe INFOs" {

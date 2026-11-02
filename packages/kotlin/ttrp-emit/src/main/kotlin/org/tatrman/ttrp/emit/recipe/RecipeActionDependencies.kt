@@ -193,7 +193,8 @@ object RecipeActionDependencies {
                     "approval" to action.approval,
                     "deliverable" to action.deliverable,
                     "due" to action.due?.let { listOf(it.amount.toString(), it.unit) },
-                    "onDue" to action.onDue?.let { listOf(it.action, entries(it.arguments)) },
+                    // D-142 took `on_due:`; the slot stays, always null, so an unaffected action's hash does not move.
+                    "onDue" to null,
                     "properties" to entries(action.properties.filter { it.first !in setOf("label", "dry_run") }),
                     "targets" to targets,
                 )

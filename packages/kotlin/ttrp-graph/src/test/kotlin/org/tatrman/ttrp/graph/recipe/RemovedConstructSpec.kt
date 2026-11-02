@@ -68,7 +68,7 @@ class RemovedConstructSpec :
 
         fun cut(r: TtrpPipeline.PlanResult) = r.diagnostics.filter { it.id.id.startsWith("TTRP-CUT-") }
 
-        "a recipe over a model with removed constructs fails: one TTRP-CUT per occurrence, with the engine replacement" {
+        "a model with removed constructs fails the recipe: one TTRP-CUT per occurrence, with the replacement" {
             val root = planted()
             val source =
                 Files
@@ -105,14 +105,17 @@ class RemovedConstructSpec :
                 d.message shouldContain "removed in grammar 0.22 (D-142)"
                 d.suggestedAlternative shouldBe
                     RemovedConstructs.Cut.entries
-                        .single { it.id == d.id.id }
+                        .single { "TTRP-${it.ref}" == d.id.id }
                         .replacement
             }
             cut(r).single { it.id == TtrpDiagnosticId.CUT_001 }.let {
                 it.message shouldContain "process `cut_flow`"
                 it.location.file shouldEndWith "demo.ttrm"
             }
-            cut(r).filter { it.id == TtrpDiagnosticId.CUT_015 }.map { it.location.file.substringAfterLast('/') } shouldContainExactlyInAnyOrder
+            cut(r)
+                .filter {
+                    it.id == TtrpDiagnosticId.CUT_015
+                }.map { it.location.file.substringAfterLast('/') } shouldContainExactlyInAnyOrder
                 listOf("cut.ttrm", "release_order.ttrp")
         }
 

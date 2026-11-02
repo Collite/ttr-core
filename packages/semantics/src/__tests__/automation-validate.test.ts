@@ -36,7 +36,7 @@ function cutIds(diags: { code: string; message: string }[]): string[] {
   return diags
     .filter((d) => d.code === REMOVED)
     .map((d) => {
-      const id = /TTRP-CUT-\d{3}/.exec(d.message)?.[0];
+      const id = /CUT-\d{3}/.exec(d.message)?.[0];
       if (!id) throw new Error(`no TTRP-CUT id in ${d.message}`);
       return id;
     });
@@ -64,20 +64,20 @@ describe('validateAutomationProject (grammar 0.16)', () => {
     expect(new Set(diags.filter((d) => d.severity !== 'info').map((d) => d.code))).toEqual(new Set([REMOVED]));
     for (const d of diags.filter((d) => d.code === REMOVED)) expect(d.severity).toBe('error');
     expect(counts(cutIds(diags))).toEqual({
-      'TTRP-CUT-001': 1, // def process return_line_flow
-      'TTRP-CUT-002': 1, // returns_n8n { process: … }
-      'TTRP-CUT-003': 4, // trigger: schedule … on four deployments
-      'TTRP-CUT-004': 8, // target: native
-      'TTRP-CUT-006': 2, // deliver: (digest, immediate)
-      'TTRP-CUT-007': 4, // schedule:
-      'TTRP-CUT-009': 3, // port: event
-      'TTRP-CUT-010': 3, // event: schema.…
-      'TTRP-CUT-011': 2, // sinks.native: deliver
-      'TTRP-CUT-012': 2, // sinks.native: task
-      'TTRP-CUT-013': 1, // sinks.native: start
-      'TTRP-CUT-016': 2, // role delivery:
+      'CUT-001': 1, // def process return_line_flow
+      'CUT-002': 1, // returns_n8n { process: … }
+      'CUT-003': 4, // trigger: schedule … on four deployments
+      'CUT-004': 8, // target: native
+      'CUT-006': 2, // deliver: (digest, immediate)
+      'CUT-007': 4, // schedule:
+      'CUT-009': 3, // port: event
+      'CUT-010': 3, // event: schema.…
+      'CUT-011': 2, // sinks.native: deliver
+      'CUT-012': 2, // sinks.native: task
+      'CUT-013': 1, // sinks.native: start
+      'CUT-016': 2, // role delivery:
     });
-    const process = diags.find((d) => d.message.includes('TTRP-CUT-001'))!;
+    const process = diags.find((d) => d.message.includes('CUT-001'))!;
     expect(process.message).toContain("process 'return_line_flow'");
     expect(process.message).toContain('model it in the process engine');
   });
@@ -91,7 +91,7 @@ describe('validateAutomationProject (grammar 0.16)', () => {
     ];
     const diags = validateAutomationProject(project, { stdlib: await loadAutomationStdlib() });
     expect(new Set(diags.filter((d) => d.severity !== 'info').map((d) => d.code))).toEqual(new Set([REMOVED]));
-    expect(cutIds(diags).sort()).toEqual(['TTRP-CUT-005', 'TTRP-CUT-005', 'TTRP-CUT-008', 'TTRP-CUT-014', 'TTRP-CUT-015']);
+    expect(cutIds(diags).sort()).toEqual(['CUT-005', 'CUT-008', 'CUT-014', 'CUT-015']);
   });
 
   it('the Core fixture model as cut validates clean: only the pre-catalog recipe INFOs', async () => {

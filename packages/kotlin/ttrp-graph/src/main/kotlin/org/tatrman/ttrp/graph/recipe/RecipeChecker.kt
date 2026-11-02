@@ -9,6 +9,9 @@ import org.tatrman.ttr.metadata.model.AutomationProgram
 import org.tatrman.ttr.metadata.model.AutomationRole
 import org.tatrman.ttr.metadata.model.AutomationService
 import org.tatrman.ttr.metadata.model.Relation
+import org.tatrman.ttr.metadata.model.World
+import org.tatrman.ttr.semantics.RemovedConstructs
+import org.tatrman.ttr.semantics.RemovedConstructs.Cut
 import org.tatrman.ttrp.ast.IslandForm
 import org.tatrman.ttrp.ast.RecipeDecl
 import org.tatrman.ttrp.ast.RoleContainer
@@ -60,7 +63,8 @@ import org.tatrman.ttrp.resolve.TargetResolution
  * - parameters (REC-020 / 021);
  * - transitions against `states:` (REC-030);
  * - the turn rule (REC-040);
- * - time typing ([RecipeTime], REC-050).
+ * - time typing ([RecipeTime], REC-050);
+ * - the orchestration constructs the grammar cut removed (D-142, TTRP-CUT-001…016), wherever the recipe meets them.
  *
  * The document-level shape (one recipe, DML, the decision body) is checked at parse time (`TtrpChecks`): a DML
  * island's TTRP-SQL-001 stops the compile before this pass would run.
@@ -121,6 +125,7 @@ class RecipeChecker(
             )
 
         checkShape(recipe)
+        checkRemoved(recipe)
         checkIslandSchemas(recipe)
         checkRoleWiring(rg)
         val candidatesRow = candidatesId?.let { id -> container(id)?.let { outRow(rows, it) } }
@@ -248,6 +253,79 @@ class RecipeChecker(
             )
         return Result(recipeModel, diags.toList())
     }
+
+    // ---- the grammar cut (D-142) --------------------------------------------------------------------------
+
+    /**
+     * CG (grammar 0.22): every orchestration construct the process engine took over is refused once, where it was
+     * written — in the model's automation objects, the world's members and deployments, and this recipe's wiring.
+     */
+    private fun checkRemoved(recipe: RecipeDecl) {
+        val idx = model ?: return
+        for (obj in idx.automationAll()) {
+            val kind =
+                when (obj) {
+                    is AutomationProgram -> "program"
+                    is AutomationAction -> "action"
+                    is AutomationRole -> "role"
+                    else -> continue
+                }
+            for (hit in RemovedConstructs.inEntries(kind, obj.properties)) {
+                removed(hit.cut, "$kind `${obj.qname.name}`", hit.value.source)
+            }
+        }
+        val world =
+            report.world?.let { w ->
+                idx.objectsByQname.values
+                    .filterIsInstance<World>()
+                    .firstOrNull { it.qname == w.qname }
+            }
+        if (world != null) {
+            for (m in world.removed) {
+                (m.sourceLocation ?: world.sourceLocation)?.let { removed(Cut.PROCESS, "${m.keyword} `${m.name}`", it) }
+            }
+            for (d in world.deployments) {
+                val what = "deployment `${d.qname.name}`"
+                if (RemovedConstructs.isNativeTarget(
+                        d.target,
+                    )
+                ) {
+                    d.sourceLocation?.let { removed(Cut.NATIVE_TARGET, what, it) }
+                }
+                for (hit in RemovedConstructs.inEntries(
+                    "deployment",
+                    d.properties,
+                )) {
+                    removed(hit.cut, what, hit.value.source)
+                }
+            }
+        }
+        for (w in recipe.wirings) {
+            for (a in w.args.filter { it.name == REMOVED_WIRING }) {
+                diags +=
+                    cut(Cut.ON_DUE, "wiring `${w.action}`", a.location)
+            }
+        }
+    }
+
+    private fun removed(
+        c: Cut,
+        what: String,
+        at: org.tatrman.ttr.parser.model.SourceLocation,
+    ) {
+        diags +=
+            cut(
+                c,
+                what,
+                SourceLocation(at.file, at.line, at.column, at.endLine, at.endColumn, at.offsetStart, at.offsetEnd),
+            )
+    }
+
+    private fun cut(
+        c: Cut,
+        what: String,
+        at: SourceLocation,
+    ) = err(TtrpDiagnosticId.of(c), "$what: ${c.message}", at)
 
     // ---- roles -------------------------------------------------------------------------------------------
 
@@ -652,44 +730,27 @@ class RecipeChecker(
         }
     }
 
-    /** REC-011: a batch program's schedule period must cover whole windows (a period `over:` only — D-28). */
+    /**
+     * REC-011: a batch run must cover whole windows (a period `over:` only — D-28). D-142 took `schedule:`: the engine's
+     * timer starts a batch run and the Server bounds a period window from the ledger's watermark (D-143), so a batch
+     * program fails on a key list (`port: keys`) or on a count / gap window (gated until an event stream, D-143).
+     */
     private fun checkWindow(
         ctx: ContextInfo,
         programs: List<AutomationProgram>,
     ) {
         val window = ctx.window ?: return
-        val over = window.over
-        for (p in programs.filter { it.mode == "batch" }) {
-            val period = schedulePeriod(p.schedule)
-            val ok =
-                p.port != "keys" &&
-                    when (over) {
-                        is org.tatrman.ttrp.ast.WindowOver.Calendar ->
-                            period != null && PERIODS.indexOf(period) >= PERIODS.indexOf(over.unit)
-                        else -> false
-                    }
-            if (!ok) {
-                diags +=
-                    err(
-                        TtrpDiagnosticId.REC_011,
-                        "batch program `${p.qname.name}` (schedule " +
-                            "${p.schedule ?: "none"}${if (p.port == "keys") ", `port: keys`" else ""}) " +
-                            "does not cover whole windows of context `${ctx.name}`",
-                        window.location,
-                    )
-            }
+        val period = window.over is org.tatrman.ttrp.ast.WindowOver.Calendar
+        for (p in programs.filter { it.mode == "batch" && (it.port == "keys" || !period) }) {
+            val why = if (p.port == "keys") "`port: keys`" else "a count or gap window"
+            diags +=
+                err(
+                    TtrpDiagnosticId.REC_011,
+                    "batch program `${p.qname.name}` ($why) does not cover whole windows of context `${ctx.name}`",
+                    window.location,
+                )
         }
     }
-
-    /** A schedule string's period: `06:00 Europe/Prague` is daily; cron forms are the Server's to read. */
-    private fun schedulePeriod(schedule: String?): String? =
-        when {
-            schedule == null -> null
-            Regex("^\\d{1,2}:\\d{2}( .*)?$").matches(schedule.trim()) -> "day"
-            schedule.trim().startsWith("weekly") -> "week"
-            schedule.trim().startsWith("monthly") -> "month"
-            else -> null
-        }
 
     /** T5: the decision's switch reads keyed rows — one per candidate, never one built from several. */
     private fun checkDecisionLineage(
@@ -824,7 +885,7 @@ class RecipeChecker(
 
     /**
      * REC-040 (D-32): a wiring decided on an agent's answer — its route's condition, the rows the route was chosen
-     * from, or its own `when:` — fires only actions that need approval, and no unapproved `on_due:` either.
+     * from, or its own `when:` — fires only actions that need approval.
      */
     private fun checkTurnRule(
         w: Wiring,
@@ -842,18 +903,6 @@ class RecipeChecker(
         if (action.approval != "required") {
             diags +=
                 err(TtrpDiagnosticId.REC_040, "$why and fires `${w.action}`, which needs no approval", w.actionLocation)
-        }
-        for (a in w.args.filter { it.name == "on_due" }) {
-            val call = a.value as? WiringValue.Call ?: continue
-            val onDue = action(call.action) ?: continue
-            if (onDue.approval != "required") {
-                diags +=
-                    err(
-                        TtrpDiagnosticId.REC_040,
-                        "$why, and its `on_due:` fires `${call.action}` unapproved when the ask runs out",
-                        a.location,
-                    )
-            }
         }
     }
 
@@ -885,6 +934,7 @@ class RecipeChecker(
     ) {
         val columns = action.columns.associateBy { it.name }
         for (a in args) {
+            if (a.name == REMOVED_WIRING) continue // refused once by [checkRemoved] (TTRP-CUT-015)
             val col = columns[a.name]
             if (col == null) {
                 if (a.name in WIRING_PROPERTIES) {
@@ -910,7 +960,7 @@ class RecipeChecker(
         }
     }
 
-    /** An action call nested in a wiring — `on_due: hold { … }` (D-98), or an ask's `action: start { … }`. */
+    /** An action call nested in a wiring — an ask's `action: start { … }`. */
     private fun checkCall(
         call: WiringValue.Call,
         ctx: WiringContext,
@@ -1165,12 +1215,7 @@ class RecipeChecker(
     ) {
         val declared = recipe.parameters.map { it.text }.toSet()
         val runtime = mutableSetOf(AS_OF)
-        for (p in programs) {
-            when (p.port) {
-                "event" -> p.event?.let { e -> rowSchema(e)?.let { runtime += it.keys } }
-                "key", "keys" -> runtime += keyColumns
-            }
-        }
+        if (programs.any { it.port == "key" || it.port == "keys" }) runtime += keyColumns
         val refs = paramRefs(recipe, rg)
         for (r in refs) {
             if (r.name !in declared && r.name !in runtime) {
@@ -1436,11 +1481,12 @@ class RecipeChecker(
         private const val IDENTITY = "all"
 
         /** Wiring arguments that set an action's properties rather than a column (D-98, the `ask` grouping). */
-        val WIRING_PROPERTIES = setOf("due", "on_due", "group_by")
+        val WIRING_PROPERTIES = setOf("due", "group_by")
+
+        /** The wiring argument D-142 removed (`on_due:` — a timer boundary on the engine's user task now). */
+        private const val REMOVED_WIRING = "on_due"
 
         val DURATION_FUNCTIONS = DurationUnit.entries.map { it.spelling }.toSet()
-
-        private val PERIODS = listOf("day", "week", "month")
 
         /** A `because:` fill — `{column}` or `{parameter}` (D-108); shared with the switch lowering (AU-core-P2). */
         internal val FILL = Regex("\\{([A-Za-z_][A-Za-z0-9_]*)}")

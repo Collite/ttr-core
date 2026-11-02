@@ -109,7 +109,7 @@ object RecipeExplain {
         return "${w.action}$args${if (w.whenCondition != null) " when …" else ""}"
     }
 
-    /** An `on_due: hold { … }` argument shows the action it calls. */
+    /** A call-valued argument (an ask's `action: start { … }`) shows the action it calls. */
     private fun nested(v: WiringValue): String = if (v is WiringValue.Call) ": ${v.action}" else ""
 
     private fun ports(ports: List<PortDecl>): String =

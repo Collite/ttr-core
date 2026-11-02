@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttrp.diagnostics
 
+import org.tatrman.ttr.semantics.RemovedConstructs.Cut
 import org.tatrman.ttrp.ast.SourceLocation
 
 /**
@@ -429,6 +430,26 @@ enum class TtrpDiagnosticId(
     TGT_004("TTRP-TGT-004", "Recipe executor capability refusal"),
     TGT_005("TTRP-TGT-005", "Recipe executor capability refusal"),
 
+    // ---- AU-core CG (D-142, grammar 0.22): the orchestration constructs the process engine took over parse for one
+    // release and are refused, one id per construct; the suggestion is what models it now (ttr-semantics
+    // RemovedConstructs — the one table, shared with the automation validator). ----
+    CUT_001("TTRP-CUT-001", Cut.PROCESS.replacement),
+    CUT_002("TTRP-CUT-002", Cut.DEPLOYMENT_PROCESS.replacement),
+    CUT_003("TTRP-CUT-003", Cut.TRIGGER.replacement),
+    CUT_004("TTRP-CUT-004", Cut.NATIVE_TARGET.replacement),
+    CUT_005("TTRP-CUT-005", Cut.CONNECTORS.replacement),
+    CUT_006("TTRP-CUT-006", Cut.DELIVER.replacement),
+    CUT_007("TTRP-CUT-007", Cut.SCHEDULE.replacement),
+    CUT_008("TTRP-CUT-008", Cut.ASK_DUE.replacement),
+    CUT_009("TTRP-CUT-009", Cut.EVENT_PORT.replacement),
+    CUT_010("TTRP-CUT-010", Cut.EVENT_SCHEMA.replacement),
+    CUT_011("TTRP-CUT-011", Cut.SINK_DELIVER.replacement),
+    CUT_012("TTRP-CUT-012", Cut.SINK_TASK.replacement),
+    CUT_013("TTRP-CUT-013", Cut.SINK_START.replacement),
+    CUT_014("TTRP-CUT-014", Cut.SINK_EMIT.replacement),
+    CUT_015("TTRP-CUT-015", Cut.ON_DUE.replacement),
+    CUT_016("TTRP-CUT-016", Cut.ROLE_DELIVERY.replacement),
+
     CAP_204(
         "TTRP-CAP-204",
         "this world's executor is read-only and does not allow `store` — route the rows to a `display`, " +
@@ -674,6 +695,9 @@ enum class TtrpDiagnosticId(
     ;
 
     companion object {
+        /** The `TTRP-CUT-nnn` id of a removed construct (D-142). */
+        fun of(cut: Cut): TtrpDiagnosticId = valueOf("CUT_%03d".format(cut.number))
+
         /** Guards against id-string collisions across the catalogue (Stage 1.3 DONE bar). */
         fun assertNoDuplicateIds() {
             val dupes = entries.groupBy { it.id }.filterValues { it.size > 1 }.keys

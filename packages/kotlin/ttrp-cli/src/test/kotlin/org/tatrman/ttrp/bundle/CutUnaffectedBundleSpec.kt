@@ -28,7 +28,10 @@ class CutUnaffectedBundleSpec :
 
         val fixtures = locate("packages/kotlin/ttrp-graph/src/test/resources/fixtures/recipes")
         val recipes = locate("packages/kotlin/ttrp-frontend/src/test/resources/recipes")
-        val golden = locate("packages/kotlin/ttrp-cli/src/test/resources/fixtures").resolve("cut-unaffected-bundles.txt")
+        val golden =
+            locate(
+                "packages/kotlin/ttrp-cli/src/test/resources/fixtures",
+            ).resolve("cut-unaffected-bundles.txt")
         val manifest = TtrpManifest(world = "hartland.worlds.demo", manifestDir = fixtures)
 
         fun sha256(bytes: ByteArray): String =
@@ -50,8 +53,10 @@ class CutUnaffectedBundleSpec :
                     Files.walk(result.dir).use { paths ->
                         paths
                             .filter { Files.isRegularFile(it) }
-                            .map { "$name/${result.dir.relativize(it).toString().replace('\\', '/')}" to sha256(Files.readAllBytes(it)) }
-                            .toList()
+                            .map {
+                                "$name/${result.dir.relativize(it).toString().replace('\\', '/')}" to
+                                    sha256(Files.readAllBytes(it))
+                            }.toList()
                     }
                 }
             val text = lines.sortedBy { it.first }.joinToString("") { (file, sha) -> "$sha  $file\n" }

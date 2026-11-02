@@ -84,32 +84,20 @@ class EmitCommand : CliktCommand(name = "emit") {
                     "unknown or ambiguous deployment $deploymentName (world ${config.manifest.world})"
                 }
             val deployment = original.copy(granularity = granularity ?: original.granularity)
-            val process =
-                original.process?.let { name ->
-                    requireNotNull(
-                        world.processes.singleOrNull { it.qname.name == name },
-                    ) { "unknown or ambiguous process $name" }
-                }
-            val programObjects = objects.filterIsInstance<AutomationProgram>()
-            val steps = process?.steps.orEmpty()
-            require(process == null || steps.isNotEmpty()) { "process has no steps" }
-            val programNames =
-                process?.steps?.map { requireNotNull(it.program) { "process step has no program" } }
-                    ?: listOf(requireNotNull(deployment.program) { "deployment has no program" })
+            // D-142: a deployment runs one program (a process is a BPMN process now, not an export input).
             val programs =
-                programNames.map { name ->
+                listOf(
                     requireNotNull(
-                        programObjects.singleOrNull { it.qname.name == name },
-                    ) { "unknown or ambiguous program $name" }
-                }
+                        objects.filterIsInstance<AutomationProgram>().singleOrNull {
+                            it.qname.name == deployment.program
+                        },
+                    ) { "unknown or ambiguous program ${deployment.program}" },
+                )
             val plugin =
                 EmitPluginLoader.builtin(
                     org.tatrman.ttrp.graph.capability.RegistryGrid
                         .executorType(world, deployment),
                 )
-            require(
-                process == null || plugin.supportsProcesses,
-            ) { "${plugin.targetId} does not support process exports" }
             val temp = if (bundlePath == null) Files.createTempDirectory("ttrp-export-build") else null
             try {
                 data class Loaded(
@@ -138,31 +126,11 @@ class EmitCommand : CliktCommand(name = "emit") {
                 ) { "cannot resolve export world: $resolved" }
                 val bundleDirs = mutableMapOf<String, Path>()
 
-                fun load(
-                    program: AutomationProgram,
-                    port: String?,
-                ): Loaded {
+                fun load(program: AutomationProgram): Loaded {
                     val recipeName = requireNotNull(program.recipe)
-                    if ((port ?: program.port) == "event") {
-                        val event =
-                            requireNotNull(
-                                program.event,
-                            ) { "event port needs an event schema" }.removePrefix("schema.")
-                        val schemas =
-                            loaded.model.rowSchemas.values
-                                .filter { it.name == event }
-                        val schema =
-                            requireNotNull(schemas.singleOrNull()) { "unknown or ambiguous event schema $event" }
-                        require(
-                            schema.columns.none { it.name == "at" },
-                        ) { "event schema column `at` collides with the port clock" }
-                    }
                     val dir =
                         bundleDirs.getOrPut(recipeName) {
-                            bundlePath?.let { base ->
-                                val path = Path.of(base).toAbsolutePath().normalize()
-                                if (process != null) ExportFolderWriter.safePath(path, recipeName) else path
-                            } ?: run {
+                            bundlePath?.let { base -> Path.of(base).toAbsolutePath().normalize() } ?: run {
                                 val sources =
                                     Files.walk(root).use { paths ->
                                         paths
@@ -183,7 +151,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                                     recipeDir = source.parent,
                                     pipelineManifest = config.manifest,
                                     modelsRoot = config.manifest.modelsRoot(),
-                                    outDir = if (process != null) temp!!.resolve(recipeName) else temp!!,
+                                    outDir = temp!!,
                                 ).dir
                             }
                         }
@@ -283,7 +251,6 @@ class EmitCommand : CliktCommand(name = "emit") {
                         )
                     return Loaded(
                         projected.copy(
-                            program = projected.program.copy(port = port ?: projected.program.port),
                             recipe =
                                 projected.recipe.copy(
                                     fingerprints =
@@ -300,36 +267,9 @@ class EmitCommand : CliktCommand(name = "emit") {
                         wiredActions.values.toList(),
                     )
                 }
-                val loadedRecipes =
-                    programs.mapIndexed {
-                        index,
-                        program,
-                        ->
-                        load(program, steps.getOrNull(index)?.port)
-                    }
+                val loadedRecipes = programs.map(::load)
                 val first = loadedRecipes.first()
-                val graph =
-                    if (process == null) {
-                        first.graph
-                    } else {
-                        RecipeGraphProjector
-                            .project(
-                                first.bundle,
-                                world,
-                                programs.first(),
-                                deployment,
-                                first.actions,
-                                process = process,
-                                stepGraphs =
-                                    steps
-                                        .mapIndexed {
-                                            index,
-                                            step,
-                                            ->
-                                            step.name to loadedRecipes[index].graph
-                                        }.toMap(),
-                            ).let { it.copy(recipe = first.graph.recipe, program = first.graph.program) }
-                    }
+                val graph = first.graph
                 val program = programs.first()
                 val recipeName = graph.recipe.name
                 val bundle = first.bundle
@@ -371,16 +311,12 @@ class EmitCommand : CliktCommand(name = "emit") {
                     "Stale when any text, values, labels, program, deployment, world, toolchain " +
                         "or target version fingerprint differs for any step from the served bundle; re-export the deployment."
 
-                fun fixturePath(
-                    recipe: String,
-                    relative: String,
-                ): String = if (process == null) relative else "tests/$recipe/${relative.removePrefix("tests/")}"
                 val fixtures =
                     loadedRecipes
                         .flatMap { loadedRecipe ->
-                            loadedRecipe.bundle.recipe!!.tests.orEmpty().map { relative ->
-                                fixturePath(loadedRecipe.graph.recipe.name, relative)
-                            }
+                            loadedRecipe.bundle.recipe!!
+                                .tests
+                                .orEmpty()
                         }.distinct()
                 val conformance =
                     buildJsonObject {
@@ -408,33 +344,6 @@ class EmitCommand : CliktCommand(name = "emit") {
                             JsonObject(fingerprints.toSortedMap().mapValues { JsonPrimitive(it.value) }),
                         )
                         put("toolchain", bundle.toolchain)
-                        if (process != null) {
-                            put(
-                                "steps",
-                                JsonArray(
-                                    steps.mapIndexed { index, step ->
-                                        val loadedStep = loadedRecipes[index]
-                                        buildJsonObject {
-                                            put("name", step.name)
-                                            put("recipe", loadedStep.graph.recipe.name)
-                                            put("program", loadedStep.graph.program.name)
-                                            put(
-                                                "fingerprints",
-                                                JsonObject(
-                                                    loadedStep.graph.recipe.fingerprints
-                                                        .toSortedMap()
-                                                        .mapValues {
-                                                            JsonPrimitive(it.value)
-                                                        },
-                                                ),
-                                            )
-                                            put("toolchain", loadedStep.bundle.toolchain)
-                                            put("cell", "${graph.deployment.type}.${loadedStep.graph.program.mode}")
-                                        }
-                                    },
-                                ),
-                            )
-                        }
                         put("granularity", graph.deployment.granularity)
                         put(
                             "connections",
@@ -490,11 +399,10 @@ class EmitCommand : CliktCommand(name = "emit") {
                             relative in loadedRecipe.bundle.files,
                         ) { "fixture missing from bundle hashes: $relative" }
                         val bytes = Files.readAllBytes(ExportFolderWriter.bundleFile(loadedRecipe.dir, relative))
-                        val destination = fixturePath(loadedRecipe.graph.recipe.name, relative)
                         require(
-                            fixtureBytes[destination]?.contentEquals(bytes) != false,
-                        ) { "conflicting process fixture $relative" }
-                        fixtureBytes[destination] = bytes
+                            fixtureBytes[relative]?.contentEquals(bytes) != false,
+                        ) { "conflicting fixture $relative" }
+                        fixtureBytes[relative] = bytes
                     }
                 }
                 val workflowCalls =

@@ -8,58 +8,61 @@ import org.tatrman.ttr.parser.model.AutoValue
  * deprecate"). The process engine in the estate owns flow, waits, human tasks, schedules and delivery (D-141, D-143,
  * D-144, D-147, D-148); the calculus keeps the decision layer.
  *
- * For ONE release every removed construct still parses and is refused with its own id — the automation validator
- * reports `ttr/automation-removed`, the recipe checker `TTRP-CUT-nnn` — so a stale model fails loudly and names
- * what models it now, instead of reading as an unknown property. One table for both (the TS twin
- * `removed-constructs.ts` mirrors it id for id).
+ * For ONE release every removed construct still parses and is refused with its own number — the automation
+ * validator reports `ttr/automation-removed` naming `CUT-nnn`, the recipe checker the TTR-P id built from it (ttrp-frontend
+ * mints the TTR-P ids, MD5) — so a stale model fails loudly and names what models it now, instead of reading as an
+ * unknown property. One table for both (the TS twin `removed-constructs.ts` mirrors it number for number).
  */
 object RemovedConstructs {
-    /** The validator's code for every removed construct (the TTRP id is in the message). */
+    /** The validator's code for every removed construct (its `CUT-nnn` is in the message). */
     const val CODE = "ttr/automation-removed"
 
     enum class Cut(
-        val id: String,
+        val number: Int,
         val construct: String,
         val replacement: String,
     ) {
         PROCESS(
-            "TTRP-CUT-001",
+            1,
             "`def process` (with its `def step`s and `after:` waits)",
             "a BPMN process — a service task per step calling the run API, a wait as a message catch with a timer " +
                 "boundary event",
         ),
-        DEPLOYMENT_PROCESS("TTRP-CUT-002", "a deployment's `process:`", "deploy the program; the BPMN process calls it"),
-        TRIGGER("TTRP-CUT-003", "a deployment's `trigger:`", "a BPMN timer start event"),
+        DEPLOYMENT_PROCESS(2, "a deployment's `process:`", "deploy the program; the BPMN process calls it"),
+        TRIGGER(3, "a deployment's `trigger:`", "a BPMN timer start event"),
         NATIVE_TARGET(
-            "TTRP-CUT-004",
+            4,
             "`target: native`",
             "name an executor of the world (`def executor <name> { extends: <type> }`)",
         ),
         CONNECTORS(
-            "TTRP-CUT-005",
+            5,
             "a deployment's `connectors:` (`deliver`, `ask`, `start`)",
             "the engine's tasks call the connectors",
         ),
         DELIVER(
-            "TTRP-CUT-006",
+            6,
             "a program's `deliver:` (and its digest)",
             "a BPMN send task; the Server renders a digest on request",
         ),
-        SCHEDULE("TTRP-CUT-007", "a program's `schedule:`", "a BPMN timer start event"),
-        ASK_DUE("TTRP-CUT-008", "a program's `ask_due:`", "the BPMN user task's due date, with a timer boundary event"),
-        EVENT_PORT("TTRP-CUT-009", "`port: event`", "`port: key` — the engine's message carries the key"),
-        EVENT_SCHEMA("TTRP-CUT-010", "a program's `event:` schema", "`port: key` — the engine's message carries the key"),
-        SINK_DELIVER("TTRP-CUT-011", "the native sink `deliver`", "a BPMN send task acting on the action row"),
+        SCHEDULE(7, "a program's `schedule:`", "a BPMN timer start event"),
+        ASK_DUE(8, "a program's `ask_due:`", "the BPMN user task's due date, with a timer boundary event"),
+        EVENT_PORT(9, "`port: event`", "`port: key` — the engine's message carries the key"),
+        EVENT_SCHEMA(10, "a program's `event:` schema", "`port: key` — the engine's message carries the key"),
+        SINK_DELIVER(11, "the native sink `deliver`", "a BPMN send task acting on the action row"),
         SINK_TASK(
-            "TTRP-CUT-012",
+            12,
             "the native sink `task`",
             "`approval: required` on the action — the emitted BPMN puts a user task behind the route",
         ),
-        SINK_START("TTRP-CUT-013", "the native sink `start`", "a BPMN call activity acting on the action row"),
-        SINK_EMIT("TTRP-CUT-014", "the native sink `emit`", "a BPMN message the engine sends for the action row"),
-        ON_DUE("TTRP-CUT-015", "`on_due:`", "a timer boundary event on the BPMN user task"),
-        ROLE_DELIVERY("TTRP-CUT-016", "a role's `delivery:`", "the BPMN send task addresses the role's members"),
+        SINK_START(13, "the native sink `start`", "a BPMN call activity acting on the action row"),
+        SINK_EMIT(14, "the native sink `emit`", "a BPMN message the engine sends for the action row"),
+        ON_DUE(15, "`on_due:`", "a timer boundary event on the BPMN user task"),
+        ROLE_DELIVERY(16, "a role's `delivery:`", "the BPMN send task addresses the role's members"),
         ;
+
+        /** `CUT-001` — the number the validator names and the recipe checker's id carries. */
+        val ref: String get() = "CUT-%03d".format(number)
 
         /** The finding's text, after `<what>: ` — what was removed, when, and what models it now. */
         val message: String
@@ -139,6 +142,9 @@ object RemovedConstructs {
             "deployment" -> key == "process" || key == "trigger" || key in CONNECTOR_KEYS
             else -> false
         }
+
+    /** A native sink value D-142 removed (`deliver`, `task`, `start`, `emit`). */
+    fun isRemovedSink(value: AutoValue): Boolean = idOf(value) in SINKS
 
     /** `target: native` — the Server as a pseudo-executor; a deployment now names an executor of its world. */
     fun isNativeTarget(target: String?): Boolean = target == "native"
