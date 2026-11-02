@@ -8,14 +8,21 @@ import { afterEach, beforeEach, test } from 'node:test';
 import { canonicalYamlReleaseTag } from './canonical-yaml-release-tag.mjs';
 
 let root;
-const gitEnv = { ...process.env, GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: '1' };
-const repositoryVariables = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE'];
-const inherited = new Map(repositoryVariables.map((key) => [key, process.env[key]]));
-for (const key of repositoryVariables) delete gitEnv[key];
+const inherited = new Map(Object.entries(process.env).filter(([key]) => key.startsWith('GIT_')));
+const gitEnv = {
+  ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
+  GIT_CONFIG_GLOBAL: devNull,
+  GIT_CONFIG_NOSYSTEM: '1',
+};
+const clearGitEnvironment = () => {
+  for (const key of Object.keys(process.env)) if (key.startsWith('GIT_')) delete process.env[key];
+};
 const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe', env: gitEnv });
 beforeEach(() => {
   // The lookup also launches Git: isolate this test process from an enclosing checkout's overrides.
-  for (const key of repositoryVariables) delete process.env[key];
+  clearGitEnvironment();
+  process.env.GIT_CONFIG_GLOBAL = devNull;
+  process.env.GIT_CONFIG_NOSYSTEM = '1';
   root = mkdtempSync(join(tmpdir(), 'yaml-release-tag-'));
   git('init', '--quiet');
   git(
@@ -31,10 +38,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   rmSync(root, { recursive: true, force: true });
-  for (const [key, value] of inherited) {
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
+  clearGitEnvironment();
+  for (const [key, value] of inherited) process.env[key] = value;
 });
 
 test('uses the internal tag, including annotated release tags', () => {
