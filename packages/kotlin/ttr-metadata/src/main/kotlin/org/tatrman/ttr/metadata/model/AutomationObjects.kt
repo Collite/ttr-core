@@ -98,13 +98,11 @@ data class AutomationSet(
     val column: String,
 )
 
-/** A call-shaped value: `on_due: hold { order: order_number, department: "Sales" }`. */
-data class AutomationCall(
-    val action: String,
-    val arguments: List<Pair<String, AutoValue>> = emptyList(),
-)
-
-/** `def action <n> { columns, sinks, transition?, set?, approval, deliverable, due, on_due, dry_run, label }` (D-65, D-98). */
+/**
+ * `def action <n> { columns, sinks, transition?, set?, approval, deliverable, due, dry_run, label }` (D-65, D-98).
+ * Grammar 0.22 (D-142): `on_due:` and the native sinks `deliver · task · start · emit` are gone — the engine acts on
+ * the action row (a send task, a user task with a timer boundary, a call activity).
+ */
 data class AutomationAction(
     override val internalId: String,
     override val qname: QualifiedName,
@@ -117,7 +115,7 @@ data class AutomationAction(
     override val properties: List<Pair<String, AutoValue>> = emptyList(),
     override val sourceLocation: SourceLocation? = null,
     val columns: List<AutomationColumn> = emptyList(),
-    /** Target → sink: `native → transition`, `n8n → door`, `n8n → "n8n-nodes-base.emailSend"`. */
+    /** Target → sink: `native → transition | writer | obligation`, `n8n → door`, `n8n → "n8n-nodes-base.emailSend"`. */
     val sinks: Map<String, String> = emptyMap(),
     val transition: AutomationTransition? = null,
     val set: AutomationSet? = null,
@@ -125,7 +123,6 @@ data class AutomationAction(
     val approval: String? = null,
     val deliverable: Boolean = false,
     val due: AutomationDuration? = null,
-    val onDue: AutomationCall? = null,
     /** The `dry_run:` text, `{ en: …, cs: … }`. */
     val dryRun: LocalizedText = LocalizedText.EMPTY,
 ) : AutomationObject {
@@ -168,7 +165,10 @@ sealed interface RoleMembership {
     ) : RoleMembership
 }
 
-/** A `def role` in a `model automation` file: `resolve: keycloak_group "…"` | `members: […]`, `delivery`. */
+/**
+ * A `def role` in a `model automation` file: `resolve: keycloak_group "…"` | `members: […]`.
+ * Grammar 0.22 (D-142): no `delivery:` — the engine's send task addresses the members.
+ */
 data class AutomationRole(
     override val internalId: String,
     override val qname: QualifiedName,
@@ -181,8 +181,6 @@ data class AutomationRole(
     override val properties: List<Pair<String, AutoValue>> = emptyList(),
     override val sourceLocation: SourceLocation? = null,
     val membership: RoleMembership? = null,
-    /** `delivery: { email: "…" }` — channel → address. */
-    val delivery: Map<String, String> = emptyMap(),
 ) : AutomationObject {
     override val kind: String = "role"
 }
@@ -206,19 +204,10 @@ data class AutomationApproval(
     override val kind: String = "approval"
 }
 
-/** A program's delivery: right away, or a digest grouped by a column per day/week. */
-sealed interface ProgramDelivery {
-    data object Immediate : ProgramDelivery
-
-    data class Digest(
-        val by: String,
-        val per: String,
-    ) : ProgramDelivery
-}
-
 /**
- * `def program <n> { recipe, port, event, mode, as_of, deliver, schedule, overrides, budget, turn_budget, ask_due,
- * protocol }` (D-26, D-104). `schedule` is an exporter hint; the Server's trigger is the deployment's (D-106).
+ * `def program <n> { recipe, port, mode, as_of, overrides, budget, turn_budget, protocol }` (D-26). Grammar 0.22
+ * (D-142): `deliver:`, `schedule:`, `ask_due:`, `port: event` and `event:` are gone — the engine sends, schedules,
+ * times the user task and carries the key in its message.
  */
 data class AutomationProgram(
     override val internalId: String,
@@ -232,22 +221,17 @@ data class AutomationProgram(
     override val properties: List<Pair<String, AutoValue>> = emptyList(),
     override val sourceLocation: SourceLocation? = null,
     val recipe: String? = null,
-    /** `none · key · keys · event`. */
+    /** `none · key · keys`. */
     val port: String? = null,
-    /** The event `def schema` name (`line_received` for `event: schema.line_received`). */
-    val event: String? = null,
     /** `batch · on_event · windowed`. */
     val mode: String? = null,
     /** `run`, `event`, or a literal instant. */
     val asOf: String? = null,
-    val deliver: ProgramDelivery? = null,
-    val schedule: String? = null,
     val overrides: List<Pair<String, AutoValue>> = emptyList(),
     val budgetSync: AutomationDuration? = null,
     val budgetBatch: AutomationDuration? = null,
     val turnBudgetPerRun: Int? = null,
     val turnBudgetPerCandidate: Int? = null,
-    val askDue: AutomationDuration? = null,
     /** `always · on_route`. */
     val protocol: String? = null,
 ) : AutomationObject {
@@ -352,19 +336,11 @@ data class WorldGrant(
     val anyProgram: Boolean get() = program == null
 }
 
-/** A deployment's Server trigger (D-106): a schedule, or none (event/manual only). */
-sealed interface DeploymentTrigger {
-    data class Schedule(
-        val spec: String,
-    ) : DeploymentTrigger
-
-    data object None : DeploymentTrigger
-}
-
 /**
- * `def deployment <n> { program | process, target, run_as, trigger, … }` (D-107, D-92, D-94, D-106). Loaded
- * FAIL-CLOSED: a deployment with a non-boolean flag, a missing/malformed `run_as` or `target`, or not exactly
- * one of `program` / `process` is not loaded (a load error says so) — a flag keeps its default only when absent.
+ * `def deployment <n> { program, target, run_as, … }` (D-107, D-92, D-94). Loaded FAIL-CLOSED: a deployment with a
+ * non-boolean flag, or a missing/malformed `program`, `run_as` or `target` is not loaded (a load error says so) — a
+ * flag keeps its default only when absent. Grammar 0.22 (D-142): no `process:` and no `trigger:` (the engine runs
+ * and schedules); a `target: native` still loads, for the checkers to refuse (CUT-004).
  */
 data class WorldDeployment(
     override val internalId: String,
@@ -374,13 +350,10 @@ data class WorldDeployment(
     override val tags: List<String> = emptyList(),
     override val sourceFile: String = "",
     override val binding: Binding = Binding.BoundReal,
-    /** The program's name; null when the deployment runs a [process]. */
-    val program: String? = null,
-    val process: String? = null,
-    /** `native` or an executor of the world. */
+    val program: String,
+    /** An executor of the world. */
     val target: String,
     val runAs: RunAsRef,
-    val trigger: DeploymentTrigger? = null,
     val dryRun: Boolean = false,
     val enabled: Boolean = true,
     val debug: Boolean = false,
@@ -397,36 +370,12 @@ data class WorldDeployment(
     override val kind: String = "deployment"
 }
 
-/** A step's wait: the obligation kind(s) it waits on, or a time; ending at the first of [until]. */
-data class StepAfter(
-    val obligations: List<String> = emptyList(),
-    val time: AutomationDuration? = null,
-    val until: List<String> = emptyList(),
-)
-
-/** `def step <n> { program, port, after }` inside a process. */
-data class ProcessStep(
+/**
+ * A world member the grammar still RECOGNISES for one release but the model no longer has (grammar 0.22, D-142):
+ * `def process` ([keyword]). Kept only so a checker can refuse it (CUT-001) where it was written.
+ */
+data class RemovedWorldMember(
+    val keyword: String,
     val name: String,
-    val program: String? = null,
-    /** `key · keys`. */
-    val port: String? = null,
-    val after: StepAfter? = null,
-    val properties: List<Pair<String, AutoValue>> = emptyList(),
-)
-
-/** `def process <n> { instance, steps }` (D-39, D-86). */
-data class WorldProcess(
-    override val internalId: String,
-    override val qname: QualifiedName,
-    override val description: String = "",
-    override val descriptionLocalized: LocalizedText = LocalizedText.EMPTY,
-    override val tags: List<String> = emptyList(),
-    override val sourceFile: String = "",
-    override val binding: Binding = Binding.BoundReal,
-    /** The instance key (`return_request_line.line_id`). */
-    val instance: String? = null,
-    val steps: List<ProcessStep> = emptyList(),
     val sourceLocation: SourceLocation? = null,
-) : ModelObject {
-    override val kind: String = "process"
-}
+)

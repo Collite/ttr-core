@@ -3,7 +3,6 @@ package org.tatrman.ttr.metadata.source
 
 import org.tatrman.ttr.metadata.model.AutomationAction
 import org.tatrman.ttr.metadata.model.AutomationApproval
-import org.tatrman.ttr.metadata.model.AutomationCall
 import org.tatrman.ttr.metadata.model.AutomationColumn
 import org.tatrman.ttr.metadata.model.AutomationDuration
 import org.tatrman.ttr.metadata.model.AutomationObject
@@ -14,19 +13,15 @@ import org.tatrman.ttr.metadata.model.AutomationRole
 import org.tatrman.ttr.metadata.model.AutomationService
 import org.tatrman.ttr.metadata.model.AutomationSet
 import org.tatrman.ttr.metadata.model.AutomationTransition
-import org.tatrman.ttr.metadata.model.DeploymentTrigger
 import org.tatrman.ttr.metadata.model.GrantWho
 import org.tatrman.ttr.metadata.model.LocalizedText
-import org.tatrman.ttr.metadata.model.ProcessStep
-import org.tatrman.ttr.metadata.model.ProgramDelivery
 import org.tatrman.ttr.metadata.model.QualifiedName
+import org.tatrman.ttr.metadata.model.RemovedWorldMember
 import org.tatrman.ttr.metadata.model.RoleMembership
 import org.tatrman.ttr.metadata.model.RunAsRef
-import org.tatrman.ttr.metadata.model.StepAfter
 import org.tatrman.ttr.metadata.model.WorldDeployment
 import org.tatrman.ttr.metadata.model.WorldGrant
 import org.tatrman.ttr.metadata.model.WorldIdentity
-import org.tatrman.ttr.metadata.model.WorldProcess
 import org.tatrman.ttr.parser.loader.AutomationStdlib
 import org.tatrman.ttr.parser.model.AutoBody
 import org.tatrman.ttr.parser.model.AutoEntry
@@ -101,16 +96,6 @@ internal object AutomationBuilder {
                     approval = text(b["approval"]),
                     deliverable = bool(b["deliverable"]) ?: false,
                     due = duration(b["due"]),
-                    onDue =
-                        (b["on_due"] as? AutoValue.Call)?.let { c ->
-                            AutomationCall(
-                                c.name,
-                                c.entries.map {
-                                    it.key to
-                                        it.value
-                                },
-                            )
-                        },
                     dryRun = localizedOf(b["dry_run"]),
                 )
             "service" ->
@@ -177,27 +162,6 @@ internal object AutomationBuilder {
         props: List<Pair<String, AutoValue>>,
         sourceFile: String,
     ): AutomationProgram {
-        val deliver =
-            when (val d = b["deliver"]) {
-                is AutoValue.Id -> if (d.ref.path == "immediate") ProgramDelivery.Immediate else null
-                is AutoValue.Obj ->
-                    (d["digest"] as? AutoValue.Obj)?.let { dg ->
-                        val by = text(dg["by"])
-                        val per = text(dg["per"])
-                        if (by != null && per != null) ProgramDelivery.Digest(by, per) else null
-                    }
-                else -> null
-            }
-        val event =
-            (b["event"] as? AutoValue.Id)?.parts?.let {
-                if (it.size == 2 &&
-                    it[0] == "schema"
-                ) {
-                    it[1]
-                } else {
-                    it.joinToString(".")
-                }
-            }
         val budget = b["budget"] as? AutoValue.Obj
         val turns = b["turn_budget"] as? AutoValue.Obj
         return AutomationProgram(
@@ -212,17 +176,13 @@ internal object AutomationBuilder {
             sourceLocation = def.source,
             recipe = text(b["recipe"]),
             port = text(b["port"]),
-            event = event,
             mode = text(b["mode"]),
             asOf = text(b["as_of"]),
-            deliver = deliver,
-            schedule = text(b["schedule"]),
             overrides = (b["overrides"] as? AutoValue.Obj)?.entries?.map { it.key to it.value } ?: emptyList(),
             budgetSync = duration(budget?.get("sync")),
             budgetBatch = duration(budget?.get("batch")),
             turnBudgetPerRun = int(turns?.get("per_run")),
             turnBudgetPerCandidate = int(turns?.get("per_candidate")),
-            askDue = duration(b["ask_due"]),
             protocol = text(b["protocol"]),
         )
     }
@@ -252,13 +212,6 @@ internal object AutomationBuilder {
             properties = def.entries.map { it.key to it.value },
             sourceLocation = def.source,
             membership = membership,
-            delivery =
-                (last("delivery") as? AutoValue.Obj)
-                    ?.entries
-                    ?.mapNotNull { e ->
-                        text(e.value)?.let { e.key to it }
-                    }?.toMap()
-                    ?: emptyMap(),
         )
     }
 
@@ -345,8 +298,9 @@ internal object AutomationBuilder {
 
     /**
      * The world's deployments, FAIL-CLOSED (review-114 M4): a deployment with a non-boolean flag (`enabled:
-     * "false"`), a missing or malformed `run_as:` or `target:`, or not exactly one of `program:` / `process:` is
-     * dropped and [dropped] reports it. A flag keeps its default only when it is absent.
+     * "false"`), or a missing or malformed `program:`, `run_as:` or `target:` is dropped and [dropped] reports it. A
+     * flag keeps its default only when it is absent. The keys D-142 removed (`process:`, `trigger:`, the connectors)
+     * ride in [WorldDeployment.properties] only, for the checkers to refuse.
      */
     fun deployments(
         def: WorldDef,
@@ -359,7 +313,6 @@ internal object AutomationBuilder {
             val b = d.body
             val q = FileBasedSource.qname("world", def.name, name, pkg)
             val program = (b["program"] as? AutoValue.Id)?.ref?.path
-            val process = (b["process"] as? AutoValue.Id)?.ref?.path
             val target = (b.target as? TargetReferenceValue)?.ref?.path
             val runAs = runAs(b["run_as"])
             val badFlags = DEPLOYMENT_FLAGS.filter { b[it] != null && b[it] !is AutoValue.Bool }
@@ -368,7 +321,7 @@ internal object AutomationBuilder {
                     badFlags.isNotEmpty() -> "non-boolean ${badFlags.joinToString { "`$it:`" }}"
                     runAs == null -> "a missing or malformed `run_as:`"
                     target == null -> "a missing or malformed `target:`"
-                    (program == null) == (process == null) -> "not exactly one of `program:` / `process:`"
+                    program == null -> "a missing or malformed `program:`"
                     else -> null
                 }
             if (problem != null) {
@@ -382,16 +335,9 @@ internal object AutomationBuilder {
                 b.descriptionLocalized.toLocalizedText(),
                 b.tags,
                 sourceFile,
-                program = program,
-                process = process,
+                program = program!!,
                 target = target!!,
                 runAs = runAs!!,
-                trigger =
-                    when (val t = b["trigger"]) {
-                        is AutoValue.Tagged -> if (t.tag == "schedule") DeploymentTrigger.Schedule(t.value) else null
-                        is AutoValue.Id -> if (t.ref.path == "none") DeploymentTrigger.None else null
-                        else -> null
-                    },
                 dryRun = bool(b["dry_run"]) ?: false,
                 enabled = bool(b["enabled"]) ?: true,
                 debug = bool(b["debug"]) ?: false,
@@ -406,42 +352,9 @@ internal object AutomationBuilder {
             )
         }
 
-    fun processes(
-        def: WorldDef,
-        pkg: String,
-        sourceFile: String,
-    ): List<WorldProcess> =
-        def.processes.map { p ->
-            val q = FileBasedSource.qname("world", def.name, p.name, pkg)
-            WorldProcess(
-                FileBasedSource.idFor("process", q),
-                q,
-                p.description ?: "",
-                p.descriptionLocalized.toLocalizedText(),
-                p.tags,
-                sourceFile,
-                instance = text(p["instance"]),
-                steps =
-                    p.steps.map { s ->
-                        val after = s.body["after"] as? AutoValue.Obj
-                        ProcessStep(
-                            name = s.name ?: "",
-                            program = text(s.body["program"]),
-                            port = text(s.body["port"]),
-                            after =
-                                after?.let { a ->
-                                    StepAfter(
-                                        obligations = texts(a["obligation"]),
-                                        time = duration(a["time"]),
-                                        until = texts(a["until"]),
-                                    )
-                                },
-                            properties = s.body.entries.map { it.key to it.value },
-                        )
-                    },
-                sourceLocation = p.source,
-            )
-        }
+    /** The members D-142 removed (`def process`): recognised by the 0.22 grammar only to be refused (CUT-001). */
+    fun removed(def: WorldDef): List<RemovedWorldMember> =
+        def.processes.map { RemovedWorldMember("process", it.name, it.source) }
 
     /** A storage's `writable:` manifest entry, each item as written (a glob without its quotes). */
     fun writable(manifest: Map<String, PropertyValue>): List<String> {
@@ -501,13 +414,6 @@ internal object AutomationBuilder {
             is AutoValue.Id -> v.ref.path
             is AutoValue.Str -> v.raw
             else -> null
-        }
-
-    private fun texts(v: AutoValue?): List<String> =
-        when (v) {
-            is AutoValue.ListV -> v.items.mapNotNull { text(it) }
-            null -> emptyList()
-            else -> listOfNotNull(text(v))
         }
 
     private fun bool(v: AutoValue?): Boolean? = (v as? AutoValue.Bool)?.raw
