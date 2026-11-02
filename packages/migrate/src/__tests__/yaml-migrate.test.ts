@@ -323,6 +323,21 @@ process.stdout.write(JSON.stringify({source: ${JSON.stringify(after)}, changed: 
     expect(readFileSync(file, 'utf8')).toBe(before);
     expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
   });
+  it('keeps pre-check I/O errors raw and removes staged files', async () => {
+    let calls = 0;
+    race.beforeLstat = (path) => {
+      // Discovery, then the pre-check before any replacement.
+      if (path === file && ++calls === 2) rmSync(file);
+    };
+    const error = await runYamlMigration([file], options()).catch((error: Error) => error);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({
+      message: `ENOENT: no such file or directory, lstat '${file}'`,
+      code: 'ENOENT',
+    });
+    expect((error as Error).message).not.toContain('already replaced');
+    expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
+  });
   it('reports none and retains ENOENT when file 1 disappears at its replacement recheck', async () => {
     let calls = 0;
     race.beforeLstat = (path) => {
