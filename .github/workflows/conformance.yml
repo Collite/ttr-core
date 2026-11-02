@@ -37,6 +37,7 @@ jobs:
       # Check the committed schemas before a build can refresh generated resources.
       - run: node packages/grammar/scripts/generate-canonical-schemas.mjs --check
       - run: node --test packages/grammar/tests/canonical-generation.test.mjs
+      - run: node --test scripts/canonical-yaml-release-tag.test.mjs
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tatrman/grammar prebuild
       # Tests read committed twins, discover the current roster, and exercise missing-twin and

@@ -15,12 +15,16 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { runYamlMigration } from '../yaml-migrate.js';
 
-const race = vi.hoisted(() => ({ afterRename: undefined as (() => void) | undefined }));
+const race = vi.hoisted(() => ({
+  afterRename: undefined as (() => void) | undefined,
+  failRename: undefined as string | undefined,
+}));
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
   return {
     ...actual,
     rename: async (...args: Parameters<typeof actual.rename>) => {
+      if (args[1] === race.failRename) throw new Error('simulated rename failure');
       await actual.rename(...args);
       race.afterRename?.();
     },
@@ -55,6 +59,7 @@ process.stdout.write(JSON.stringify({ source, changed: source !== r.source }));
   });
   afterEach(() => {
     race.afterRename = undefined;
+    race.failRename = undefined;
     rmSync(root, { recursive: true, force: true });
   });
   const options = () => ({ from: '0.22', to: '0.22', bridge });
@@ -256,6 +261,46 @@ process.stdout.write(JSON.stringify({source: ${JSON.stringify(after)}, changed: 
     );
     expect(readFileSync(file, 'utf8')).toBe(after);
     expect(readFileSync(second, 'utf8')).toBe('editor save');
+    expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
+  });
+  for (const damage of ['delete', 'invalid UTF-8']) {
+    it(`reports already replaced files when the next input is ${damage}`, async () => {
+      const second = join(root, 'second.yaml');
+      writeFileSync(second, before);
+      race.afterRename = () => {
+        if (damage === 'delete') rmSync(second);
+        else writeFileSync(second, Buffer.from([0xff, 0xfe]));
+        race.afterRename = undefined;
+      };
+      const error = await runYamlMigration([file, second], options()).catch(
+        (error: Error) => error
+      );
+      expect(error).toBeInstanceOf(Error);
+      const message = (error as Error).message;
+      expect(message.startsWith(`${second}: input changed before replacement (`)).toBe(true);
+      expect(message).toContain(damage === 'delete' ? 'ENOENT' : 'not valid UTF-8');
+      expect(message.endsWith(`); already replaced: ${file}`)).toBe(true);
+      expect(readFileSync(file, 'utf8')).toBe(after);
+      if (damage === 'invalid UTF-8')
+        expect(readFileSync(second)).toEqual(Buffer.from([0xff, 0xfe]));
+      expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
+    });
+  }
+  it('reports only successful replacements after a subsequent rename fails', async () => {
+    const second = join(root, 'second.yaml');
+    writeFileSync(second, before);
+    race.failRename = second;
+    await expect(runYamlMigration([file, second], options())).rejects.toMatchObject({
+      message: `${second}: replacement failed (simulated rename failure); already replaced: ${file}`,
+    });
+    expect(readFileSync(file, 'utf8')).toBe(after);
+    expect(readFileSync(second, 'utf8')).toBe(before);
+    expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
+  });
+  it('keeps a first-replacement rename failure unchanged and removes its staged files', async () => {
+    race.failRename = file;
+    await expect(runYamlMigration([file], options())).rejects.toThrow(/^simulated rename failure$/);
+    expect(readFileSync(file, 'utf8')).toBe(before);
     expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
   });
 });

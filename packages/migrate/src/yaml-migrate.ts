@@ -122,8 +122,18 @@ export async function runYamlMigration(
     }
     const replaced: string[] = [];
     const checkUnchanged = async (write: YamlMigrationWrite, replacing = false) => {
-      const stat = await lstat(write.path);
-      const current = decodeUtf8(write.path, await readFile(write.path));
+      let stat;
+      let current;
+      try {
+        stat = await lstat(write.path);
+        current = decodeUtf8(write.path, await readFile(write.path));
+      } catch (error) {
+        if (!replacing || !replaced.length) throw error;
+        const cause = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `${write.path}: input changed before replacement (${cause}); already replaced: ${replaced.join(', ')}`
+        );
+      }
       if (!stat.isFile() || stat.nlink !== 1 || current !== write.before) {
         throw new Error(
           replacing
@@ -135,7 +145,15 @@ export async function runYamlMigration(
     for (const { write } of staged) await checkUnchanged(write);
     for (const { write, temp } of staged) {
       await checkUnchanged(write, true);
-      await rename(temp, write.path);
+      try {
+        await rename(temp, write.path);
+      } catch (error) {
+        if (!replaced.length) throw error;
+        const cause = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `${write.path}: replacement failed (${cause}); already replaced: ${replaced.join(', ')}`
+        );
+      }
       replaced.push(write.path);
     }
   } finally {

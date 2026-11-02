@@ -84,6 +84,30 @@ class CanonicalYamlDepthSpec :
                 }
             }
         }
+        for (value in listOf("-{ x: 1 }", "-[1, 2]")) {
+            test("earlier lexer error in $value precedes a resulting unmatched closer") {
+                smallStack {
+                    val error =
+                        shouldThrow<CanonicalYamlException> {
+                            CanonicalYaml.fromTtr("model automation\ndef program D {\n a: $value\n}\n", "lexer.ttrm")
+                        }
+                    error.file shouldBe "lexer.ttrm"
+                    error.line shouldBe 3
+                    error.column shouldBe 5
+                    error.detail shouldBe "token recognition error at: '${value.take(2)}'"
+                }
+            }
+        }
+        test("a later lexer error cannot mask the earlier token depth refusal") {
+            smallStack {
+                val source = ttr(65, false).replace("\n}\n", "\n b: -{ x: 1 }\n}\n")
+                val error = shouldThrow<CanonicalYamlException> { CanonicalYaml.fromTtr(source, "later.ttrm") }
+                error.file shouldBe "later.ttrm"
+                error.line shouldBe 3
+                error.column shouldBe 68
+                error.detail shouldBe "nesting too deep (limit 64)"
+            }
+        }
         test("native token guard refuses deep input before recursive parsing on a 1 MiB stack") {
             smallStack {
                 val error =
