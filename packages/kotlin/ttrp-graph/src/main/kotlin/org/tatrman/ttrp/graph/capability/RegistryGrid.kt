@@ -66,25 +66,25 @@ class RegistryGrid(
         }
 
     companion object {
+        /**
+         * The type of the world executor [deployment] targets. Grammar 0.22 (D-142): there is no `target: native`
+         * pseudo-executor any more — the Server is an executor of the world (`def executor server { extends: native }`),
+         * and an executor named `native` is resolved like any other.
+         */
         fun executorType(
             world: World,
             deployment: WorldDeployment,
-        ): String =
-            if (deployment.target ==
-                "native"
-            ) {
-                "native"
-            } else {
-                val executor =
-                    requireNotNull(
-                        world.executors.singleOrNull {
-                            it.qname.name == deployment.target
-                        },
-                    ) { "unknown executor ${deployment.target}" }
+        ): String {
+            val executor =
                 requireNotNull(
-                    executor.extendsRef ?: executor.type,
-                ) { "executor ${deployment.target} has no type" }.replace('-', '_')
-            }
+                    world.executors.singleOrNull {
+                        it.qname.name == deployment.target
+                    },
+                ) { "unknown executor ${deployment.target}" }
+            return requireNotNull(
+                executor.extendsRef ?: executor.type,
+            ) { "executor ${deployment.target} has no type" }.replace('-', '_')
+        }
     }
 }
 

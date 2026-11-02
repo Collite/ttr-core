@@ -579,7 +579,7 @@ class Ctx {
     const target = d.target;
     if (!target) this.missing(what, 'target', d.source);
     else if ('path' in target) {
-      if (isNativeTarget(target.path)) this.cut(what, CUTS.NATIVE_TARGET, target.source);
+      if (isNativeTarget(target.path, executors)) this.cut(what, CUTS.NATIVE_TARGET, target.source);
       else if (!executors.has(target.path)) this.unknownRef(what, 'target', 'executor', target.path, target.source);
     } else this.report('ttr/automation-invalid-value', `${what}: target is an executor name`, target.source);
     const runAs = entry(d, 'run_as');

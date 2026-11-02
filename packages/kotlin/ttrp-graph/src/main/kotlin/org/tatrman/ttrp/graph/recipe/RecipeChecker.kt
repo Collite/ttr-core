@@ -286,10 +286,7 @@ class RecipeChecker(
             }
             for (d in world.deployments) {
                 val what = "deployment `${d.qname.name}`"
-                if (RemovedConstructs.isNativeTarget(
-                        d.target,
-                    )
-                ) {
+                if (RemovedConstructs.isNativeTarget(d.target, world.executors.map { it.qname.name })) {
                     d.sourceLocation?.let { removed(Cut.NATIVE_TARGET, what, it) }
                 }
                 for (hit in RemovedConstructs.inProperties("deployment", d.properties)) {

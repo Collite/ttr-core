@@ -94,6 +94,18 @@ describe('validateAutomationProject (grammar 0.16)', () => {
     expect(cutIds(diags).sort()).toEqual(['CUT-005', 'CUT-008', 'CUT-014', 'CUT-015']);
   });
 
+  it('D-142: `target: native` is refused only where the world declares no executor named `native`', async () => {
+    const project = [
+      parse(join(SEMANTIC, 'hartland-er-stub.ttrm')),
+      parse(join(SEMANTIC, 'negative/common.ttrm')),
+      parse(join(SEMANTIC, 'removed/native-executor.ttrm')),
+    ];
+    const diags = validateAutomationProject(project, { stdlib: await loadAutomationStdlib() }).filter((d) => d.severity !== 'info');
+    expect(diags.map((d) => d.code)).toEqual([REMOVED]);
+    expect(cutIds(diags)).toEqual(['CUT-004']);
+    expect(diags[0]!.source.line).toBe(13); // world `bare`'s deployment
+  });
+
   it('D-142: a removed key written twice is refused at each entry', async () => {
     const project = [
       parse(join(SEMANTIC, 'hartland-er-stub.ttrm')),

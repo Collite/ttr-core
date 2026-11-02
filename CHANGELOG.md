@@ -19,6 +19,8 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   (`World.removed` lists a recognised `def process` for the checkers). `WorldDeployment.program` is non-null: a
   deployment without a program does not load. The deployment fingerprint keeps its `process=null`/`trigger=null`
   lines, so unaffected fingerprints and bundles are byte-identical.
+- `target: native` names the removed pseudo-executor only where the world declares no executor named `native`; one
+  that does is targeted like any other, and `RegistryGrid.executorType` resolves every target through the world.
 - Exports: `ttrp emit` exports one program per deployment (no process exports). SPI v2 is unchanged —
   `ProgramMeta2.deliver/schedule` and `RecipeGraph.process` are null and `DeploymentMeta.connectors` is empty — so a
   batch n8n or Camunda export now refuses ("needs a schedule hint") until the exporters take the timer from the engine.

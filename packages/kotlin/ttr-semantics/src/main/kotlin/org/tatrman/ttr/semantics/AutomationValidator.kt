@@ -697,7 +697,7 @@ object AutomationValidator {
                 null -> missing(what, "target", d.source)
                 is TargetReferenceValue ->
                     when {
-                        RemovedConstructs.isNativeTarget(target.ref.path) ->
+                        RemovedConstructs.isNativeTarget(target.ref.path, executors) ->
                             cut(what, RemovedConstructs.Cut.NATIVE_TARGET, target.source)
                         target.ref.path !in executors ->
                             unknownRef(what, "target", "executor", target.ref.path, target.source)

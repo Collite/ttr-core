@@ -72,6 +72,19 @@ class AutomationValidatorSpec :
                 listOf("CUT-008", "CUT-014", "CUT-015", "CUT-005")
         }
 
+        "D-142: `target: native` is refused only where the world declares no executor named `native`" {
+            val project =
+                listOf(
+                    parse(resource("automation/hartland-er-stub.ttrm")),
+                    parse(resource("automation/negative/common.ttrm")),
+                    parse(resource("automation/removed/native-executor.ttrm")),
+                )
+            val diags = AutomationValidator.validate(project).filter { it.severity != "info" }
+            diags.map { it.code } shouldContainExactly listOf(RemovedConstructs.CODE)
+            cutIds(diags) shouldContainExactly listOf("CUT-004")
+            diags.single().source.line shouldBe 13 // world `bare`'s deployment
+        }
+
         "D-142: a removed key written twice is refused at each entry" {
             val project =
                 listOf(

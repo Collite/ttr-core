@@ -157,8 +157,14 @@ object RemovedConstructs {
     /** A native sink value D-142 removed (`deliver`, `task`, `start`, `emit`). */
     fun isRemovedSink(value: AutoValue): Boolean = idOf(value) in SINKS
 
-    /** `target: native` — the Server as a pseudo-executor; a deployment now names an executor of its world. */
-    fun isNativeTarget(target: String?): Boolean = target == "native"
+    /**
+     * `target: native` — the Server as a pseudo-executor, which no longer exists: a deployment names an executor of its
+     * world. A world that declares an executor named `native` ([executors]) targets that executor, not the pseudo one.
+     */
+    fun isNativeTarget(
+        target: String?,
+        executors: Collection<String>,
+    ): Boolean = target == "native" && "native" !in executors
 
     private fun idOf(v: AutoValue): String? = (v as? AutoValue.Id)?.ref?.path
 }

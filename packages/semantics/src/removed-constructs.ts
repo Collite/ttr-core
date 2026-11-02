@@ -147,7 +147,10 @@ export function isRemovedKey(kind: string, key: string): boolean {
   return cutOfKey(kind, key) !== undefined;
 }
 
-/** `target: native` — the Server as a pseudo-executor; a deployment now names an executor of its world. */
-export function isNativeTarget(target: string | undefined): boolean {
-  return target === 'native';
+/**
+ * `target: native` — the Server as a pseudo-executor, which no longer exists: a deployment names an executor of its
+ * world. A world that declares an executor named `native` ([executors]) targets that executor, not the pseudo one.
+ */
+export function isNativeTarget(target: string | undefined, executors: ReadonlySet<string>): boolean {
+  return target === 'native' && !executors.has('native');
 }
