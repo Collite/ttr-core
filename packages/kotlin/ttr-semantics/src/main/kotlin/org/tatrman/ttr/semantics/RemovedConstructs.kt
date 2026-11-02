@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.semantics
 
+import org.tatrman.ttr.parser.model.AutoEntry
 import org.tatrman.ttr.parser.model.AutoValue
+import org.tatrman.ttr.parser.model.SourceLocation
 
 /**
  * Grammar 0.22 — the orchestration constructs D-142 deleted from the automation model (2026-11-01, "delete, don't
@@ -69,11 +71,15 @@ object RemovedConstructs {
             get() = "$construct was removed in grammar 0.22 (D-142) — model it in the process engine: $replacement"
     }
 
-    /** One removed construct found among an object's entries: [key] as written (`sinks.native` for a sink). */
+    /**
+     * One removed construct found among an object's entries: [key] as written (`sinks.native` for a sink), [at] the
+     * entry it was written in (the sink's value for a sink; the value itself when only values are kept, [inProperties]).
+     */
     data class Hit(
         val cut: Cut,
         val key: String,
         val value: AutoValue,
+        val at: SourceLocation,
     )
 
     /** The native sinks D-142 removed (`transition`, `writer` and `obligation` stay). */
@@ -85,63 +91,68 @@ object RemovedConstructs {
             "emit" to Cut.SINK_EMIT,
         )
 
-    /** The deployment keys of the removed connectors (D-142: `connectors: { deliver, ask, start }`). */
-    private val CONNECTOR_KEYS = setOf("connectors", "deliver", "ask", "start")
+    /**
+     * The removed keys of each kind, whatever their value. Two more are gated by their value: a program's `port:
+     * event` ([isEventPort]) and an action's `sinks: { native: <removed sink> }` ([isRemovedSink]).
+     */
+    private val KEYS: Map<String, Map<String, Cut>> =
+        mapOf(
+            "program" to
+                mapOf(
+                    "deliver" to Cut.DELIVER,
+                    "schedule" to Cut.SCHEDULE,
+                    "ask_due" to Cut.ASK_DUE,
+                    "event" to Cut.EVENT_SCHEMA,
+                ),
+            "action" to mapOf("on_due" to Cut.ON_DUE),
+            "role" to mapOf("delivery" to Cut.ROLE_DELIVERY),
+            // the connectors (`connectors: { deliver, ask, start }`) as a block or one key each
+            "deployment" to
+                mapOf("process" to Cut.DEPLOYMENT_PROCESS, "trigger" to Cut.TRIGGER) +
+                listOf("connectors", "deliver", "ask", "start").associateWith { Cut.CONNECTORS },
+        )
 
     /**
      * The removed constructs among the free-form entries of one object of [kind] (`program`, `action`, `role`,
-     * `deployment`), in authored order. A deployment's `target: native` is typed, not an entry — see [isNativeTarget].
+     * `deployment`), in authored order, each at its entry. A deployment's `target: native` is typed, not an entry —
+     * see [isNativeTarget].
      */
     fun inEntries(
         kind: String,
-        entries: List<Pair<String, AutoValue>>,
+        entries: List<AutoEntry>,
     ): List<Hit> =
-        entries.flatMap { (key, value) ->
-            when (kind) {
-                "program" ->
-                    when (key) {
-                        "deliver" -> listOf(Hit(Cut.DELIVER, key, value))
-                        "schedule" -> listOf(Hit(Cut.SCHEDULE, key, value))
-                        "ask_due" -> listOf(Hit(Cut.ASK_DUE, key, value))
-                        "event" -> listOf(Hit(Cut.EVENT_SCHEMA, key, value))
-                        "port" -> if (idOf(value) == "event") listOf(Hit(Cut.EVENT_PORT, key, value)) else emptyList()
-                        else -> emptyList()
-                    }
-                "action" ->
-                    when (key) {
-                        "on_due" -> listOf(Hit(Cut.ON_DUE, key, value))
-                        "sinks" ->
-                            (value as? AutoValue.Obj)
-                                ?.entries
-                                .orEmpty()
-                                .filter { it.key == "native" }
-                                .mapNotNull { e -> SINKS[idOf(e.value)]?.let { Hit(it, "sinks.native", e.value) } }
-                        else -> emptyList()
-                    }
-                "role" -> if (key == "delivery") listOf(Hit(Cut.ROLE_DELIVERY, key, value)) else emptyList()
-                "deployment" ->
-                    when (key) {
-                        "process" -> listOf(Hit(Cut.DEPLOYMENT_PROCESS, key, value))
-                        "trigger" -> listOf(Hit(Cut.TRIGGER, key, value))
-                        in CONNECTOR_KEYS -> listOf(Hit(Cut.CONNECTORS, key, value))
-                        else -> emptyList()
-                    }
+        entries.flatMap { e ->
+            val cut = KEYS[kind]?.get(e.key)
+            when {
+                cut != null -> listOf(Hit(cut, e.key, e.value, e.source))
+                kind == "program" && e.key == "port" && isEventPort(e.value) ->
+                    listOf(Hit(Cut.EVENT_PORT, e.key, e.value, e.source))
+                kind == "action" && e.key == "sinks" ->
+                    (e.value as? AutoValue.Obj)
+                        ?.entries
+                        .orEmpty()
+                        .filter { it.key == "native" }
+                        .mapNotNull { s ->
+                            SINKS[idOf(s.value)]?.let { Hit(it, "sinks.native", s.value, s.value.source) }
+                        }
                 else -> emptyList()
             }
         }
 
-    /** The removed keys of [kind] — read by nothing but [inEntries]; the validator skips them as unknown keys. */
+    /** [inEntries] over entries kept as `key to value` (the metadata model's `properties`): each hit at its value. */
+    fun inProperties(
+        kind: String,
+        properties: List<Pair<String, AutoValue>>,
+    ): List<Hit> = inEntries(kind, properties.map { (key, value) -> AutoEntry(key, value, value.source) })
+
+    /** A removed key of [kind] whatever its value — the validator does not report it as unknown. */
     fun isRemovedKey(
         kind: String,
         key: String,
-    ): Boolean =
-        when (kind) {
-            "program" -> key in setOf("deliver", "schedule", "ask_due", "event")
-            "action" -> key == "on_due"
-            "role" -> key == "delivery"
-            "deployment" -> key == "process" || key == "trigger" || key in CONNECTOR_KEYS
-            else -> false
-        }
+    ): Boolean = KEYS[kind]?.containsKey(key) == true
+
+    /** `port: event` — the event port D-142 removed. */
+    fun isEventPort(value: AutoValue): Boolean = idOf(value) == "event"
 
     /** A native sink value D-142 removed (`deliver`, `task`, `start`, `emit`). */
     fun isRemovedSink(value: AutoValue): Boolean = idOf(value) in SINKS

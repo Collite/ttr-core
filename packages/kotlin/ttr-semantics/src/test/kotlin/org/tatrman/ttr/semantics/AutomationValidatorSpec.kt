@@ -72,6 +72,18 @@ class AutomationValidatorSpec :
                 listOf("CUT-008", "CUT-014", "CUT-015", "CUT-005")
         }
 
+        "D-142: a removed key written twice is refused at each entry" {
+            val project =
+                listOf(
+                    parse(resource("automation/hartland-er-stub.ttrm")),
+                    parse(resource("automation/negative/common.ttrm")),
+                    parse(resource("automation/removed/duplicate-key.ttrm")),
+                )
+            val cuts = AutomationValidator.validate(project).filter { it.code == RemovedConstructs.CODE }
+            cutIds(cuts) shouldContainExactly listOf("CUT-007", "CUT-007")
+            cuts.map { it.source.line } shouldContainExactly listOf(6, 7)
+        }
+
         "the Core fixture model as cut validates clean: only the pre-catalog recipe INFOs" {
             val root = locate("packages/kotlin/ttrp-graph/src/test/resources/fixtures/recipes/model/hartland")
             val files =

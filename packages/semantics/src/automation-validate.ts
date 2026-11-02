@@ -29,6 +29,7 @@ import {
   CUTS,
   REMOVED_CODE,
   cutMessage,
+  isEventPort,
   isNativeTarget,
   isRemovedKey,
   isRemovedSink,
@@ -245,10 +246,7 @@ class Ctx {
 
   /** The removed constructs among [entries] (D-142), one error each; the key is not reported as unknown. */
   private removed(kind: string, what: string, entries: readonly { key: string; value: AutoValue; source: SourceLocation }[]): void {
-    for (const hit of removedInEntries(kind, entries)) {
-      const at = hit.key === 'sinks.native' ? hit.value.source : [...entries].reverse().find((e) => e.key === hit.key)!.source;
-      this.cut(what, hit.cut, at);
-    }
+    for (const hit of removedInEntries(kind, entries)) this.cut(what, hit.cut, hit.at);
   }
 
   private cut(what: string, c: Cut, at: SourceLocation): void {
@@ -406,7 +404,7 @@ class Ctx {
     const port = entry(def, 'port');
     if (!port) this.missing(what, 'port', def.source);
     // `port: event` is refused by `removed` (D-142)
-    else if (removedInEntries('program', [{ key: 'port', value: port }]).length === 0) this.enumId(what, 'port', port, PORTS);
+    else if (!isEventPort(port)) this.enumId(what, 'port', port, PORTS);
     const mode = entry(def, 'mode');
     if (!mode) this.missing(what, 'mode', def.source);
     else this.enumId(what, 'mode', mode, MODES);

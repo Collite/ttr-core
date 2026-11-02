@@ -1,0 +1,7 @@
+// D-142 (grammar 0.22): a removed key written twice is refused twice, each at its own entry (TTRP-CUT-007 ×2).
+package acme.automation
+model automation
+
+def program twice { recipe: r, port: none, mode: batch,
+                    schedule: "06:00 Europe/Prague",
+                    schedule: "07:00 Europe/Prague" }

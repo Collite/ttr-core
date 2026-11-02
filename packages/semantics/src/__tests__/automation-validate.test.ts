@@ -94,6 +94,17 @@ describe('validateAutomationProject (grammar 0.16)', () => {
     expect(cutIds(diags).sort()).toEqual(['CUT-005', 'CUT-008', 'CUT-014', 'CUT-015']);
   });
 
+  it('D-142: a removed key written twice is refused at each entry', async () => {
+    const project = [
+      parse(join(SEMANTIC, 'hartland-er-stub.ttrm')),
+      parse(join(SEMANTIC, 'negative/common.ttrm')),
+      parse(join(SEMANTIC, 'removed/duplicate-key.ttrm')),
+    ];
+    const cuts = validateAutomationProject(project, { stdlib: await loadAutomationStdlib() }).filter((d) => d.code === REMOVED);
+    expect(cutIds(cuts)).toEqual(['CUT-007', 'CUT-007']);
+    expect(cuts.map((d) => d.source.line)).toEqual([6, 7]);
+  });
+
   it('the Core fixture model as cut validates clean: only the pre-catalog recipe INFOs', async () => {
     const root = join(KOTLIN, 'ttrp-graph/src/test/resources/fixtures/recipes/model/hartland');
     const diags = validateAutomationProject(ttrmFiles(root).map(parse), { stdlib: await loadAutomationStdlib() });

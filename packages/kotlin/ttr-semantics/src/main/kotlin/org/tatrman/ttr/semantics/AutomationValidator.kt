@@ -185,10 +185,7 @@ object AutomationValidator {
             what: String,
             entries: List<AutoEntry>,
         ) {
-            for (hit in RemovedConstructs.inEntries(kind, entries.map { it.key to it.value })) {
-                val at = if (hit.key == "sinks.native") hit.value.source else entries.last { it.key == hit.key }.source
-                cut(what, hit.cut, at)
-            }
+            for (hit in RemovedConstructs.inEntries(kind, entries)) cut(what, hit.cut, hit.at)
         }
 
         private fun cut(
@@ -431,8 +428,7 @@ object AutomationValidator {
             when {
                 port == null -> missing(what, "port", def.source)
                 // `port: event` is refused by [removed] (D-142)
-                RemovedConstructs.inEntries("program", listOf("port" to port)).isEmpty() ->
-                    enumId(what, "port", port, PORTS)
+                !RemovedConstructs.isEventPort(port) -> enumId(what, "port", port, PORTS)
             }
             val mode = body["mode"]
             if (mode == null) missing(what, "mode", def.source) else enumId(what, "mode", mode, MODES)

@@ -6,7 +6,7 @@
  * carries it). The TS twin of Kotlin `RemovedConstructs.kt`, number for number and word for word (the validator's
  * messages are a cross-target contract).
  */
-import type { AutoValue } from '@tatrman/parser';
+import type { AutoEntry, AutoValue, SourceLocation } from '@tatrman/parser';
 
 /** The validator's code for every removed construct (its `CUT-nnn` is in the message). */
 export const REMOVED_CODE = 'ttr/automation-removed';
@@ -66,11 +66,15 @@ export function cutMessage(c: Cut): string {
   return `${c.construct} was removed in grammar 0.22 (D-142) — model it in the process engine: ${c.replacement}`;
 }
 
-/** One removed construct among an object's entries: [key] as written (`sinks.native` for a sink). */
+/**
+ * One removed construct among an object's entries: [key] as written (`sinks.native` for a sink), [at] the entry it was
+ * written in (the sink's value for a sink).
+ */
 export interface Hit {
   cut: Cut;
   key: string;
   value: AutoValue;
+  at: SourceLocation;
 }
 
 const SINKS: Record<string, Cut> = {
@@ -80,10 +84,37 @@ const SINKS: Record<string, Cut> = {
   emit: CUTS.SINK_EMIT,
 };
 
-const CONNECTOR_KEYS = new Set(['connectors', 'deliver', 'ask', 'start']);
+/**
+ * The removed keys of each kind, whatever their value. Two more are gated by their value: a program's `port: event`
+ * (`isEventPort`) and an action's `sinks: { native: <removed sink> }` (`isRemovedSink`).
+ */
+const KEYS: Record<string, Record<string, Cut>> = {
+  program: { deliver: CUTS.DELIVER, schedule: CUTS.SCHEDULE, ask_due: CUTS.ASK_DUE, event: CUTS.EVENT_SCHEMA },
+  action: { on_due: CUTS.ON_DUE },
+  role: { delivery: CUTS.ROLE_DELIVERY },
+  // the connectors (`connectors: { deliver, ask, start }`) as a block or one key each
+  deployment: {
+    process: CUTS.DEPLOYMENT_PROCESS,
+    trigger: CUTS.TRIGGER,
+    connectors: CUTS.CONNECTORS,
+    deliver: CUTS.CONNECTORS,
+    ask: CUTS.CONNECTORS,
+    start: CUTS.CONNECTORS,
+  },
+};
 
 function idOf(v: AutoValue): string | undefined {
   return v.kind === 'id' ? v.path : undefined;
+}
+
+function cutOfKey(kind: string, key: string): Cut | undefined {
+  const keys = KEYS[kind];
+  return keys !== undefined && Object.prototype.hasOwnProperty.call(keys, key) ? keys[key] : undefined;
+}
+
+/** `port: event` — the event port D-142 removed. */
+export function isEventPort(v: AutoValue): boolean {
+  return idOf(v) === 'event';
 }
 
 /** A native sink value D-142 removed (`deliver`, `task`, `start`, `emit`). */
@@ -92,55 +123,28 @@ export function isRemovedSink(v: AutoValue): boolean {
   return id !== undefined && Object.prototype.hasOwnProperty.call(SINKS, id);
 }
 
-/** The removed constructs among one object's free-form entries, in authored order (mirrors Kotlin `inEntries`). */
-export function removedInEntries(kind: string, entries: readonly { key: string; value: AutoValue }[]): Hit[] {
+/** The removed constructs among one object's free-form entries, in authored order, each at its entry (mirrors Kotlin `inEntries`). */
+export function removedInEntries(kind: string, entries: readonly AutoEntry[]): Hit[] {
   const out: Hit[] = [];
-  for (const { key, value } of entries) {
-    switch (kind) {
-      case 'program':
-        if (key === 'deliver') out.push({ cut: CUTS.DELIVER, key, value });
-        else if (key === 'schedule') out.push({ cut: CUTS.SCHEDULE, key, value });
-        else if (key === 'ask_due') out.push({ cut: CUTS.ASK_DUE, key, value });
-        else if (key === 'event') out.push({ cut: CUTS.EVENT_SCHEMA, key, value });
-        else if (key === 'port' && idOf(value) === 'event') out.push({ cut: CUTS.EVENT_PORT, key, value });
-        break;
-      case 'action':
-        if (key === 'on_due') out.push({ cut: CUTS.ON_DUE, key, value });
-        else if (key === 'sinks' && value.kind === 'autoObject') {
-          for (const e of value.entries) {
-            if (e.key === 'native' && isRemovedSink(e.value)) {
-              out.push({ cut: SINKS[idOf(e.value)!], key: 'sinks.native', value: e.value });
-            }
-          }
+  for (const { key, value, source } of entries) {
+    const cut = cutOfKey(kind, key);
+    if (cut !== undefined) out.push({ cut, key, value, at: source });
+    else if (kind === 'program' && key === 'port' && isEventPort(value)) {
+      out.push({ cut: CUTS.EVENT_PORT, key, value, at: source });
+    } else if (kind === 'action' && key === 'sinks' && value.kind === 'autoObject') {
+      for (const e of value.entries) {
+        if (e.key === 'native' && isRemovedSink(e.value)) {
+          out.push({ cut: SINKS[idOf(e.value)!], key: 'sinks.native', value: e.value, at: e.value.source });
         }
-        break;
-      case 'role':
-        if (key === 'delivery') out.push({ cut: CUTS.ROLE_DELIVERY, key, value });
-        break;
-      case 'deployment':
-        if (key === 'process') out.push({ cut: CUTS.DEPLOYMENT_PROCESS, key, value });
-        else if (key === 'trigger') out.push({ cut: CUTS.TRIGGER, key, value });
-        else if (CONNECTOR_KEYS.has(key)) out.push({ cut: CUTS.CONNECTORS, key, value });
-        break;
+      }
     }
   }
   return out;
 }
 
-/** The removed keys of [kind] — the validator does not report them as unknown keys. */
+/** A removed key of [kind] whatever its value — the validator does not report it as unknown. */
 export function isRemovedKey(kind: string, key: string): boolean {
-  switch (kind) {
-    case 'program':
-      return key === 'deliver' || key === 'schedule' || key === 'ask_due' || key === 'event';
-    case 'action':
-      return key === 'on_due';
-    case 'role':
-      return key === 'delivery';
-    case 'deployment':
-      return key === 'process' || key === 'trigger' || CONNECTOR_KEYS.has(key);
-    default:
-      return false;
-  }
+  return cutOfKey(kind, key) !== undefined;
 }
 
 /** `target: native` — the Server as a pseudo-executor; a deployment now names an executor of its world. */

@@ -270,8 +270,8 @@ class RecipeChecker(
                     is AutomationRole -> "role"
                     else -> continue
                 }
-            for (hit in RemovedConstructs.inEntries(kind, obj.properties)) {
-                removed(hit.cut, "$kind `${obj.qname.name}`", hit.value.source)
+            for (hit in RemovedConstructs.inProperties(kind, obj.properties)) {
+                removed(hit.cut, "$kind `${obj.qname.name}`", hit.at)
             }
         }
         val world =
@@ -292,11 +292,8 @@ class RecipeChecker(
                 ) {
                     d.sourceLocation?.let { removed(Cut.NATIVE_TARGET, what, it) }
                 }
-                for (hit in RemovedConstructs.inEntries(
-                    "deployment",
-                    d.properties,
-                )) {
-                    removed(hit.cut, what, hit.value.source)
+                for (hit in RemovedConstructs.inProperties("deployment", d.properties)) {
+                    removed(hit.cut, what, hit.at)
                 }
             }
         }
