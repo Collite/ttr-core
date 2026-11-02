@@ -12,6 +12,22 @@ The canonical version lives in the `// @grammar-version:` marker at the top of
 `src/generated/version.ts`, re-exported from `@tatrman/grammar` as
 `TTR_GRAMMAR_VERSION`.
 
+## 0.22 — the grammar cut (AU-core CG, D-142)
+
+The process engine in the estate owns flow, waits, human tasks, schedules and delivery (D-141…D-148); the automation
+model keeps the decision layer. Removed — "delete, don't deprecate": `def process` (with `def step`, `after:`), a
+deployment's `process:`, `trigger:`, `connectors:` and `target: native` (a deployment names an executor of its world),
+a program's `deliver:` (and digests), `schedule:`, `ask_due:`, `port: event` and `event:`, the native sinks `deliver`,
+`task`, `start` and `emit`, `on_due:` (on an action and in a recipe wiring) and a role's `delivery:`.
+
+No production is deleted in this release: `def process` (`processBody`) and the role's `deliveryProperty` stay as
+**recognisers** for one release, and the other constructs were free-form automation entries already. A pre-0.22 model
+therefore parses whole, every conformance golden and the canonical YAML shape are unchanged, and the semantics refuse
+each removed construct once — `ttr/automation-removed` from the automation validator (Kotlin and TS) and
+`TTRP-CUT-001…016` from the recipe checker, each naming its process-engine replacement (`RemovedConstructs`). A model
+written for 0.21 that uses them no longer validates: it needs the adoption edits before a 0.22 reader loads it.
+The recognisers and the STEP/STEPS tokens go in 0.23. The LSP stops advertising `delivery:` on a role.
+
 ## 0.21.2 — `variant` follow-ups (review-200)
 
 `SUBKIND` joins `cnKey`, so `subkind:` is a cn free-form key, as `variant:` has been since 0.21.1 (missing since

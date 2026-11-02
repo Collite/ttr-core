@@ -15,8 +15,8 @@ class YamlMigrationSpec :
     FunSpec({
         fun request(
             source: String,
-            from: String = "0.21",
-            to: String = "0.21",
+            from: String = "0.22",
+            to: String = "0.22",
         ): JsonObject =
             obj("operation" to text("migrate"), "from" to text(from), "to" to text(to), "source" to text(source))
 
@@ -28,18 +28,18 @@ class YamlMigrationSpec :
         }
 
         test("same-version normalization is idempotent and reports changed accurately") {
-            val source = "{ttr: '0.21', model: er}\n"
+            val source = "{ttr: '0.22', model: er}\n"
             val result = YamlMigration.migrate(request(source))
             result["changed"] shouldBe JsonPrimitive(true)
             val canonical = result.getValue("source").jsonPrimitive.content
-            canonical shouldBe "ttr: \"0.21\"\nmodel: \"er\"\n"
+            canonical shouldBe "ttr: \"0.22\"\nmodel: \"er\"\n"
             YamlMigration.migrate(request(canonical))["changed"] shouldBe JsonPrimitive(false)
             val (status, stdout, stderr) = invoke(request(canonical).toString().toByteArray())
             status shouldBe 0
             stderr shouldBe ""
             Json.parseToJsonElement(stdout) shouldBe YamlMigration.migrate(request(canonical))
         }
-        for ((from, to) in listOf("0.20" to "0.21", "0.21" to "0.22", "0.20" to "0.20", "0.21.0" to "0.21")) {
+        for ((from, to) in listOf("0.20" to "0.21", "0.21" to "0.22", "0.21" to "0.21", "0.22.0" to "0.22")) {
             test("unregistered version pair $from to $to refuses before parsing") {
                 val (status, stdout, stderr) = invoke(request("invalid: [", from, to).toString().toByteArray())
                 status shouldBe 2
@@ -51,7 +51,7 @@ class YamlMigrationSpec :
             "model: er\n",
             "ttr: '0.20'\n",
             "profile: dfp/1\ngrammar: '0.21'\n",
-            "ttr: '0.21'\nunknown: 1\n",
+            "ttr: '0.22'\nunknown: 1\n",
         )) {
             test("undeclared dialect or invalid marker refuses ${JsonPrimitive(source)}") {
                 val (status, stdout, stderr) = invoke(request(source).toString().toByteArray())
@@ -64,7 +64,7 @@ class YamlMigrationSpec :
             val (_, stdout, stderr) =
                 invoke(
                     request(
-                        "ttr: '0.21'\nmodel: er\ndefs:\n - kind: entity\n   id: E\n   properties:\n     unknown: 1\n",
+                        "ttr: '0.22'\nmodel: er\ndefs:\n - kind: entity\n   id: E\n   properties:\n     unknown: 1\n",
                     ).toString().toByteArray(),
                 )
             stdout shouldBe ""

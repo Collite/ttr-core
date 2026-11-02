@@ -17,7 +17,7 @@ class CanonicalYamlFollowupSpec :
             model: String = "md",
             kind: String = "domain",
         ): String =
-            "ttr: \"0.21\"\nmodel: $model\ndefs:\n  - kind: $kind\n    id: D\n    properties:\n" +
+            "ttr: \"0.22\"\nmodel: $model\ndefs:\n  - kind: $kind\n    id: D\n    properties:\n" +
                 properties.prependIndent("      ") + "\n"
 
         for (clauses in listOf("{zeta: 1, alpha: 2}", "{alpha: 2, zeta: 1}")) {
@@ -69,7 +69,7 @@ class CanonicalYamlFollowupSpec :
                     Triple("# c\n" + yaml("a: $decimal", "automation", "program"), 8, 10),
                     Triple("# c\n" + yaml("a: 0x" + "F".repeat(1_000_000), "automation", "program"), 8, 10),
                     Triple(
-                        "ttr: \"0.21\"\nmodel: automation\ndefs:\n - kind: program\n   id: D\n   properties: {a: $decimal}\n",
+                        "ttr: \"0.22\"\nmodel: automation\ndefs:\n - kind: program\n   id: D\n   properties: {a: $decimal}\n",
                         6,
                         20,
                     ),
@@ -136,7 +136,7 @@ class CanonicalYamlFollowupSpec :
             CanonicalYaml.fromTtr("model automation\ndef program D {\n a: \"$digits\"\n}").ast.ok shouldBe true
             CanonicalYaml.fromTtr("model automation\ndef program D {\n // a: $digits\n a: 1\n}").ast.ok shouldBe true
             val flow =
-                "ttr: \"0.21\"\nmodel: automation\ndefs:\n - kind: program\n   id: D\n" +
+                "ttr: \"0.22\"\nmodel: automation\ndefs:\n - kind: program\n   id: D\n" +
                     "   properties: {\n      a: $digits\n      suffix\n   }\n"
             CanonicalYaml.read(flow).ast.ok shouldBe true
         }

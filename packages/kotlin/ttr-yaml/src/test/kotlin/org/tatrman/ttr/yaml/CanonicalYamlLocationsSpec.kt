@@ -13,7 +13,7 @@ class CanonicalYamlLocationsSpec :
         test("definition and nested reference spans point to YAML nodes") {
             val source =
                 """
-                ttr: "0.21"
+                ttr: "0.22"
                 model: er
                 defs:
                   - kind: entity
@@ -40,7 +40,7 @@ class CanonicalYamlLocationsSpec :
         test("schema failures locate the offending YAML value") {
             val error =
                 shouldThrow<CanonicalYamlException> {
-                    CanonicalYaml.read("ttr: \"0.21\"\nmodel: typo\n", "bad.yaml")
+                    CanonicalYaml.read("ttr: \"0.22\"\nmodel: typo\n", "bad.yaml")
                 }
             error.file shouldBe "bad.yaml"
             error.line shouldBe 2
@@ -50,7 +50,7 @@ class CanonicalYamlLocationsSpec :
             val doc =
                 CanonicalYaml.read(
                     """
-                    ttr: "0.21"
+                    ttr: "0.22"
                     model: cn
                     defs:
                       - kind: kind
@@ -71,7 +71,7 @@ class CanonicalYamlLocationsSpec :
             val doc =
                 CanonicalYaml.read(
                     """
-                    ttr: "0.21"
+                    ttr: "0.22"
                     model: cn
                     defs:
                       - kind: kind

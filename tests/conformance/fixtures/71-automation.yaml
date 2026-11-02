@@ -1,4 +1,4 @@
-ttr: "0.21"
+ttr: "0.22"
 package: "acme.automation"
 model: "automation"
 defs:

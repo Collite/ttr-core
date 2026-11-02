@@ -14,7 +14,7 @@ class CanonicalYamlEdgeSpec :
             val content = "  first\n  \"\"\"\n  last\n"
             val value =
                 obj(
-                    "ttr" to text("0.21"),
+                    "ttr" to text("0.22"),
                     "model" to text("cn"),
                     "defs" to
                         JsonArray(
@@ -44,7 +44,7 @@ class CanonicalYamlEdgeSpec :
             val content = "  a\n  \"\"\"\n"
             val value =
                 obj(
-                    "ttr" to text("0.21"),
+                    "ttr" to text("0.22"),
                     "model" to text("automation"),
                     "defs" to
                         JsonArray(
@@ -76,7 +76,7 @@ class CanonicalYamlEdgeSpec :
                 shouldThrowAny {
                     CanonicalYaml.read(
                         """
-                        ttr: "0.21"
+                        ttr: "0.22"
                         model: md
                         defs:
                           - kind: map
@@ -120,7 +120,7 @@ class CanonicalYamlEdgeSpec :
             val doc =
                 CanonicalYaml.read(
                     """
-                    ttr: "0.21"
+                    ttr: "0.22"
                     model: automation
                     defs:
                       - kind: program
@@ -134,7 +134,7 @@ class CanonicalYamlEdgeSpec :
             (auto.body.entries[2].value as AutoValue.Num).text shouldBe "1.0"
             shouldThrowAny {
                 CanonicalYaml.read(
-                    "ttr: \"0.21\"\nmodel: automation\ndefs: [{kind: program, id: P, properties: {x: .inf}}]",
+                    "ttr: \"0.22\"\nmodel: automation\ndefs: [{kind: program, id: P, properties: {x: .inf}}]",
                     "inf.yaml",
                 )
             }
@@ -166,7 +166,7 @@ class CanonicalYamlEdgeSpec :
             val doc =
                 CanonicalYaml.read(
                     """
-                    ttr: "0.21"
+                    ttr: "0.22"
                     model: cn
                     defs:
                       - kind: kind

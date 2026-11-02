@@ -6,8 +6,8 @@ import { TTR_GRAMMAR_VERSION, PROPERTY_MAP } from '@tatrman/grammar';
 // the grammar prebuild) is what moves this constant; the assertion is the
 // reminder that the CHANGELOG entry + downstream proto/version sync move with it.
 describe('grammar version', () => {
-  it('is 0.21 (generic canonical metadata carriers)', () => {
-    expect(TTR_GRAMMAR_VERSION).toBe('0.21');
+  it('is 0.22 (the grammar cut, D-142)', () => {
+    expect(TTR_GRAMMAR_VERSION).toBe('0.22');
   });
 
   it('advertises the automation kinds on the one shared body (typed alternatives only)', () => {

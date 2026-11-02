@@ -19,8 +19,8 @@ describe('canonical YAML migration file policy', () => {
   let root: string;
   let bridge: string;
   let file: string;
-  const before = "ttr: '0.21'\nmodel: er\n";
-  const after = 'ttr: "0.21"\nmodel: "er"\n';
+  const before = "ttr: '0.22'\nmodel: er\n";
+  const after = 'ttr: "0.22"\nmodel: "er"\n';
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'yaml migrate '));
     bridge = join(root, 'bridge with spaces');
@@ -31,7 +31,7 @@ describe('canonical YAML migration file policy', () => {
       `#!/usr/bin/env node
 const fs = require('node:fs');
 const r = JSON.parse(fs.readFileSync(0, 'utf8'));
-if (r.operation !== 'migrate' || r.from !== '0.21' || r.to !== '0.21' || !r.source.startsWith('ttr:')) {
+if (r.operation !== 'migrate' || r.from !== '0.22' || r.to !== '0.22' || !r.source.startsWith('ttr:')) {
   process.stderr.write('<yaml>:1:1: refused marker or version'); process.exit(2);
 }
 const source = ${JSON.stringify(after)};
@@ -41,13 +41,13 @@ process.stdout.write(JSON.stringify({ source, changed: source !== r.source }));
     chmodSync(bridge, 0o755);
   });
   afterEach(() => rmSync(root, { recursive: true, force: true }));
-  const options = () => ({ from: '0.21', to: '0.21', bridge });
+  const options = () => ({ from: '0.22', to: '0.22', bridge });
 
   it('dry-run validates via bridge and returns a diff without writes or metadata changes', async () => {
     const stat = statSync(file);
     const result = await runYamlMigration([file], { ...options(), dryRun: true });
     expect(result.writes).toHaveLength(1);
-    expect(result.writes[0].diff).toContain('+ttr: "0.21"');
+    expect(result.writes[0].diff).toContain('+ttr: "0.22"');
     expect(readFileSync(file, 'utf8')).toBe(before);
     expect(statSync(file).mtimeMs).toBe(stat.mtimeMs);
     expect(readdirSync(root).sort()).toEqual(['bridge with spaces', 'model.yaml']);
@@ -67,7 +67,7 @@ process.stdout.write(JSON.stringify({ source, changed: source !== r.source }));
     await expect(runYamlMigration([file, other], options())).rejects.toThrow('<yaml>:1:1: refused');
     expect(readFileSync(file, 'utf8')).toBe(before);
     expect(readFileSync(other, 'utf8')).toBe('entities: []\n');
-    await expect(runYamlMigration([file], { ...options(), to: '0.22' })).rejects.toThrow('version');
+    await expect(runYamlMigration([file], { ...options(), to: '0.23' })).rejects.toThrow('version');
     expect(readFileSync(file, 'utf8')).toBe(before);
   });
   for (const stdout of [

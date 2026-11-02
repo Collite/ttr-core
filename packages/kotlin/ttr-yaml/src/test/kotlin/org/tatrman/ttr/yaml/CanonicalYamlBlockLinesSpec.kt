@@ -18,7 +18,7 @@ class CanonicalYamlBlockLinesSpec :
             test("literal block preserves content ${JsonPrimitive(content)}") {
                 val input =
                     buildJsonObject {
-                        put("ttr", "0.21")
+                        put("ttr", "0.22")
                         put("model", "automation")
                         put(
                             "defs",

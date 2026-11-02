@@ -1,7 +1,9 @@
 // =============================================================================
 // TTR (Tatrman) grammar
 //
-// @grammar-version: 0.21
+// @grammar-version: 0.22
+// 0.22 (AU-core CG, D-142): the orchestration constructs are removed from the language — `def process`
+// and a role's `delivery:` stay ONE release as recognisers only, so the semantics refuse them (TTRP-CUT).
 // 0.21 (MW-53): lexical indexSecurity; query skipSecurity; parameter
 // defaultValue and binds. Typed optional declarations; execution stays host-owned.
 // 0.21.x (CN-P8 S8.6): variant = subkind alias (CN-D32) — one soft keyword, one stereotype.

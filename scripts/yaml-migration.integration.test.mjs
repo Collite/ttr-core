@@ -15,17 +15,17 @@ const bridge = resolve(
 );
 const cli = resolve(root, 'packages/migrate/dist/cli.js');
 const input = JSON.stringify({
-  ttr: '0.21',
+  ttr: '0.22',
   model: 'er',
   defs: [{ kind: 'entity', id: 'Item', properties: { description: 'Příliš žluťoučký 🐈' } }],
 });
-const request = (source, from = '0.21', to = '0.21') =>
+const request = (source, from = '0.22', to = '0.22') =>
   JSON.stringify({ operation: 'migrate', from, to, source });
 const invoke = (source) => spawnSync(bridge, [], { input: source, encoding: 'utf8' });
 const runCli = (files, extra = []) =>
   spawnSync(
     process.execPath,
-    [cli, 'migrate-yaml', ...files, '--from', '0.21', '--to', '0.21', '--bridge', bridge, ...extra],
+    [cli, 'migrate-yaml', ...files, '--from', '0.22', '--to', '0.22', '--bridge', bridge, ...extra],
     { encoding: 'utf8' }
   );
 function withFiles(action) {
@@ -52,7 +52,7 @@ test('packaged UTF-8 bridge normalizes and then reaches an unchanged fixed point
 test('packaged bridge reports located YAML errors only on stderr', () => {
   const result = invoke(
     request(
-      'ttr: "0.21"\nmodel: er\ndefs:\n - kind: entity\n   id: E\n   properties:\n     unknown: 1\n'
+      'ttr: "0.22"\nmodel: er\ndefs:\n - kind: entity\n   id: E\n   properties:\n     unknown: 1\n'
     )
   );
   assert.equal(result.status, 2);

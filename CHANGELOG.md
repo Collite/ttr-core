@@ -6,6 +6,25 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Removed — the orchestration constructs (grammar 0.22, AU-core CG, D-142)
+
+- The automation model loses what the process engine owns: `def process`/`def step`/`after:`, a deployment's
+  `process:`, `trigger:`, `connectors:` and `target: native`, a program's `deliver:`, `schedule:`, `ask_due:`,
+  `port: event` and `event:`, the native sinks `deliver · task · start · emit`, `on_due:` and a role's `delivery:`.
+  Each still parses for one release and is refused: `ttr/automation-removed` (validator, so a metadata load reports
+  it), `TTRP-CUT-001…016` (recipe checker, so `ttrp build` fails), with the replacement in the message.
+- ttr-metadata: `WorldProcess`, `ProcessStep`, `StepAfter`, `ProgramDelivery`, `DeploymentTrigger` and
+  `AutomationCall` are gone, and so are `AutomationProgram.{event, deliver, schedule, askDue}`,
+  `AutomationAction.onDue`, `AutomationRole.delivery`, `WorldDeployment.{process, trigger}` and `World.processes`
+  (`World.removed` lists a recognised `def process` for the checkers). `WorldDeployment.program` is non-null: a
+  deployment without a program does not load. The deployment fingerprint keeps its `process=null`/`trigger=null`
+  lines, so unaffected fingerprints and bundles are byte-identical.
+- Exports: `ttrp emit` exports one program per deployment (no process exports). SPI v2 is unchanged —
+  `ProgramMeta2.deliver/schedule` and `RecipeGraph.process` are null and `DeploymentMeta.connectors` is empty — so a
+  batch n8n or Camunda export now refuses ("needs a schedule hint") until the exporters take the timer from the engine.
+- REC-011 loses its `schedule:` half: a batch program over a windowed context fails only on `port: keys` or a count /
+  gap window.
+
 ### Fixed — `variant` follow-ups (grammar 0.21.2, ttr-core#358)
 
 - `subkind:` is a cn free-form key, as `variant:` is (`SUBKIND` was missing from `cnKey` since 0.20). Text using it
