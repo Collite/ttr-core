@@ -13,6 +13,7 @@ import org.tatrman.ttrp.doc.ExtractedRecipe
 import org.tatrman.ttrp.doc.utf16Offset
 import org.tatrman.ttrp.graph.TtrpPipeline
 import org.tatrman.ttrp.lsp.docs.OpenDocument
+import org.tatrman.ttrp.lsp.nav.FragmentLinks
 import org.tatrman.ttrp.lsp.project.ProjectContext
 import org.tatrman.ttrp.resolve.TtrpChecker
 
@@ -102,6 +103,14 @@ object RecipeEditorAnalysis {
                 recipes.flatMap { entry ->
                     val recipe = requireNotNull(entry.extracted)
                     diagnostics(entry.plan).map { finding ->
+                        // made in another file (a model file, D-142's TTRP-CUT-nnn): not at an offset of this recipe
+                        if (finding.location.file != recipe.path && finding.location.line >= 1) {
+                            return@map FragmentLinks.elsewhere(
+                                finding,
+                                finding.location.file,
+                                location(doc.text, doc.uri, recipe.skeletonSpan),
+                            )
+                        }
                         val mapped =
                             recipe.sidecar.nodes.values.firstOrNull {
                                 utf16Offset(recipe.text, finding.location.offsetStart) in
