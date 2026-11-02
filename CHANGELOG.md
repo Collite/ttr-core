@@ -6,6 +6,16 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — Canonical YAML diagnostic and migration follow-ups (ttr-core#372)
+
+- Native syntax diagnostics use the earliest source position; retained calc arguments prefer an earlier
+  lexer failure over a misleading unmatched closer. Nesting guards still run before recursive parsing.
+- Every migration replacement-loop failure names completed paths, including `none` before the first rename.
+  Cleanup failures append only their failed temporary paths while preserving the original error and cause.
+- Tier-2 suffix hunk positions are regression-tested. Release-tag fixtures ignore inherited Git settings;
+  consumer documentation covers public/internal tags and pre-schema versions receive a clear refusal.
+- These fixes ship in the next internal grammar cut; no new release is cut by this follow-up.
+
 ### Removed — the orchestration constructs (grammar 0.22, AU-core CG, D-142)
 
 - The automation model loses what the process engine owns: `def process`/`def step`/`after:`, a deployment's

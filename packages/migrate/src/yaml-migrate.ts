@@ -106,6 +106,14 @@ export async function runYamlMigration(
   }
   if (options.dryRun) return { writes };
   const staged: { write: YamlMigrationWrite; temp: string }[] = [];
+  const replaced: string[] = [];
+  const replacementError = (path: string, action: string, cause: unknown) =>
+    new Error(
+      `${path}: ${action} (${errorMessage(cause)}); already replaced: ${replaced.join(', ') || 'none'}`,
+      { cause }
+    );
+  let failed = false;
+  let failure: unknown;
   try {
     // Same-directory temp + rename keeps each replacement atomic. Batch validation is all-or-nothing;
     // filesystem failures during the replacement phase are reported and may require re-running the batch.
@@ -120,7 +128,6 @@ export async function runYamlMigration(
       });
       await chmod(temp, modes.get(write.path)!);
     }
-    const replaced: string[] = [];
     const checkUnchanged = async (write: YamlMigrationWrite, replacing = false) => {
       let stat;
       let current;
@@ -128,11 +135,8 @@ export async function runYamlMigration(
         stat = await lstat(write.path);
         current = decodeUtf8(write.path, await readFile(write.path));
       } catch (error) {
-        if (!replacing || !replaced.length) throw error;
-        const cause = error instanceof Error ? error.message : String(error);
-        throw new Error(
-          `${write.path}: input changed before replacement (${cause}); already replaced: ${replaced.join(', ')}`
-        );
+        if (!replacing) throw error;
+        throw replacementError(write.path, 'input changed before replacement', error);
       }
       if (!stat.isFile() || stat.nlink !== 1 || current !== write.before) {
         throw new Error(
@@ -148,18 +152,33 @@ export async function runYamlMigration(
       try {
         await rename(temp, write.path);
       } catch (error) {
-        if (!replaced.length) throw error;
-        const cause = error instanceof Error ? error.message : String(error);
-        throw new Error(
-          `${write.path}: replacement failed (${cause}); already replaced: ${replaced.join(', ')}`
-        );
+        throw replacementError(write.path, 'replacement failed', error);
       }
       replaced.push(write.path);
     }
+  } catch (error) {
+    failed = true;
+    failure = error;
+    throw error;
   } finally {
-    await Promise.all(staged.map(({ temp }) => rm(temp, { force: true })));
+    const cleanup = await Promise.allSettled(staged.map(({ temp }) => rm(temp, { force: true })));
+    const pending = staged.filter((_, i) => cleanup[i].status === 'rejected').map(({ temp }) => temp);
+    if (pending.length) {
+      if (failed)
+        throw new Error(`${errorMessage(failure)}; could not remove: ${pending.join(', ')}`, {
+          cause: failure,
+        });
+      throw new Error(
+        `could not remove temporary files: ${pending.join(', ')}; already replaced: ${replaced.join(', ') || 'none'}`,
+        { cause: new AggregateError(cleanup.filter((r) => r.status === 'rejected').map((r) => r.reason)) }
+      );
+    }
   }
   return { writes };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function decodeUtf8(path: string, bytes: Uint8Array): string {

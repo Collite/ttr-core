@@ -2,14 +2,20 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { devNull, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, test } from 'node:test';
 import { canonicalYamlReleaseTag } from './canonical-yaml-release-tag.mjs';
 
 let root;
-const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
+const gitEnv = { ...process.env, GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: '1' };
+const repositoryVariables = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE'];
+const inherited = new Map(repositoryVariables.map((key) => [key, process.env[key]]));
+for (const key of repositoryVariables) delete gitEnv[key];
+const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe', env: gitEnv });
 beforeEach(() => {
+  // The lookup also launches Git: isolate this test process from an enclosing checkout's overrides.
+  for (const key of repositoryVariables) delete process.env[key];
   root = mkdtempSync(join(tmpdir(), 'yaml-release-tag-'));
   git('init', '--quiet');
   git(
@@ -23,7 +29,13 @@ beforeEach(() => {
     'base'
   );
 });
-afterEach(() => rmSync(root, { recursive: true, force: true }));
+afterEach(() => {
+  rmSync(root, { recursive: true, force: true });
+  for (const [key, value] of inherited) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+});
 
 test('uses the internal tag, including annotated release tags', () => {
   git(

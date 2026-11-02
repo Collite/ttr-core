@@ -71,6 +71,19 @@ it('keeps correct suffix context line numbers when tier 2 changes the middle len
   );
 });
 
+for (const change of ['insert', 'delete']) {
+  it(`pins tier-2 suffix line numbers for a pure first-line ${change}`, () => {
+    const suffix = Array.from({ length: 2200 }, (_, i) => `c${i}`).join('\n');
+    const before = change === 'insert' ? suffix : `old\n${suffix}`;
+    const after = change === 'insert' ? `new\n${suffix}` : suffix;
+    const result = unifiedDiff('suffix-only', before, after);
+    expect(result).toBe(referenceUnifiedDiff('suffix-only', before, after));
+    expect(result.split('\n')[2]).toBe(
+      change === 'insert' ? '@@ -1,3 +1,4 @@' : '@@ -1,4 +1,3 @@'
+    );
+  });
+}
+
 it('bounds the tier-3 fallback to the changed middle, excluding a shared prefix and suffix', () => {
   const before = ['head', ...Array.from({ length: 2100 }, (_, i) => `old ${i}`), 'tail'];
   const after = ['head', ...Array.from({ length: 2100 }, (_, i) => `new ${i}`), 'tail'];

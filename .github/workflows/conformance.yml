@@ -37,7 +37,15 @@ jobs:
       # Check the committed schemas before a build can refresh generated resources.
       - run: node packages/grammar/scripts/generate-canonical-schemas.mjs --check
       - run: node --test packages/grammar/tests/canonical-generation.test.mjs
-      - run: node --test scripts/canonical-yaml-release-tag.test.mjs
+      - name: Check release-tag fixtures ignore inherited Git settings
+        env:
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/canonical-yaml-signing.gitconfig
+          GIT_DIR: ${{ runner.temp }}/absent-canonical-yaml.git
+          GIT_WORK_TREE: ${{ runner.temp }}/absent-canonical-yaml-tree
+          GIT_INDEX_FILE: ${{ runner.temp }}/absent-canonical-yaml-index
+        run: |
+          printf '[commit]\n gpgsign = true\n[tag]\n gpgSign = true\n' > "$GIT_CONFIG_GLOBAL"
+          node --test scripts/canonical-yaml-release-tag.test.mjs
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tatrman/grammar prebuild
       # Tests read committed twins, discover the current roster, and exercise missing-twin and
