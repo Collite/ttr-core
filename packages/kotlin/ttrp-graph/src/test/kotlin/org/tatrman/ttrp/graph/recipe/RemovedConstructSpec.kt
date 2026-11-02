@@ -148,6 +148,43 @@ class RemovedConstructSpec :
             }
         }
 
+        "a removed construct in a world other than the manifest's fails the recipe too, located in that world" {
+            val root = planted("", null)
+            val other =
+                listOf(
+                    "package hartland.worlds",
+                    "model world",
+                    "",
+                    "def world other {",
+                    "    def executor x { extends: n8n_l1 }",
+                    "    def process other_flow { instance: order.order_number, steps: [ def step s { program: " +
+                        "morning_release, port: key } ] }",
+                    "    def deployment o1 { program: morning_release, target: x, run_as: caller, " +
+                        "trigger: schedule \"06:00 Europe/Prague\" }",
+                    "    def deployment o2 { program: morning_release, target: native, run_as: caller }",
+                    "}",
+                )
+            Files.write(root.resolve("model/hartland/worlds/other.ttrm"), other)
+            val r =
+                plan(root, Files.readString(RecipeFixtures.shared.resolve("release_order.ttrp")), "release_order.ttrp")
+            r.ok shouldBe false
+            val expected =
+                listOf(
+                    Triple("TTRP-CUT-001", "process `other_flow`", "def process"),
+                    Triple("TTRP-CUT-003", "deployment `o1`", "trigger:"),
+                    Triple("TTRP-CUT-004", "deployment `o2`", "native"),
+                )
+            cut(r).map { it.id.id } shouldContainExactlyInAnyOrder expected.map { it.first }
+            for ((id, what, entry) in expected) {
+                val d = cut(r).single { it.id.id == id }
+                val line = other.indexOfFirst { it.contains(what.substringAfter('`').substringBefore('`') + " {") }
+                d.message shouldContain what
+                d.location.file shouldEndWith "other.ttrm"
+                d.location.line shouldBe line + 1
+                d.location.column shouldBe other[line].indexOf(entry)
+            }
+        }
+
         "a program still on `port: event` is refused once: its event column reads are not REC-020 as well" {
             fun reader(port: String) =
                 """

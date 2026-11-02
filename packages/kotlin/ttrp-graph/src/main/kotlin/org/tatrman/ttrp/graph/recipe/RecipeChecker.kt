@@ -260,8 +260,9 @@ class RecipeChecker(
     /**
      * CG (grammar 0.22): every orchestration construct the process engine took over is refused once, where it was
      * written. The scope is the whole model the recipe is checked against, as the 0.22 metadata load refuses it — every
-     * program, action and role, the world's removed members and deployment entries ([World.removed], which keeps those
-     * of a deployment that did not load) — plus this recipe's wiring. Once per recipe check.
+     * program, action and role, every world's removed members and deployment entries ([World.removed], which keeps
+     * those of a deployment that did not load; not only the manifest's world) — plus this recipe's wiring. Once per
+     * recipe check.
      */
     private fun checkRemoved(recipe: RecipeDecl) {
         val idx = model ?: return
@@ -277,15 +278,11 @@ class RecipeChecker(
                 removed(hit.cut, "$kind `${obj.qname.name}`", hit.at)
             }
         }
-        val world =
-            report.world?.let { w ->
-                idx.objectsByQname.values
-                    .filterIsInstance<World>()
-                    .firstOrNull { it.qname == w.qname }
+        for (world in idx.objectsByQname.values.filterIsInstance<World>()) {
+            for (m in world.removed) {
+                val c = RemovedConstructs.ofWorldMember(m.keyword, m.key) ?: continue
+                (m.sourceLocation ?: world.sourceLocation)?.let { removed(c, "${m.keyword} `${m.name}`", it) }
             }
-        for (m in world?.removed.orEmpty()) {
-            val c = RemovedConstructs.ofWorldMember(m.keyword, m.key) ?: continue
-            (m.sourceLocation ?: world?.sourceLocation)?.let { removed(c, "${m.keyword} `${m.name}`", it) }
         }
         for (w in recipe.wirings) {
             for (a in w.args.filter { it.name == REMOVED_WIRING }) {
