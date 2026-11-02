@@ -151,6 +151,20 @@ object RemovedConstructs {
         key: String,
     ): Boolean = KEYS[kind]?.containsKey(key) == true
 
+    /**
+     * The construct a world-side record names: a world member [keyword] (`process`, `deployment`) and, for a
+     * deployment, the removed [key] as written (`target` for `target: native`). Null when it names none.
+     */
+    fun ofWorldMember(
+        keyword: String,
+        key: String,
+    ): Cut? =
+        when (keyword) {
+            "process" -> Cut.PROCESS
+            "deployment" -> if (key == "target") Cut.NATIVE_TARGET else KEYS.getValue("deployment")[key]
+            else -> null
+        }
+
     /** `port: event` — the event port D-142 removed. */
     fun isEventPort(value: AutoValue): Boolean = idOf(value) == "event"
 

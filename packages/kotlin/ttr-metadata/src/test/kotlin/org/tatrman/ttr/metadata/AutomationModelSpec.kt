@@ -3,6 +3,8 @@ package org.tatrman.ttr.metadata
 
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -80,6 +82,11 @@ class AutomationModelSpec :
                     // `returns_n8n { process: … }` has no program: it does not load
                     "ttr/automation-deployment-dropped" to 1,
                 )
+            // … and the drop names the cut, not a missing program (the flow moves to the engine)
+            r.errors.single { it.message.startsWith("ttr/automation-deployment-dropped") }.message.let {
+                it shouldContain "deployment 'returns_n8n' runs the removed `process:` (CUT-002"
+                it shouldNotContain "program:`"
+            }
             val au = r.model.schemas.getValue("automation") as AutomationSchema
             au.parameters.size shouldBe 9
             au.actions.size shouldBe 10
@@ -150,9 +157,26 @@ class AutomationModelSpec :
             morning.runAs shouldBe RunAsRef.Identity("automation_decider")
             morning.enabled shouldBe true
             world.deployment("release_n8n")!!.granularity shouldBe "parts"
-            // D-142: `def process` is recognised only to be refused; a deployment of one does not load
+            // D-142: `def process` is recognised only to be refused; a deployment of one does not load, but its
+            // removed entries are still the world's — one record each, at its entry
             world.deployment("returns_n8n").shouldBeNull()
-            world.removed.map { it.keyword to it.name } shouldContainExactly listOf("process" to "return_line_flow")
+            world.removed.groupingBy { "${it.keyword}.${it.key}" }.eachCount() shouldBe
+                mapOf(
+                    "process.process" to 1,
+                    "deployment.process" to 1,
+                    "deployment.target" to 8,
+                    "deployment.trigger" to 4,
+                )
+            world.removed.single { it.keyword == "process" }.name shouldBe "return_line_flow"
+            world.removed.single { it.keyword == "deployment" && it.key == "process" }.name shouldBe "returns_n8n"
+            val trigger = world.removed.first { it.key == "trigger" }
+            trigger.name shouldBe "release_native_morning"
+            trigger.sourceLocation!!.column shouldBe
+                Files
+                    .readAllLines(
+                        locate("packages/kotlin/ttr-parser/src/test/resources/automation").resolve("demo-world.ttrm"),
+                    )[trigger.sourceLocation!!.line - 1]
+                    .indexOf("trigger:")
         }
 
         "writable on a storage, states and transitions on an attribute" {

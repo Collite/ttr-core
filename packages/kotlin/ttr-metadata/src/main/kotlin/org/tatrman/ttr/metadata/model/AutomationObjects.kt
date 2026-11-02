@@ -340,7 +340,8 @@ data class WorldGrant(
  * `def deployment <n> { program, target, run_as, … }` (D-107, D-92, D-94). Loaded FAIL-CLOSED: a deployment with a
  * non-boolean flag, or a missing/malformed `program`, `run_as` or `target` is not loaded (a load error says so) — a
  * flag keeps its default only when absent. Grammar 0.22 (D-142): no `process:` and no `trigger:` (the engine runs
- * and schedules); a `target: native` still loads, for the checkers to refuse (CUT-004).
+ * and schedules); a `target: native` still loads, for the checkers to refuse (CUT-004). Every removed entry is also a
+ * [RemovedWorldMember] of the world, loaded or not.
  */
 data class WorldDeployment(
     override val internalId: String,
@@ -371,11 +372,16 @@ data class WorldDeployment(
 }
 
 /**
- * A world member the grammar still RECOGNISES for one release but the model no longer has (grammar 0.22, D-142):
- * `def process` ([keyword]). Kept only so a checker can refuse it (CUT-001) where it was written.
+ * One construct of the world the grammar still RECOGNISES for one release but the model no longer has (grammar 0.22,
+ * D-142), kept only so a checker can refuse it where it was written: a `def process` ([keyword] `process`, [key]
+ * `process`), or a removed entry of a `def deployment` ([keyword] `deployment`, [key] as written — `process`,
+ * `trigger`, `connectors`/`deliver`/`ask`/`start` — or `target` for `target: native`). A deployment's records are
+ * kept whether or not the deployment loaded: one that ran a process has no `program:` and is not loaded, but its
+ * `process:` is still refused. [sourceLocation] is the entry's own.
  */
 data class RemovedWorldMember(
     val keyword: String,
     val name: String,
+    val key: String = keyword,
     val sourceLocation: SourceLocation? = null,
 )

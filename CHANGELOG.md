@@ -16,9 +16,11 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - ttr-metadata: `WorldProcess`, `ProcessStep`, `StepAfter`, `ProgramDelivery`, `DeploymentTrigger` and
   `AutomationCall` are gone, and so are `AutomationProgram.{event, deliver, schedule, askDue}`,
   `AutomationAction.onDue`, `AutomationRole.delivery`, `WorldDeployment.{process, trigger}` and `World.processes`
-  (`World.removed` lists a recognised `def process` for the checkers). `WorldDeployment.program` is non-null: a
-  deployment without a program does not load. The deployment fingerprint keeps its `process=null`/`trigger=null`
-  lines, so unaffected fingerprints and bundles are byte-identical.
+  (`World.removed` lists every removed construct of the world for the checkers — a recognised `def process` and each
+  removed entry of a deployment, `RemovedWorldMember.key` naming it). `WorldDeployment.program` is non-null: a
+  deployment without a program does not load (one that ran a `process:` says so, CUT-002), but its removed entries
+  stay in `World.removed`, so `ttrp build` still refuses them. The deployment fingerprint keeps its
+  `process=null`/`trigger=null` lines, so unaffected fingerprints and bundles are byte-identical.
 - `target: native` names the removed pseudo-executor only where the world declares no executor named `native`; one
   that does is targeted like any other, and `RegistryGrid.executorType` resolves every target through the world.
 - Exports: `ttrp emit` exports one program per deployment (no process exports). SPI v2 is unchanged —

@@ -31,6 +31,7 @@ import org.tatrman.ttr.parser.model.PropertyValue
 import org.tatrman.ttr.parser.model.RoleDef
 import org.tatrman.ttr.parser.model.TargetReferenceValue
 import org.tatrman.ttr.parser.model.WorldDef
+import org.tatrman.ttr.semantics.RemovedConstructs
 import java.nio.file.Path
 
 /**
@@ -318,14 +319,17 @@ internal object AutomationBuilder {
             val badFlags = DEPLOYMENT_FLAGS.filter { b[it] != null && b[it] !is AutoValue.Bool }
             val problem =
                 when {
-                    badFlags.isNotEmpty() -> "non-boolean ${badFlags.joinToString { "`$it:`" }}"
-                    runAs == null -> "a missing or malformed `run_as:`"
-                    target == null -> "a missing or malformed `target:`"
-                    program == null -> "a missing or malformed `program:`"
+                    badFlags.isNotEmpty() -> "has non-boolean ${badFlags.joinToString { "`$it:`" }}"
+                    runAs == null -> "has a missing or malformed `run_as:`"
+                    target == null -> "has a missing or malformed `target:`"
+                    // D-142: it ran a process; the flow moves to the engine, it does not gain a program
+                    program == null && b["process"] != null ->
+                        "runs the removed `process:` (CUT-002; model the flow in the process engine)"
+                    program == null -> "has a missing or malformed `program:`"
                     else -> null
                 }
             if (problem != null) {
-                dropped(d.source, "ttr/automation-deployment-dropped: deployment '$name' has $problem — not loaded")
+                dropped(d.source, "ttr/automation-deployment-dropped: deployment '$name' $problem — not loaded")
                 return@mapNotNull null
             }
             WorldDeployment(
@@ -352,9 +356,30 @@ internal object AutomationBuilder {
             )
         }
 
-    /** The members D-142 removed (`def process`): recognised by the 0.22 grammar only to be refused (CUT-001). */
-    fun removed(def: WorldDef): List<RemovedWorldMember> =
-        def.processes.map { RemovedWorldMember("process", it.name, it.source) }
+    /**
+     * What D-142 removed from the world, recognised by the 0.22 grammar only to be refused: every `def process`
+     * (CUT-001), and every removed entry of every `def deployment` — loaded or dropped — with `target: native` when the
+     * world declares no executor of that name (CUT-002…005). Each at its entry.
+     */
+    fun removed(def: WorldDef): List<RemovedWorldMember> {
+        val executors = def.executors.map { it.name }
+        return def.processes.map { RemovedWorldMember("process", it.name, "process", it.source) } +
+            def.deployments.flatMap { d ->
+                val name = d.name ?: return@flatMap emptyList()
+                val target = d.body.target as? TargetReferenceValue
+                val native =
+                    if (target != null && RemovedConstructs.isNativeTarget(target.ref.path, executors)) {
+                        listOf(RemovedWorldMember("deployment", name, "target", target.source))
+                    } else {
+                        emptyList()
+                    }
+                (
+                    RemovedConstructs.inEntries("deployment", d.body.entries).map {
+                        RemovedWorldMember("deployment", name, it.key, it.at)
+                    } + native
+                ).sortedWith(compareBy({ it.sourceLocation?.line }, { it.sourceLocation?.column }))
+            }
+    }
 
     /** A storage's `writable:` manifest entry, each item as written (a glob without its quotes). */
     fun writable(manifest: Map<String, PropertyValue>): List<String> {
