@@ -123,10 +123,7 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile --filter @tatrman/grammar
       - run: pnpm --filter @tatrman/grammar prebuild
-      # An explicit heap: with no gradle.properties the Gradle daemon (and the Kotlin daemon, which inherits it) runs
-      # on the 512 MB default, and a change low in the module graph recompiles enough modules at once to exhaust it
-      # ("GC overhead limit exceeded" in compileKotlin). The runner has 16 GB.
-      - run: ./gradlew build -Dorg.gradle.jvmargs="-Xmx3g -XX:MaxMetaspaceSize=1g" -Pkotlin.daemon.jvmargs=-Xmx3g
+      - run: ./gradlew build
 
   # SV-P4·S3·T6 — the import-schema determinism gate. The unit tier is the pure GI-2 instrument:
   # the hero db-mirror golden (T1) + the permuted-catalog byte-equality (T6) + the conventions /
