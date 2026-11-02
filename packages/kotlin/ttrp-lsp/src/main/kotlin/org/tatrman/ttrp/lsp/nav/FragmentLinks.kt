@@ -8,12 +8,14 @@ import org.tatrman.ttrp.ast.SourceLocation
 import org.tatrman.ttrp.ast.TtrpDocument
 import org.tatrman.ttrp.diagnostics.TtrpDiagnostic
 import org.tatrman.ttrp.dialect.FragmentFiles
+import java.net.URI
+import java.nio.file.Path
 
 /**
  * File-backed fragments in the editor (AG B5): every `container … from "<path>"` clause of a program,
  * with the fragment file it names — the target of go-to-definition and of a document link — and the
  * re-anchoring of findings made INSIDE a fragment file onto the clause that pulls it in (and of
- * findings made in any other file onto the recipe's header).
+ * findings made in any other file, or with no position, onto the recipe's header).
  */
 object FragmentLinks {
     data class Link(
@@ -41,7 +43,10 @@ object FragmentLinks {
      * `from` clause that pulls the file in, its message prefixed with `<file>:<line>:<col>:`. A finding
      * located in any other file — a model file the recipe is checked against (D-142's TTRP-CUT-nnn in a
      * `.ttrm`) — is not at that line and column of the program: it moves onto [header] (the recipe's
-     * header, else the document start) with the same prefix. Any other finding is returned unchanged.
+     * header, else the document start) with the same prefix. A finding with no position
+     * (`SourceLocation.UNKNOWN`), the program's own as well as another file's, is shown on [header],
+     * unprefixed; a fragment file's goes to its clause. A finding located in [uri] is returned unchanged,
+     * and so is every other one when there is no [header].
      */
     fun anchor(
         d: TtrpDiagnostic,
@@ -56,8 +61,8 @@ object FragmentLinks {
     }
 
     /**
-     * Where [doc] shows a finding made in another file: the `recipe` keyword of its recipe, else the
-     * start of the document.
+     * Where [doc] shows a finding made in another file, or with no position: the `recipe` keyword of its
+     * recipe, else the start of the document.
      */
     fun header(doc: TtrpDocument): SourceLocation {
         val r =
@@ -80,11 +85,17 @@ object FragmentLinks {
         at: SourceLocation,
     ): TtrpDiagnostic {
         if (d.location.line < 1) return d.copy(location = at)
-        val name = file.substringAfterLast('/')
-        val decoded = runCatching { java.net.URLDecoder.decode(name, Charsets.UTF_8) }.getOrDefault(name)
+        // a `file:` URI is decoded by URI rules (`%20` is a space, a `+` stays a `+`); any other name is as written
+        val raw = file.substringAfterLast('/')
+        val name =
+            if (file.startsWith("file:")) {
+                runCatching { Path.of(URI(file)).fileName.toString() }.getOrNull() ?: raw
+            } else {
+                raw
+            }
         return d.copy(
             location = at,
-            message = "$decoded:${d.location.line}:${d.location.column}: ${d.message}",
+            message = "$name:${d.location.line}:${d.location.column}: ${d.message}",
         )
     }
 }

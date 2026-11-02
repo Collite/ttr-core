@@ -185,7 +185,7 @@ class CanonicalYamlDepthSpec :
                 }
             }
         }
-        // the 0.21 pair finds its marker in the event stream as well, before the reader's guard
+        // the 0.21 pair reaches the same located refusal (its marker step composes nothing)
         for (from in listOf("0.22", "0.21")) {
             test("streaming guard refuses 100,000 levels before composition or recursion (from $from)") {
                 val request =

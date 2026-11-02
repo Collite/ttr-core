@@ -88,6 +88,26 @@ object RecipeEditorAnalysis {
         // to documents that opt into literate recipe authoring; the extractor remains strict when invoked directly.
         if (!recipeDocument) return Analysis(doc.uri, doc.version, emptyReport(doc))
         val recipes = extraction.recipes.map { EditorRecipe(it, pipeline.plan(it.text, it.path)) }
+
+        // One rule places every finding in this document. One at an offset of a recipe's extracted text goes to the
+        // markdown its sidecar node maps (else the skeleton). One made in another file (a model file's TTRP-CUT-nnn,
+        // the manifest's TTRP-CFG) or with no position of its own sits on the skeleton, prefixed with where it was
+        // made: every literate finding leaves here at this document, so the scheduler's re-anchoring (header
+        // positions of the EXTRACTED text) never applies to it.
+        fun place(
+            d: TtrpDiagnostic,
+            recipe: ExtractedRecipe?,
+        ): TtrpDiagnostic {
+            val skeleton = location(doc.text, doc.uri, recipe?.skeletonSpan ?: listOf(0, 0))
+            if (recipe == null || d.location.file != recipe.path || d.location.line < 1) {
+                return FragmentLinks.elsewhere(d, d.location.file, skeleton)
+            }
+            val mapped =
+                recipe.sidecar.nodes.values.firstOrNull {
+                    utf16Offset(recipe.text, d.location.offsetStart) in it.generatedSpan[0] until it.generatedSpan[1]
+                }
+            return d.copy(location = location(doc.text, doc.uri, mapped?.span ?: recipe.skeletonSpan))
+        }
         val findings =
             extraction.diagnostics.map { d ->
                 TtrpDiagnostic(
@@ -100,36 +120,9 @@ object RecipeEditorAnalysis {
                     d.suggestedAlternative,
                 )
             } +
-                recipes.flatMap { entry ->
-                    val recipe = requireNotNull(entry.extracted)
-                    diagnostics(entry.plan).map { finding ->
-                        // made in another file (a model file, D-142's TTRP-CUT-nnn): not at an offset of this recipe
-                        if (finding.location.file != recipe.path && finding.location.line >= 1) {
-                            return@map FragmentLinks.elsewhere(
-                                finding,
-                                finding.location.file,
-                                location(doc.text, doc.uri, recipe.skeletonSpan),
-                            )
-                        }
-                        val mapped =
-                            recipe.sidecar.nodes.values.firstOrNull {
-                                utf16Offset(recipe.text, finding.location.offsetStart) in
-                                    it.generatedSpan[0] until it.generatedSpan[1]
-                            }
-                        val span = mapped?.span ?: recipe.skeletonSpan
-                        finding.copy(location = location(doc.text, doc.uri, span))
-                    }
-                }
-        // A finding made in another file (the manifest's TTRP-CFG) sits on the first recipe's skeleton, else the
-        // document start, as the model-file findings above do: every literate finding leaves here at this document,
-        // so the scheduler's re-anchoring (header positions of the EXTRACTED text) never applies to it.
-        val elsewhere =
-            recipes.firstOrNull()?.extracted?.let { location(doc.text, doc.uri, it.skeletonSpan) }
-                ?: location(doc.text, doc.uri, listOf(0, 0))
-        val manifest =
-            ctx.manifestDiagnostics.map { d ->
-                if (d.location.file == doc.uri) d else FragmentLinks.elsewhere(d, d.location.file, elsewhere)
-            }
+                recipes.flatMap { entry -> diagnostics(entry.plan).map { place(it, requireNotNull(entry.extracted)) } }
+        // the manifest's findings on the first recipe's skeleton, else the document start
+        val manifest = ctx.manifestDiagnostics.map { place(it, recipes.firstOrNull()?.extracted) }
         // Features still need imported metadata, but navigation never consumes canonical positions (R1).
         val report = recipes.firstOrNull()?.plan?.frontendReport ?: emptyReport(doc)
         return Analysis(
