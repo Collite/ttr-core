@@ -34,7 +34,7 @@ class CanonicalYamlRepairSpec :
             kind: String,
             properties: String,
         ): String =
-            "ttr: \"0.21\"\nmodel: $model\ndefs:\n  - kind: $kind\n    id: P\n    properties:\n" +
+            "ttr: \"0.22\"\nmodel: $model\ndefs:\n  - kind: $kind\n    id: P\n    properties:\n" +
                 properties.prependIndent("      ")
 
         fun located(
@@ -256,7 +256,7 @@ class CanonicalYamlRepairSpec :
                 ),
             ) shouldBe
                 """
-                ttr: "0.21"
+                ttr: "0.22"
                 graph:
                   id: "main"
                   properties:
@@ -272,7 +272,7 @@ class CanonicalYamlRepairSpec :
         test("F9 exact canonical security statement order") {
             val expected =
                 """
-                ttr: "0.21"
+                ttr: "0.22"
                 security:
                   -
                     -
@@ -356,12 +356,12 @@ class CanonicalYamlRepairSpec :
         }
         for (version in listOf("1.1", "1.3")) {
             test("F14 YAML $version directive refused at the directive") {
-                val source = "%YAML $version\n---\nttr: \"0.21\"\n"
+                val source = "%YAML $version\n---\nttr: \"0.22\"\n"
                 located(source, 0, "version.yaml") { CanonicalYaml.read(source, "version.yaml") }
             }
         }
         test("F14 YAML 1.2 and absent directives accepted") {
-            CanonicalYaml.read("%YAML 1.2\n---\nttr: \"0.21\"\n")
-            CanonicalYaml.read("ttr: \"0.21\"\n")
+            CanonicalYaml.read("%YAML 1.2\n---\nttr: \"0.22\"\n")
+            CanonicalYaml.read("ttr: \"0.22\"\n")
         }
     })

@@ -5,7 +5,7 @@
   "program": "release_order.ttrp",
   "world": {
     "qname": "hartland.worlds.demo",
-    "fingerprint": "sha256:e6ed5c4a3be8aa1fc00c13fb32f873e77c478b13ed24f6721a6a70b52904dbd9"
+    "fingerprint": "sha256:53c0785903729aa5cd8e7b25cb3cde492adc5c643011d4294d79d348ffc36d6e"
   },
   "islands": [
     {
@@ -720,8 +720,7 @@
           "who": "role.sales_manager",
           "about": "order_number",
           "action": "release",
-          "due": "2 working_days",
-          "on_due": "hold { order: order_number, department: \"Sales\" }"
+          "due": "2 working_days"
         }
       },
       {
@@ -819,14 +818,14 @@
       "er.entity.warehouse_outage"
     ],
     "fingerprints": {
-      "text": "sha256:b8e7981518acaba84ae3d55e0a6f350abe04025f6ef702386186f5c56f82b29c",
+      "text": "sha256:305cb1dfc10ae94809d61b1db22e92b021ea9cafc57ecbc86c6e60ca4a0cef58",
       "values": "sha256:54e165c4463646ed8b9ae490dc1a830b34e76dda883caa0f3df407699c7ae888",
       "labels": "sha256:c5c1b1d184cae956a8f24a43ddc346019550d754206b1069f367e4a977006ac0"
     },
     "protocol": "always"
   },
   "files": {
-    "catalog/release_order.ttrm": "sha256:45c8fc8d15668f2ba9869b4f60286e6ae5664b89a1d35ccb11c374dcdc4d9702",
+    "catalog/release_order.ttrm": "sha256:b96a8f28750313e960d2f324fe19aaeca67a10423c0fcebd27f315fa39c3f57a",
     "catalog/release_order_verdict.ttrm": "sha256:1172675861546a966ea9a1daca8c805386898e3dec5bd81790dd6739123f8909",
     "islands/overdue.rows.sql": "sha256:3730c48e4975b3a5052a7e1a246a7c02f3c783c51505461e037842f503e6755a",
     "islands/placed_orders.orders.sql": "sha256:87fc1d71dba0be2a03e674da6d79188432e2ec439625472e0c33201c7e640ce0",

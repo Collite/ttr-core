@@ -27,7 +27,7 @@
                 0
             ],
             "parameters": {
-                "jsCode": "return [{json:{openBody:(() => {const b = {deployment:\"release_n8n\", port:{key:(($('trigger').first().json.body || $('trigger').first().json).key ?? ($('trigger').first().json.body || $('trigger').first().json)[\"order_number\"])}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:b8e7981518acaba84ae3d55e0a6f350abe04025f6ef702386186f5c56f82b29c\", recipeValuesFingerprint:\"sha256:54e165c4463646ed8b9ae490dc1a830b34e76dda883caa0f3df407699c7ae888\"}; b.programFingerprint=\"sha256:c47e78b56316cdb6d1ec28ba5020998b08877e160c229a6998de3426ba44c357\"; b.deploymentFingerprint=\"sha256:fe77871c1f0c500785aa32197843b8c13fb37e410b52280c2eb02c81eebc0b04\"; if (($('trigger').first().json.body || $('trigger').first().json).at) b.port.at=($('trigger').first().json.body || $('trigger').first().json).at; return b;})()}}];",
+                "jsCode": "return [{json:{openBody:(() => {const b = {deployment:\"release_n8n\", port:{key:(($('trigger').first().json.body || $('trigger').first().json).key ?? ($('trigger').first().json.body || $('trigger').first().json)[\"order_number\"])}, origin:'engine', dryRun:false, recipeFingerprint:\"sha256:305cb1dfc10ae94809d61b1db22e92b021ea9cafc57ecbc86c6e60ca4a0cef58\", recipeValuesFingerprint:\"sha256:54e165c4463646ed8b9ae490dc1a830b34e76dda883caa0f3df407699c7ae888\"}; b.programFingerprint=\"sha256:75ea334ae26ece109421dba8f6c1cebf146987d5e5fdeac270e39ac2b9055f33\"; b.deploymentFingerprint=\"sha256:fe77871c1f0c500785aa32197843b8c13fb37e410b52280c2eb02c81eebc0b04\"; if (($('trigger').first().json.body || $('trigger').first().json).at) b.port.at=($('trigger').first().json.body || $('trigger').first().json).at; return b;})()}}];",
                 "mode": "runOnceForAllItems"
             }
         },
@@ -1386,7 +1386,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route release_confirmed collect\").isExecuted ? $(\"route release_confirmed collect\").first().json.rows : []).map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/action-release_confirmed-ask'} }}",
+                "jsonBody": "={{ {keys:($(\"route release_confirmed collect\").isExecuted ? $(\"route release_confirmed collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1403,136 +1403,6 @@
             },
             "retryOnFail": true,
             "maxTries": 3
-        },
-        {
-            "id": "1f3ebfcf-46df-3e0a-99c3-df2a5c1d2abc",
-            "name": "action release_confirmed ask wait",
-            "type": "n8n-nodes-base.wait",
-            "typeVersion": 1.1,
-            "position": [
-                11220,
-                0
-            ],
-            "parameters": {
-                "resume": "webhook",
-                "httpMethod": "POST",
-                "limitWaitTime": true,
-                "limitType": "afterTimeInterval",
-                "resumeAmount": "={{ (() => {const due=($json.body.tasks || []).filter(t => t.action === \"ask\" && t.dueAt).map(t => Date.parse(t.dueAt)).filter(Number.isFinite); return due.length ? Math.max(1, Math.ceil((Math.min(...due)-Date.now())/1000)) : 3600;})() }}",
-                "resumeUnit": "seconds",
-                "options": {
-                    "webhookSuffix": "action-release_confirmed-ask"
-                }
-            }
-        },
-        {
-            "id": "a4dbf652-c269-306f-b884-4e38766bd563",
-            "name": "action release_confirmed ask task pending",
-            "type": "n8n-nodes-base.if",
-            "typeVersion": 2.2,
-            "position": [
-                11440,
-                0
-            ],
-            "parameters": {
-                "conditions": {
-                    "options": {
-                        "caseSensitive": true,
-                        "leftValue": "",
-                        "typeValidation": "strict",
-                        "version": 2
-                    },
-                    "conditions": [
-                        {
-                            "leftValue": "={{ ($json.body.performed || []).some(p => p.taskId) }}",
-                            "rightValue": true,
-                            "operator": {
-                                "type": "boolean",
-                                "operation": "true",
-                                "singleValue": true
-                            }
-                        }
-                    ],
-                    "combinator": "and"
-                }
-            }
-        },
-        {
-            "id": "4601778a-0350-30fd-b34e-52839c99a19f",
-            "name": "action release_confirmed ask resumed",
-            "type": "n8n-nodes-base.code",
-            "typeVersion": 2.0,
-            "position": [
-                11660,
-                0
-            ],
-            "parameters": {
-                "jsCode": "return [{json:{}}];",
-                "mode": "runOnceForAllItems"
-            }
-        },
-        {
-            "id": "7ef3a2e3-fbd9-3cce-be43-bf94df16beb1",
-            "name": "action release_confirmed ask task status",
-            "type": "n8n-nodes-base.httpRequest",
-            "typeVersion": 4.2,
-            "position": [
-                11880,
-                0
-            ],
-            "parameters": {
-                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"\" }}",
-                "method": "GET",
-                "authentication": "genericCredentialType",
-                "genericAuthType": "httpBearerAuth",
-                "options": {
-                    "response": {
-                        "response": {
-                            "responseFormat": "json",
-                            "fullResponse": true
-                        }
-                    }
-                }
-            },
-            "credentials": {
-                "httpBearerAuth": {
-                    "name": "tatrman-automation"
-                }
-            },
-            "retryOnFail": true,
-            "maxTries": 3
-        },
-        {
-            "id": "7bfc3aac-ecba-336c-a1a8-47bb1edc4b5e",
-            "name": "action release_confirmed ask still waiting",
-            "type": "n8n-nodes-base.if",
-            "typeVersion": 2.2,
-            "position": [
-                12100,
-                0
-            ],
-            "parameters": {
-                "conditions": {
-                    "options": {
-                        "caseSensitive": true,
-                        "leftValue": "",
-                        "typeValidation": "strict",
-                        "version": 2
-                    },
-                    "conditions": [
-                        {
-                            "leftValue": "={{ $json.body.status === 'waiting' }}",
-                            "rightValue": true,
-                            "operator": {
-                                "type": "boolean",
-                                "operation": "true",
-                                "singleValue": true
-                            }
-                        }
-                    ],
-                    "combinator": "and"
-                }
-            }
         },
         {
             "id": "f499bf70-5a40-3bc6-896e-80bf52dfe372",
@@ -1540,7 +1410,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                12320,
+                11220,
                 0
             ],
             "parameters": {
@@ -1594,7 +1464,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                12540,
+                11440,
                 0
             ],
             "parameters": {
@@ -1608,7 +1478,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                12760,
+                11660,
                 0
             ],
             "parameters": {
@@ -1642,7 +1512,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                12980,
+                11880,
                 0
             ],
             "parameters": {
@@ -1656,7 +1526,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                13200,
+                12100,
                 0
             ],
             "parameters": {
@@ -1670,7 +1540,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                13420,
+                12320,
                 0
             ],
             "parameters": {
@@ -1704,7 +1574,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                13640,
+                12540,
                 0
             ],
             "parameters": {
@@ -2327,75 +2197,6 @@
             ]
         },
         "action release_confirmed ask": {
-            "main": [
-                [
-                    {
-                        "node": "action release_confirmed ask task pending",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "action release_confirmed ask task pending": {
-            "main": [
-                [
-                    {
-                        "node": "action release_confirmed ask task status",
-                        "type": "main",
-                        "index": 0
-                    }
-                ],
-                [
-                    {
-                        "node": "action release_confirmed ask resumed",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "action release_confirmed ask wait": {
-            "main": [
-                [
-                    {
-                        "node": "action release_confirmed ask task status",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "action release_confirmed ask task status": {
-            "main": [
-                [
-                    {
-                        "node": "action release_confirmed ask still waiting",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "action release_confirmed ask still waiting": {
-            "main": [
-                [
-                    {
-                        "node": "action release_confirmed ask wait",
-                        "type": "main",
-                        "index": 0
-                    }
-                ],
-                [
-                    {
-                        "node": "action release_confirmed ask resumed",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "action release_confirmed ask resumed": {
             "main": [
                 [
                     {
@@ -3174,7 +2975,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route release_confirmed collect\").isExecuted ? $(\"route release_confirmed collect\").first().json.rows : []).map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/action-release_confirmed-ask'} }}",
+                        "jsonBody": "={{ {keys:($(\"route release_confirmed collect\").isExecuted ? $(\"route release_confirmed collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -3188,34 +2989,6 @@
                         "action": "ask"
                     },
                     "action": "ask"
-                },
-                {
-                    "node": "action release_confirmed ask task status",
-                    "name": "status",
-                    "method": "GET",
-                    "path": "/automation/runs/{id}",
-                    "recipe": "release_order",
-                    "program": "release_on_placement",
-                    "mode": "on_event",
-                    "port": "key",
-                    "key": [
-                        "order.order_number"
-                    ],
-                    "parameters": {
-                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"\" }}",
-                        "method": "GET",
-                        "authentication": "genericCredentialType",
-                        "genericAuthType": "httpBearerAuth",
-                        "options": {
-                            "response": {
-                                "response": {
-                                    "responseFormat": "json",
-                                    "fullResponse": true
-                                }
-                            }
-                        }
-                    },
-                    "arguments": {}
                 },
                 {
                     "node": "route release rows",

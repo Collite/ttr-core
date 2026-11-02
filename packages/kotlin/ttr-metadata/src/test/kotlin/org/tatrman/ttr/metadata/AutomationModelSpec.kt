@@ -3,6 +3,8 @@ package org.tatrman.ttr.metadata
 
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -12,11 +14,9 @@ import org.tatrman.ttr.metadata.model.AutomationParameter
 import org.tatrman.ttr.metadata.model.AutomationProgram
 import org.tatrman.ttr.metadata.model.AutomationRole
 import org.tatrman.ttr.metadata.model.AutomationSchema
-import org.tatrman.ttr.metadata.model.DeploymentTrigger
 import org.tatrman.ttr.metadata.model.ErSchema
 import org.tatrman.ttr.metadata.model.GrantWho
 import org.tatrman.ttr.metadata.model.ModelDescriptor
-import org.tatrman.ttr.metadata.model.ProgramDelivery
 import org.tatrman.ttr.metadata.model.QualifiedName
 import org.tatrman.ttr.metadata.model.RoleMembership
 import org.tatrman.ttr.metadata.model.RunAsRef
@@ -38,7 +38,8 @@ import java.time.Instant
 /**
  * Grammar 0.16 — the automation tier in the metadata model (AU-core-P0 S0.2 T5): design `17` §1–§2 (as written
  * for 0.16) load into typed objects — what ttr-server's bundle loader, `RunAs` and `GrantMap` read — plus
- * `writable:` on storages, `states:`/`transitions:` on attributes, and the implicit automation stdlib.
+ * `writable:` on storages, `states:`/`transitions:` on attributes, and the implicit automation stdlib. Since grammar
+ * 0.22 (D-142) its orchestration constructs are load errors and leave the typed tier.
  */
 class AutomationModelSpec :
     StringSpec({
@@ -70,9 +71,22 @@ class AutomationModelSpec :
             return reconcile(root)
         }
 
-        "design 17 §1–§2 load clean into the automation tier" {
+        "design 17 §1–§2 load into the automation tier; D-142's removed constructs are load errors" {
             val r = hartland()
-            r.errors shouldBe emptyList()
+            r.errors
+                .map { it.message.substringBefore(':') }
+                .groupingBy { it }
+                .eachCount() shouldBe
+                mapOf(
+                    "ttr/automation-removed" to 33,
+                    // `returns_n8n { process: … }` has no program: it does not load
+                    "ttr/automation-deployment-dropped" to 1,
+                )
+            // … and the drop names the cut, not a missing program (the flow moves to the engine)
+            r.errors.single { it.message.startsWith("ttr/automation-deployment-dropped") }.message.let {
+                it shouldContain "deployment 'returns_n8n' runs the removed `process:` (CUT-002"
+                it shouldNotContain "program:`"
+            }
             val au = r.model.schemas.getValue("automation") as AutomationSchema
             au.parameters.size shouldBe 9
             au.actions.size shouldBe 10
@@ -95,15 +109,15 @@ class AutomationModelSpec :
             program.port shouldBe "none"
             program.mode shouldBe "batch"
             program.asOf shouldBe "run"
-            program.deliver shouldBe ProgramDelivery.Digest(by = "who", per = "day")
-            program.schedule shouldBe "06:00 Europe/Prague"
+            // D-142: `deliver:` and `schedule:` are no typed fields; they ride as authored, for the checkers to refuse
+            program.properties.map { it.first } shouldContainExactly
+                listOf("recipe", "port", "mode", "as_of", "deliver", "schedule")
             program.qname.dotted() shouldBe "automation.program.morning_release"
             val decide =
                 q.getObject(
                     QualifiedName(SchemaCode.AUTOMATION, "program", "decide_on_request", "hartland.automation"),
                 )
-            (decide as AutomationProgram).event shouldBe "line_received"
-            decide.port shouldBe "event"
+            (decide as AutomationProgram).port shouldBe "event" // refused (TTRP-CUT-009), read as written
             decide.mode shouldBe "on_event"
         }
 
@@ -125,7 +139,6 @@ class AutomationModelSpec :
             (au.byName("action", "set_state") as AutomationAction).transition?.toColumn shouldBe "to"
             val sales = au.byName("role", "sales") as AutomationRole
             sales.membership shouldBe RoleMembership.KeycloakGroup("hartland-sales")
-            sales.delivery shouldBe mapOf("email" to "sales@hartland.example")
         }
 
         "a grant round-trips its triple; a deployment its run_as; an identity its credential" {
@@ -140,18 +153,30 @@ class AutomationModelSpec :
             world.grants[1].who shouldBe GrantWho.Role("sales_manager")
             val morning = world.deployment("release_native_morning")!!
             morning.program shouldBe "morning_release"
-            morning.target shouldBe "native"
+            morning.target shouldBe "native" // refused (TTRP-CUT-004), read as written
             morning.runAs shouldBe RunAsRef.Identity("automation_decider")
-            morning.trigger shouldBe DeploymentTrigger.Schedule("06:00 Europe/Prague")
             morning.enabled shouldBe true
             world.deployment("release_n8n")!!.granularity shouldBe "parts"
-            world.deployment("returns_n8n")!!.process shouldBe "return_line_flow"
-            world.deployment("returns_n8n")!!.program.shouldBeNull()
-            val flow = world.process("return_line_flow")!!
-            flow.instance shouldBe "return_request_line.line_id"
-            flow.steps.map { it.name } shouldContainExactly listOf("decide", "inbound", "settle")
-            flow.steps[2].after?.obligations shouldContainExactly listOf("credit_note", "payment", "replacement")
-            flow.steps[2].after?.until shouldContainExactly listOf("fulfilled", "due", "absent")
+            // D-142: `def process` is recognised only to be refused; a deployment of one does not load, but its
+            // removed entries are still the world's — one record each, at its entry
+            world.deployment("returns_n8n").shouldBeNull()
+            world.removed.groupingBy { "${it.keyword}.${it.key}" }.eachCount() shouldBe
+                mapOf(
+                    "process.process" to 1,
+                    "deployment.process" to 1,
+                    "deployment.target" to 8,
+                    "deployment.trigger" to 4,
+                )
+            world.removed.single { it.keyword == "process" }.name shouldBe "return_line_flow"
+            world.removed.single { it.keyword == "deployment" && it.key == "process" }.name shouldBe "returns_n8n"
+            val trigger = world.removed.first { it.key == "trigger" }
+            trigger.name shouldBe "release_native_morning"
+            trigger.sourceLocation!!.column shouldBe
+                Files
+                    .readAllLines(
+                        locate("packages/kotlin/ttr-parser/src/test/resources/automation").resolve("demo-world.ttrm"),
+                    )[trigger.sourceLocation!!.line - 1]
+                    .indexOf("trigger:")
         }
 
         "writable on a storage, states and transitions on an attribute" {
@@ -264,10 +289,11 @@ class AutomationModelSpec :
                         package acme.worlds
                         model world
                         def world w {
-                            def deployment off  { program: p, target: native, run_as: caller, enabled: "false" }
-                            def deployment dry  { program: p, target: native, run_as: caller, dry_run: "true" }
-                            def deployment obo  { program: p, target: native, run_as: caller, obo_only: "true" }
-                            def deployment good { program: p, target: native, run_as: caller }
+                            def executor x { extends: n8n_l1 }
+                            def deployment off  { program: p, target: x, run_as: caller, enabled: "false" }
+                            def deployment dry  { program: p, target: x, run_as: caller, dry_run: "true" }
+                            def deployment obo  { program: p, target: x, run_as: caller, obo_only: "true" }
+                            def deployment good { program: p, target: x, run_as: caller }
                         }
                         """,
                 )
@@ -291,7 +317,8 @@ class AutomationModelSpec :
                         """
                         package acme.automation
                         model automation
-                        def program q { recipe: r, port: event, event: schema.nope, mode: on_event }
+                        def schema s { columns: [def column a { type: text }] }
+                        def service q { request: nope, response: s }
                         """,
                 )
             r.errors.map { it.message.substringBefore(':') } shouldContainExactly
@@ -341,7 +368,7 @@ class AutomationModelSpec :
                         package hartland.automation
                         model automation
                         def schema line_received { columns: [def column line_id { type: text }] }
-                        def program on_line { recipe: r, port: event, event: schema.line_received, mode: on_event }
+                        def program on_line { recipe: r, port: key, mode: on_event }
                         """,
                     "hartland/x/e.ttrm" to
                         """

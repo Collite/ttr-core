@@ -15,17 +15,17 @@ const bridge = resolve(
 );
 const cli = resolve(root, 'packages/migrate/dist/cli.js');
 const input = JSON.stringify({
-  ttr: '0.21',
+  ttr: '0.22',
   model: 'er',
   defs: [{ kind: 'entity', id: 'Item', properties: { description: 'Příliš žluťoučký 🐈' } }],
 });
-const request = (source, from = '0.21', to = '0.21') =>
+const request = (source, from = '0.22', to = '0.22') =>
   JSON.stringify({ operation: 'migrate', from, to, source });
 const invoke = (source) => spawnSync(bridge, [], { input: source, encoding: 'utf8' });
 const runCli = (files, extra = []) =>
   spawnSync(
     process.execPath,
-    [cli, 'migrate-yaml', ...files, '--from', '0.21', '--to', '0.21', '--bridge', bridge, ...extra],
+    [cli, 'migrate-yaml', ...files, '--from', '0.22', '--to', '0.22', '--bridge', bridge, ...extra],
     { encoding: 'utf8' }
   );
 function withFiles(action) {
@@ -52,7 +52,7 @@ test('packaged UTF-8 bridge normalizes and then reaches an unchanged fixed point
 test('packaged bridge reports located YAML errors only on stderr', () => {
   const result = invoke(
     request(
-      'ttr: "0.21"\nmodel: er\ndefs:\n - kind: entity\n   id: E\n   properties:\n     unknown: 1\n'
+      'ttr: "0.22"\nmodel: er\ndefs:\n - kind: entity\n   id: E\n   properties:\n     unknown: 1\n'
     )
   );
   assert.equal(result.status, 2);
@@ -109,11 +109,24 @@ test('real TS CLI refuses an undeclared dialect before any batch write', () =>
     assert.deepEqual(readdirSync(dir).sort(), ['first.yaml', 'foreign.yaml']);
   }));
 
+test('packaged bridge migrates a 0.21 document by its marker, then reads it as 0.22', () => {
+  const old = input.replace('"ttr":"0.22"', '"ttr":"0.21"');
+  assert.notEqual(old, input);
+  const result = invoke(request(old, '0.21', '0.22'));
+  assert.equal(result.status, 0, result.stderr);
+  const value = JSON.parse(result.stdout);
+  assert.equal(value.changed, true);
+  assert.equal(value.source, JSON.parse(invoke(request(input)).stdout).source);
+  const refused = invoke(request(input, '0.21', '0.22'));
+  assert.equal(refused.status, 2);
+  assert.match(refused.stderr, /Expected ttr: "0.21"/);
+});
+
 test('real TS CLI refuses unsupported target versions without writing', () =>
   withFiles((dir) => {
     const path = join(dir, 'model.yaml');
     writeFileSync(path, input);
-    const result = runCli([path], ['--to', '0.22']);
+    const result = runCli([path], ['--to', '0.23']);
     assert.equal(result.status, 2);
     assert.match(result.stderr, /No registered canonical YAML migration/);
     assert.equal(readFileSync(path, 'utf8'), input);
@@ -121,7 +134,7 @@ test('real TS CLI refuses unsupported target versions without writing', () =>
 
 test('real launcher refuses depth 1,000 at the guard node and without a stack trace', () => {
   const source =
-    "ttr: '0.21'\nmodel: automation\ndefs:\n  - kind: program\n    id: D\n    properties:\n      a: " +
+    "ttr: '0.22'\nmodel: automation\ndefs:\n  - kind: program\n    id: D\n    properties:\n      a: " +
     '['.repeat(1000) +
     '1' +
     ']'.repeat(1000) +
@@ -134,7 +147,7 @@ test('real launcher refuses depth 1,000 at the guard node and without a stack tr
 
 test('real launcher locates 100,000 nested retained calc brackets at the argument scalar', () => {
   const source =
-    "ttr: '0.21'\nmodel: md\ndefs:\n  - kind: map\n    id: Convert\n    properties:\n" +
+    "ttr: '0.22'\nmodel: md\ndefs:\n  - kind: map\n    id: Convert\n    properties:\n" +
     "      calc:\n        name: convert\n        args:\n          input: '" +
     '['.repeat(100000) +
     '1' +

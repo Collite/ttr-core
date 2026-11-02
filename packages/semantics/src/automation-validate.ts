@@ -9,6 +9,10 @@
  * (`stock/automation-stdlib.ttrm`, see `loadAutomationStdlib` in `node-only`) joins the project when
  * the caller passes it and the project needs it (`automationStdlibNeeded`). Name matching is by
  * object name within the project (`role.ops` → the role `ops`).
+ *
+ * Grammar 0.22 (D-142): the orchestration constructs the process engine took over still parse for one
+ * release and are refused here, one `ttr/automation-removed` error each, naming its `CUT-nnn` and what
+ * models it now (`removed-constructs.ts`, the twin of Kotlin `RemovedConstructs`).
  */
 import type {
   AttributeDef,
@@ -17,11 +21,21 @@ import type {
   AutomationDef,
   Document,
   EntityDef,
-  ProcessDef,
   RoleDef,
   SourceLocation,
   WorldDef,
 } from '@tatrman/parser';
+import {
+  CUTS,
+  REMOVED_CODE,
+  cutMessage,
+  isEventPort,
+  isNativeTarget,
+  isRemovedKey,
+  isRemovedSink,
+  removedInEntries,
+  type Cut,
+} from './removed-constructs.js';
 
 export type AutomationSeverity = 'error' | 'warning' | 'info';
 
@@ -35,15 +49,12 @@ export interface AutomationDiagnostic {
 const PARAMETER_TYPES = new Set(['decimal', 'int', 'text', 'date', 'days', 'working_days', 'bool']);
 const DURATION_UNITS = new Set(['seconds', 'minutes', 'hours', 'days', 'working_days', 'weeks', 'months']);
 const COLUMN_TYPES = new Set(['text', 'int', 'decimal', 'date', 'timestamp', 'bool', 'rows', 'role', 'action']);
-const NATIVE_SINKS = new Set(['transition', 'writer', 'deliver', 'task', 'obligation', 'start', 'emit']);
+const NATIVE_SINKS = new Set(['transition', 'writer', 'obligation']);
 const APPROVAL_KINDS = new Set(['recipe', 'values', 'program', 'deployment', 'personal']);
-const PORTS = new Set(['none', 'key', 'keys', 'event']);
-const STEP_PORTS = new Set(['key', 'keys']);
+const PORTS = new Set(['none', 'key', 'keys']);
 const MODES = new Set(['batch', 'on_event', 'windowed']);
 const PROTOCOLS = new Set(['always', 'on_route']);
 const GRANULARITIES = new Set(['recipe', 'parts', 'islands']);
-const UNTIL = new Set(['fulfilled', 'due', 'absent']);
-const DIGEST_PER = new Set(['day', 'week']);
 const DEPLOYMENT_FLAGS = ['dry_run', 'enabled', 'debug', 'ungoverned', 'allow_restricted_view', 'approval_override', 'obo_only'];
 const WHO_SHAPE = '`role.<r>`, `identity.<i>`, `user.<u>`, `user "<u>"`, `*` or "*"';
 
@@ -57,24 +68,21 @@ const TYPED: Record<string, Set<string>> = {
   identity: new Set(),
   grant: new Set(),
   deployment: new Set(['target']),
-  step: new Set(),
 };
 
 /** Known free-form keys per kind (the typed alternatives are always allowed). */
 const KNOWN: Record<string, Set<string>> = {
   parameter: new Set(['value']),
-  action: new Set(['sinks', 'approval', 'deliverable', 'due', 'on_due', 'dry_run']),
+  action: new Set(['sinks', 'approval', 'deliverable', 'due', 'dry_run']),
   service: new Set(['request', 'response', 'timeout', 'budget', 'write', 'idempotency']),
   approval: new Set(['by', 'quorum']),
   program: new Set([
-    'recipe', 'port', 'event', 'mode', 'as_of', 'deliver', 'schedule', 'overrides', 'budget', 'turn_budget', 'ask_due', 'protocol',
+    'recipe', 'port', 'mode', 'as_of', 'overrides', 'budget', 'turn_budget', 'protocol',
   ]),
-  role: new Set(['resolve', 'members', 'delivery']),
+  role: new Set(['resolve', 'members']),
   identity: new Set(['principal', 'credential']),
   grant: new Set(['who', 'program', 'as']),
-  deployment: new Set(['program', 'process', 'run_as', 'trigger', 'granularity', 'read_ceiling', ...DEPLOYMENT_FLAGS]),
-  process: new Set(['instance']),
-  step: new Set(['program', 'port', 'after']),
+  deployment: new Set(['program', 'run_as', 'granularity', 'read_ceiling', ...DEPLOYMENT_FLAGS]),
 };
 
 /** A project needs the stdlib when a document declares `model automation` (an import path segment does not count). */
@@ -236,6 +244,15 @@ class Ctx {
     this.out.push({ code, message, severity, source });
   }
 
+  /** The removed constructs among [entries] (D-142), one error each; the key is not reported as unknown. */
+  private removed(kind: string, what: string, entries: readonly { key: string; value: AutoValue; source: SourceLocation }[]): void {
+    for (const hit of removedInEntries(kind, entries)) this.cut(what, hit.cut, hit.at);
+  }
+
+  private cut(what: string, c: Cut, at: SourceLocation): void {
+    this.report(REMOVED_CODE, `${what}: ${c.ref} ${cutMessage(c)}`, at);
+  }
+
   // ----- the six kinds -----
 
   automation(def: AutomationDef): void {
@@ -243,6 +260,7 @@ class Ctx {
     const what = `${def.kind} '${def.name}'`;
     this.commonEntries(def.kind, what, def);
     this.misplaced(def.kind, what, def, def.source);
+    this.removed(def.kind, what, def.entries);
     switch (def.kind) {
       case 'parameter':
         this.parameter(def, what);
@@ -293,7 +311,10 @@ class Ctx {
     if (!sinks) this.missing(what, 'sinks', def.source);
     else if (sinks.kind === 'autoObject') {
       for (const e of sinks.entries) {
-        if (e.key === 'native') this.enumId(what, 'sinks.native', e.value, NATIVE_SINKS);
+        if (e.key === 'native') {
+          // a removed sink (`deliver`, `task`, `start`, `emit`) is refused by `removed`
+          if (!isRemovedSink(e.value)) this.enumId(what, 'sinks.native', e.value, NATIVE_SINKS);
+        }
         else if (!(e.value.kind === 'string' || e.value.kind === 'tripleString' || e.value.kind === 'id')) {
           // a target's sink is its own vocabulary (a node name, `door`, `message`, …)
           this.report('ttr/automation-invalid-value', `${what}: sink '${e.key}' must be a name or a string`, e.value.source);
@@ -306,12 +327,6 @@ class Ctx {
     if (deliverable) this.bool(what, 'deliverable', deliverable);
     const due = entry(def, 'due');
     if (due) this.duration(what, 'due', due);
-    const onDue = entry(def, 'on_due');
-    if (onDue) {
-      if (onDue.kind === 'call') {
-        if (!this.ix.has('action', onDue.name)) this.unknownRef(what, 'on_due', 'action', onDue.name, onDue.source);
-      } else this.shape(what, 'on_due', 'an action call `<action> { … }`', onDue);
-    }
     const dryRun = entry(def, 'dry_run');
     if (dryRun && dryRun.kind !== 'autoObject') this.shape(what, 'dry_run', 'a localized text `{ en: …, cs: … }`', dryRun);
     const t = def.transition;
@@ -388,34 +403,13 @@ class Ctx {
     } else this.shape(what, 'recipe', 'a recipe name', recipe);
     const port = entry(def, 'port');
     if (!port) this.missing(what, 'port', def.source);
-    else this.enumId(what, 'port', port, PORTS);
-    const event = entry(def, 'event');
-    const isEventPort = idPath(port) === 'event';
-    if (isEventPort && !event) this.report('ttr/automation-event-port-mismatch', `${what}: \`port: event\` needs an \`event:\` schema`, def.source);
-    if (event && !isEventPort) this.report('ttr/automation-event-port-mismatch', `${what}: \`event:\` is only read with \`port: event\``, event.source);
-    if (event) {
-      if (event.kind === 'id') this.schemaRef(what, 'event', event);
-      else this.shape(what, 'event', 'a `def schema` name', event);
-    }
+    // `port: event` is refused by `removed` (D-142)
+    else if (!isEventPort(port)) this.enumId(what, 'port', port, PORTS);
     const mode = entry(def, 'mode');
     if (!mode) this.missing(what, 'mode', def.source);
     else this.enumId(what, 'mode', mode, MODES);
     const asOf = entry(def, 'as_of');
     if (asOf && asOf.kind !== 'string' && asOf.kind !== 'tripleString') this.enumId(what, 'as_of', asOf, new Set(['run', 'event']));
-    const deliver = entry(def, 'deliver');
-    if (deliver) {
-      const digest = objEntry(deliver, 'digest');
-      if (idPath(deliver) === 'immediate') {
-        // ok
-      } else if (digest && digest.kind === 'autoObject') {
-        const per = entry(digest, 'per');
-        if (per) this.enumId(what, 'deliver.digest.per', per, DIGEST_PER);
-        else this.missing(what, 'deliver.digest.per', deliver.source);
-        if (!entry(digest, 'by')) this.missing(what, 'deliver.digest.by', deliver.source);
-      } else this.shape(what, 'deliver', '`immediate` or `{ digest: { by: …, per: day | week } }`', deliver);
-    }
-    const schedule = entry(def, 'schedule');
-    if (schedule && schedule.kind !== 'string' && schedule.kind !== 'tripleString') this.shape(what, 'schedule', 'a string', schedule);
     const overrides = entry(def, 'overrides');
     if (overrides) {
       if (overrides.kind === 'autoObject') {
@@ -445,8 +439,6 @@ class Ctx {
         }
       } else this.shape(what, 'turn_budget', '`{ per_run: <int>, per_candidate: <int> }`', turnBudget);
     }
-    const askDue = entry(def, 'ask_due');
-    if (askDue) this.duration(what, 'ask_due', askDue);
     const protocol = entry(def, 'protocol');
     if (protocol) this.enumId(what, 'protocol', protocol, PROTOCOLS);
   }
@@ -456,7 +448,8 @@ class Ctx {
   role(def: RoleDef): void {
     const what = `role '${def.name}'`;
     const entries = def.entries ?? [];
-    for (const e of entries) if (!KNOWN.role.has(e.key)) this.unknownKey(what, e.key, e.source);
+    for (const e of entries) if (!KNOWN.role.has(e.key) && !isRemovedKey('role', e.key)) this.unknownKey(what, e.key, e.source);
+    this.removed('role', what, entries);
     const keys = new Set(entries.map((e) => e.key));
     if (keys.has('resolve') === keys.has('members')) {
       this.report('ttr/automation-role-resolve', `${what}: declare exactly one of \`resolve:\` and \`members:\``, def.source);
@@ -470,8 +463,6 @@ class Ctx {
     if (members && !(members.kind === 'autoList' && members.items.every((i) => i.kind === 'string' || i.kind === 'tripleString'))) {
       this.shape(what, 'members', 'a list of strings', members);
     }
-    const delivery = entry(body, 'delivery');
-    if (delivery && delivery.kind !== 'autoObject') this.shape(what, 'delivery', 'an object `{ email: … }`', delivery);
   }
 
   // ----- the world members -----
@@ -482,7 +473,7 @@ class Ctx {
     // World members share one name space; a duplicate involving an automation member is an error (an
     // engine/executor/storage clash among themselves predates 0.16 and is left as it was).
     const seenNames = new Set([...world.engines, ...world.executors, ...world.storages].map((m) => m.name));
-    for (const m of [...(world.identities ?? []), ...(world.deployments ?? []), ...(world.processes ?? [])]) {
+    for (const m of [...(world.identities ?? []), ...(world.deployments ?? [])]) {
       if (seenNames.has(m.name)) this.report('ttr/automation-duplicate-member', `world '${world.name}': '${m.name}' names two members`, m.source);
       seenNames.add(m.name);
     }
@@ -506,7 +497,8 @@ class Ctx {
       seen.add(triple);
     }
     for (const d of world.deployments ?? []) this.deployment(d, executors);
-    for (const p of world.processes ?? []) this.process(p);
+    // `def process` parses for one release (grammar 0.22) only to be refused here (D-142).
+    for (const p of world.processes ?? []) this.cut(`process '${p.name}'`, CUTS.PROCESS, p.source);
     for (const storage of world.storages) {
       const writable = storage.manifest['writable'];
       if (!writable) continue;
@@ -575,28 +567,21 @@ class Ctx {
     const what = `deployment '${d.name}'`;
     this.commonEntries('deployment', what, d);
     this.misplaced('deployment', what, d, d.source);
+    this.removed('deployment', what, d.entries);
     const program = entry(d, 'program');
-    const process = entry(d, 'process');
-    if ((program === undefined) === (process === undefined)) {
-      this.report('ttr/automation-deployment-program-and-process', `${what}: declare exactly one of \`program:\` and \`process:\``, d.source);
-    }
+    // a deployment that ran a process (`process:`, refused by `removed`) is not also told it lacks a program
+    if (program === undefined && entry(d, 'process') === undefined) this.missing(what, 'program', d.source);
     if (program) {
       if (program.kind === 'id') {
         if (!this.ix.has('program', program.path)) this.unknownRef(what, 'program', 'program', program.path, program.source);
       } else this.shape(what, 'program', 'a program name', program);
     }
-    if (process) {
-      if (process.kind === 'id') {
-        if (!(this.currentWorld?.processes ?? []).some((p) => p.name === process.path)) {
-          this.unknownRef(what, 'process', 'process', process.path, process.source);
-        }
-      } else this.shape(what, 'process', 'a process name', process);
-    }
     const target = d.target;
     if (!target) this.missing(what, 'target', d.source);
     else if ('path' in target) {
-      if (target.path !== 'native' && !executors.has(target.path)) this.unknownRef(what, 'target', 'executor', target.path, target.source);
-    } else this.report('ttr/automation-invalid-value', `${what}: target is \`native\` or an executor name`, target.source);
+      if (isNativeTarget(target.path, executors)) this.cut(what, CUTS.NATIVE_TARGET, target.source);
+      else if (!executors.has(target.path)) this.unknownRef(what, 'target', 'executor', target.path, target.source);
+    } else this.report('ttr/automation-invalid-value', `${what}: target is an executor name`, target.source);
     const runAs = entry(d, 'run_as');
     if (!runAs) this.missing(what, 'run_as', d.source);
     else if (runAs.kind === 'id') {
@@ -605,10 +590,6 @@ class Ctx {
         else this.shape(what, 'run_as', '`caller`, `author` or `identity.<n>`', runAs);
       }
     } else this.shape(what, 'run_as', '`caller`, `author` or `identity.<n>`', runAs);
-    const trigger = entry(d, 'trigger');
-    if (trigger && !((trigger.kind === 'tagged' && trigger.tag === 'schedule') || idPath(trigger) === 'none')) {
-      this.shape(what, 'trigger', '`schedule "<cron or HH:MM TZ>"` or `none`', trigger);
-    }
     const granularity = entry(d, 'granularity');
     if (granularity) this.enumId(what, 'granularity', granularity, GRANULARITIES);
     for (const flag of DEPLOYMENT_FLAGS) {
@@ -617,43 +598,6 @@ class Ctx {
     }
     const ceiling = entry(d, 'read_ceiling');
     if (ceiling && !isPositiveInt(ceiling)) this.shape(what, 'read_ceiling', 'a positive integer', ceiling);
-  }
-
-  private process(p: ProcessDef): void {
-    const what = `process '${p.name}'`;
-    for (const e of p.entries) if (!KNOWN.process.has(e.key)) this.unknownKey(what, e.key, e.source);
-    const instance = entry(p, 'instance');
-    if (!instance) this.missing(what, 'instance', p.source);
-    else if (instance.kind === 'id') this.attributeRef(`${what} instance`, instance.path, instance.source);
-    else this.shape(what, 'instance', '`<entity>.<attribute>`', instance);
-    if (p.steps.length === 0) this.missing(what, 'steps', p.source);
-    for (const step of p.steps) {
-      const sw = `${what} step '${step.name}'`;
-      this.commonEntries('step', sw, step);
-      this.misplaced('step', sw, step, step.source);
-      const program = entry(step, 'program');
-      if (!program) this.missing(sw, 'program', step.source);
-      else if (program.kind === 'id') {
-        if (!this.ix.has('program', program.path)) this.unknownRef(sw, 'program', 'program', program.path, program.source);
-      } else this.shape(sw, 'program', 'a program name', program);
-      const port = entry(step, 'port');
-      if (!port) this.missing(sw, 'port', step.source);
-      else this.enumId(sw, 'port', port, STEP_PORTS);
-      const after = entry(step, 'after');
-      if (after) {
-        if (after.kind !== 'autoObject') this.shape(sw, 'after', '`{ obligation: …, time: …, until: [ … ] }`', after);
-        else {
-          for (const e of after.entries) {
-            if (e.key === 'obligation') continue;
-            if (e.key === 'time') this.duration(sw, 'after.time', e.value);
-            else if (e.key === 'until') {
-              const items = e.value.kind === 'autoList' ? e.value.items : [e.value];
-              for (const i of items) this.enumId(sw, 'after.until', i, UNTIL);
-            } else this.unknownKey(sw, `after.${e.key}`, e.source);
-          }
-        }
-      }
-    }
   }
 
   // ----- attribute lifecycle (D-67) -----
@@ -689,7 +633,7 @@ class Ctx {
       if (e.key === 'transition' || e.key === 'set') {
         const form = e.key === 'set' ? '<entity>.<attribute> = <column>' : '<entity>.<attribute> -> <state>';
         this.report('ttr/automation-malformed-property', `${what}: \`${e.key}:\` is \`${form}\``, e.source);
-      } else if (!known.has(e.key)) this.unknownKey(what, e.key, e.source);
+      } else if (!known.has(e.key) && !isRemovedKey(kind, e.key)) this.unknownKey(what, e.key, e.source);
     }
   }
 

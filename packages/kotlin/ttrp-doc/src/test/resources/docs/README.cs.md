@@ -20,7 +20,7 @@
 ## Co dělá
 
 - `verdict.release` → Uvolnit objednávku (`release`): `order` = `order_number`. Objednávka by byla uvolněna.
-- `verdict.release_confirmed` → `ask`: `about` = `order_number`, `action` = `release`, `due` = `2 working_days`, `on_due` = `hold { order: order_number, department: "Sales" }`, `who` = `role.sales_manager`
+- `verdict.release_confirmed` → `ask`: `about` = `order_number`, `action` = `release`, `due` = `2 working_days`, `who` = `role.sales_manager`
 - `verdict.hold_sales` → `hold`: `department` = `"Sales"`, `order` = `order_number`
 - `verdict.hold_sales` → `notify`: `detail` = `shortfall, price_differences`, `who` = `role.sales`
 - `verdict.hold_ar` → `hold`: `department` = `"AR"`, `order` = `order_number`

@@ -131,21 +131,10 @@ class RecipeTime(
         automation.filterIsInstance<AutomationParameter>().associateBy { it.qname.name }
     private lateinit var rows: RecipeRows
 
-    /** `:name` → its type: `as_of`, the recipe's parameters, the bound event / port columns. */
+    /** `:name` → its type: `as_of` and the recipe's parameters (D-142 took the event port's columns). */
     private val bindings: Map<String, RecipeType> by lazy {
         val out = LinkedHashMap<String, RecipeType>()
         out[RecipeChecker.AS_OF] = RecipeType.Scalar(TtrpType.Timestamp)
-        for (p in programs) {
-            if (p.port == "event") {
-                p.event?.let { e ->
-                    model
-                        ?.findRowSchemas(e.removePrefix("schema."), imports)
-                        ?.firstOrNull()
-                        ?.columns
-                        ?.forEach { c -> out.putIfAbsent(c.name, RecipeType.Scalar(attributeType(c.type))) }
-                }
-            }
-        }
         for (p in rg.recipe.parameters) parameters[p.text]?.let { out[p.text] = parameterType(it) }
         out
     }

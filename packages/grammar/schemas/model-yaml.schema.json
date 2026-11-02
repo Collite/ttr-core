@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://tatrman.org/schemas/0.21/model-yaml.schema.json",
+  "$id": "https://tatrman.org/schemas/0.22/model-yaml.schema.json",
   "title": "Canonical TTR YAML document",
   "type": "object",
   "properties": {
     "ttr": {
-      "const": "0.21"
+      "const": "0.22"
     },
     "package": {
       "$ref": "#/$defs/identifier"

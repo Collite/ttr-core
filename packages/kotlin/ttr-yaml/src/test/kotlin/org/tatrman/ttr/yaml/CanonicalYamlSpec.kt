@@ -131,7 +131,7 @@ class CanonicalYamlSpec :
             val sugar =
                 CanonicalYaml.read(
                     """
-                    ttr: "0.21"
+                    ttr: "0.22"
                     model: cn
                     defs:
                       - kind: kind
@@ -145,13 +145,13 @@ class CanonicalYamlSpec :
             CanonicalYaml.write(sugar) shouldContain "tag:"
             val bad =
                 listOf(
-                    "ttr: \"0.21\"\nttr: \"0.21\"",
-                    "ttr: \"0.21\"\n---\nttr: \"0.21\"",
-                    "ttr: \"0.21\"\nmodel: wrong",
+                    "ttr: \"0.22\"\nttr: \"0.22\"",
+                    "ttr: \"0.22\"\n---\nttr: \"0.22\"",
+                    "ttr: \"0.22\"\nmodel: wrong",
                     "ttr: \"0.20\"",
-                    "ttr: \"0.21\"\ndefs: &defs []",
-                    "ttr: \"0.21\"\ndefs: !java/object []",
-                    "ttr: \"0.21\"\ndefs: [{kind: entity, id: A, properties: {typo: true}}]",
+                    "ttr: \"0.22\"\ndefs: &defs []",
+                    "ttr: \"0.22\"\ndefs: !java/object []",
+                    "ttr: \"0.22\"\ndefs: [{kind: entity, id: A, properties: {typo: true}}]",
                 )
             bad.forEach { text ->
                 shouldThrowAny { CanonicalYaml.read(text, "invalid.yaml") }.message!! shouldContain "invalid.yaml:"

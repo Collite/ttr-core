@@ -278,7 +278,7 @@ sealed interface WiringValue : TtrpNode {
         override val location: SourceLocation,
     ) : WiringValue
 
-    /** An action call: `on_due: hold { order: order_number, department: "Sales" }` (D-98). */
+    /** An action call: an ask's `action: start { process: "purchasing" }` (D-98). */
     data class Call(
         val action: String,
         val args: List<WiringArg>,

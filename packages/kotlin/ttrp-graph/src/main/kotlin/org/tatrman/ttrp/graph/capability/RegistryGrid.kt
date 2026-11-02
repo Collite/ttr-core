@@ -38,62 +38,58 @@ class RegistryGrid(
         world: World,
         bundle: RegistryBundle,
     ): List<RegistryCell> =
-        world.deployments.sortedBy { it.qname.name }.flatMap { d ->
-            val names =
-                d.program?.let { listOf(it) }
-                    ?: requireNotNull(world.process(d.process!!)) {
-                        "unknown process ${d.process}"
-                    }.steps.map { requireNotNull(it.program) }
-            names.map { name ->
-                val program = requireNotNull(bundle.programs[name]) { "unknown program $name" }
-                val recipe = requireNotNull(bundle.recipes[program.recipe]) { "missing bundle for ${program.recipe}" }
-                val type = executorType(world, d)
-                val manifest = requireNotNull(manifests.load(type)) { "unknown executor type $type" }
-                RegistryCell(
-                    d.qname.name,
-                    name,
-                    type,
-                    program.mode ?: "",
-                    ExecutorManifestGate.checkRecipe(
-                        manifest,
-                        program,
-                        d,
-                        recipe.copy(
-                            sinks =
-                                recipe.sinks +
-                                    recipe.actionSinks.mapValues { (_, sinks) ->
-                                        sinks[type] ?: sinks[type.substringBefore('_')]
-                                            ?: sinks["native"]
-                                            ?: "no"
-                                    },
-                        ),
+        world.deployments.sortedBy { it.qname.name }.map { d ->
+            val program = requireNotNull(bundle.programs[d.program]) { "unknown program ${d.program}" }
+            val recipe = requireNotNull(bundle.recipes[program.recipe]) { "missing bundle for ${program.recipe}" }
+            val type = executorType(world, d)
+            val manifest = requireNotNull(manifests.load(type)) { "unknown executor type $type" }
+            RegistryCell(
+                d.qname.name,
+                d.program,
+                type,
+                program.mode ?: "",
+                ExecutorManifestGate.checkRecipe(
+                    manifest,
+                    program,
+                    d,
+                    recipe.copy(
+                        sinks =
+                            recipe.sinks +
+                                recipe.actionSinks.mapValues { (_, sinks) ->
+                                    sinks[type] ?: sinks[type.substringBefore('_')]
+                                        ?: sinks["native"]
+                                        ?: "no"
+                                },
                     ),
-                )
-            }
+                ),
+            )
         }
 
     companion object {
+        /**
+         * The type of the world executor [deployment] targets. Grammar 0.22 (D-142): there is no `target: native`
+         * pseudo-executor any more — the Server is an executor of the world (`def executor server { extends: native }`),
+         * and an executor named `native` is resolved like any other.
+         */
         fun executorType(
             world: World,
             deployment: WorldDeployment,
-        ): String =
-            if (deployment.target ==
-                "native"
-            ) {
-                "native"
-            } else {
-                val executor =
-                    requireNotNull(
-                        world.executors.singleOrNull {
-                            it.qname.name == deployment.target
-                        },
-                    ) { "unknown executor ${deployment.target}" }
+        ): String {
+            val executor =
                 requireNotNull(
-                    executor.extendsRef ?: executor.type,
-                ) { "executor ${deployment.target} has no type" }.replace('-', '_')
-            }
+                    world.executors.singleOrNull {
+                        it.qname.name == deployment.target
+                    },
+                ) { "unknown executor ${deployment.target}" }
+            return requireNotNull(
+                executor.extendsRef ?: executor.type,
+            ) { "executor ${deployment.target} has no type" }.replace('-', '_')
+        }
     }
 }
+
+/** The Server's executor type. */
+private const val NATIVE = "native"
 
 internal fun recipeCellCheck(
     manifest: RecipeExecutorManifest,
@@ -123,6 +119,9 @@ internal fun recipeCellCheck(
         }
         for ((action, sink) in recipe.sinks) {
             val supported = manifest.entries("sinks")
+            // D-142: the Server records the action row of every wired action. One with no native sink is that row
+            // only — the engine acts on it (a send task, a user task, a call activity) — so the Server takes it.
+            if (sink == "no" && manifest.id == NATIVE) continue
             if (sink == "no" ||
                 (
                     supported["all"] in listOf(null, "no") &&

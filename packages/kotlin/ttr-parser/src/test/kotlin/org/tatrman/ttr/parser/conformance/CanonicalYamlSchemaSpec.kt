@@ -54,9 +54,9 @@ class CanonicalYamlSchemaSpec :
                     resource(name) shouldBe Files.readString(Path.of("../../grammar/schemas/$name"))
                     val json = mapper.readTree(resource(name))
                     if (name.endsWith("schema.json")) {
-                        json["\$id"].asText().substringAfter("/schemas/").substringBefore('/') shouldBe "0.21"
+                        json["\$id"].asText().substringAfter("/schemas/").substringBefore('/') shouldBe "0.22"
                     } else {
-                        json["version"].asText() shouldBe "0.21"
+                        json["version"].asText() shouldBe "0.22"
                     }
                 }
             }

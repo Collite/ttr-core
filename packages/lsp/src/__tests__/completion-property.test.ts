@@ -83,6 +83,40 @@ describe('completion-property', () => {
     expect(labels).toContain('search');
   });
 
+  it('D-142: an automation role offers resolve and members, never the removed delivery', async () => {
+    await clientConnection.sendRequest('initialize', {
+      processId: null,
+      rootUri: null,
+      capabilities: {},
+    });
+    clientConnection.sendNotification('initialized', {});
+
+    clientConnection.sendNotification('textDocument/didOpen', {
+      textDocument: {
+        uri: 'file:///role.ttrm',
+        languageId: 'ttr',
+        version: 1,
+        text: `model automation
+def role sales {
+  res
+}`,
+      },
+    });
+
+    await sleep(50);
+
+    const result = await clientConnection.sendRequest('textDocument/completion', {
+      textDocument: { uri: 'file:///role.ttrm' },
+      position: { line: 2, character: 2 },
+      context: { triggerKind: 1 },
+    }) as { isIncomplete: boolean; items: unknown[] };
+
+    const labels = (result.items as Array<{ label: string }>).map((i) => i.label);
+    expect(labels).toContain('resolve');
+    expect(labels).toContain('members');
+    expect(labels).not.toContain('delivery');
+  });
+
   it('returns property names inside column def body', async () => {
     await clientConnection.sendRequest('initialize', {
       processId: null,

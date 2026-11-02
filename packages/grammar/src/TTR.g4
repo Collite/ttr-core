@@ -1,7 +1,9 @@
 // =============================================================================
 // TTR (Tatrman) grammar
 //
-// @grammar-version: 0.21
+// @grammar-version: 0.22
+// 0.22 (AU-core CG, D-142): the orchestration constructs are removed from the language — `def process`
+// and a role's `delivery:` stay ONE release as recognisers only, so the semantics refuse them (TTRP-CUT).
 // 0.21 (MW-53): lexical indexSecurity; query skipSecurity; parameter
 // defaultValue and binds. Typed optional declarations; execution stays host-owned.
 // 0.21.x (CN-P8 S8.6): variant = subkind alias (CN-D32) — one soft keyword, one stereotype.
@@ -636,8 +638,8 @@ worldMember
   | DEF STORAGE  id storageDef
   | DEF IDENTITY   id autoBody                        // 0.16 — a service principal (D-90)
   | DEF GRANT         autoBody                        // 0.16 — UNNAMED; keyed by its who/program/as triple (D-91)
-  | DEF DEPLOYMENT id autoBody                        // 0.16 — program|process × target × run_as (D-107)
-  | DEF PROCESS    id processBody                     // 0.16 — a stepped process instance (D-39, D-86)
+  | DEF DEPLOYMENT id autoBody                        // 0.16 — program × target × run_as (D-107)
+  | DEF PROCESS    id processBody                     // REMOVED 0.22 (D-142) — recognised only to be refused (TTRP-CUT-001)
   | worldProperty
   ;
 worldProperty    : descriptionProperty | tagsProperty | extendsProperty ;
@@ -706,7 +708,10 @@ transitionTarget   : id | LBRACE id RBRACE ;        // a state, or `{column}` �
 transitionGuard    : LBRACE FROM propSep? (listOfIds | id) RBRACE ;
 setProperty        : SET propSep? id EQUALS id ;    // set: order.held_for = department
 
-// `def process <id> { instance: …, steps: [ def step <id> { … } … ] }` (D-39, D-86).
+// `def process <id> { instance: …, steps: [ def step <id> { … } … ] }` (D-39, D-86). REMOVED in 0.22 (D-142): the
+// process engine runs processes now. The production stays for ONE release so a pre-0.22 world parses whole and the
+// automation validator / recipe checker refuse it once (TTRP-CUT-001), instead of a parse-error cascade; the model
+// has no process object. Deleted with STEP/STEPS in 0.23.
 processBody      : LBRACE (processProperty (COMMA? processProperty)* COMMA?)? RBRACE ;
 processProperty  : descriptionProperty | tagsProperty | stepsProperty | autoEntry ;
 stepsProperty    : STEPS propSep? LBRACK (stepInline COMMA?)* RBRACK ;
@@ -834,7 +839,7 @@ queryProperty            : descriptionProperty | tagsProperty | languageProperty
 roleProperty             : descriptionProperty | tagsProperty | labelProperty | searchBlockProperty | resolveProperty | deliveryProperty | membersProperty
                          | cnRefProperty | groundsProperty | involvesProperty | periodProperty | lexiconBlockProperty | cnEntry ;
 resolveProperty          : RESOLVE  propSep? autoValue ;   // resolve: keycloak_group "hartland-sales"
-deliveryProperty         : DELIVERY propSep? autoValue ;   // delivery: { email: "…" }
+deliveryProperty         : DELIVERY propSep? autoValue ;   // REMOVED 0.22 (D-142) — recognised only to be refused (TTRP-CUT-016)
 membersProperty          : MEMBERS  propSep? autoValue ;   // members: ["ana", "bo"] (MEMBERS reused from MD)
 
 er2cncRoleProperty       : descriptionProperty | tagsProperty | entityProperty_ | roleProperty_ ;

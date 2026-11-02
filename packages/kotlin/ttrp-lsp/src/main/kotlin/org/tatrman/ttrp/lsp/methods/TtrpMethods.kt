@@ -24,6 +24,7 @@ import org.eclipse.lsp4j.WorkspaceEdit
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.tatrman.ttrp.diagnostics.TtrpDiagnosticId
 import org.tatrman.ttrp.lsp.edit.GraphEditSynthesizer
+import org.tatrman.ttrp.lsp.nav.FragmentLinks
 import org.tatrman.ttrp.lsp.protocol.ApplyGraphEditParams
 import org.tatrman.ttrp.lsp.protocol.AuthoringContextParams
 import org.tatrman.ttrp.lsp.protocol.AuthoringContextResult
@@ -257,12 +258,21 @@ class TtrpMethods(
                 } else {
                     report.diagnostics
                 }
-            ValidateResult(diagnostics.map { toValidateDiagnostic(it, recipe?.let { r -> blockOf(r, it.location) }) })
+            // Placed as the editor places them (AnalysisScheduler): a finding inside a file-backed fragment on its
+            // `from` clause, one made in another file (a model file's TTRP-CUT-nnn) or with no position on the
+            // recipe's header, prefixed with where it was made — never at another file's line and column.
+            val links = FragmentLinks.of(uri, report.document)
+            val header = FragmentLinks.header(report.document)
+            ValidateResult(
+                diagnostics
+                    .map { FragmentLinks.anchor(it, fileNameOf(uri), links, header) }
+                    .map { toValidateDiagnostic(it, recipe?.let { r -> blockOf(r, it.location) }) },
+            )
         }
 
     /**
      * The recipe block [loc] sits in: a role container's or the decision's name, `actions`, or `recipe` for a header
-     * (`key:`, `parameters:` …); null outside the recipe.
+     * (`key:`, `parameters:` …); null outside the recipe, and for a finding located in another file.
      */
     private fun blockOf(
         recipe: RecipeDecl,
@@ -272,7 +282,7 @@ class TtrpMethods(
             outer.offsetStart <= loc.offsetStart &&
                 loc.offsetEnd <= outer.offsetEnd &&
                 outer.offsetEnd > outer.offsetStart
-        if (!inside(recipe.location)) return null
+        if (loc.file != recipe.location.file || !inside(recipe.location)) return null
         return recipe.members.firstOrNull { inside(it.location) }?.let { m ->
             when (m) {
                 is RoleContainer -> m.name

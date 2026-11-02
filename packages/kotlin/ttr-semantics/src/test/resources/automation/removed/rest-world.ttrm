@@ -1,0 +1,8 @@
+// D-142 (grammar 0.22): a deployment's connectors (TTRP-CUT-005).
+package acme.worlds
+model world
+
+def world w {
+    def executor x { extends: n8n_l1 }
+    def deployment d { program: q, target: x, run_as: caller, connectors: { deliver: "smtp", ask: "hebe" } }
+}

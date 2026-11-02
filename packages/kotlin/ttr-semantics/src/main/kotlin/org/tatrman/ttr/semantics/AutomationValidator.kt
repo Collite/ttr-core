@@ -9,7 +9,6 @@ import org.tatrman.ttr.parser.model.AutoEntry
 import org.tatrman.ttr.parser.model.AutoValue
 import org.tatrman.ttr.parser.model.AutomationDef
 import org.tatrman.ttr.parser.model.EntityDef
-import org.tatrman.ttr.parser.model.ProcessDef
 import org.tatrman.ttr.parser.model.PropertyValue
 import org.tatrman.ttr.parser.model.RoleDef
 import org.tatrman.ttr.parser.model.SchemaDef
@@ -34,9 +33,15 @@ data class AutomationDiagnostic(
  * Grammar 0.16 — the automation model's semantic contract (AU-core-P0 S0.2 T3; AU ttr-core
  * contracts §2–§3): the per-kind property contract of the one permissive grammar body (required
  * and known properties, enum values, durations), the references between the automation objects
- * (programs → recipes, event schemas; approvals → roles; grants, deployments and process steps →
- * programs, identities, executors), the action columns' attribute types, and the attribute
- * lifecycle (`states:` / `transitions:` and the actions' transitions against them, D-67/D-85).
+ * (programs → recipes; approvals → roles; grants and deployments → programs, identities, executors),
+ * the action columns' attribute types, and the attribute lifecycle (`states:` / `transitions:` and the
+ * actions' transitions against them, D-67/D-85).
+ *
+ * Grammar 0.22 (D-142): the orchestration constructs the process engine took over — `def process`,
+ * `trigger:`, `target: native`, the connectors, `deliver:`, `schedule:`, `ask_due:`, `port: event`,
+ * `event:`, the native sinks `deliver · task · start · emit`, `on_due:`, a role's `delivery:` — still
+ * parse for one release and are refused here, one [RemovedConstructs.CODE] error each, naming its
+ * `CUT-nnn` and what models it now.
  *
  * A standalone, project-scoped entry point (the [WorldValidator] precedent — NOT part of
  * [Validator], excluded from the conformance dump): references cross files, so it takes every
@@ -48,15 +53,12 @@ object AutomationValidator {
     private val PARAMETER_TYPES = setOf("decimal", "int", "text", "date", "days", "working_days", "bool")
     private val DURATION_UNITS = setOf("seconds", "minutes", "hours", "days", "working_days", "weeks", "months")
     private val COLUMN_TYPES = setOf("text", "int", "decimal", "date", "timestamp", "bool", "rows", "role", "action")
-    private val NATIVE_SINKS = setOf("transition", "writer", "deliver", "task", "obligation", "start", "emit")
+    private val NATIVE_SINKS = setOf("transition", "writer", "obligation")
     private val APPROVAL_KINDS = setOf("recipe", "values", "program", "deployment", "personal")
-    private val PORTS = setOf("none", "key", "keys", "event")
-    private val STEP_PORTS = setOf("key", "keys")
+    private val PORTS = setOf("none", "key", "keys")
     private val MODES = setOf("batch", "on_event", "windowed")
     private val PROTOCOLS = setOf("always", "on_route")
     private val GRANULARITIES = setOf("recipe", "parts", "islands")
-    private val UNTIL = setOf("fulfilled", "due", "absent")
-    private val DIGEST_PER = setOf("day", "week")
     private val DEPLOYMENT_FLAGS =
         setOf("dry_run", "enabled", "debug", "ungoverned", "allow_restricted_view", "approval_override", "obo_only")
 
@@ -73,38 +75,21 @@ object AutomationValidator {
             "identity" to emptySet(),
             "grant" to emptySet(),
             "deployment" to setOf("target"),
-            "step" to emptySet(),
         )
 
     /** Known free-form keys per kind (the typed alternatives are always allowed). */
     private val KNOWN =
         mapOf(
             "parameter" to setOf("value"),
-            "action" to setOf("sinks", "approval", "deliverable", "due", "on_due", "dry_run"),
+            "action" to setOf("sinks", "approval", "deliverable", "due", "dry_run"),
             "service" to setOf("request", "response", "timeout", "budget", "write", "idempotency"),
             "approval" to setOf("by", "quorum"),
             "program" to
-                setOf(
-                    "recipe",
-                    "port",
-                    "event",
-                    "mode",
-                    "as_of",
-                    "deliver",
-                    "schedule",
-                    "overrides",
-                    "budget",
-                    "turn_budget",
-                    "ask_due",
-                    "protocol",
-                ),
-            "role" to setOf("resolve", "members", "delivery"),
+                setOf("recipe", "port", "mode", "as_of", "overrides", "budget", "turn_budget", "protocol"),
+            "role" to setOf("resolve", "members"),
             "identity" to setOf("principal", "credential"),
             "grant" to setOf("who", "program", "as"),
-            "deployment" to
-                setOf("program", "process", "run_as", "trigger", "granularity", "read_ceiling") + DEPLOYMENT_FLAGS,
-            "process" to setOf("instance"),
-            "step" to setOf("program", "port", "after"),
+            "deployment" to setOf("program", "run_as", "granularity", "read_ceiling") + DEPLOYMENT_FLAGS,
         )
 
     /**
@@ -194,6 +179,21 @@ object AutomationValidator {
             out += AutomationDiagnostic(code, message, severity, source)
         }
 
+        /** The removed constructs among [entries] (D-142), one error each; the key is not reported as unknown. */
+        private fun removed(
+            kind: String,
+            what: String,
+            entries: List<AutoEntry>,
+        ) {
+            for (hit in RemovedConstructs.inEntries(kind, entries)) cut(what, hit.cut, hit.at)
+        }
+
+        private fun cut(
+            what: String,
+            c: RemovedConstructs.Cut,
+            at: SourceLocation,
+        ) = report(RemovedConstructs.CODE, "$what: ${c.ref} ${c.message}", at)
+
         // ----- the six kinds -----
 
         fun automation(def: AutomationDef) {
@@ -201,6 +201,7 @@ object AutomationValidator {
             val what = "${def.kind} '${def.name}'"
             commonEntries(def.kind, what, def.body)
             misplaced(def.kind, what, def.body, def.source)
+            removed(def.kind, what, def.body.entries)
             when (def.kind) {
                 "parameter" -> parameter(def, what)
                 "action" -> action(def, what)
@@ -279,7 +280,13 @@ object AutomationValidator {
                 is AutoValue.Obj ->
                     for (e in sinks.entries) {
                         if (e.key == "native") {
-                            enumId(what, "sinks.native", e.value, NATIVE_SINKS)
+                            // a removed sink (`deliver`, `task`, `start`, `emit`) is refused by [removed]
+                            if (!RemovedConstructs.isRemovedSink(
+                                    e.value,
+                                )
+                            ) {
+                                enumId(what, "sinks.native", e.value, NATIVE_SINKS)
+                            }
                         } else if (!(e.value is AutoValue.Str || e.value is AutoValue.Id)) {
                             // a target's sink is its own vocabulary (a node name, `door`, `message`, …)
                             report(
@@ -294,13 +301,6 @@ object AutomationValidator {
             body["approval"]?.let { enumId(what, "approval", it, setOf("none", "required")) }
             body["deliverable"]?.let { bool(what, "deliverable", it) }
             body["due"]?.let { duration(what, "due", it) }
-            body["on_due"]?.let { v ->
-                if (v is AutoValue.Call) {
-                    if (!ix.has("action", v.name)) unknownRef(what, "on_due", "action", v.name, v.source)
-                } else {
-                    shape(what, "on_due", "an action call `<action> { … }`", v)
-                }
-            }
             body["dry_run"]?.let {
                 if (it !is AutoValue.Obj) {
                     shape(
@@ -425,50 +425,14 @@ object AutomationValidator {
                 else -> shape(what, "recipe", "a recipe name", recipe)
             }
             val port = body["port"]
-            if (port == null) missing(what, "port", def.source) else enumId(what, "port", port, PORTS)
-            val event = body["event"]
-            val isEventPort = (port as? AutoValue.Id)?.ref?.path == "event"
-            if (isEventPort && event == null) {
-                report(
-                    "ttr/automation-event-port-mismatch",
-                    "$what: `port: event` needs an `event:` schema",
-                    def.source,
-                )
-            }
-            if (event != null && !isEventPort) {
-                report(
-                    "ttr/automation-event-port-mismatch",
-                    "$what: `event:` is only read with `port: event`",
-                    event.source,
-                )
-            }
-            if (event != null) {
-                if (event is AutoValue.Id) {
-                    schemaRef(
-                        what,
-                        "event",
-                        event,
-                    )
-                } else {
-                    shape(what, "event", "a `def schema` name", event)
-                }
+            when {
+                port == null -> missing(what, "port", def.source)
+                // `port: event` is refused by [removed] (D-142)
+                !RemovedConstructs.isEventPort(port) -> enumId(what, "port", port, PORTS)
             }
             val mode = body["mode"]
             if (mode == null) missing(what, "mode", def.source) else enumId(what, "mode", mode, MODES)
             body["as_of"]?.let { v -> if (v !is AutoValue.Str) enumId(what, "as_of", v, setOf("run", "event")) }
-            body["deliver"]?.let { v ->
-                when {
-                    (v as? AutoValue.Id)?.ref?.path == "immediate" -> {}
-                    v is AutoValue.Obj && v["digest"] is AutoValue.Obj -> {
-                        val digest = v["digest"] as AutoValue.Obj
-                        digest["per"]?.let { enumId(what, "deliver.digest.per", it, DIGEST_PER) }
-                            ?: missing(what, "deliver.digest.per", v.source)
-                        if (digest["by"] == null) missing(what, "deliver.digest.by", v.source)
-                    }
-                    else -> shape(what, "deliver", "`immediate` or `{ digest: { by: …, per: day | week } }`", v)
-                }
-            }
-            body["schedule"]?.let { if (it !is AutoValue.Str) shape(what, "schedule", "a string", it) }
             body["overrides"]?.let { v ->
                 if (v is AutoValue.Obj) {
                     for (e in v.entries) {
@@ -518,7 +482,6 @@ object AutomationValidator {
                     shape(what, "turn_budget", "`{ per_run: <int>, per_candidate: <int> }`", v)
                 }
             }
-            body["ask_due"]?.let { duration(what, "ask_due", it) }
             body["protocol"]?.let { enumId(what, "protocol", it, PROTOCOLS) }
         }
 
@@ -527,7 +490,12 @@ object AutomationValidator {
         fun role(def: RoleDef) {
             val what = "role '${def.name}'"
             val keys = def.entries.map { it.key }.toSet()
-            for (e in def.entries) if (e.key !in KNOWN.getValue("role")) unknownKey(what, e.key, e.source)
+            for (e in def.entries) {
+                if (e.key !in KNOWN.getValue("role") && !RemovedConstructs.isRemovedKey("role", e.key)) {
+                    unknownKey(what, e.key, e.source)
+                }
+            }
+            removed("role", what, def.entries)
             if (("resolve" in keys) == ("members" in keys)) {
                 report(
                     "ttr/automation-role-resolve",
@@ -547,9 +515,6 @@ object AutomationValidator {
                     shape(what, "members", "a list of strings", v)
                 }
             }
-            def.entries.lastOrNull { it.key == "delivery" }?.value?.let { v ->
-                if (v !is AutoValue.Obj) shape(what, "delivery", "an object `{ email: … }`", v)
-            }
         }
 
         // ----- the world members -----
@@ -564,8 +529,7 @@ object AutomationValidator {
                     world.storages.map { it.name to it.source }
             val automationMembers =
                 world.identities.mapNotNull { m -> m.name?.let { it to m.source } } +
-                    world.deployments.mapNotNull { m -> m.name?.let { it to m.source } } +
-                    world.processes.map { it.name to it.source }
+                    world.deployments.mapNotNull { m -> m.name?.let { it to m.source } }
             val seenNames = members.map { it.first }.toMutableSet()
             for ((name, source) in automationMembers) {
                 if (!seenNames.add(name)) {
@@ -590,7 +554,8 @@ object AutomationValidator {
                 }
             }
             for (d in world.deployments) deployment(d, executors)
-            for (p in world.processes) process(p)
+            // `def process` parses for one release (grammar 0.22) only to be refused here (D-142).
+            for (p in world.processes) cut("process '${p.name}'", RemovedConstructs.Cut.PROCESS, p.source)
             for (storage in world.storages) {
                 val writable = storage.manifest["writable"] ?: continue
                 val items = (writable as? PropertyValue.ListValue)?.items ?: listOf(writable)
@@ -717,15 +682,10 @@ object AutomationValidator {
             val what = "deployment '${d.name}'"
             commonEntries("deployment", what, d.body)
             misplaced("deployment", what, d.body, d.source)
+            removed("deployment", what, d.body.entries)
             val program = d.body["program"]
-            val process = d.body["process"]
-            if ((program == null) == (process == null)) {
-                report(
-                    "ttr/automation-deployment-program-and-process",
-                    "$what: declare exactly one of `program:` and `process:`",
-                    d.source,
-                )
-            }
+            // a deployment that ran a process (`process:`, refused by [removed]) is not also told it lacks a program
+            if (program == null && d.body["process"] == null) missing(what, "program", d.source)
             program?.let { v ->
                 if (v is AutoValue.Id) {
                     if (!ix.has("program", v.ref.path)) unknownRef(what, "program", "program", v.ref.path, v.source)
@@ -733,25 +693,19 @@ object AutomationValidator {
                     shape(what, "program", "a program name", v)
                 }
             }
-            process?.let { v ->
-                if (v is AutoValue.Id) {
-                    if (world?.processes?.none { it.name == v.ref.path } != false) {
-                        unknownRef(what, "process", "process", v.ref.path, v.source)
-                    }
-                } else {
-                    shape(what, "process", "a process name", v)
-                }
-            }
             when (val target = d.body.target) {
                 null -> missing(what, "target", d.source)
                 is TargetReferenceValue ->
-                    if (target.ref.path != "native" && target.ref.path !in executors) {
-                        unknownRef(what, "target", "executor", target.ref.path, target.source)
+                    when {
+                        RemovedConstructs.isNativeTarget(target.ref.path, executors) ->
+                            cut(what, RemovedConstructs.Cut.NATIVE_TARGET, target.source)
+                        target.ref.path !in executors ->
+                            unknownRef(what, "target", "executor", target.ref.path, target.source)
                     }
                 else ->
                     report(
                         "ttr/automation-invalid-value",
-                        "$what: target is `native` or an executor name",
+                        "$what: target is an executor name",
                         target.source,
                     )
             }
@@ -769,10 +723,6 @@ object AutomationValidator {
                     }
                 else -> shape(what, "run_as", "`caller`, `author` or `identity.<n>`", runAs)
             }
-            d.body["trigger"]?.let { v ->
-                val ok = (v is AutoValue.Tagged && v.tag == "schedule") || (v as? AutoValue.Id)?.ref?.path == "none"
-                if (!ok) shape(what, "trigger", "`schedule \"<cron or HH:MM TZ>\"` or `none`", v)
-            }
             d.body["granularity"]?.let { enumId(what, "granularity", it, GRANULARITIES) }
             for (flag in DEPLOYMENT_FLAGS) d.body[flag]?.let { bool(what, flag, it) }
             d.body["read_ceiling"]?.let {
@@ -781,53 +731,6 @@ object AutomationValidator {
                     )
                 ) {
                     shape(what, "read_ceiling", "a positive integer", it)
-                }
-            }
-        }
-
-        private fun process(p: ProcessDef) {
-            val what = "process '${p.name}'"
-            for (e in p.entries) if (e.key !in KNOWN.getValue("process")) unknownKey(what, e.key, e.source)
-            when (val instance = p["instance"]) {
-                null -> missing(what, "instance", p.source)
-                is AutoValue.Id -> attributeRef("$what instance", instance.ref.path, instance.source)
-                else -> shape(what, "instance", "`<entity>.<attribute>`", instance)
-            }
-            if (p.steps.isEmpty()) missing(what, "steps", p.source)
-            for (step in p.steps) {
-                val sw = "$what step '${step.name}'"
-                commonEntries("step", sw, step.body)
-                misplaced("step", sw, step.body, step.source)
-                when (val program = step.body["program"]) {
-                    null -> missing(sw, "program", step.source)
-                    is AutoValue.Id ->
-                        if (!ix.has(
-                                "program",
-                                program.ref.path,
-                            )
-                        ) {
-                            unknownRef(sw, "program", "program", program.ref.path, program.source)
-                        }
-                    else -> shape(sw, "program", "a program name", program)
-                }
-                val port = step.body["port"]
-                if (port == null) missing(sw, "port", step.source) else enumId(sw, "port", port, STEP_PORTS)
-                step.body["after"]?.let { after ->
-                    if (after !is AutoValue.Obj) {
-                        shape(sw, "after", "`{ obligation: …, time: …, until: [ … ] }`", after)
-                    } else {
-                        for (e in after.entries) {
-                            when (e.key) {
-                                "obligation" -> {}
-                                "time" -> duration(sw, "after.time", e.value)
-                                "until" -> {
-                                    val items = (e.value as? AutoValue.ListV)?.items ?: listOf(e.value)
-                                    for (i in items) enumId(sw, "after.until", i, UNTIL)
-                                }
-                                else -> unknownKey(sw, "after.${e.key}", e.source)
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -887,7 +790,7 @@ object AutomationValidator {
                         "$what: `${e.key}:` is `${if (e.key == "set") "<entity>.<attribute> = <column>" else "<entity>.<attribute> -> <state>"}`",
                         e.source,
                     )
-                } else if (e.key !in known) {
+                } else if (e.key !in known && !RemovedConstructs.isRemovedKey(kind, e.key)) {
                     unknownKey(what, e.key, e.source)
                 }
             }

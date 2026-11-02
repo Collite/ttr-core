@@ -79,7 +79,7 @@ class ExplainCommandSpec :
             withClue(out) { code shouldBe 0 }
             out shouldContain
                 "decision   verdict(in orders, in shortfall, in price_differences, in overdue)  switch v  overlapping"
-            out shouldContain "verdict.release_confirmed -> ask { who, about, action, due, on_due: hold }"
+            out shouldContain "verdict.release_confirmed -> ask { who, about, action, due }"
             out shouldContain "checker · mode per-candidate · programs morning_release, release_on_placement"
             out shouldContain "context shortfall          canonical  per-candidate"
             out shouldContain "routes (overlapping): hold_sales, hold_ar, release_confirmed, release"

@@ -5,7 +5,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21"
+      "ttr": "0.22"
     }
   },
   {
@@ -14,7 +14,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "package": "demo.sales",
       "imports": [
         "demo.common.*"
@@ -30,7 +30,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "graph": {
         "id": "sales",
         "properties": {
@@ -51,7 +51,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "security": [
         [
           {
@@ -104,7 +104,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "models": []
     }
   },
@@ -114,7 +114,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "schema": "demo"
     }
   },
@@ -124,7 +124,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "locale": "cs"
     }
   },
@@ -134,7 +134,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "er",
       "graph": {
         "id": "g",
@@ -148,7 +148,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "invented"
     }
   },
@@ -158,7 +158,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "security": [
         [
           {
@@ -175,7 +175,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "security": [
         [
           {
@@ -193,7 +193,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "security": [
         [
           {
@@ -214,7 +214,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "entity",
@@ -246,7 +246,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "er",
       "defs": [
         {
@@ -275,7 +275,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "lexicon",
       "locale": "en",
       "defs": [
@@ -298,7 +298,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "binding",
       "defs": [
         {
@@ -318,7 +318,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "md",
       "defs": [
         {
@@ -339,7 +339,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "md",
       "defs": [
         {
@@ -367,7 +367,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "world",
       "defs": [
         {
@@ -427,7 +427,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "foreign_key",
@@ -443,7 +443,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "er2dbEntity",
@@ -459,7 +459,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "engine",
@@ -475,7 +475,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "entity",
@@ -493,7 +493,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "entity",
@@ -518,7 +518,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "entity",
@@ -543,7 +543,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "query",
@@ -561,7 +561,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "query",
@@ -584,7 +584,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "query",
@@ -609,7 +609,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "query",
@@ -632,7 +632,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "entities",
@@ -648,7 +648,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "graph": {
         "id": "x",
         "properties": {
@@ -663,7 +663,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "world",
@@ -687,7 +687,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "fk",
@@ -708,7 +708,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "fk",
@@ -737,7 +737,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "fk",
@@ -759,7 +759,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "entity",
@@ -792,7 +792,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "cn",
       "defs": [
         {
@@ -826,7 +826,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "cn",
       "defs": [
         {
@@ -854,7 +854,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "automation",
       "defs": [
         {
@@ -928,7 +928,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "query",
@@ -949,7 +949,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "cn",
       "defs": [
         {
@@ -972,7 +972,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "cn",
       "defs": [
         {
@@ -991,7 +991,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "cn",
       "defs": [
         {
@@ -1011,7 +1011,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "cn",
       "defs": [
         {
@@ -1035,7 +1035,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "entity",
@@ -1055,7 +1055,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "automation",
       "defs": [
         {
@@ -1075,7 +1075,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "query",
@@ -1096,7 +1096,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "query",
@@ -1118,7 +1118,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "entity",
@@ -1136,7 +1136,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "entity",
@@ -1156,7 +1156,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "fk",
@@ -1177,7 +1177,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "automation",
       "defs": [
         {
@@ -1873,7 +1873,7 @@
     "group": "exact vocabulary and nested types",
     "name": "lexical policy rejects boolean",
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "lexicon",
       "defs": [
         {
@@ -1892,7 +1892,7 @@
     "group": "exact vocabulary and nested types",
     "name": "search method typed",
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "entity",
@@ -1916,7 +1916,7 @@
     "group": "exact vocabulary and nested types",
     "name": "search method wrong argument",
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "entity",
@@ -1941,7 +1941,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -1961,7 +1961,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -1981,7 +1981,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2000,7 +2000,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2021,7 +2021,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2041,7 +2041,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2061,7 +2061,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2080,7 +2080,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2101,7 +2101,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2121,7 +2121,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2141,7 +2141,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2160,7 +2160,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2181,7 +2181,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2205,7 +2205,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2229,7 +2229,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2252,7 +2252,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2277,7 +2277,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2301,7 +2301,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2325,7 +2325,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2348,7 +2348,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2373,7 +2373,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2395,7 +2395,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2417,7 +2417,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2438,7 +2438,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2461,7 +2461,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2485,7 +2485,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2506,7 +2506,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2531,7 +2531,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2553,7 +2553,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2581,7 +2581,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2606,7 +2606,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2631,7 +2631,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -2653,7 +2653,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "kind",
@@ -2758,7 +2758,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "domain",
@@ -2783,7 +2783,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "domain",
@@ -2807,7 +2807,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "domain",
@@ -2834,7 +2834,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "domain",
@@ -2856,7 +2856,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "domain",
@@ -2880,7 +2880,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "domain",
@@ -2903,7 +2903,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "domain",
@@ -2928,7 +2928,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "domain",
@@ -2953,7 +2953,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "action",
@@ -2976,7 +2976,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "world",
@@ -3003,7 +3003,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "world",
@@ -3030,7 +3030,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "world",
@@ -3057,7 +3057,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "world",
@@ -3084,7 +3084,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "world",
@@ -3111,7 +3111,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "world",
@@ -3138,7 +3138,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "world",
@@ -3166,7 +3166,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "world",
@@ -3194,7 +3194,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "world",
@@ -3222,7 +3222,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "world",
@@ -3252,7 +3252,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "world",
@@ -3282,7 +3282,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "entity",
@@ -3320,7 +3320,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "query",
@@ -3342,7 +3342,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "role",
@@ -3366,7 +3366,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "action",
@@ -3388,7 +3388,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "action",
@@ -3410,7 +3410,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "action",
@@ -3431,7 +3431,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "kind",
@@ -3453,7 +3453,7 @@
     "schema": "model-yaml",
     "valid": false,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "kind",
@@ -3475,7 +3475,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "kind",
@@ -3496,7 +3496,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "kind",
@@ -3564,7 +3564,7 @@
     "valid": false,
     "path": "$.defs[0].properties.restrict.members",
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "domain",
@@ -3589,7 +3589,7 @@
     "valid": false,
     "path": "$.defs[0].properties.restrict.members",
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "defs": [
         {
           "kind": "domain",
@@ -3616,7 +3616,7 @@
     "schema": "model-yaml",
     "valid": true,
     "value": {
-      "ttr": "0.21",
+      "ttr": "0.22",
       "model": "cn",
       "defs": [
         {

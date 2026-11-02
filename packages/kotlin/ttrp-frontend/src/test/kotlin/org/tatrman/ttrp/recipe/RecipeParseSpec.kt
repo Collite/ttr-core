@@ -161,7 +161,7 @@ class RecipeParseSpec :
                 .shouldBeInstanceOf<ColumnRef>()
                 .column shouldBe
                 "order_number"
-            // the confirmation ask: a role, a duration, an action call for on_due (D-98)
+            // the confirmation ask: a role and a duration (D-98; D-142 took its `on_due:`)
             val ask = w[1]
             ask.action shouldBe "ask"
             ask.arg("who").shouldBeInstanceOf<WiringValue.Expr>().expression.shouldBeInstanceOf<ColumnRef>().let {
@@ -172,9 +172,7 @@ class RecipeParseSpec :
                 it.amount shouldBe 2L
                 it.unit shouldBe DurationUnit.WORKING_DAYS
             }
-            val onDue = ask.arg("on_due").shouldBeInstanceOf<WiringValue.Call>()
-            onDue.action shouldBe "hold"
-            onDue.args.map { it.name } shouldContainExactly listOf("order", "department")
+            ask.args.map { it.name } shouldContainExactly listOf("who", "about", "action", "due")
             // `detail: shortfall, price_differences` — a bare list
             w[3]
                 .arg(
