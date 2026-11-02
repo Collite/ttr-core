@@ -144,7 +144,7 @@ class RecipeCheckerSpec :
 
         "REC-011 — a daily batch program over a weekly window" {
             ids("rec-011-batch-scope.ttrp") shouldContainExactly listOf(TtrpDiagnosticId.REC_011)
-            message("rec-011-batch-scope.ttrp") shouldContain "`probe_daily_batch`"
+            message("rec-011-batch-scope.ttrp") shouldContain "`probe_keys_batch`"
         }
 
         "REC-012 — `port: key` on a set-level recipe" {

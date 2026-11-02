@@ -5,6 +5,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.tatrman.ttr.parser.loader.AutomationStdlib
 import org.tatrman.ttr.parser.loader.ParseResult
 import org.tatrman.ttr.parser.loader.TtrLoader
@@ -14,10 +15,11 @@ import java.nio.file.Path
 import java.nio.file.Paths
 
 /**
- * Grammar 0.16 — the automation validator (AU-core-P0 S0.2 T3). Design `17` §1–§2 (as written for
- * 0.16) validate clean against a hartland ER stub plus the implicit stdlib — the only findings are
- * the INFO "recipe not in the catalog yet" (the recipes are compiled at P2); each planted negative
- * fires exactly its code. Mirrors the TS `automation-validate.test.ts` on the same fixtures.
+ * Grammar 0.16 — the automation validator (AU-core-P0 S0.2 T3). Design `17` §1–§2 as written for 0.16 parse, and
+ * since grammar 0.22 (D-142) refuse exactly their orchestration constructs, one `ttr/automation-removed` each; the
+ * Core fixture model as cut validates clean against the implicit stdlib — the only findings are the INFO "recipe not
+ * in the catalog yet"; each planted negative fires exactly its code. Mirrors the TS `automation-validate.test.ts` on
+ * the same fixtures.
  */
 class AutomationValidatorSpec :
     StringSpec({
@@ -27,11 +29,56 @@ class AutomationValidatorSpec :
                 parse(locate("packages/kotlin/ttr-parser/src/test/resources/automation").resolve(it))
             } + parse(resource("automation/hartland-er-stub.ttrm"))
 
-        "17 §1–§2 validate clean: only the pre-catalog recipe INFOs" {
+        fun cutIds(diags: List<AutomationDiagnostic>): List<String> =
+            diags.filter { it.code == RemovedConstructs.CODE }.map {
+                Regex("TTRP-CUT-\\d{3}").find(it.message)?.value ?: error("no TTRP-CUT id in ${it.message}")
+            }
+
+        "D-142: 17 §1–§2 as written refuse exactly their removed constructs, one finding each" {
             val diags = AutomationValidator.validate(hartland())
+            diags.filter { it.severity != "info" }.map { it.code }.toSet() shouldBe setOf(RemovedConstructs.CODE)
+            diags.filter { it.code == RemovedConstructs.CODE }.forEach { it.severity shouldBe "error" }
+            cutIds(diags).groupingBy { it }.eachCount() shouldBe
+                mapOf(
+                    "TTRP-CUT-001" to 1, // def process return_line_flow
+                    "TTRP-CUT-002" to 1, // returns_n8n { process: … }
+                    "TTRP-CUT-003" to 4, // trigger: schedule … on four deployments
+                    "TTRP-CUT-004" to 8, // target: native
+                    "TTRP-CUT-006" to 2, // deliver: (digest, immediate)
+                    "TTRP-CUT-007" to 4, // schedule:
+                    "TTRP-CUT-009" to 3, // port: event
+                    "TTRP-CUT-010" to 3, // event: schema.…
+                    "TTRP-CUT-011" to 2, // sinks.native: deliver
+                    "TTRP-CUT-012" to 2, // sinks.native: task
+                    "TTRP-CUT-013" to 1, // sinks.native: start
+                    "TTRP-CUT-016" to 2, // role delivery:
+                )
+            val process = diags.single { it.message.contains("TTRP-CUT-001") }
+            process.message shouldContain "process 'return_line_flow'"
+            process.message shouldContain "model it in the process engine"
+        }
+
+        "D-142: the constructs 17 does not use are refused too (ask_due, emit, on_due, connectors)" {
+            val project =
+                listOf(
+                    parse(resource("automation/hartland-er-stub.ttrm")),
+                    parse(resource("automation/negative/common.ttrm")),
+                    parse(resource("automation/removed/rest.ttrm")),
+                    parse(resource("automation/removed/rest-world.ttrm")),
+                )
+            val diags = AutomationValidator.validate(project)
+            diags.filter { it.severity != "info" }.map { it.code }.toSet() shouldBe setOf(RemovedConstructs.CODE)
+            cutIds(diags) shouldContainExactlyInAnyOrder
+                listOf("TTRP-CUT-008", "TTRP-CUT-014", "TTRP-CUT-015", "TTRP-CUT-005", "TTRP-CUT-005")
+        }
+
+        "the Core fixture model as cut validates clean: only the pre-catalog recipe INFOs" {
+            val root = locate("packages/kotlin/ttrp-graph/src/test/resources/fixtures/recipes/model/hartland")
+            val files =
+                Files.walk(root).use { s -> s.filter { it.toString().endsWith(".ttrm") }.sorted().toList() }
+            val diags = AutomationValidator.validate(files.map { parse(it) })
             diags.filter { it.severity != "info" } shouldBe emptyList()
             diags.map { it.code }.toSet() shouldBe setOf("ttr/automation-recipe-precatalog")
-            diags.size shouldBe 8 // one per program
         }
 
         "the stdlib joins a project that declares `model automation` (obligation.state resolves)" {
@@ -48,9 +95,9 @@ class AutomationValidatorSpec :
         }
 
         listOf(
-            "neg-01-deployment-program-and-process.ttrm" to listOf("ttr/automation-deployment-program-and-process"),
+            "neg-01-deployment-without-program.ttrm" to listOf("ttr/automation-missing-property"),
             "neg-02-duplicate-grant.ttrm" to listOf("ttr/automation-duplicate-grant"),
-            "neg-03-event-not-schema.ttrm" to listOf("ttr/automation-event-not-schema"),
+            "neg-03-not-a-schema.ttrm" to listOf("ttr/automation-event-not-schema"),
             "neg-04-transitions-unknown-state.ttrm" to listOf("ttr/states-unknown-state"),
             "neg-05-action-transition-unknown-state.ttrm" to listOf("ttr/states-unknown-state"),
             "neg-06-writable-unknown-entity.ttrm" to listOf("ttr/automation-writable-unknown-entity"),

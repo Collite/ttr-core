@@ -1,0 +1,7 @@
+// D-142 (grammar 0.22): the removed constructs design 17 does not use — refused one each (TTRP-CUT-005, -008,
+// -014, -015). The `17` fixtures (ttr-parser `automation/`) carry the rest.
+package acme.automation
+model automation
+
+def program q { recipe: r, port: none, mode: batch, ask_due: 2 working_days }
+def action e  { columns: [def column order { type: order.order_number }], sinks: { native: emit }, on_due: e { order: order } }

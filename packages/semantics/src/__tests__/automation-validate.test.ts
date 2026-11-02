@@ -10,8 +10,9 @@ import { ProjectSymbolTable } from '../project-symbols.js';
 import { Resolver } from '../resolver.js';
 
 // Grammar 0.16 — the TS twin of the Kotlin `AutomationValidatorSpec` (AU-core-P0 S0.2 T4), on the
-// same fixtures: design `17` §1–§2 (ttr-parser test resources) validate clean against the hartland
-// ER stub plus the implicit stdlib; each planted negative fires exactly its code.
+// same fixtures: design `17` §1–§2 as written (ttr-parser test resources) refuse exactly their removed
+// constructs since grammar 0.22 (D-142); the Core fixture model as cut validates clean against the
+// implicit stdlib; each planted negative fires exactly its code.
 const KOTLIN = join(__dirname, '../../../kotlin');
 const AUTOMATION = join(KOTLIN, 'ttr-parser/src/test/resources/automation');
 const SEMANTIC = join(KOTLIN, 'ttr-semantics/src/test/resources/automation');
@@ -29,13 +30,75 @@ function hartland(): Document[] {
   ];
 }
 
+const REMOVED = 'ttr/automation-removed';
+
+function cutIds(diags: { code: string; message: string }[]): string[] {
+  return diags
+    .filter((d) => d.code === REMOVED)
+    .map((d) => {
+      const id = /TTRP-CUT-\d{3}/.exec(d.message)?.[0];
+      if (!id) throw new Error(`no TTRP-CUT id in ${d.message}`);
+      return id;
+    });
+}
+
+function counts(ids: string[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const id of ids) out[id] = (out[id] ?? 0) + 1;
+  return out;
+}
+
+function ttrmFiles(dir: string): string[] {
+  return readdirSync(dir)
+    .flatMap((f) => {
+      const p = join(dir, f);
+      return statSync(p).isDirectory() ? ttrmFiles(p) : f.endsWith('.ttrm') ? [p] : [];
+    })
+    .sort();
+}
+
 describe('validateAutomationProject (grammar 0.16)', () => {
-  it('17 §1–§2 validate clean: only the pre-catalog recipe INFOs', async () => {
+  it('D-142: 17 §1–§2 as written refuse exactly their removed constructs, one finding each', async () => {
     const stdlib = await loadAutomationStdlib();
     const diags = validateAutomationProject(hartland(), { stdlib });
+    expect(new Set(diags.filter((d) => d.severity !== 'info').map((d) => d.code))).toEqual(new Set([REMOVED]));
+    for (const d of diags.filter((d) => d.code === REMOVED)) expect(d.severity).toBe('error');
+    expect(counts(cutIds(diags))).toEqual({
+      'TTRP-CUT-001': 1, // def process return_line_flow
+      'TTRP-CUT-002': 1, // returns_n8n { process: … }
+      'TTRP-CUT-003': 4, // trigger: schedule … on four deployments
+      'TTRP-CUT-004': 8, // target: native
+      'TTRP-CUT-006': 2, // deliver: (digest, immediate)
+      'TTRP-CUT-007': 4, // schedule:
+      'TTRP-CUT-009': 3, // port: event
+      'TTRP-CUT-010': 3, // event: schema.…
+      'TTRP-CUT-011': 2, // sinks.native: deliver
+      'TTRP-CUT-012': 2, // sinks.native: task
+      'TTRP-CUT-013': 1, // sinks.native: start
+      'TTRP-CUT-016': 2, // role delivery:
+    });
+    const process = diags.find((d) => d.message.includes('TTRP-CUT-001'))!;
+    expect(process.message).toContain("process 'return_line_flow'");
+    expect(process.message).toContain('model it in the process engine');
+  });
+
+  it('D-142: the constructs 17 does not use are refused too (ask_due, emit, on_due, connectors)', async () => {
+    const project = [
+      parse(join(SEMANTIC, 'hartland-er-stub.ttrm')),
+      parse(join(SEMANTIC, 'negative/common.ttrm')),
+      parse(join(SEMANTIC, 'removed/rest.ttrm')),
+      parse(join(SEMANTIC, 'removed/rest-world.ttrm')),
+    ];
+    const diags = validateAutomationProject(project, { stdlib: await loadAutomationStdlib() });
+    expect(new Set(diags.filter((d) => d.severity !== 'info').map((d) => d.code))).toEqual(new Set([REMOVED]));
+    expect(cutIds(diags).sort()).toEqual(['TTRP-CUT-005', 'TTRP-CUT-005', 'TTRP-CUT-008', 'TTRP-CUT-014', 'TTRP-CUT-015']);
+  });
+
+  it('the Core fixture model as cut validates clean: only the pre-catalog recipe INFOs', async () => {
+    const root = join(KOTLIN, 'ttrp-graph/src/test/resources/fixtures/recipes/model/hartland');
+    const diags = validateAutomationProject(ttrmFiles(root).map(parse), { stdlib: await loadAutomationStdlib() });
     expect(diags.filter((d) => d.severity !== 'info')).toEqual([]);
     expect(new Set(diags.map((d) => d.code))).toEqual(new Set(['ttr/automation-recipe-precatalog']));
-    expect(diags).toHaveLength(8); // one per program
   });
 
   it('the stdlib joins a project that declares `model automation` (obligation.state resolves)', () => {
@@ -49,9 +112,9 @@ describe('validateAutomationProject (grammar 0.16)', () => {
   });
 
   const negatives: Array<[string, string[]]> = [
-    ['neg-01-deployment-program-and-process.ttrm', ['ttr/automation-deployment-program-and-process']],
+    ['neg-01-deployment-without-program.ttrm', ['ttr/automation-missing-property']],
     ['neg-02-duplicate-grant.ttrm', ['ttr/automation-duplicate-grant']],
-    ['neg-03-event-not-schema.ttrm', ['ttr/automation-event-not-schema']],
+    ['neg-03-not-a-schema.ttrm', ['ttr/automation-event-not-schema']],
     ['neg-04-transitions-unknown-state.ttrm', ['ttr/states-unknown-state']],
     ['neg-05-action-transition-unknown-state.ttrm', ['ttr/states-unknown-state']],
     ['neg-06-writable-unknown-entity.ttrm', ['ttr/automation-writable-unknown-entity']],

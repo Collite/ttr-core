@@ -1,0 +1,5 @@
+// expect: ttr/automation-event-not-schema — a service's `request:` names a `def schema` (D-69).
+package acme.automation
+model automation
+
+def service q { request: nope, response: evt }
