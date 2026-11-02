@@ -64,7 +64,8 @@ import org.tatrman.ttrp.resolve.TargetResolution
  * - transitions against `states:` (REC-030);
  * - the turn rule (REC-040);
  * - time typing ([RecipeTime], REC-050);
- * - the orchestration constructs the grammar cut removed (D-142, TTRP-CUT-001…016), wherever the recipe meets them.
+ * - the orchestration constructs the grammar cut removed (D-142, TTRP-CUT-001…016): every one in the model the
+ *   recipe is checked against (the whole model, as the 0.22 metadata load refuses it), once per recipe check.
  *
  * The document-level shape (one recipe, DML, the decision body) is checked at parse time (`TtrpChecks`): a DML
  * island's TTRP-SQL-001 stops the compile before this pass would run.
