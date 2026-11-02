@@ -113,7 +113,7 @@ test('real TS CLI refuses unsupported target versions without writing', () =>
   withFiles((dir) => {
     const path = join(dir, 'model.yaml');
     writeFileSync(path, input);
-    const result = runCli([path], ['--to', '0.22']);
+    const result = runCli([path], ['--to', '0.23']);
     assert.equal(result.status, 2);
     assert.match(result.stderr, /No registered canonical YAML migration/);
     assert.equal(readFileSync(path, 'utf8'), input);
