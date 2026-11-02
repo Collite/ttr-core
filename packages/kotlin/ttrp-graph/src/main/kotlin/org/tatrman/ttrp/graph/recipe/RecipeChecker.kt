@@ -1201,8 +1201,12 @@ class RecipeChecker(
         val runtime = mutableSetOf(AS_OF)
         if (programs.any { it.port == "key" || it.port == "keys" }) runtime += keyColumns
         // D-142: a program still on the removed `port: event` bound its event's columns; its CUT-009/010 already fail
-        // the recipe, so its `:<event column>` reads are not refused a second time
-        val eventPort = programs.any { it.port == "event" }
+        // the recipe, so its `:<event column>` reads are not refused a second time. The question is CUT-009's own (the
+        // identifier `event`): a quoted `port: "event"` raises no CUT, so its unbound reads are REC-020.
+        val eventPort =
+            programs.any { p ->
+                p.properties.any { (key, value) -> key == "port" && RemovedConstructs.isEventPort(value) }
+            }
         val refs = paramRefs(recipe, rg)
         for (r in refs) {
             if (r.name !in declared && r.name !in runtime && !eventPort) {

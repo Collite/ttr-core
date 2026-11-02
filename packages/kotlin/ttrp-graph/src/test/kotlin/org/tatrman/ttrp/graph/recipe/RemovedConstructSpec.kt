@@ -207,6 +207,11 @@ class RemovedConstructSpec :
             val none = plan(planted("", reader("port: none")), source, "cut_event_reader.ttrp")
             cut(none).shouldBeEmpty()
             none.diagnostics.map { it.id } shouldContain TtrpDiagnosticId.REC_020
+            // a quoted `port: "event"` is not the removed construct (no CUT-009), so it silences nothing either
+            val quoted = plan(planted("", reader("port: \"event\"")), source, "cut_event_reader.ttrp")
+            cut(quoted).shouldBeEmpty()
+            quoted.ok shouldBe false
+            quoted.diagnostics.map { it.id } shouldContain TtrpDiagnosticId.REC_020
         }
 
         "the hero recipes over the model as cut say nothing of removed constructs" {
