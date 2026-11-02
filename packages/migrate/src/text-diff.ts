@@ -5,6 +5,9 @@
 // context. Good enough for a human to review a codemod's changes; not intended
 // to be byte-compatible with GNU diff in every edge case.
 
+// 4 Mi cells bounds the table while retaining the 2,002-line compatibility vector.
+const MAX_LCS_CELLS = 4_194_304;
+
 interface Op {
   tag: 'eq' | 'del' | 'add';
   line: string;
@@ -30,7 +33,8 @@ function diffLines(a: string[], b: string[]): Op[] {
   while (i < n && j < m) {
     if (a[i] === b[j]) {
       ops.push({ tag: 'eq', line: a[i], a: i + 1, b: j + 1 });
-      i++; j++;
+      i++;
+      j++;
     } else if (lcs[i + 1][j] >= lcs[i][j + 1]) {
       ops.push({ tag: 'del', line: a[i], a: i + 1, b: 0 });
       i++;
@@ -51,7 +55,31 @@ function diffLines(a: string[], b: string[]): Op[] {
  */
 export function unifiedDiff(path: string, before: string, after: string, context = 3): string {
   if (before === after) return '';
-  const ops = diffLines(before.split('\n'), after.split('\n'));
+  const a = before.split('\n');
+  const b = after.split('\n');
+  let start = 0;
+  while (start < a.length && start < b.length && a[start] === b[start]) start++;
+  const n = a.length - start;
+  const m = b.length - start;
+  if (n * m > MAX_LCS_CELLS) {
+    return [
+      `--- a/${path}`,
+      `+++ b/${path}`,
+      `@@ -${n ? start + 1 : start},${n} +${m ? start + 1 : start},${m} @@`,
+      ...a.slice(start).map((line) => `-${line}`),
+      ...b.slice(start).map((line) => `+${line}`),
+    ].join('\n');
+  }
+  // Equal leading lines are always taken first by the original LCS walk. Keep the
+  // suffix in the table: trimming it changes tie-breaking for repeated lines.
+  const ops = [
+    ...a.slice(0, start).map((line, i): Op => ({ tag: 'eq', line, a: i + 1, b: i + 1 })),
+    ...diffLines(a.slice(start), b.slice(start)).map((op) => ({
+      ...op,
+      a: op.a ? op.a + start : 0,
+      b: op.b ? op.b + start : 0,
+    })),
+  ];
   const changed = ops.map((o) => o.tag !== 'eq');
 
   // Mark which ops to include: every change plus `context` equal lines around it.
@@ -67,7 +95,10 @@ export function unifiedDiff(path: string, before: string, after: string, context
   const out: string[] = [`--- a/${path}`, `+++ b/${path}`];
   let k = 0;
   while (k < ops.length) {
-    if (!include[k]) { k++; continue; }
+    if (!include[k]) {
+      k++;
+      continue;
+    }
     let end = k;
     while (end < ops.length && include[end]) end++;
     const hunk = ops.slice(k, end);

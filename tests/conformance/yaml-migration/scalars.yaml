@@ -1,0 +1,10 @@
+# Plain and single-quoted strings, and a folded plain scalar.
+ttr: '0.21'
+model: er
+defs:
+    - kind: entity
+      id: Customer
+      properties:
+          labelPlural: 'Customer''s accounts' # retained string, discarded comment
+          description: A customer
+              with an account

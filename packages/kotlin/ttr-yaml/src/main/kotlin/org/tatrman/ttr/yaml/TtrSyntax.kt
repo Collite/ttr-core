@@ -136,8 +136,12 @@ internal class TtrSyntax(
                 removeErrorListeners()
                 addErrorListener(listener)
             }
+        val tokens = CommonTokenStream(lexer)
+        TtrTokens.checkNesting(tokens) { token, message ->
+            throw CanonicalYamlException(file, token.line, token.charPositionInLine + 1, message)
+        }
         val parser =
-            TTRParser(CommonTokenStream(lexer)).apply {
+            TTRParser(tokens).apply {
                 removeErrorListeners()
                 addErrorListener(listener)
             }

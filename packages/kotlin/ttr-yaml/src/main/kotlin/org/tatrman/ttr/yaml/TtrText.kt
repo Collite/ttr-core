@@ -471,7 +471,7 @@ internal class TtrText(
                 addErrorListener(listener)
             }
         val tokens = CommonTokenStream(lexer)
-        tokens.fill()
+        TtrTokens.checkNesting(tokens) { _, message -> throw CanonicalValueException(value, message) }
         val parser =
             TTRParser(tokens).apply {
                 removeErrorListeners()

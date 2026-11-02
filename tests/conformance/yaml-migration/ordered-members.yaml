@@ -1,0 +1,7 @@
+ttr: '0.21'
+model: md
+defs:
+    - kind: domain
+      id: Status
+      properties:
+          restrict: {members: {zeta: {en: Last}, alpha: {en: First}}}

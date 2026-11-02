@@ -49,6 +49,11 @@ jobs:
           pnpm --filter '@tatrman/migrate...' build
           node --test scripts/yaml-migration.integration.test.mjs
 
+      - name: Canonical YAML library publication and isolated artifact consumer
+        run: |
+          ./gradlew --no-configuration-cache -Pversion=0.21.0-SMOKE -I scripts/canonical-yaml-smoke.init.gradle :packages:kotlin:ttr-parser:publishAllPublicationsToYamlSmokeRepository :packages:kotlin:ttr-yaml:publishAllPublicationsToYamlSmokeRepository :packages:kotlin:ttr-yaml:verifyLibraryPublication
+          node scripts/canonical-yaml-consumer.mjs 0.21.0-SMOKE --repository build/yaml-smoke-repository
+
   ts-dump:
     runs-on: ubuntu-latest
     steps:

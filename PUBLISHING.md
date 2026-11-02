@@ -31,6 +31,7 @@ See [§ Maven Central — the public lane](#maven-central--the-public-lane-sv-p1
 | Module (Gradle path) | Coordinate | Phase | Why it's published |
 |---|---|---|---|
 | `:packages:kotlin:ttr-parser` | `org.tatrman:ttr-parser` | 1 | ANTLR parser + typed AST; ai-platform's `infra/metadata` consumes the model types |
+| `:packages:kotlin:ttr-yaml` | `org.tatrman:ttr-yaml` | MW-P2 | Canonical YAML codec; grammar-family library JAR (no distribution), depends on parser and bundled schema resources, never metadata |
 | `:packages:kotlin:ttr-writer` | `org.tatrman:ttr-writer` | 1 | Deterministic AST → TTR-source renderer; depends on `ttr-parser` (api) |
 | `:packages:kotlin:ttr-semantics` | `org.tatrman:ttr-semantics` | 2 | Symbol table + resolver + per-kind validator + bundled stock CNC vocab; depends on `ttr-parser` (api) |
 | `:packages:kotlin:ttr-metadata` | `org.tatrman:ttr-metadata` | 1 (M1) | Typed model, storage SPI (+ fs/classpath), reconciler, resolver, graph, search, registry, refresher mechanism, export, world resolution (M2). Pins the in-repo `ttr-parser`/`ttr-writer`/`ttr-semantics` and re-exports them as `api` deps (contracts §1) |
@@ -67,7 +68,7 @@ coordinate/version, so this rename is not a breaking change for consumers:
 
 | Tag | Modules published | `just publish` |
 |---|---|---|
-| `grammar/v<x.y.z>[-RELEASE]` | **THE unified TTR toolchain bundle** (2026-07-30): `ttr-parser` + `ttr-writer` + `ttr-semantics` + `ttr-metadata` + `ttr-metadata-git` + `ttr-snapshot` + `ttr-md-resolver` — plus `ttr-lexicon` + `ttr-lexicon-compile` + `ttr-lexicon-cli`, which joined the lane on 2026-08-03 (`publish.yml` also publishes `ttr-metadata-cli` since SO S0.3; the CLI distribution is `ttr-metadata-cli:<v>:dist@zip`; SO S2.1/S2.2 also prepare `ttr-report` and `ttr-report-cli` (`bin/ttr-report`, `ttr-report-cli:<v>:dist@zip` and `:dist@tar`) for this bundle; this row listed seven until MH-P0 corrected it). They are one **`api` closure**, so they share one version — see [Why one bundle](#why-one-bundle-2026-07-30) below. **Since 2026-10-02 (AG-14) also the TTR-P toolchain:** `ttrp-frontend`, `ttrp-graph`, `ttrp-emit`, `ttrp-doc`, `ttrp-emit-spi`, `ttrp-conform`, `ttrp-cli` (+ `ttrp-cli:<v>:dist@zip`, the self-contained CLI: `bin/ttrp-cli` + `lib/`) and the emit plugins `ttr-emit-bash`/`-kestra`/`-airflow3`/`-native`/`-n8n`/`-camunda`/`-python`/`-sql-job`. `ttrp-emit` `api`s **ttr-translator**, which keeps its own line: the grammar run pins it to the latest `translator/v*` tag in the POMs (`-PtranslatorVersion`, root `build.gradle.kts`) and fails if the translator sources changed since that tag — cut the translator first. `ttrp-lsp` is not published | `just publish bundle grammar` |
+| `grammar/v<x.y.z>[-RELEASE]` | **THE unified TTR toolchain bundle** (2026-07-30): `ttr-parser` + `ttr-yaml` + `ttr-writer` + `ttr-semantics` + `ttr-metadata` + `ttr-metadata-git` + `ttr-snapshot` + `ttr-md-resolver` — plus `ttr-lexicon` + `ttr-lexicon-compile` + `ttr-lexicon-cli`, which joined the lane on 2026-08-03 (`publish.yml` also publishes `ttr-metadata-cli` since SO S0.3; the CLI distribution is `ttr-metadata-cli:<v>:dist@zip`; SO S2.1/S2.2 also prepare `ttr-report` and `ttr-report-cli` (`bin/ttr-report`, `ttr-report-cli:<v>:dist@zip` and `:dist@tar`) for this bundle; this row listed seven until MH-P0 corrected it). They are one **`api` closure**, so they share one version — see [Why one bundle](#why-one-bundle-2026-07-30) below. **Since 2026-10-02 (AG-14) also the TTR-P toolchain:** `ttrp-frontend`, `ttrp-graph`, `ttrp-emit`, `ttrp-doc`, `ttrp-emit-spi`, `ttrp-conform`, `ttrp-cli` (+ `ttrp-cli:<v>:dist@zip`, the self-contained CLI: `bin/ttrp-cli` + `lib/`) and the emit plugins `ttr-emit-bash`/`-kestra`/`-airflow3`/`-native`/`-n8n`/`-camunda`/`-python`/`-sql-job`. `ttrp-emit` `api`s **ttr-translator**, which keeps its own line: the grammar run pins it to the latest `translator/v*` tag in the POMs (`-PtranslatorVersion`, root `build.gradle.kts`) and fails if the translator sources changed since that tag — cut the translator first. `ttrp-lsp` is not published | `just publish bundle grammar` |
 | `ttr-parser/v<x.y.z>[-RELEASE]` | `ttr-parser` only (rare; parser-only patch) | `just publish ttr-parser` |
 | `ttr-semantics/v<x.y.z>[-RELEASE]` | `ttr-semantics` only (Phase 2 cadence) | `just publish ttr-semantics` |
 | `metadata/v<x.y.z>[-RELEASE]` | **RETIRED 2026-07-30** — folded into `grammar/v*`. The workflow trigger is kept deliberately, so a stale tag **fails loudly** instead of falling through and publishing the wrong module set at a metadata version number | ~~`just publish bundle metadata`~~ → errors with a pointer |
@@ -85,9 +86,10 @@ The `grammar` and `metadata` bundles were merged. They were never independently
 releasable, and treating them as if they were produced two dead versions on Maven
 Central.
 
-**The seven modules are one `api` closure:**
+**The grammar-family modules are one `api` closure:**
 
 ```
+ttr-yaml          api→ ttr-parser
 ttr-metadata      api→ ttr-parser, ttr-writer, ttr-semantics, ttr-md-resolver
 ttr-md-resolver   api→ ttr-parser, ttr-semantics
 ttr-snapshot      api→ ttr-metadata
@@ -748,3 +750,14 @@ run's Artifacts section. The source `profile.yaml` is included in the metadata j
 Locally run `./gradlew :packages:kotlin:ttr-metadata:renderTtrMdg`; the installable
 file is `packages/kotlin/ttr-metadata/build/distributions/ttr-mdg.xml`.
 See [EA installation and verification](docs/ea.md).
+
+## Canonical YAML clean consumer
+
+`node scripts/canonical-yaml-consumer.mjs <internal-version>` copies a standalone Java consumer
+into a fresh directory under `build/`, resolves only published Maven artifacts (no composite builds or
+mavenLocal), and checks canonical read/write/native fixed points, located rejection, offline schemas,
+and the actual runtime closure. Set `GITHUB_ACTOR`/`GITHUB_TOKEN` for GitHub Packages; otherwise the
+script uses the existing `gh` login without persisting credentials. `--repository <path>` selects an
+isolated file repository for pre-publication checks. The default is the authenticated internal registry.
+No public registry publish or deployment is involved. Rebuild dependent JVM modules against the chosen
+family version; the existing binary incompatibility notices still apply.
