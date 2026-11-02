@@ -5,7 +5,6 @@ import org.tatrman.ttr.metadata.world.AutomationFingerprints
 
 import org.tatrman.ttr.metadata.model.World
 import org.tatrman.ttr.metadata.model.WorldDeployment
-import org.tatrman.ttr.metadata.model.WorldProcess
 import org.tatrman.ttr.metadata.model.AutomationProgram
 import org.tatrman.ttr.metadata.model.AutomationAction
 import org.tatrman.ttrp.bundle.RunManifest
@@ -18,8 +17,6 @@ import org.tatrman.ttrp.emit.spi.ContextMeta
 import org.tatrman.ttrp.emit.spi.RouteMeta
 import org.tatrman.ttrp.emit.spi.WiringMeta
 import org.tatrman.ttrp.emit.spi.ActionMeta
-import org.tatrman.ttrp.emit.spi.ProcessMeta
-import org.tatrman.ttrp.emit.spi.StepMeta
 import org.tatrman.ttrp.emit.spi.RunApiMeta
 import org.tatrman.ttrp.emit.spi.ParameterMeta
 import org.tatrman.ttrp.graph.capability.RegistryGrid
@@ -34,8 +31,6 @@ object RecipeGraphProjector {
         granularity: String =
             deployment.granularity
                 ?: "parts",
-        process: WorldProcess? = null,
-        stepGraphs: Map<String, RecipeGraph> = emptyMap(),
     ): RecipeGraph {
         require(bundle.schemaVersion == 3) { "recipe export requires manifest v3" }
         val recipe = requireNotNull(bundle.recipe) { "bundle has no recipe" }
@@ -50,22 +45,6 @@ object RecipeGraphProjector {
                 waveNames.toSet() == islandNames.toSet(),
         ) {
             "bundle waves must name every island exactly once"
-        }
-        if (process != null) {
-            require(process.steps.isNotEmpty()) { "process has no steps" }
-            require(stepGraphs.keys == process.steps.map { it.name }.toSet()) { "process needs every step graph" }
-            process.steps.forEach { step ->
-                val graph = stepGraphs.getValue(step.name)
-                require(
-                    graph.process == null &&
-                        graph.program.name == step.program &&
-                        graph.deployment.name == deployment.qname.name &&
-                        graph.deployment.target == deployment.target &&
-                        graph.program.port == (step.port ?: graph.program.port),
-                ) { "invalid process step projection ${step.name}" }
-            }
-        } else {
-            require(stepGraphs.isEmpty()) { "step graphs require a process" }
         }
         val type = RegistryGrid.executorType(world, deployment)
         val executor = world.executors.singleOrNull { it.qname.name == deployment.target }
@@ -111,8 +90,9 @@ object RecipeGraphProjector {
                 program.port,
                 program.mode,
                 program.asOf,
-                program.property("deliver")?.let { AutomationFingerprints.render(it) },
-                program.schedule,
+                // D-142 took `deliver:` and `schedule:` (the engine sends and schedules); SPI v2 keeps the fields, null.
+                null,
+                null,
                 program.overrides.associate { it.first to AutomationFingerprints.render(it.second) }.toSortedMap(),
                 buildMap {
                     program.budgetSync?.let { put("sync", "${it.amount} ${it.unit}") }
@@ -128,7 +108,7 @@ object RecipeGraphProjector {
                 granularity,
                 deployment.dryRun,
                 deployment.ungoverned,
-                connectors(deployment),
+                emptyMap(), // D-142 took the connectors (`deliver`, `ask`, `start`)
             ),
             Roles(
                 recipe.roles.candidates,
@@ -157,25 +137,7 @@ object RecipeGraphProjector {
                 },
             recipe.wiring.map { WiringMeta(it.routes, it.action, it.columns.toSortedMap(), it.whenCondition) },
             wired,
-            process?.let {
-                ProcessMeta(
-                    it.qname.name,
-                    it.instance,
-                    it.steps.map { s ->
-                        StepMeta(
-                            s.name,
-                            s.program,
-                            s.port,
-                            s.after?.obligations.orEmpty(),
-                            s.after?.time?.let {
-                                "${it.amount} ${it.unit}"
-                            },
-                            s.after?.until.orEmpty(),
-                            stepGraphs.getValue(s.name),
-                        )
-                    },
-                )
-            },
+            null, // D-142 took `def process`: a process is a BPMN process now, not an export input
             RunApiMeta(
                 "/automation",
                 sortedMapOf(
@@ -195,25 +157,6 @@ object RecipeGraphProjector {
             ),
             bundle.waves.map { it.toList() },
         )
-    }
-
-    private fun connectors(deployment: WorldDeployment): Map<String, String> {
-        val nested =
-            deployment.properties.lastOrNull { it.first == "connectors" }?.second
-                as? org.tatrman.ttr.parser.model.AutoValue.Obj
-        val entries = nested?.entries.orEmpty().map { it.key to it.value } + deployment.properties
-        return entries
-            .filter { it.first in setOf("deliver", "ask", "start") }
-            .associate { (name, value) ->
-                name to
-                    if (value is org.tatrman.ttr.parser.model.AutoValue.Str) {
-                        value.raw
-                    } else {
-                        AutomationFingerprints.render(
-                            value,
-                        )
-                    }
-            }.toSortedMap()
     }
 
     fun sink(

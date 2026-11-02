@@ -54,15 +54,19 @@ class AnalysisScheduler(
         // Latest-version-wins: if the document advanced while we analyzed, drop this set.
         val now = docs.get(uri) ?: return
         if (now.version != doc.version) return
-        // A finding inside a file-backed fragment (AG B5) is shown on the `from "<path>"` clause.
+        // A finding inside a file-backed fragment (AG B5) is shown on the `from "<path>"` clause; one made in
+        // another file (a model file, D-142's TTRP-CUT-nnn) on the recipe's header.
         val links =
             org.tatrman.ttrp.lsp.nav.FragmentLinks
                 .of(uri, analysis.report.document)
+        val header =
+            org.tatrman.ttrp.lsp.nav.FragmentLinks
+                .header(analysis.report.document)
         val diagnostics =
             analysis.report.diagnostics.map {
                 DiagnosticMapping.toLsp(
                     org.tatrman.ttrp.lsp.nav.FragmentLinks
-                        .anchor(it, uri, links),
+                        .anchor(it, uri, links, header),
                 )
             }
         client()?.publishDiagnostics(PublishDiagnosticsParams(uri, diagnostics, doc.version))

@@ -5,6 +5,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldStartWith
 import org.tatrman.ttrp.lsp.project.ProjectContext
 import org.tatrman.ttrp.lsp.project.ProjectResolver
 import org.tatrman.ttrp.lsp.protocol.ValidateDiagnostic
@@ -18,7 +19,8 @@ import java.nio.file.Path
  * AU-core-P2 · S2.4 T5 — `ttrp/validate` for a recipe (the LSP/Studio generate→validate→repair loop): the candidate
  * runs through the whole recipe checker, not the front half alone, and every finding names the recipe block it sits
  * in. Driven over H-1 (`release_order`): as written it validates clean; with `hold_ar`'s wirings dropped the one
- * finding is REC-003 on the route, in `verdict`; with a misspelled action column it is REC-001, in `actions`.
+ * finding is REC-003 on the route, in `verdict`; with a misspelled action column it is REC-001, in `actions`. A
+ * finding made in a model file (D-142's TTRP-CUT-nnn) sits on the `recipe` keyword, named by where it was made.
  */
 class RecipeValidateSpec :
     StringSpec({
@@ -34,17 +36,22 @@ class RecipeValidateSpec :
 
         val fixtures = locate("packages/kotlin/ttrp-graph/src/test/resources/fixtures/recipes")
         val h1 = Files.readString(locate("packages/kotlin/ttrp-frontend/src/test/resources/recipes/release_order.ttrp"))
-        val hartland =
+
+        fun project(dir: Path) =
             ProjectResolver {
                 ProjectContext(
-                    manifest = TtrpManifest(world = "hartland.worlds.demo", manifestDir = fixtures),
-                    modelsRoot = fixtures.resolve("model"),
+                    manifest = TtrpManifest(world = "hartland.worlds.demo", manifestDir = dir),
+                    modelsRoot = dir.resolve("model"),
                     manifestDiagnostics = emptyList(),
                 )
             }
+        val hartland = project(fixtures)
 
-        fun validate(source: String): List<ValidateDiagnostic> =
-            TtrpLspHarness(hartland).use { h ->
+        fun validate(
+            source: String,
+            resolver: ProjectResolver = hartland,
+        ): List<ValidateDiagnostic> =
+            TtrpLspHarness(resolver).use { h ->
                 h.initialize()
                 h.remote
                     .validate(ValidateParams(source = source, uri = "file:///release_order.ttrp"))
@@ -106,6 +113,42 @@ class RecipeValidateSpec :
             errors(turn).single().let {
                 it.code shouldBe "TTRP-REC-080"
                 it.block shouldBe "overdue"
+            }
+        }
+
+        "a removed construct in a model file: its TTRP-CUT on the `recipe` line, named by the model file" {
+            val dir = Files.createTempDirectory("validate-cut")
+            try {
+                val model = fixtures.resolve("model")
+                Files.walk(model).use { paths ->
+                    paths.forEach { p ->
+                        val to = dir.resolve("model").resolve(model.relativize(p).toString())
+                        if (Files.isDirectory(p)) Files.createDirectories(to) else Files.copy(p, to)
+                    }
+                }
+                val demo = dir.resolve("model/hartland/worlds/demo.ttrm")
+                val planted =
+                    "    def deployment cut_trigger { program: morning_release, target: server, run_as: caller, " +
+                        "trigger: schedule \"06:00 Europe/Prague\" }"
+                val world = Files.readString(demo)
+                Files.writeString(demo, world.substring(0, world.lastIndexOf('}')) + planted + "\n}\n")
+                val at = Files.readAllLines(demo).indexOf(planted) + 1
+                val found = validate(h1, project(dir))
+                val cut = found.single { it.code.startsWith("TTRP-CUT") }
+                cut.code shouldBe "TTRP-CUT-003"
+                cut.message shouldStartWith "demo.ttrm:$at:"
+                cut.block shouldBe "recipe"
+                val recipeLine = h1.lines().indexOfFirst { it.startsWith("recipe") } + 1
+                (cut.line to cut.column) shouldBe (recipeLine to 0)
+                (cut.endLine to cut.endColumn) shouldBe (recipeLine to "recipe".length)
+                // no finding carries another file's line and column
+                val lines = h1.lines()
+                for (d in found) {
+                    (d.line in 1..lines.size && d.endLine in d.line..lines.size) shouldBe true
+                    (d.endColumn <= lines[d.endLine - 1].length) shouldBe true
+                }
+            } finally {
+                dir.toFile().deleteRecursively()
             }
         }
 

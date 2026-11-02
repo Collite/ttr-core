@@ -1,7 +1,7 @@
 # Canonical YAML schemas
 
 The grammar package generates a canonical document schema, a profile schema and
-shape metadata from `TTR.g4`. They describe grammar **0.21**, including its exact
+shape metadata from `TTR.g4`. They describe grammar **0.22**, including its exact
 58 top-level definition spellings and nested world/automation declarations. Schema
 validation checks syntax and value shapes; required domain fields, reference
 resolution and profile execution belong to semantic validation. The Kotlin YAML
@@ -41,7 +41,7 @@ YAML parser has already discarded it.
 The YAML examples below are accepted input; the writer normalizes their quoting and layout.
 
 ```yaml
-ttr: '0.21'
+ttr: '0.22'
 package: demo.sales
 imports: [demo.common.*]
 model: er
@@ -87,7 +87,7 @@ alternative order. A quoted string that is a valid qname at a typed-reference ke
 order and repeated declarations:
 
 ```yaml
-ttr: '0.21'
+ttr: '0.22'
 model: cn
 defs:
   - kind: kind
@@ -257,6 +257,12 @@ build directory; no pnpm installation is needed for that task. Tests compare
 source, classpath and jar bytes; the isolated npm consumer checks export paths,
 versions and byte hashes.
 
-These resources keep grammar version 0.21. Internal bundle versions remain
-0.21.x. Publication follows the normal bundle process; the existing JVM rebuild
+These resources describe grammar version 0.22. Internal bundle versions are
+0.22.x. Publication follows the normal bundle process; the existing JVM rebuild
 notice for grammar 0.21's appended model fields still applies.
+
+Grammar 0.22 changed no canonical YAML shape, only the marker: a 0.22 reader
+refuses a `ttr: '0.21'` document. `migrate-yaml --from 0.21 --to 0.22` migrates
+one by rewriting that marker alone, then normalizes it as a 0.22 document. A
+document marked otherwise is refused at its marker, and every other version
+pair is refused.

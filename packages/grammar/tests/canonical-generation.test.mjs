@@ -186,7 +186,7 @@ test('all three generated outputs are deterministic UTF-8/LF JSON with the gramm
     const value = JSON.parse(bytes);
     assert.equal(
       name.endsWith('schema.json') ? value.$id.split('/schemas/')[1].split('/')[0] : value.version,
-      '0.21'
+      '0.22'
     );
     if (name.endsWith('schema.json'))
       assert.equal(value.$schema, 'https://json-schema.org/draft/2020-12/schema');

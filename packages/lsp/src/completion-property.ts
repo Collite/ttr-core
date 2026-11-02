@@ -49,6 +49,12 @@ export interface PackageNameCompletionOptions {
   projectSymbols: import('@tatrman/semantics').ProjectSymbolTable;
 }
 
+/**
+ * Grammar 0.22 (D-142): properties the grammar still RECOGNISES for one release, only so the automation validator
+ * refuses them (`ttr/automation-removed`) — never offered.
+ */
+const REMOVED_PROPERTIES: Partial<Record<string, ReadonlySet<string>>> = { role: new Set(['delivery']) };
+
 export function getPropertyNameCompletions(
   opts: PropertyCompletionOptions
 ): CompletionList | null {
@@ -71,7 +77,9 @@ export function getPropertyNameCompletions(
   const props = PROPERTY_MAP[def.kind as DefinitionKind] ?? [];
   const presentProps = getPresentProperties(def);
 
-  const available = props.filter((p: PropertyInfo) => !presentProps.has(p.name));
+  const available = props.filter(
+    (p: PropertyInfo) => !presentProps.has(p.name) && !REMOVED_PROPERTIES[def.kind]?.has(p.name)
+  );
 
   const items: CompletionItem[] = available.map((p: PropertyInfo) => ({
     label: p.name,

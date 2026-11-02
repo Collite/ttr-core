@@ -9,7 +9,7 @@ import org.tatrman.ttr.yaml.CanonicalYamlException;
 public final class CanonicalYamlConsumer {
     public static void main(String[] args) throws Exception {
         var codec = CanonicalYaml.INSTANCE;
-        var source = "{ttr: '0.21', model: er, defs: [{kind: entity, id: Item, properties: {}}]}\n";
+        var source = "{ttr: '0.22', model: er, defs: [{kind: entity, id: Item, properties: {}}]}\n";
         var document = codec.read(source, "consumer.yaml");
         check(document.getAst().getErrors().isEmpty(), "typed parse");
         check(document.getAst().getDefinitions().size() == 1, "entity count");
@@ -23,7 +23,7 @@ public final class CanonicalYamlConsumer {
             }
         }
         try {
-            codec.read("ttr: '0.21'\nunknown: true\n", "bad.yaml");
+            codec.read("ttr: '0.22'\nunknown: true\n", "bad.yaml");
             throw new AssertionError("unknown key accepted");
         } catch (CanonicalYamlException expected) {
             check(expected.getFile().equals("bad.yaml") && expected.getLine() == 2, "located rejection");

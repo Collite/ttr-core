@@ -31,7 +31,7 @@ class RecipeExplainSpec :
                   route release            because "all checks passed"
                 actions
                   verdict.release           -> release { order }
-                  verdict.release_confirmed -> ask { who, about, action, due, on_due: hold }
+                  verdict.release_confirmed -> ask { who, about, action, due }
                   verdict.hold_sales        -> hold { order, department }
                   verdict.hold_sales        -> notify { who, detail }
                   verdict.hold_ar           -> hold { order, department }

@@ -25,7 +25,7 @@ class CanonicalYamlDepthSpec :
             block: Boolean,
         ): String {
             val header =
-                "ttr: '0.21'\nmodel: automation\ndefs:\n" +
+                "ttr: '0.22'\nmodel: automation\ndefs:\n" +
                     "  - kind: program\n    id: D\n    properties:\n      a:"
             return if (block) {
                 header + "\n" + (0 until depth).joinToString("\n") { " ".repeat(8 + 2 * it) + "-" } + " 1\n"
@@ -146,7 +146,7 @@ class CanonicalYamlDepthSpec :
         for (value in listOf("-[1, 2]", "-{ x: 1 }", "1)")) {
             test("retained calc argument $value reports its actual cause") {
                 val source =
-                    "ttr: '0.21'\nmodel: md\ndefs:\n" +
+                    "ttr: '0.22'\nmodel: md\ndefs:\n" +
                         "  - kind: map\n    id: Convert\n    properties:\n" +
                         "      calc:\n        name: convert\n        args:\n" +
                         "          input: '$value'\n"
@@ -173,7 +173,7 @@ class CanonicalYamlDepthSpec :
             test("retained calc argument depth $depth is guarded on a 1 MiB stack") {
                 smallStack {
                     val source =
-                        "ttr: '0.21'\nmodel: md\ndefs:\n" +
+                        "ttr: '0.22'\nmodel: md\ndefs:\n" +
                             "  - kind: map\n    id: Convert\n    properties:\n" +
                             "      calc:\n        name: convert\n        args:\n" +
                             "          input: '" + "[".repeat(depth) + "1" + "]".repeat(depth) + "'\n"
@@ -235,18 +235,23 @@ class CanonicalYamlDepthSpec :
                 }
             }
         }
-        test("streaming guard refuses 100,000 levels before composition or recursion") {
-            val request =
-                obj(
-                    "operation" to text("migrate"),
-                    "from" to text("0.21"),
-                    "to" to text("0.21"),
-                    "source" to text(yaml(100_000, false)),
-                )
-            val stdout = java.io.ByteArrayOutputStream()
-            val stderr = java.io.ByteArrayOutputStream()
-            YamlMigrationCli.run(request.toString().byteInputStream(), stdout, stderr) shouldBe 2
-            stdout.size() shouldBe 0
-            stderr.toString() shouldBe "<yaml>:7:70: nesting too deep (limit 64)\n"
+        // the 0.21 pair reaches the same located refusal (its marker step composes nothing)
+        for (from in listOf("0.22", "0.21")) {
+            test("streaming guard refuses 100,000 levels before composition or recursion (from $from)") {
+                val request =
+                    obj(
+                        "operation" to text("migrate"),
+                        "from" to text(from),
+                        "to" to text("0.22"),
+                        "source" to text(yaml(100_000, false).replaceFirst("'0.22'", "'$from'")),
+                    )
+                val stdout = java.io.ByteArrayOutputStream()
+                val stderr = java.io.ByteArrayOutputStream()
+                smallStack {
+                    YamlMigrationCli.run(request.toString().byteInputStream(), stdout, stderr)
+                } shouldBe 2
+                stdout.size() shouldBe 0
+                stderr.toString() shouldBe "<yaml>:7:70: nesting too deep (limit 64)\n"
+            }
         }
     })

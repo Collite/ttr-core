@@ -16,6 +16,39 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   consumer documentation covers public/internal tags and pre-schema versions receive a clear refusal.
 - These fixes ship in the next internal grammar cut; no new release is cut by this follow-up.
 
+### Removed — the orchestration constructs (grammar 0.22, AU-core CG, D-142)
+
+- The automation model loses what the process engine owns: `def process`/`def step`/`after:`, a deployment's
+  `process:`, `trigger:`, `connectors:` and `target: native`, a program's `deliver:`, `schedule:`, `ask_due:`,
+  `port: event` and `event:`, the native sinks `deliver · task · start · emit`, `on_due:` and a role's `delivery:`.
+  Each still parses for one release and is refused: `ttr/automation-removed` (validator, so a metadata load reports
+  it), `TTRP-CUT-001…016` (recipe checker, so `ttrp build` fails), with the replacement in the message.
+- ttr-metadata: `WorldProcess`, `ProcessStep`, `StepAfter`, `ProgramDelivery`, `DeploymentTrigger` and
+  `AutomationCall` are gone, and so are `AutomationProgram.{event, deliver, schedule, askDue}`,
+  `AutomationAction.onDue`, `AutomationRole.delivery`, `WorldDeployment.{process, trigger}` and `World.processes`
+  (`World.removed` lists every removed construct of the world for the checkers — a recognised `def process` and each
+  removed entry of a deployment, `RemovedWorldMember.key` naming it). `WorldDeployment.program` is non-null: a
+  deployment without a program does not load (one that ran a `process:` says so, CUT-002), but its removed entries
+  stay in `World.removed`, so `ttrp build` still refuses them. The deployment fingerprint keeps its
+  `process=null`/`trigger=null` lines, so unaffected fingerprints and bundles are byte-identical.
+- `target: native` names the removed pseudo-executor only where the world declares no executor named `native`; one
+  that does is targeted like any other, and `RegistryGrid.executorType` resolves every target through the world.
+- On the native (Server) executor, a wired action with no `native` sink is accepted as its action row — the engine
+  acts on it (a send task, a user task, a call activity) — where it was `TTRP-TGT-003` before. Other executors still
+  refuse an action they have no sink for.
+- The recipe checker refuses a removed construct anywhere in the model the recipe is checked against (every
+  program, action and role, every world's members and deployments), once per recipe check; the TTR-P editor and
+  `ttrp/validate` show one made in a model file on the recipe's header, prefixed with its `<file>:<line>:<col>`. A
+  literate (`.md`) recipe shows every finding made in another file (the manifest's as well) on its skeleton, with the
+  same prefix.
+- Exports: `ttrp emit` exports one program per deployment (no process exports). SPI v2 is unchanged —
+  `ProgramMeta2.deliver/schedule` and `RecipeGraph.process` are null and `DeploymentMeta.connectors` is empty — so a
+  batch n8n or Camunda export now refuses ("needs a schedule hint") until the exporters take the timer from the engine.
+- REC-011 loses its `schedule:` half: a batch program over a windowed context fails only on `port: keys` or a count /
+  gap window.
+- Canonical YAML: the marker is `ttr: "0.22"` (the shape is unchanged). `migrate-yaml --from 0.21 --to 0.22` rewrites
+  a 0.21 document's marker alone; every other version pair is still refused.
+
 ### Fixed — Canonical YAML and migration follow-ups (ttr-core#370)
 
 - Large dry-run diffs preserve base tie-breaking within budget, then trim unchanged suffixes before

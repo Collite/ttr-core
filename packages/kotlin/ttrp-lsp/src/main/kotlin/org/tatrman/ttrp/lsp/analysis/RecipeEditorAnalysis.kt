@@ -13,6 +13,7 @@ import org.tatrman.ttrp.doc.ExtractedRecipe
 import org.tatrman.ttrp.doc.utf16Offset
 import org.tatrman.ttrp.graph.TtrpPipeline
 import org.tatrman.ttrp.lsp.docs.OpenDocument
+import org.tatrman.ttrp.lsp.nav.FragmentLinks
 import org.tatrman.ttrp.lsp.project.ProjectContext
 import org.tatrman.ttrp.resolve.TtrpChecker
 
@@ -87,6 +88,26 @@ object RecipeEditorAnalysis {
         // to documents that opt into literate recipe authoring; the extractor remains strict when invoked directly.
         if (!recipeDocument) return Analysis(doc.uri, doc.version, emptyReport(doc))
         val recipes = extraction.recipes.map { EditorRecipe(it, pipeline.plan(it.text, it.path)) }
+
+        // One rule places every finding in this document. One at an offset of a recipe's extracted text goes to the
+        // markdown its sidecar node maps (else the skeleton). One made in another file (a model file's TTRP-CUT-nnn,
+        // the manifest's TTRP-CFG) or with no position of its own sits on the skeleton, prefixed with where it was
+        // made: every literate finding leaves here at this document, so the scheduler's re-anchoring (header
+        // positions of the EXTRACTED text) never applies to it.
+        fun place(
+            d: TtrpDiagnostic,
+            recipe: ExtractedRecipe?,
+        ): TtrpDiagnostic {
+            val skeleton = location(doc.text, doc.uri, recipe?.skeletonSpan ?: listOf(0, 0))
+            if (recipe == null || d.location.file != recipe.path || d.location.line < 1) {
+                return FragmentLinks.elsewhere(d, d.location.file, skeleton)
+            }
+            val mapped =
+                recipe.sidecar.nodes.values.firstOrNull {
+                    utf16Offset(recipe.text, d.location.offsetStart) in it.generatedSpan[0] until it.generatedSpan[1]
+                }
+            return d.copy(location = location(doc.text, doc.uri, mapped?.span ?: recipe.skeletonSpan))
+        }
         val findings =
             extraction.diagnostics.map { d ->
                 TtrpDiagnostic(
@@ -99,24 +120,15 @@ object RecipeEditorAnalysis {
                     d.suggestedAlternative,
                 )
             } +
-                recipes.flatMap { entry ->
-                    val recipe = requireNotNull(entry.extracted)
-                    diagnostics(entry.plan).map { finding ->
-                        val mapped =
-                            recipe.sidecar.nodes.values.firstOrNull {
-                                utf16Offset(recipe.text, finding.location.offsetStart) in
-                                    it.generatedSpan[0] until it.generatedSpan[1]
-                            }
-                        val span = mapped?.span ?: recipe.skeletonSpan
-                        finding.copy(location = location(doc.text, doc.uri, span))
-                    }
-                }
+                recipes.flatMap { entry -> diagnostics(entry.plan).map { place(it, requireNotNull(entry.extracted)) } }
+        // the manifest's findings on the first recipe's skeleton, else the document start
+        val manifest = ctx.manifestDiagnostics.map { place(it, recipes.firstOrNull()?.extracted) }
         // Features still need imported metadata, but navigation never consumes canonical positions (R1).
         val report = recipes.firstOrNull()?.plan?.frontendReport ?: emptyReport(doc)
         return Analysis(
             doc.uri,
             doc.version,
-            report.copy(diagnostics = (ctx.manifestDiagnostics + findings).distinct()),
+            report.copy(diagnostics = (manifest + findings).distinct()),
             extraction,
             recipes,
         )

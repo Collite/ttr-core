@@ -231,8 +231,10 @@ class RecipeBundleSpec :
                 .single { it.name == "hold_sales" }
                 .detail shouldContainExactly
                 listOf("shortfall", "price_differences")
-            rec.wiring.single { it.action == "ask" }.columns["on_due"] shouldBe
-                "hold { order: order_number, department: \"Sales\" }"
+            rec.wiring
+                .single {
+                    it.action == "ask"
+                }.columns.keys shouldBe setOf("who", "about", "action", "due") // D-142: no on_due
             rec.wiring.single { it.action == "ask" }.columns["due"] shouldBe "2 working_days"
             rec.mode shouldBe "per-candidate"
             rec.verdictSchema.entity shouldBe "release_order_verdict"
@@ -585,6 +587,7 @@ class RecipeBundleSpec :
                             "\"README.md\":",
                         )
                     }.joinToString("\n")
+            if (System.getProperty("updateGolden") == "true") Files.writeString(baseline, beforeReadme)
             beforeReadme shouldBe Files.readString(baseline)
         }
 

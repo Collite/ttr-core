@@ -6,7 +6,7 @@
 package hartland.automation
 model automation
 
-def program probe_daily_batch    { recipe: rec_011,       port: none, mode: batch,    as_of: run,   schedule: "06:00 Europe/Prague" }
+def program probe_keys_batch     { recipe: rec_011,       port: keys, mode: batch,    as_of: run }   // D-142: no `schedule:`
 def program probe_key            { recipe: rec_012,       port: key,  mode: on_event, as_of: event }
 def program probe_event_setlevel { recipe: rec_010_event, port: none, mode: on_event, as_of: event }
 

@@ -1,4 +1,5 @@
-// AU-core-P1 negative: a weekly window, and a daily batch program (`probe_daily_batch`) → TTRP-REC-011.
+// AU-core-P1 negative: a weekly window, and a batch program on `port: keys` (`probe_keys_batch`) → TTRP-REC-011.
+// (D-142 took the `schedule:` half: the engine's timer and the ledger watermark bound a batch run's windows.)
 uses world "hartland.worlds.demo"
 import hartland.*
 import hartland.automation.*

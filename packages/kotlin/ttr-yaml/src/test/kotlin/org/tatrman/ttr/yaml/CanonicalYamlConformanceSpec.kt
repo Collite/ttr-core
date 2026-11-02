@@ -54,19 +54,19 @@ class CanonicalYamlConformanceSpec :
                 Files.writeString(root.resolve("one.ttrm"), "model er\n")
                 shouldThrow<IllegalStateException> { YamlFixtureRoster(root).requireTwins() }.message!! shouldContain
                     "one.yaml"
-                Files.writeString(root.resolve("one.yaml"), "ttr: \"0.21\"\nmodel: er\n")
+                Files.writeString(root.resolve("one.yaml"), "ttr: \"0.22\"\nmodel: er\n")
                 YamlFixtureRoster(root).requireTwins()
                 val dir = Files.createDirectory(root.resolve("new-scenario"))
                 Files.writeString(dir.resolve("a.ttrm"), "model md\n")
                 shouldThrow<IllegalStateException> { YamlFixtureRoster(root).requireTwins() }.message!! shouldContain
                     "new-scenario/a.yaml"
-                Files.writeString(dir.resolve("a.yaml"), "ttr: \"0.21\"\nmodel: md\n")
+                Files.writeString(dir.resolve("a.yaml"), "ttr: \"0.22\"\nmodel: md\n")
                 YamlFixtureRoster(root).requireTwins()
                 Files.writeString(dir.resolve("b.ttrm"), "model cn\n")
                 shouldThrow<IllegalStateException> { YamlFixtureRoster(root).requireTwins() }.message!! shouldContain
                     "new-scenario/b.yaml"
-                Files.writeString(root.resolve("orphan.yaml"), "ttr: \"0.21\"\n")
-                Files.writeString(dir.resolve("b.yaml"), "ttr: \"0.21\"\nmodel: cn\n")
+                Files.writeString(root.resolve("orphan.yaml"), "ttr: \"0.22\"\n")
+                Files.writeString(dir.resolve("b.yaml"), "ttr: \"0.22\"\nmodel: cn\n")
                 shouldThrow<IllegalStateException> { YamlFixtureRoster(root).requireTwins() }.message!! shouldContain
                     "Orphan"
             } finally {

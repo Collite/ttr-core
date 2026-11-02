@@ -1,0 +1,8 @@
+// expect: ttr/automation-missing-property — a deployment runs a program (D-142 took `process:`).
+package acme.worlds
+model world
+
+def world w {
+    def executor x { extends: n8n_l1 }
+    def deployment none_run { target: x, run_as: caller }
+}

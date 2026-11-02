@@ -773,7 +773,7 @@ class FileBasedSource(
             identities = AutomationBuilder.identities(def, pkg, sourceFile),
             grants = AutomationBuilder.grants(def, pkg, sourceFile, dropped),
             deployments = AutomationBuilder.deployments(def, pkg, sourceFile, dropped),
-            processes = AutomationBuilder.processes(def, pkg, sourceFile),
+            removed = AutomationBuilder.removed(def),
         )
     }
 

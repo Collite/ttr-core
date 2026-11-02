@@ -4,6 +4,14 @@ package org.tatrman.ttr.yaml
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.serialization.json.*
+import org.snakeyaml.engine.v2.api.LoadSettings
+import org.snakeyaml.engine.v2.api.lowlevel.Parse
+import org.snakeyaml.engine.v2.events.AliasEvent
+import org.snakeyaml.engine.v2.events.CollectionEndEvent
+import org.snakeyaml.engine.v2.events.MappingStartEvent
+import org.snakeyaml.engine.v2.events.ScalarEvent
+import org.snakeyaml.engine.v2.events.SequenceStartEvent
+import org.snakeyaml.engine.v2.exceptions.YamlEngineException
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.ByteBuffer
@@ -14,7 +22,69 @@ import kotlin.system.exitProcess
 object YamlMigration {
     private val version = CanonicalGrammar.version
     private val transforms: Map<Pair<String, String>, (String) -> CanonicalDocument> =
-        mapOf((version to version) to { source -> CanonicalYaml.read(source) })
+        mapOf(
+            (version to version) to { source -> CanonicalYaml.read(source) },
+            // Grammar 0.22 removed constructs canonical YAML never carried (D-142): the shape is unchanged, so a 0.21
+            // document migrates by its `ttr:` marker alone, then normalizes as the identity transform does.
+            ("0.21" to "0.22") to { source -> CanonicalYaml.read(remark(source, "0.21", "0.22")) },
+        )
+
+    /**
+     * [source] with its top-level `ttr:` marker — and nothing else — rewritten from [from] to [to]. A marker other
+     * than [from] is refused at the marker; a document without one (or not YAML) is returned as it is, for the reader
+     * to refuse with its own location.
+     */
+    private fun remark(
+        source: String,
+        from: String,
+        to: String,
+    ): String {
+        val marker = marker(source) ?: return source
+        val start = marker.startMark.orElse(null) ?: return source
+        val end = marker.endMark.orElse(null) ?: return source
+        if (marker.value != from) {
+            throw CanonicalYamlException(
+                "<yaml>",
+                start.line + 1,
+                start.column + 1,
+                "Expected ttr: \"$from\" for a migration from $from",
+            )
+        }
+        // the marks count code points from the start of the text, whatever its line breaks
+        return source.substring(0, source.offsetByCodePoints(0, start.index)) + "\"" + to + "\"" +
+            source.substring(source.offsetByCodePoints(0, end.index))
+    }
+
+    /**
+     * The scalar value of the first document's top-level `ttr` key, from the event stream: no node is composed, so
+     * no nesting is recursed into before the reader's depth guard sees it. Null when there is none.
+     */
+    private fun marker(source: String): ScalarEvent? {
+        var depth = 0
+        var key = true
+        var value = false
+        try {
+            for (event in Parse(LoadSettings.builder().build()).parseString(source)) {
+                val start = event is MappingStartEvent || event is SequenceStartEvent
+                val node = start || event is ScalarEvent || event is AliasEvent
+                if (depth == 0 && node && event !is MappingStartEvent) return null
+                if (depth == 1 && node && value) return event as? ScalarEvent
+                when {
+                    start -> depth++
+                    event is CollectionEndEvent -> depth--
+                }
+                if (depth == 0 && event is CollectionEndEvent) return null
+                // a node at the top level is complete: a key's value follows it
+                if (depth == 1 && (event is ScalarEvent || event is AliasEvent || event is CollectionEndEvent)) {
+                    value = key && (event as? ScalarEvent)?.value == "ttr"
+                    key = !key
+                }
+            }
+        } catch (_: YamlEngineException) {
+            return null
+        }
+        return null
+    }
 
     fun migrate(request: JsonObject): JsonObject {
         fun invalid(message: String): Nothing = throw CanonicalYamlException("<request>", 1, 1, message)

@@ -1,0 +1,14 @@
+// D-142 (grammar 0.22): `target: native` names the removed pseudo-executor — unless the world declares an executor
+// of that name (`native` is no keyword), which is targeted like any other. `w` declares one, `bare` does not.
+package acme.worlds
+model world
+
+def world w {
+    def executor native { extends: native }
+    def deployment d { program: p, target: native, run_as: caller }
+}
+
+def world bare {
+    def executor x { extends: n8n_l1 }
+    def deployment d { program: p, target: native, run_as: caller }
+}
