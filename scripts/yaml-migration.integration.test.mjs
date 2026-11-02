@@ -109,6 +109,19 @@ test('real TS CLI refuses an undeclared dialect before any batch write', () =>
     assert.deepEqual(readdirSync(dir).sort(), ['first.yaml', 'foreign.yaml']);
   }));
 
+test('packaged bridge migrates a 0.21 document by its marker, then reads it as 0.22', () => {
+  const old = input.replace('"ttr":"0.22"', '"ttr":"0.21"');
+  assert.notEqual(old, input);
+  const result = invoke(request(old, '0.21', '0.22'));
+  assert.equal(result.status, 0, result.stderr);
+  const value = JSON.parse(result.stdout);
+  assert.equal(value.changed, true);
+  assert.equal(value.source, JSON.parse(invoke(request(input)).stdout).source);
+  const refused = invoke(request(input, '0.21', '0.22'));
+  assert.equal(refused.status, 2);
+  assert.match(refused.stderr, /Expected ttr: "0.21"/);
+});
+
 test('real TS CLI refuses unsupported target versions without writing', () =>
   withFiles((dir) => {
     const path = join(dir, 'model.yaml');

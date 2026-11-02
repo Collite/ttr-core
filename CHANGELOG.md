@@ -28,6 +28,8 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   batch n8n or Camunda export now refuses ("needs a schedule hint") until the exporters take the timer from the engine.
 - REC-011 loses its `schedule:` half: a batch program over a windowed context fails only on `port: keys` or a count /
   gap window.
+- Canonical YAML: the marker is `ttr: "0.22"` (the shape is unchanged). `migrate-yaml --from 0.21 --to 0.22` rewrites
+  a 0.21 document's marker alone; every other version pair is still refused.
 
 ### Fixed — `variant` follow-ups (grammar 0.21.2, ttr-core#358)
 

@@ -26,7 +26,8 @@ therefore parses whole, every conformance golden and the canonical YAML shape ar
 each removed construct once — `ttr/automation-removed` from the automation validator (Kotlin and TS) and
 `TTRP-CUT-001…016` from the recipe checker, each naming its process-engine replacement (`RemovedConstructs`). A model
 written for 0.21 that uses them no longer validates: it needs the adoption edits before a 0.22 reader loads it.
-The recognisers and the STEP/STEPS tokens go in 0.23. The LSP stops advertising `delivery:` on a role.
+The recognisers and the STEP/STEPS tokens go in 0.23. The LSP stops advertising `delivery:` on a role. Canonical YAML
+moves to `ttr: "0.22"`; a 0.21 document migrates by its marker alone (`migrate-yaml --from 0.21 --to 0.22`).
 
 ## 0.21.2 — `variant` follow-ups (review-200)
 

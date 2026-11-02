@@ -31,7 +31,7 @@ describe('canonical YAML migration file policy', () => {
       `#!/usr/bin/env node
 const fs = require('node:fs');
 const r = JSON.parse(fs.readFileSync(0, 'utf8'));
-if (r.operation !== 'migrate' || r.from !== '0.22' || r.to !== '0.22' || !r.source.startsWith('ttr:')) {
+if (r.operation !== 'migrate' || !['0.21', '0.22'].includes(r.from) || r.to !== '0.22' || !r.source.startsWith('ttr:')) {
   process.stderr.write('<yaml>:1:1: refused marker or version'); process.exit(2);
 }
 const source = ${JSON.stringify(after)};
@@ -60,6 +60,12 @@ process.stdout.write(JSON.stringify({ source, changed: source !== r.source }));
     const stat = statSync(file);
     expect((await runYamlMigration([file], options())).writes).toEqual([]);
     expect(statSync(file).mtimeMs).toBe(stat.mtimeMs);
+  });
+  it('passes the 0.21 → 0.22 pair to the bridge and writes its migrated marker', async () => {
+    writeFileSync(file, "ttr: '0.21'\nmodel: er\n");
+    const result = await runYamlMigration([file], { ...options(), from: '0.21' });
+    expect(result.writes).toHaveLength(1);
+    expect(readFileSync(file, 'utf8')).toBe(after);
   });
   it('refuses the entire batch before writes when any marker or version fails', async () => {
     const other = join(root, 'foreign.yaml');
