@@ -131,7 +131,6 @@ const typeMap: Record<string, string> = {
   states: 'list of identifiers',
   // 0.16 — the automation role's typed properties (review-114 M5).
   resolve: 'role membership',
-  delivery: 'object',
   members: 'list of strings',
   transitions: 'state transition map',
   // 0.17 — the conceptual model (cn contracts §1).
@@ -234,8 +233,12 @@ output += ';\n\n';
 
 output += 'export interface PropertyInfo {\n  name: string;\n  type: string;\n}\n\n';
 
+// 0.22 (D-142) — properties the grammar still RECOGNISES for one release, only so the validators refuse them
+// (`ttr/automation-removed`); they are not advertised.
+const REMOVED = new Set(['delivery']);
+
 const propertiesByKind = Object.fromEntries(allKinds.map((kind) => [kind,
-  extractProps(KIND_RULE[kind] ?? `${kind}Property`).flatMap(
+  extractProps(KIND_RULE[kind] ?? `${kind}Property`).filter((p) => !REMOVED.has(p)).flatMap(
     (p) => KIND_OVERRIDES[kind]?.[p] ?? [{ name: p, type: typeMap[p] ?? 'unknown' }],
   ),
 ]));

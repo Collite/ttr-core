@@ -2,7 +2,7 @@
   "version": 2,
   "world": {
     "qname": "hartland.worlds.demo",
-    "fingerprint": "sha256:e6ed5c4a3be8aa1fc00c13fb32f873e77c478b13ed24f6721a6a70b52904dbd9",
+    "fingerprint": "sha256:53c0785903729aa5cd8e7b25cb3cde492adc5c643011d4294d79d348ffc36d6e",
     "engines": [
       {
         "name": "erp",
@@ -14,6 +14,10 @@
       }
     ],
     "executors": [
+      {
+        "name": "server",
+        "type": "native"
+      },
       {
         "name": "n8n",
         "type": "n8n_l1"
@@ -2515,8 +2519,7 @@
       "sinks": {
         "camunda": "user task",
         "hebe": "task",
-        "n8n": "door",
-        "native": "task"
+        "n8n": "door"
       },
       "approval": "required"
     },
@@ -2607,8 +2610,7 @@
       "sinks": {
         "camunda": "send task",
         "hebe": "message",
-        "n8n": "n8n-nodes-base.emailSend",
-        "native": "deliver"
+        "n8n": "n8n-nodes-base.emailSend"
       },
       "approval": "none"
     },
@@ -2630,8 +2632,7 @@
         }
       ],
       "sinks": {
-        "n8n": "n8n-nodes-base.emailSend",
-        "native": "deliver"
+        "n8n": "n8n-nodes-base.emailSend"
       },
       "approval": "none"
     },
@@ -2706,8 +2707,7 @@
         }
       ],
       "sinks": {
-        "n8n": "n8n-nodes-base.httpRequest",
-        "native": "start"
+        "n8n": "n8n-nodes-base.httpRequest"
       },
       "approval": "none"
     },
@@ -2731,8 +2731,7 @@
       ],
       "sinks": {
         "hebe": "task",
-        "n8n": "door",
-        "native": "task"
+        "n8n": "door"
       },
       "approval": "none"
     },
@@ -2835,36 +2834,6 @@
         {
           "name": "approve",
           "type": "bool"
-        }
-      ]
-    },
-    {
-      "kind": "schema",
-      "name": "line_received",
-      "columns": [
-        {
-          "name": "line_id",
-          "type": "return_request_line.line_id"
-        }
-      ]
-    },
-    {
-      "kind": "schema",
-      "name": "receipt_posted",
-      "columns": [
-        {
-          "name": "line_id",
-          "type": "return_request_line.line_id"
-        }
-      ]
-    },
-    {
-      "kind": "schema",
-      "name": "settlement_posted",
-      "columns": [
-        {
-          "name": "line_id",
-          "type": "return_request_line.line_id"
         }
       ]
     }
@@ -3914,6 +3883,86 @@
       "id": "TTRP-TGT-005",
       "area": "TGT",
       "suggestedAlternative": "Recipe executor capability refusal"
+    },
+    {
+      "id": "TTRP-CUT-001",
+      "area": "CUT",
+      "suggestedAlternative": "a BPMN process — a service task per step calling the run API, a wait as a message catch with a timer boundary event"
+    },
+    {
+      "id": "TTRP-CUT-002",
+      "area": "CUT",
+      "suggestedAlternative": "deploy the program; the BPMN process calls it"
+    },
+    {
+      "id": "TTRP-CUT-003",
+      "area": "CUT",
+      "suggestedAlternative": "a BPMN timer start event"
+    },
+    {
+      "id": "TTRP-CUT-004",
+      "area": "CUT",
+      "suggestedAlternative": "name an executor of the world (`def executor <name> { extends: <type> }`)"
+    },
+    {
+      "id": "TTRP-CUT-005",
+      "area": "CUT",
+      "suggestedAlternative": "the engine's tasks call the connectors"
+    },
+    {
+      "id": "TTRP-CUT-006",
+      "area": "CUT",
+      "suggestedAlternative": "a BPMN send task; the Server renders a digest on request"
+    },
+    {
+      "id": "TTRP-CUT-007",
+      "area": "CUT",
+      "suggestedAlternative": "a BPMN timer start event"
+    },
+    {
+      "id": "TTRP-CUT-008",
+      "area": "CUT",
+      "suggestedAlternative": "the BPMN user task's due date, with a timer boundary event"
+    },
+    {
+      "id": "TTRP-CUT-009",
+      "area": "CUT",
+      "suggestedAlternative": "`port: key` — the engine's message carries the key"
+    },
+    {
+      "id": "TTRP-CUT-010",
+      "area": "CUT",
+      "suggestedAlternative": "`port: key` — the engine's message carries the key"
+    },
+    {
+      "id": "TTRP-CUT-011",
+      "area": "CUT",
+      "suggestedAlternative": "a BPMN send task acting on the action row"
+    },
+    {
+      "id": "TTRP-CUT-012",
+      "area": "CUT",
+      "suggestedAlternative": "`approval: required` on the action — the emitted BPMN puts a user task behind the route"
+    },
+    {
+      "id": "TTRP-CUT-013",
+      "area": "CUT",
+      "suggestedAlternative": "a BPMN call activity acting on the action row"
+    },
+    {
+      "id": "TTRP-CUT-014",
+      "area": "CUT",
+      "suggestedAlternative": "a BPMN message the engine sends for the action row"
+    },
+    {
+      "id": "TTRP-CUT-015",
+      "area": "CUT",
+      "suggestedAlternative": "a timer boundary event on the BPMN user task"
+    },
+    {
+      "id": "TTRP-CUT-016",
+      "area": "CUT",
+      "suggestedAlternative": "the BPMN send task addresses the role's members"
     },
     {
       "id": "TTRP-CAP-204",

@@ -41,4 +41,7 @@ def world demo {
     def deployment inbound_native_batch   { program: inbound_daily,       target: server, run_as: identity.automation_decider }
     def deployment settle_native_event    { program: settle_on_document,  target: server, run_as: identity.automation_decider }
     def deployment settle_native_batch    { program: settle_daily,        target: server, run_as: identity.automation_decider }
+
+    // H-2 on n8n, one program per deployment: the engine owns the waiting between them (D-142 took `def process`)
+    def deployment decide_n8n             { program: decide_on_request,   target: n8n,    run_as: identity.automation_decider }
 }

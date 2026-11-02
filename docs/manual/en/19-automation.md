@@ -7,8 +7,11 @@ Two places hold it:
 
 | where | what |
 |---|---|
-| a `model automation` file (e.g. `hartland/automation/automation.ttrm`) | `def parameter` · `def action` · `def service` · `def role` · `def approval` · `def program` · event `def schema`s |
-| the world (`model world`, inside `def world <name> { … }`) | `def identity` · `def grant` · `def deployment` · `def process` — the parts that differ per environment |
+| a `model automation` file (e.g. `hartland/automation/automation.ttrm`) | `def parameter` · `def action` · `def service` · `def role` · `def approval` · `def program` |
+| the world (`model world`, inside `def world <name> { … }`) | `def identity` · `def grant` · `def deployment` — the parts that differ per environment |
+
+The flow around a decision — waiting, asking a person, scheduling, sending — is a process in the process engine
+(BPMN), not part of this model. See [Removed in grammar 0.22](#removed-in-grammar-022).
 
 ## Parameters
 
@@ -42,35 +45,34 @@ def action hold {
 - `transition: <entity>.<attribute> -> <state> { from: [...] }` — a state change, checked against the attribute's
   `states:`; `-> {to}` takes the state from an action column.
 - `set: <entity>.<attribute> = <column>` — a plain write.
-- `sinks:` — per target: `native` (`transition`, `writer`, `deliver`, `task`, `obligation`, `start`, `emit`), or a
-  node/task name for an exported target, or `door`.
-- `approval: none | required`, `deliverable: true`, `due: 2 working_days` (an ask's deadline).
+- `sinks:` — per target: `native` (`transition`, `writer`, `obligation` — what the Server writes), or a node/task name
+  for an exported target, or `door`. An action without a `native` sink is an action row the engine acts on.
+- `approval: none | required`, `deliverable: true`, `due: 2 working_days` — data on the action row (a required approval
+  is a user task in the emitted BPMN, `due` its deadline).
 - Column types: a model attribute (`order.order_number`), `text`, `int`, `decimal`, `date`, and `rows` (context rows),
   `role`, `action`.
 
 ## Roles, approvals, services
 
 ```ttrm
-def role sales        { resolve: keycloak_group "hartland-sales", delivery: { email: "sales@hartland.example" } }
+def role sales        { resolve: keycloak_group "hartland-sales" }
 def approval values   { by: role.process_owner, quorum: 1 }
 def service pricing   { request: price_request, response: price_answer, timeout: 30 seconds, budget: { per_run: 200 } }
 ```
 
 ## Programs
 
-A program binds a recipe to how it is invoked — the whole candidate set, one key, or an event:
+A program binds a recipe to how it is invoked — the whole candidate set, one key, or a list of keys:
 
 ```ttrm
-def program morning_release      { recipe: release_order, port: none, mode: batch,    as_of: run,
-                                   deliver: { digest: { by: who, per: day } } }
-def program release_on_placement { recipe: release_order, port: key,  mode: on_event, as_of: event, deliver: immediate }
-def program decide_on_request    { recipe: decide_return, port: event, event: schema.line_received, mode: on_event, as_of: event }
-def schema line_received { columns: [def column line_id { type: return_request_line.line_id }] }
+def program morning_release      { recipe: release_order, port: none, mode: batch,    as_of: run }
+def program release_on_placement { recipe: release_order, port: key,  mode: on_event, as_of: event }
 ```
 
-`port: none | key | keys | event` · `mode: batch | on_event | windowed` · `protocol: always | on_route`.
+`port: none | key | keys` · `mode: batch | on_event | windowed` · `protocol: always | on_route`. The engine starts a
+run: its timer for a batch, its message (carrying the key) for an on-event program.
 
-## The world: identities, grants, deployments, processes
+## The world: identities, grants, deployments
 
 ```ttrm
 package hartland.worlds
@@ -78,21 +80,12 @@ model world
 
 def world demo {
     def identity automation_decider { principal: "svc-hartland-automation", credential: TTR_CONN_AUTOMATION_DECIDER }
-    def executor n8n { extends: n8n_l1, url: "https://n8n.hartland.example", connection: n8n_hartland }
+    def executor server { extends: native }
+    def executor n8n    { extends: n8n_l1, url: "https://n8n.hartland.example", connection: n8n_hartland }
 
     def grant { who: role.ops, program: *, as: identity.automation_decider }
 
-    def deployment release_native_morning { program: morning_release, target: native,
-                                            run_as: identity.automation_decider, trigger: schedule "06:00 Europe/Prague" }
-
-    def process return_line_flow {
-        instance: return_request_line.line_id
-        steps: [
-            def step decide  { program: decide_on_request,  port: key },
-            def step inbound { program: inbound_on_receipt, port: key,
-                               after: { obligation: inbound, until: [fulfilled, due, absent] } }
-        ]
-    }
+    def deployment release_native_morning { program: morning_release, target: server, run_as: identity.automation_decider }
 }
 ```
 
@@ -100,8 +93,7 @@ def world demo {
   `<client id>:<secret>`), never a value in the model.
 - **Grant** — `who` (a role, an identity or `*`) may run `program` (or `*`) **as** an identity or `author`. Unnamed; a
   grant is its triple.
-- **Deployment** — a program (or a process) on a target (`native` or an executor), with `run_as: caller | author |
-  identity.<n>` and an optional `trigger: schedule "…"`.
+- **Deployment** — a program on a target (an executor of the world), with `run_as: caller | author | identity.<n>`.
 - **Executor types** are names: `native`, `n8n_l1`, `camunda_7`, `camunda_8`, `python_client`, `python_offline`,
   `sql_job` — `extends: n8n_l1`.
 
@@ -123,8 +115,33 @@ an `expect`-style action and fulfilled by a later run), `state_history` (one row
 `approvals` — in the stock package `automation`. A recipe reads them like any entity (`er.entity.obligation`).
 
 The values in these objects are checked by the validator (`ttr/automation-*`, `ttr/states-*` diagnostics): required
-properties, enumerated values, references (a program's recipe, an event's schema, a grant's identity), duration units,
-a deployment having a program **or** a process, and duplicate grants.
+properties, enumerated values, references (a program's recipe, a service's schemas, a grant's identity), duration
+units, a deployment's program, and duplicate grants.
+
+## Removed in grammar 0.22
+
+The process engine in the estate (BPMN) owns the flow around a decision (D-142); the automation model keeps the
+decision layer. These constructs were removed on 2026-11-01. For one release they still parse and are refused with
+their own diagnostic — `ttr/automation-removed` from the validator, `TTRP-CUT-nnn` from `ttrp build` — naming what
+models them now:
+
+| id | removed | model it as |
+|---|---|---|
+| `TTRP-CUT-001` | `def process` (`def step`, `after:`) | a BPMN process: a service task per step calling the run API; a wait is a message catch with a timer boundary event |
+| `TTRP-CUT-002` | a deployment's `process:` | deploy the program; the BPMN process calls it |
+| `TTRP-CUT-003` | a deployment's `trigger:` | a BPMN timer start event |
+| `TTRP-CUT-004` | `target: native` | an executor of the world (`def executor server { extends: native }`) |
+| `TTRP-CUT-005` | a deployment's `connectors:` | the engine's tasks call the connectors |
+| `TTRP-CUT-006` | a program's `deliver:` and digests | a BPMN send task; the Server renders a digest on request |
+| `TTRP-CUT-007` | a program's `schedule:` | a BPMN timer start event |
+| `TTRP-CUT-008` | a program's `ask_due:` | the BPMN user task's due date with a timer boundary event |
+| `TTRP-CUT-009` / `-010` | `port: event`, a program's `event:` schema | `port: key` — the engine's message carries the key |
+| `TTRP-CUT-011…014` | the native sinks `deliver`, `task`, `start`, `emit` | a send task, a user task (`approval: required`), a call activity, a message — acting on the action row |
+| `TTRP-CUT-015` | `on_due:` (on an action or in a wiring) | a timer boundary event on the BPMN user task |
+| `TTRP-CUT-016` | a role's `delivery:` | the BPMN send task addresses the role's members |
+
+Exports follow: a deployment exports one program (no process exports), and an n8n or Camunda batch export needs a
+schedule the model no longer carries — it refuses until the exporters take the timer from the engine.
 
 ## Exporting a deployment
 
@@ -146,7 +163,12 @@ against the bundle's hashes and a complete directory is published only after eve
 An export becomes stale when its recipe text, parameter values, labels, program, deployment, world,
 toolchain or target version differs from the served bundle. Rebuild and export again after such a change.
 Executor manifests are plugin-owned TTR-M resources. All seven target manifests ship with the toolchain;
-n8n L1 and Camunda render recipes and processes; Python rendering remains in its planned exporter Stage.
+n8n L1 and Camunda render recipes; Python rendering remains in its planned exporter Stage.
+
+> **Grammar 0.22 (D-142).** The paragraphs below on process exports, step bundles, digests and batch schedule hints
+> describe the exporters as built before the cut. The model no longer carries `def process`, `deliver:` or
+> `schedule:` (see [Removed in grammar 0.22](#removed-in-grammar-022)), so `ttrp emit` exports one program per
+> deployment and refuses a batch n8n / Camunda export until the exporters take the timer from the engine.
 
 ## n8n L1 exports
 

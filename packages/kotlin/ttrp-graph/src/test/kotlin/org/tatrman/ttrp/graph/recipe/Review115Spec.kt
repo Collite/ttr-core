@@ -264,7 +264,7 @@ class Review115Spec :
 
         // ---- majors ----------------------------------------------------------------------------------------
 
-        "M1: the turn rule follows the answer through a context, a `when:` and an `on_due:`; a homonym is no answer" {
+        "M1: the turn rule follows the answer through a context and a `when:`; a homonym is no answer" {
             val head =
                 "key: order.order_number\ncandidates placed(out orders) target erp { load(er.entity.order) -> " +
                     "orders }\n" +
@@ -299,7 +299,8 @@ class Review115Spec :
                         "department: \"x\" },\n" +
                         "  due: 2 working_days, on_due: release { order: order_number } } }",
                 )
-            viaOnDue.single { it.id == TtrpDiagnosticId.REC_040 }.message shouldContain "on_due"
+            viaOnDue.map { it.id } shouldContain TtrpDiagnosticId.CUT_015
+            viaOnDue.none { it.id == TtrpDiagnosticId.REC_040 } shouldBe true
             val homonym =
                 findings(
                     "key: order.order_number\ncandidates placed(out orders) target erp { load(er.entity.order) " +

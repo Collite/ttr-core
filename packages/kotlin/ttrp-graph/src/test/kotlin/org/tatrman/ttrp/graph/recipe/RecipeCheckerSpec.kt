@@ -4,6 +4,7 @@ package org.tatrman.ttrp.graph.recipe
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.tatrman.ttrp.diagnostics.Severity
@@ -207,7 +208,7 @@ class RecipeCheckerSpec :
                 listOf("action `start` has no column `proces` (columns: process, rows)")
         }
 
-        "a call-valued `action:` and an `on_due:` call are checked as the actions they name" {
+        "a call-valued `action:` is checked as the action it names; an `on_due:` is refused, not checked (D-142)" {
             val r =
                 RecipeFixtures.inline(
                     """
@@ -217,10 +218,15 @@ class RecipeCheckerSpec :
                     actions {
                         v.go -> ask { who: role.sales_manager, about: order_number, action: release { order: order_number },
                                       due: 2 working_days, on_due: hold { order: order_number } }
+                        v.go -> ask { who: role.sales_manager, about: order_number, action: release { ordr: order_number } }
                     }
                     """,
                 )
-            RecipeFixtures.findings(r).map { it.message } shouldContainExactly
-                listOf("action `hold` needs its column `department`")
+            val said = RecipeFixtures.findings(r).map { "${it.id.id} ${it.message.substringBefore(" was removed")}" }
+            said shouldContainExactlyInAnyOrder
+                listOf(
+                    "TTRP-CUT-015 wiring `ask`: `on_due:`",
+                    "TTRP-REC-001 action `release` has no column `ordr` (columns: order)",
+                )
         }
     })
