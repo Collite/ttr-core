@@ -6,14 +6,15 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
-### Fixed — `variant` follow-ups (grammar 0.21.2, ttr-core#358)
+### Fixed — Canonical YAML and migration follow-ups (ttr-core#370)
 
-- `subkind:` is a cn free-form key, as `variant:` is (`SUBKIND` was missing from `cnKey` since 0.20). Text using it
-  needs a 0.21.2 reader; the canonical schemas regenerate.
-- TextMate colours `variant` as a def kind only after `def`; a column, attribute or ref part named `variant` is a name.
-- The `concept-bearer-missing` description (and ch. 14 / ch. 20) say "a quality, a phase or a variant".
-- The `cn/subkind-as-kind` hint (`use 'def variant'`) is pinned by a test in each runtime.
-- `conceptKeyword(def)` (`@tatrman/parser`) is the one "word as written" rule; the formatter and the LSP outline call it.
+- Large dry-run diffs preserve base tie-breaking within budget, then trim unchanged suffixes before
+  bounded LCS/fallback. A flat table and fewer operation/hunk copies keep lopsided inputs bounded.
+- An earlier TTR lexer error takes precedence over a resulting nesting refusal; guards still run before parsing.
+- Mid-batch recheck/rename failures name files already replaced. Released-schema consumers resolve both
+  internal and public release tags and refuse conflicting source commits.
+- These fixes ship in the next internal grammar cut; no new release is cut by this follow-up.
+
 ### Fixed — Canonical YAML depth guards (grammar 0.21.4)
 
 - Guard retained md calc-argument sub-parsing before recursion and match every TTR closing bracket to its
@@ -43,6 +44,15 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   packaged diagnostics have no logger preamble and abnormal bridge termination retains its cause.
 - Existing JVM binary compatibility/rebuild notices remain: rebuild dependent JVM modules together against
   the matching grammar-family artifacts. The grammar stays 0.21; this is an internal patch, with no public cut.
+
+### Fixed — `variant` follow-ups (grammar 0.21.2, ttr-core#358)
+
+- `subkind:` is a cn free-form key, as `variant:` is (`SUBKIND` was missing from `cnKey` since 0.20). Text using it
+  needs a 0.21.2 reader; the canonical schemas regenerate.
+- TextMate colours `variant` as a def kind only after `def`; a column, attribute or ref part named `variant` is a name.
+- The `concept-bearer-missing` description (and ch. 14 / ch. 20) say "a quality, a phase or a variant".
+- The `cn/subkind-as-kind` hint (`use 'def variant'`) is pinned by a test in each runtime.
+- `conceptKeyword(def)` (`@tatrman/parser`) is the one "word as written" rule; the formatter and the LSP outline call it.
 
 ### Added — Kotlin canonical YAML codec
 

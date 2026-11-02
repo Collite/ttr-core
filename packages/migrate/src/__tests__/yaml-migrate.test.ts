@@ -284,9 +284,9 @@ process.stdout.write(JSON.stringify({source: ${JSON.stringify(after)}, changed: 
     const second = join(root, 'second.yaml');
     writeFileSync(second, before);
     race.failRename = second;
-    await expect(runYamlMigration([file, second], options())).rejects.toThrow(
-      `${second}: replacement failed (simulated rename failure); already replaced: ${file}`
-    );
+    await expect(runYamlMigration([file, second], options())).rejects.toMatchObject({
+      message: `${second}: replacement failed (simulated rename failure); already replaced: ${file}`,
+    });
     expect(readFileSync(file, 'utf8')).toBe(after);
     expect(readFileSync(second, 'utf8')).toBe(before);
     expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
