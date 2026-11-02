@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { canonicalYamlReleaseTag } from './canonical-yaml-release-tag.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const [version, flag, repository] = process.argv.slice(2);
 if (
@@ -22,16 +23,13 @@ cpSync(join(root, 'tests/consumers/canonical-yaml'), consumer, { recursive: true
 if (version.endsWith('-SMOKE')) {
   cpSync(join(root, 'packages/grammar/schemas'), join(consumer, 'schemas'), { recursive: true });
 } else {
+  const tag = canonicalYamlReleaseTag(root, version);
   mkdirSync(join(consumer, 'schemas'));
   for (const file of ['model-yaml.schema.json', 'profile.schema.json', 'canonical-metadata.json']) {
-    const bytes = execFileSync(
-      'git',
-      ['show', `grammar/v${version}:packages/grammar/schemas/${file}`],
-      {
-        cwd: root,
-        maxBuffer: 64 * 1024 * 1024,
-      }
-    );
+    const bytes = execFileSync('git', ['show', `${tag}:packages/grammar/schemas/${file}`], {
+      cwd: root,
+      maxBuffer: 64 * 1024 * 1024,
+    });
     writeFileSync(join(consumer, 'schemas', file), bytes);
   }
 }

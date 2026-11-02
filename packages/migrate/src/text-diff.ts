@@ -18,34 +18,36 @@ interface Op {
 }
 
 /** Longest-common-subsequence line ops between two files, line-numbered. */
-function diffLines(a: string[], b: string[]): Op[] {
+function diffLines(a: string[], b: string[], offset: number, ops: Op[]): void {
   const n = a.length;
   const m = b.length;
-  const lcs: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  const width = m + 1;
+  const lcs = new Uint32Array((n + 1) * width);
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {
-      lcs[i][j] = a[i] === b[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+      lcs[i * width + j] =
+        a[i] === b[j]
+          ? lcs[(i + 1) * width + j + 1] + 1
+          : Math.max(lcs[(i + 1) * width + j], lcs[i * width + j + 1]);
     }
   }
-  const ops: Op[] = [];
   let i = 0;
   let j = 0;
   while (i < n && j < m) {
     if (a[i] === b[j]) {
-      ops.push({ tag: 'eq', line: a[i], a: i + 1, b: j + 1 });
+      ops.push({ tag: 'eq', line: a[i], a: offset + i + 1, b: offset + j + 1 });
       i++;
       j++;
-    } else if (lcs[i + 1][j] >= lcs[i][j + 1]) {
-      ops.push({ tag: 'del', line: a[i], a: i + 1, b: 0 });
+    } else if (lcs[(i + 1) * width + j] >= lcs[i * width + j + 1]) {
+      ops.push({ tag: 'del', line: a[i], a: offset + i + 1, b: 0 });
       i++;
     } else {
-      ops.push({ tag: 'add', line: b[j], a: 0, b: j + 1 });
+      ops.push({ tag: 'add', line: b[j], a: 0, b: offset + j + 1 });
       j++;
     }
   }
-  for (; i < n; i++) ops.push({ tag: 'del', line: a[i], a: i + 1, b: 0 });
-  for (; j < m; j++) ops.push({ tag: 'add', line: b[j], a: 0, b: j + 1 });
-  return ops;
+  for (; i < n; i++) ops.push({ tag: 'del', line: a[i], a: offset + i + 1, b: 0 });
+  for (; j < m; j++) ops.push({ tag: 'add', line: b[j], a: 0, b: offset + j + 1 });
 }
 
 /**
@@ -59,36 +61,48 @@ export function unifiedDiff(path: string, before: string, after: string, context
   const b = after.split('\n');
   let start = 0;
   while (start < a.length && start < b.length && a[start] === b[start]) start++;
-  const n = a.length - start;
-  const m = b.length - start;
+  // Tier 1 keeps the suffix in the LCS table to preserve base tie-breaking.
+  // Only above that budget may tiers 2/3 trim a common suffix.
+  let suffix = 0;
+  if ((a.length - start) * (b.length - start) > MAX_LCS_CELLS) {
+    while (
+      suffix < a.length - start &&
+      suffix < b.length - start &&
+      a[a.length - suffix - 1] === b[b.length - suffix - 1]
+    )
+      suffix++;
+  }
+  const n = a.length - start - suffix;
+  const m = b.length - start - suffix;
   if (n * m > MAX_LCS_CELLS) {
     return [
       `--- a/${path}`,
       `+++ b/${path}`,
       `@@ -${n ? start + 1 : start},${n} +${m ? start + 1 : start},${m} @@`,
-      ...a.slice(start).map((line) => `-${line}`),
-      ...b.slice(start).map((line) => `+${line}`),
+      ...a.slice(start, a.length - suffix).map((line) => `-${line}`),
+      ...b.slice(start, b.length - suffix).map((line) => `+${line}`),
     ].join('\n');
   }
-  // Equal leading lines are always taken first by the original LCS walk. Keep the
-  // suffix in the table: trimming it changes tie-breaking for repeated lines.
-  const ops = [
-    ...a.slice(0, start).map((line, i): Op => ({ tag: 'eq', line, a: i + 1, b: i + 1 })),
-    ...diffLines(a.slice(start), b.slice(start)).map((op) => ({
-      ...op,
-      a: op.a ? op.a + start : 0,
-      b: op.b ? op.b + start : 0,
-    })),
-  ];
-  const changed = ops.map((o) => o.tag !== 'eq');
+  // Equal leading lines are always taken first by the original LCS walk.
+  const ops: Op[] = [];
+  for (let i = 0; i < start; i++) ops.push({ tag: 'eq', line: a[i], a: i + 1, b: i + 1 });
+  diffLines(a.slice(start, start + n), b.slice(start, start + m), start, ops);
+  for (let i = 0; i < suffix; i++) {
+    ops.push({
+      tag: 'eq',
+      line: a[a.length - suffix + i],
+      a: a.length - suffix + i + 1,
+      b: b.length - suffix + i + 1,
+    });
+  }
 
   // Mark which ops to include: every change plus `context` equal lines around it.
-  const include = new Array<boolean>(ops.length).fill(false);
+  const include = new Uint8Array(ops.length);
   for (let k = 0; k < ops.length; k++) {
-    if (!changed[k]) continue;
+    if (ops[k].tag === 'eq') continue;
     for (let d = -context; d <= context; d++) {
       const idx = k + d;
-      if (idx >= 0 && idx < ops.length) include[idx] = true;
+      if (idx >= 0 && idx < ops.length) include[idx] = 1;
     }
   }
 
@@ -101,14 +115,20 @@ export function unifiedDiff(path: string, before: string, after: string, context
     }
     let end = k;
     while (end < ops.length && include[end]) end++;
-    const hunk = ops.slice(k, end);
-
-    const firstA = hunk.find((o) => o.a > 0)?.a ?? 0;
-    const firstB = hunk.find((o) => o.b > 0)?.b ?? 0;
-    const aCount = hunk.filter((o) => o.tag !== 'add').length;
-    const bCount = hunk.filter((o) => o.tag !== 'del').length;
+    let firstA = 0;
+    let firstB = 0;
+    let aCount = 0;
+    let bCount = 0;
+    for (let i = k; i < end; i++) {
+      const op = ops[i];
+      firstA ||= op.a;
+      firstB ||= op.b;
+      if (op.tag !== 'add') aCount++;
+      if (op.tag !== 'del') bCount++;
+    }
     out.push(`@@ -${firstA},${aCount} +${firstB},${bCount} @@`);
-    for (const op of hunk) {
+    for (let i = k; i < end; i++) {
+      const op = ops[i];
       const sigil = op.tag === 'eq' ? ' ' : op.tag === 'del' ? '-' : '+';
       out.push(`${sigil}${op.line}`);
     }

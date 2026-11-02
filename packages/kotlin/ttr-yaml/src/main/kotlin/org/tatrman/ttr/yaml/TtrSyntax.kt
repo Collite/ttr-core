@@ -138,6 +138,13 @@ internal class TtrSyntax(
             }
         val tokens = CommonTokenStream(lexer)
         TtrTokens.checkNesting(tokens) { token, message ->
+            // fill() has collected all lexer errors; prefer an earlier cause to its unmatched closer.
+            // The nesting guard still refuses before the parser can recurse or recover.
+            val earlier =
+                errors.firstOrNull {
+                    it.line < token.line || (it.line == token.line && it.column < token.charPositionInLine + 1)
+                }
+            if (earlier != null) throw earlier
             throw CanonicalYamlException(file, token.line, token.charPositionInLine + 1, message)
         }
         val parser =
