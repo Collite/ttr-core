@@ -753,11 +753,14 @@ See [EA installation and verification](docs/ea.md).
 
 ## Canonical YAML clean consumer
 
-`node scripts/canonical-yaml-consumer.mjs <internal-version>` copies a standalone Java consumer
-into a fresh directory under `build/`, resolves only published Maven artifacts (no composite builds or
-mavenLocal), and checks canonical read/write/native fixed points, located rejection, offline schemas,
-and the actual runtime closure. Set `GITHUB_ACTOR`/`GITHUB_TOKEN` for GitHub Packages; otherwise the
-script uses the existing `gh` login without persisting credentials. `--repository <path>` selects an
+`node scripts/canonical-yaml-consumer.mjs <version>` accepts an internal or public grammar-family
+version and copies a standalone Java consumer into a fresh directory under `build/`. It resolves only
+published Maven artifacts (no composite builds or mavenLocal) and checks canonical read/write/native
+fixed points, located rejection, offline schemas and the actual runtime closure. Expected schemas come
+from `grammar/v<version>`, falling back to `grammar/v<version>-RELEASE`; if both exist, they must name
+the same source commit. The selected tag must contain canonical YAML schemas (grammar 0.21 or later);
+older public versions such as 0.18.5 are refused. A public tag name alone does not establish schema support.
+Set `GITHUB_ACTOR`/`GITHUB_TOKEN` for GitHub Packages; otherwise the script uses the existing `gh` login without persisting credentials. `--repository <path>` selects an
 isolated file repository for pre-publication checks. The default is the authenticated internal registry.
 No public registry publish or deployment is involved. Rebuild dependent JVM modules against the chosen
 family version; the existing binary incompatibility notices still apply.

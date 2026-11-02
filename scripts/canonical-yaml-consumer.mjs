@@ -24,6 +24,14 @@ if (version.endsWith('-SMOKE')) {
   cpSync(join(root, 'packages/grammar/schemas'), join(consumer, 'schemas'), { recursive: true });
 } else {
   const tag = canonicalYamlReleaseTag(root, version);
+  try {
+    execFileSync('git', ['cat-file', '-e', `${tag}:packages/grammar/schemas/model-yaml.schema.json`], {
+      cwd: root,
+      stdio: 'ignore',
+    });
+  } catch (cause) {
+    throw new Error(`grammar ${version} (${tag}) has no canonical YAML schemas`, { cause });
+  }
   mkdirSync(join(consumer, 'schemas'));
   for (const file of ['model-yaml.schema.json', 'profile.schema.json', 'canonical-metadata.json']) {
     const bytes = execFileSync('git', ['show', `${tag}:packages/grammar/schemas/${file}`], {
