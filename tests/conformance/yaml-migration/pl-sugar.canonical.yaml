@@ -1,0 +1,12 @@
+ttr: "0.22"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Open"
+    properties:
+      -
+        definition:
+          block: |2
+            status == "open"
+          tag: "pl"

@@ -72,7 +72,7 @@ test('packaged bridge refuses unregistered versions and malformed requests', () 
     const result = invoke(text);
     assert.equal(result.status, 2, result.stderr);
     assert.equal(result.stdout, '');
-    assert.match(result.stderr, /<(yaml|request)>:/);
+    assert.match(result.stderr, /<request>:1:1:/);
   }
 });
 
@@ -103,7 +103,7 @@ test('real TS CLI refuses an undeclared dialect before any batch write', () =>
     writeFileSync(foreign, 'entities: []\n');
     const result = runCli([first, foreign]);
     assert.equal(result.status, 2);
-    assert.match(result.stderr, /foreign\.yaml: [\s\S]*<yaml>:/);
+    assert.equal(result.stderr, `${foreign}: <yaml>:1:1: : required property 'ttr' not found\n`);
     assert.equal(readFileSync(first, 'utf8'), input);
     assert.equal(readFileSync(foreign, 'utf8'), 'entities: []\n');
     assert.deepEqual(readdirSync(dir).sort(), ['first.yaml', 'foreign.yaml']);
@@ -131,3 +131,30 @@ test('real TS CLI refuses unsupported target versions without writing', () =>
     assert.match(result.stderr, /No registered canonical YAML migration/);
     assert.equal(readFileSync(path, 'utf8'), input);
   }));
+
+test('real launcher refuses depth 1,000 at the guard node and without a stack trace', () => {
+  const source =
+    "ttr: '0.22'\nmodel: automation\ndefs:\n  - kind: program\n    id: D\n    properties:\n      a: " +
+    '['.repeat(1000) +
+    '1' +
+    ']'.repeat(1000) +
+    '\n';
+  const result = invoke(request(source));
+  assert.equal(result.status, 2);
+  assert.equal(result.stdout, '');
+  assert.equal(result.stderr, '<yaml>:7:70: nesting too deep (limit 64)\n');
+});
+
+test('real launcher locates 100,000 nested retained calc brackets at the argument scalar', () => {
+  const source =
+    "ttr: '0.22'\nmodel: md\ndefs:\n  - kind: map\n    id: Convert\n    properties:\n" +
+    "      calc:\n        name: convert\n        args:\n          input: '" +
+    '['.repeat(100000) +
+    '1' +
+    ']'.repeat(100000) +
+    "'\n";
+  const result = invoke(request(source));
+  assert.equal(result.status, 2);
+  assert.equal(result.stdout, '');
+  assert.equal(result.stderr, '<yaml>:10:18: nesting too deep (limit 64)\n');
+});

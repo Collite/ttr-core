@@ -1,0 +1,8 @@
+ttr: '0.22'
+model: cn
+defs:
+    - kind: kind
+      id: Open
+      properties:
+          definition: !pl |
+              status == "open"

@@ -1,0 +1,13 @@
+ttr: "0.22"
+model: "md"
+defs:
+  -
+    kind: "domain"
+    id: "Status"
+    properties:
+      restrict:
+        members:
+          zeta:
+            en: "Last"
+          alpha:
+            en: "First"

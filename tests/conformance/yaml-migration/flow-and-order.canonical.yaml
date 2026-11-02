@@ -1,0 +1,17 @@
+ttr: "0.22"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "Product"
+    properties:
+      description: "Product"
+      tags:
+        - "one"
+        - "two"
+      attributes:
+        -
+          id: "code"
+          properties:
+            type: "text"
+            isKey: true

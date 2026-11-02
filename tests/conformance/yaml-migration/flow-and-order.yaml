@@ -1,0 +1,2 @@
+# Compact flow input; ordinary property order differs from the canonical order.
+{model: er, ttr: '0.22', defs: [{id: Product, kind: entity, properties: {tags: [one, two], description: 'Product', attributes: [{id: code, properties: {isKey: true, type: text}}]}}]}
