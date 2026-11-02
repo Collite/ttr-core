@@ -85,14 +85,12 @@ class EmitCommand : CliktCommand(name = "emit") {
                 }
             val deployment = original.copy(granularity = granularity ?: original.granularity)
             // D-142: a deployment runs one program (a process is a BPMN process now, not an export input).
-            val programs =
-                listOf(
-                    requireNotNull(
-                        objects.filterIsInstance<AutomationProgram>().singleOrNull {
-                            it.qname.name == deployment.program
-                        },
-                    ) { "unknown or ambiguous program ${deployment.program}" },
-                )
+            val program =
+                requireNotNull(
+                    objects.filterIsInstance<AutomationProgram>().singleOrNull {
+                        it.qname.name == deployment.program
+                    },
+                ) { "unknown or ambiguous program ${deployment.program}" }
             val plugin =
                 EmitPluginLoader.builtin(
                     org.tatrman.ttrp.graph.capability.RegistryGrid
@@ -104,7 +102,6 @@ class EmitCommand : CliktCommand(name = "emit") {
                     val graph: org.tatrman.ttrp.emit.spi.RecipeGraph,
                     val bundle: RunManifest,
                     val dir: Path,
-                    val actions: List<AutomationAction>,
                 )
 
                 val registrySnapshot =
@@ -124,36 +121,33 @@ class EmitCommand : CliktCommand(name = "emit") {
                 require(
                     resolved is org.tatrman.ttr.metadata.world.WorldResolution.Ok,
                 ) { "cannot resolve export world: $resolved" }
-                val bundleDirs = mutableMapOf<String, Path>()
 
                 fun load(program: AutomationProgram): Loaded {
                     val recipeName = requireNotNull(program.recipe)
                     val dir =
-                        bundleDirs.getOrPut(recipeName) {
-                            bundlePath?.let { base -> Path.of(base).toAbsolutePath().normalize() } ?: run {
-                                val sources =
-                                    Files.walk(root).use { paths ->
-                                        paths
-                                            .filter {
-                                                Files.isRegularFile(it) &&
-                                                    it.fileName.toString() == "$recipeName.ttrp"
-                                            }.toList()
-                                    }
-                                val source =
-                                    requireNotNull(
-                                        sources.singleOrNull(),
-                                    ) { "expected one $recipeName.ttrp; use --bundle for an existing bundle" }
-                                BundleAssembler(
-                                    ToolchainVersion.current,
-                                ).build(
-                                    source = Files.readString(source),
-                                    fileName = source.toString(),
-                                    recipeDir = source.parent,
-                                    pipelineManifest = config.manifest,
-                                    modelsRoot = config.manifest.modelsRoot(),
-                                    outDir = temp!!,
-                                ).dir
-                            }
+                        bundlePath?.let { base -> Path.of(base).toAbsolutePath().normalize() } ?: run {
+                            val sources =
+                                Files.walk(root).use { paths ->
+                                    paths
+                                        .filter {
+                                            Files.isRegularFile(it) &&
+                                                it.fileName.toString() == "$recipeName.ttrp"
+                                        }.toList()
+                                }
+                            val source =
+                                requireNotNull(
+                                    sources.singleOrNull(),
+                                ) { "expected one $recipeName.ttrp; use --bundle for an existing bundle" }
+                            BundleAssembler(
+                                ToolchainVersion.current,
+                            ).build(
+                                source = Files.readString(source),
+                                fileName = source.toString(),
+                                recipeDir = source.parent,
+                                pipelineManifest = config.manifest,
+                                modelsRoot = config.manifest.modelsRoot(),
+                                outDir = temp!!,
+                            ).dir
                         }
                     val bundle = RunManifest.fromJson(Files.readString(dir.resolve("manifest.json")))
                     require(
@@ -264,15 +258,12 @@ class EmitCommand : CliktCommand(name = "emit") {
                         ),
                         bundle,
                         dir,
-                        wiredActions.values.toList(),
                     )
                 }
-                val loadedRecipes = programs.map(::load)
-                val first = loadedRecipes.first()
-                val graph = first.graph
-                val program = programs.first()
+                val loaded = load(program)
+                val graph = loaded.graph
                 val recipeName = graph.recipe.name
-                val bundle = first.bundle
+                val bundle = loaded.bundle
                 val plugins = ServiceLoader.load(TtrEmitPlugin::class.java).toList()
                 val manifests =
                     RecipeManifestSource(
@@ -283,19 +274,15 @@ class EmitCommand : CliktCommand(name = "emit") {
                         manifests.load(graph.deployment.type),
                     ) { "unknown executor type ${graph.deployment.type}" }
                 val diagnostics =
-                    loadedRecipes.flatMapIndexed { index, loadedRecipe ->
-                        ExecutorManifestGate.checkRecipe(
-                            manifest,
-                            programs[index],
-                            deployment,
-                            RegistryRecipe(
-                                loadedRecipe.graph.recipe.kinds,
-                                loadedRecipe.graph.actions.mapValues {
-                                    RecipeGraphProjector.sink(it.value, graph.deployment.type)
-                                },
-                            ),
-                        )
-                    }
+                    ExecutorManifestGate.checkRecipe(
+                        manifest,
+                        program,
+                        deployment,
+                        RegistryRecipe(
+                            graph.recipe.kinds,
+                            graph.actions.mapValues { RecipeGraphProjector.sink(it.value, graph.deployment.type) },
+                        ),
+                    )
                 require(diagnostics.isEmpty()) { diagnostics.joinToString("\n") { it.render() } }
                 require(
                     plugin.supportsRecipes,
@@ -311,19 +298,13 @@ class EmitCommand : CliktCommand(name = "emit") {
                     "Stale when any text, values, labels, program, deployment, world, toolchain " +
                         "or target version fingerprint differs for any step from the served bundle; re-export the deployment."
 
-                val fixtures =
-                    loadedRecipes
-                        .flatMap { loadedRecipe ->
-                            loadedRecipe.bundle.recipe!!
-                                .tests
-                                .orEmpty()
-                        }.distinct()
+                val fixtures = bundle.recipe!!.tests.orEmpty()
                 val conformance =
                     buildJsonObject {
                         put("fixtures", JsonArray(fixtures.map(::JsonPrimitive)))
                         put(
                             "cells",
-                            JsonArray(programs.map { JsonPrimitive("${graph.deployment.type}.${it.mode}") }.distinct()),
+                            JsonArray(listOf(JsonPrimitive("${graph.deployment.type}.${program.mode}"))),
                         )
                     }
                 val exportManifest =
@@ -348,8 +329,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                         put(
                             "connections",
                             JsonArray(
-                                loadedRecipes
-                                    .flatMap { it.bundle.connections }
+                                bundle.connections
                                     .distinct()
                                     .sorted()
                                     .map(::JsonPrimitive),
@@ -393,17 +373,11 @@ class EmitCommand : CliktCommand(name = "emit") {
                         .normalize()
                         .resolve("$deploymentName.${graph.deployment.type}.export")
                 val fixtureBytes = linkedMapOf<String, ByteArray>()
-                loadedRecipes.forEach { loadedRecipe ->
-                    loadedRecipe.bundle.recipe!!.tests.orEmpty().forEach { relative ->
-                        require(
-                            relative in loadedRecipe.bundle.files,
-                        ) { "fixture missing from bundle hashes: $relative" }
-                        val bytes = Files.readAllBytes(ExportFolderWriter.bundleFile(loadedRecipe.dir, relative))
-                        require(
-                            fixtureBytes[relative]?.contentEquals(bytes) != false,
-                        ) { "conflicting fixture $relative" }
-                        fixtureBytes[relative] = bytes
-                    }
+                fixtures.forEach { relative ->
+                    require(relative in bundle.files) { "fixture missing from bundle hashes: $relative" }
+                    val bytes = Files.readAllBytes(ExportFolderWriter.bundleFile(loaded.dir, relative))
+                    require(fixtureBytes[relative]?.contentEquals(bytes) != false) { "conflicting fixture $relative" }
+                    fixtureBytes[relative] = bytes
                 }
                 val workflowCalls =
                     result.files["workflow.json"]?.let { bytes ->
