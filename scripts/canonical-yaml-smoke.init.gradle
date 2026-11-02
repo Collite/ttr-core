@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
+// Isolated pre-publish repository. Never writes mavenLocal or a registry.
+allprojects { p ->
+    if (p.name in ['ttr-parser', 'ttr-yaml']) {
+        p.plugins.withId('maven-publish') {
+            p.publishing.repositories.maven {
+                name = 'YamlSmoke'
+                url = p.rootProject.layout.buildDirectory.dir('yaml-smoke-repository')
+            }
+        }
+    }
+}

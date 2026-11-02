@@ -14,6 +14,21 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - The `concept-bearer-missing` description (and ch. 14 / ch. 20) say "a quality, a phase or a variant".
 - The `cn/subkind-as-kind` hint (`use 'def variant'`) is pinned by a test in each runtime.
 - `conceptKeyword(def)` (`@tatrman/parser`) is the one "word as written" rule; the formatter and the LSP outline call it.
+### Added — Canonical YAML internal certification (grammar 0.21.3)
+
+- The internal grammar family now publishes `org.tatrman:ttr-yaml`, with the parser's offline canonical
+  schemas. It is a library JAR with sources/javadoc, without metadata dependencies, distributions or an SLF4J provider.
+  The `ttr-yaml-migrate` launcher remains available through `installDist`.
+- Canonical YAML and TTR-to-YAML conversion refuse syntactic collection depth beyond 64 before recursive
+  parsing, with the first excessive node's source position. This codec resource limit includes document and
+  definition containers; YAML block/flow and native multiline/flow boundaries pass on a 1 MiB thread stack.
+  The native TTR parser itself retains its existing behavior and accepts the codec's first refused depth.
+- Migration pins changed-input AST/semantics, request/parser-error refusals, bounded large diffs, UTF-8 paths,
+  permissions, file identity and concurrent-save checks. Request errors use `<request>`, source errors use `<yaml>`;
+  packaged diagnostics have no logger preamble and abnormal bridge termination retains its cause.
+- Existing JVM binary compatibility/rebuild notices remain: rebuild dependent JVM modules together against
+  the matching grammar-family artifacts. The grammar stays 0.21; this is an internal patch, with no public cut.
+
 ### Added — Kotlin canonical YAML codec
 
 - Source module `ttr-yaml` reads/writes grammar 0.21 canonical documents, preserving headers, imports,
@@ -27,8 +42,7 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   spellings. Duplicate ordered-map keys, misplaced `!pl`, calc comments and unsupported YAML directives
   are refused at source locations; output escapes nonprintable YAML characters.
 - C-7 and YAML share lower definition-property serialization. C-7 export bytes and resolved-reference
-  behavior stay unchanged. No grammar/dependency pin or artifact version changes; internal release wiring
-  remains in MW-P2 certification. Existing JVM rebuild notices remain in force.
+  behavior stay unchanged. No grammar/dependency pin changes; `ttr-yaml` joins the internal grammar family in MW-P2 certification. Existing JVM rebuild notices remain in force.
 
 ### Added — `variant`, the house spelling of `subkind` (grammar 0.21.1, CN-P8 S8.6)
 

@@ -31,6 +31,7 @@ See [§ Maven Central — the public lane](#maven-central--the-public-lane-sv-p1
 | Module (Gradle path) | Coordinate | Phase | Why it's published |
 |---|---|---|---|
 | `:packages:kotlin:ttr-parser` | `org.tatrman:ttr-parser` | 1 | ANTLR parser + typed AST; ai-platform's `infra/metadata` consumes the model types |
+| `:packages:kotlin:ttr-yaml` | `org.tatrman:ttr-yaml` | MW-P2 | Canonical YAML codec; grammar-family library JAR (no distribution), depends on parser and bundled schema resources, never metadata |
 | `:packages:kotlin:ttr-writer` | `org.tatrman:ttr-writer` | 1 | Deterministic AST → TTR-source renderer; depends on `ttr-parser` (api) |
 | `:packages:kotlin:ttr-semantics` | `org.tatrman:ttr-semantics` | 2 | Symbol table + resolver + per-kind validator + bundled stock CNC vocab; depends on `ttr-parser` (api) |
 | `:packages:kotlin:ttr-metadata` | `org.tatrman:ttr-metadata` | 1 (M1) | Typed model, storage SPI (+ fs/classpath), reconciler, resolver, graph, search, registry, refresher mechanism, export, world resolution (M2). Pins the in-repo `ttr-parser`/`ttr-writer`/`ttr-semantics` and re-exports them as `api` deps (contracts §1) |
@@ -748,3 +749,14 @@ run's Artifacts section. The source `profile.yaml` is included in the metadata j
 Locally run `./gradlew :packages:kotlin:ttr-metadata:renderTtrMdg`; the installable
 file is `packages/kotlin/ttr-metadata/build/distributions/ttr-mdg.xml`.
 See [EA installation and verification](docs/ea.md).
+
+## Canonical YAML clean consumer
+
+`node scripts/canonical-yaml-consumer.mjs <internal-version>` copies a standalone Java consumer
+into a fresh directory under `build/`, resolves only published Maven artifacts (no composite builds or
+mavenLocal), and checks canonical read/write/native fixed points, located rejection, offline schemas,
+and the actual runtime closure. Set `GITHUB_ACTOR`/`GITHUB_TOKEN` for GitHub Packages; otherwise the
+script uses the existing `gh` login without persisting credentials. `--repository <path>` selects an
+isolated file repository for pre-publication checks. The default is the authenticated internal registry.
+No public registry publish or deployment is involved. Rebuild dependent JVM modules against the chosen
+family version; the existing binary incompatibility notices still apply.

@@ -12,6 +12,14 @@ The canonical version lives in the `// @grammar-version:` marker at the top of
 `src/generated/version.ts`, re-exported from `@tatrman/grammar` as
 `TTR_GRAMMAR_VERSION`.
 
+## 0.21.3 — Canonical YAML internal certification
+
+The internal JVM grammar family adds `org.tatrman:ttr-yaml` and certifies the packaged model/profile
+schemas, canonical twins, C-7 and migration fixed points. The marker and grammar remain 0.21.
+The codec guards collection nesting at depth 64 with located refusals; migration retains changed-input
+AST/semantics and bounded diffs. JVM consumers must rebuild against the matching family; existing
+binary incompatibility notices apply. No public npm/Maven release is required by this cut.
+
 ## 0.21.2 — `variant` follow-ups (review-200)
 
 `SUBKIND` joins `cnKey`, so `subkind:` is a cn free-form key, as `variant:` has been since 0.21.1 (missing since
