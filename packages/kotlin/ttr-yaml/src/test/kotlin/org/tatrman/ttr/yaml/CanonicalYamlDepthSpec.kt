@@ -49,32 +49,50 @@ class CanonicalYamlDepthSpec :
         for (block in listOf(false, true)) {
             test("YAML ${if (block) "block" else "flow"} boundary is located on a 1 MiB stack") {
                 smallStack {
-                    // Root mapping, defs sequence, definition mapping and properties mapping use four levels.
-                    CanonicalYaml.read(yaml(limit - 4, block), "depth.yaml").ast.errors shouldBe emptyList()
+                    // Canonical properties sequence and singleton map add a fifth envelope level.
+                    val accepted = CanonicalYaml.read(yaml(limit - 5, block), "depth.yaml")
+                    accepted.ast.errors shouldBe emptyList()
+                    val bytes = CanonicalYaml.write(accepted)
+                    CanonicalYaml.write(CanonicalYaml.read(bytes)) shouldBe bytes
+                    CanonicalYaml.write(CanonicalYaml.fromTtr(CanonicalYaml.toTtr(accepted))) shouldBe bytes
                     val error =
                         shouldThrow<CanonicalYamlException> {
-                            CanonicalYaml.read(yaml(limit - 3, block), "depth.yaml")
+                            CanonicalYaml.read(yaml(limit - 4, block), "depth.yaml")
                         }
                     error.file shouldBe "depth.yaml"
                     error.detail shouldBe "nesting too deep (limit $limit)"
-                    error.line shouldBe if (block) 8 + limit - 4 else 7
-                    error.column shouldBe if (block) 9 + 2 * (limit - 4) else 10 + limit - 4
+                    error.line shouldBe if (block) 8 + limit - 5 else 7
+                    error.column shouldBe if (block) 9 + 2 * (limit - 5) else 10 + limit - 5
                 }
             }
             test("TTR ${if (block) "multiline" else "flow"} boundary is located on a 1 MiB stack") {
                 smallStack {
-                    CanonicalYaml.fromTtr(ttr(limit - 1, block), "depth.ttrm").ast.errors shouldBe emptyList()
+                    val accepted = CanonicalYaml.fromTtr(ttr(limit - 5, block), "depth.ttrm")
+                    accepted.ast.errors shouldBe emptyList()
+                    val bytes = CanonicalYaml.write(accepted)
+                    CanonicalYaml.write(CanonicalYaml.read(bytes)) shouldBe bytes
                     val error =
                         shouldThrow<CanonicalYamlException> {
-                            CanonicalYaml.fromTtr(ttr(limit, block), "depth.ttrm")
+                            CanonicalYaml.fromTtr(ttr(limit - 4, block), "depth.ttrm")
                         }
                     error.file shouldBe "depth.ttrm"
                     error.detail shouldBe "nesting too deep (limit $limit)"
-                    error.line shouldBe if (block) 3 + limit - 1 else 3
-                    error.column shouldBe if (block) limit else 5 + limit - 1
+                    error.line shouldBe if (block) 3 + limit - 5 else 3
+                    error.column shouldBe if (block) limit - 4 else 5 + limit - 5
                     // Native parsing has no codec resource limit; this is intentionally a codec-only refusal.
-                    TtrLoader.parseString(ttr(limit, block), "native.ttrm").errors shouldBe emptyList()
+                    TtrLoader.parseString(ttr(limit - 4, block), "native.ttrm").errors shouldBe emptyList()
                 }
+            }
+        }
+        test("native token guard refuses deep input before recursive parsing on a 1 MiB stack") {
+            smallStack {
+                val error =
+                    shouldThrow<CanonicalYamlException> {
+                        CanonicalYaml.fromTtr(ttr(1000, false), "deep.ttrm")
+                    }
+                error.line shouldBe 3
+                error.column shouldBe 68
+                error.detail shouldBe "nesting too deep (limit 64)"
             }
         }
         test("streaming guard refuses 100,000 levels before composition or recursion") {

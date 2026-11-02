@@ -21,7 +21,8 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   The `ttr-yaml-migrate` launcher remains available through `installDist`.
 - Canonical YAML and TTR-to-YAML conversion refuse syntactic collection depth beyond 64 before recursive
   parsing, with the first excessive node's source position. This codec resource limit includes document and
-  definition containers; YAML block/flow and native multiline/flow boundaries pass on a 1 MiB thread stack.
+  definition containers in both authored and normalized canonical trees, so accepted boundary documents
+  remain readable after formatting. YAML block/flow and native multiline/flow boundaries pass on a 1 MiB thread stack.
   The native TTR parser itself retains its existing behavior and accepts the codec's first refused depth.
 - Migration pins changed-input AST/semantics, request/parser-error refusals, bounded large diffs, UTF-8 paths,
   permissions, file identity and concurrent-save checks. Request errors use `<request>`, source errors use `<yaml>`;
