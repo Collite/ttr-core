@@ -148,6 +148,30 @@ class RemovedConstructSpec :
             }
         }
 
+        "a program still on `port: event` is refused once: its event column reads are not REC-020 as well" {
+            fun reader(port: String) =
+                """
+                |package hartland.automation
+                |model automation
+                |
+                |def program cut_event_reader { recipe: cut_event_reader, $port, mode: on_event, as_of: event }
+                |def schema cut_event { columns: [def column order_number { type: order.order_number }] }
+                |
+                """.trimMargin()
+            val source =
+                Files
+                    .readString(RecipeFixtures.root.resolve("base-order.ttrp"))
+                    .replace("hold_ar: n_due > 0 ", "hold_ar: n_due > 0 and order_number = :order_number ")
+            val stale =
+                plan(planted("", reader("port: event, event: schema.cut_event")), source, "cut_event_reader.ttrp")
+            cut(stale).map { it.id.id } shouldContainExactlyInAnyOrder listOf("TTRP-CUT-009", "TTRP-CUT-010")
+            stale.diagnostics.filter { it.id == TtrpDiagnosticId.REC_020 }.shouldBeEmpty()
+            // control: the same read under a program that binds nothing is REC-020
+            val none = plan(planted("", reader("port: none")), source, "cut_event_reader.ttrp")
+            cut(none).shouldBeEmpty()
+            none.diagnostics.map { it.id } shouldContain TtrpDiagnosticId.REC_020
+        }
+
         "the hero recipes over the model as cut say nothing of removed constructs" {
             for (f in RecipeFixtures.SEVENTEEN) cut(RecipeFixtures.sharedRecipe(f)).shouldBeEmpty()
         }

@@ -1202,9 +1202,15 @@ class RecipeChecker(
         val declared = recipe.parameters.map { it.text }.toSet()
         val runtime = mutableSetOf(AS_OF)
         if (programs.any { it.port == "key" || it.port == "keys" }) runtime += keyColumns
+        // D-142: a program still on the removed `port: event` bound its event's columns; its CUT-009/010 already fail
+        // the recipe, so its `:<event column>` reads are not refused a second time
+        val eventPort =
+            programs.any { p ->
+                RemovedConstructs.inProperties("program", p.properties).any { it.cut == Cut.EVENT_PORT }
+            }
         val refs = paramRefs(recipe, rg)
         for (r in refs) {
-            if (r.name !in declared && r.name !in runtime) {
+            if (r.name !in declared && r.name !in runtime && !eventPort) {
                 diags +=
                     err(
                         TtrpDiagnosticId.REC_020,
