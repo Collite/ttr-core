@@ -6,8 +6,8 @@ defs:
     id: "Numbers"
     properties:
       -
+        c: -0.5
+      -
         a: 1.0
       -
         b: 1e3
-      -
-        c: -0.5

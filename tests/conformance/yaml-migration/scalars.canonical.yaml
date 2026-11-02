@@ -6,3 +6,4 @@ defs:
     id: "Customer"
     properties:
       description: "A customer with an account"
+      labelPlural: "Customer's accounts"

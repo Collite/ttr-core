@@ -14,16 +14,30 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - The `concept-bearer-missing` description (and ch. 14 / ch. 20) say "a quality, a phase or a variant".
 - The `cn/subkind-as-kind` hint (`use 'def variant'`) is pinned by a test in each runtime.
 - `conceptKeyword(def)` (`@tatrman/parser`) is the one "word as written" rule; the formatter and the LSP outline call it.
-### Added — Canonical YAML internal certification (grammar 0.21.3)
+### Fixed — Canonical YAML depth guards (grammar 0.21.4)
+
+- Guard retained md calc-argument sub-parsing before recursion and match every TTR closing bracket to its
+  opener before parsing or error recovery. Public codec calls refuse deep/malformed structures at source nodes
+  on a 1 MiB stack, including quoted calc values and interleaved mismatched brackets (ttr-core#364).
+- The limit is canonical collection depth 64, including document/definition containers: about 19 nested
+  automation objects, or 64 minus the document/definition containers for plain lists. Native TTR accepts deeper
+  input, so those files cannot be converted or migrated. With the guards removed, measured full round trips
+  survive 200 levels on a 1 MiB stack and overflow at 210 (about 3× margin); current fixtures reach 17.
+- Refusal is at a node inside the over-deep structure, where the first guard fires; fixing it may surface another.
+- Migration preserves below-budget LCS tie-breaking, reports already replaced files on mid-batch edits,
+  retains exit/timeout/output-limit causes without misleading self-termination signals and uses exact file identities.
+  The published-artifact consumer compares schemas to the released tag across checkouts.
+- Internal 0.21.4 supersedes 0.21.3. Rebuild JVM consumers against the matching grammar family; grammar remains 0.21.
+
+### Added — Canonical YAML internal certification (grammar 0.21.3; superseded)
+
+**Depth guard incomplete — use 0.21.4.** 0.21.3 remains published.
 
 - The internal grammar family now publishes `org.tatrman:ttr-yaml`, with the parser's offline canonical
   schemas. It is a library JAR with sources/javadoc, without metadata dependencies, distributions or an SLF4J provider.
   The `ttr-yaml-migrate` launcher remains available through `installDist`.
-- Canonical YAML and TTR-to-YAML conversion refuse syntactic collection depth beyond 64 before recursive
-  parsing, with the first excessive node's source position. This codec resource limit includes document and
-  definition containers in both authored and normalized canonical trees, so accepted boundary documents
-  remain readable after formatting. YAML block/flow and native multiline/flow boundaries pass on a 1 MiB thread stack.
-  The native TTR parser itself retains its existing behavior and accepts the codec's first refused depth.
+- Introduced authored and normalized canonical depth guards; two recursive parsing gaps are fixed in 0.21.4
+  above. Accepted boundary documents remain readable after formatting.
 - Migration pins changed-input AST/semantics, request/parser-error refusals, bounded large diffs, UTF-8 paths,
   permissions, file identity and concurrent-save checks. Request errors use `<request>`, source errors use `<yaml>`;
   packaged diagnostics have no logger preamble and abnormal bridge termination retains its cause.

@@ -163,6 +163,13 @@ YAML-only numeric spellings such as `+1`, `.5`, `0x1F`, `0o17` and `5.` normaliz
 1000 authored characters (including sign and radix prefix) before decimal or radix
 conversion, in both YAML and TTR input. Longer literals raise a located `Number literal too long`
 diagnostic. The independent finite-double check already refuses integers beyond about 309 digits; the length bound mainly protects long fractions and zero-padded literals. YAML 1.2 core numbers have no digit separators. This limit does not apply to quoted text.
+Canonical collection depth is limited to 64, including document and definition containers, and checked on
+both authored syntax and the normalized tree. This permits about 19 nested automation objects, or 64 minus
+the document/definition containers for plain lists. Native TTR keeps accepting deeper input, which cannot be
+converted or migrated by the codec. Refusal is located at a node inside the over-deep structure where the first
+guard fires; fixing it may surface another. With guards removed, full round trips on a 1 MiB stack survive
+200 levels and overflow at 210 (about 3× margin). The current shared fixtures reach canonical depth 17.
+
 Duplicate storage fields and restrict members are refused at the second key; CN object duplicates
 retain the existing parser last-wins rule. Native TTR escape handling follows the
 grammar string contract.

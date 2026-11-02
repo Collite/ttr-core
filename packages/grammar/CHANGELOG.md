@@ -12,7 +12,18 @@ The canonical version lives in the `// @grammar-version:` marker at the top of
 `src/generated/version.ts`, re-exported from `@tatrman/grammar` as
 `TTR_GRAMMAR_VERSION`.
 
-## 0.21.3 — Canonical YAML internal certification
+## 0.21.4 — Complete canonical YAML depth guards
+
+The codec checks retained calc-argument tokens and matches bracket kinds before all codec-owned TTR parsing,
+closing the public API stack-overflow gaps in #364. Canonical depth is limited to 64, including document/def
+containers (about 19 automation objects); native TTR accepts deeper input that cannot be converted/migrated.
+Refusal is at a node inside the over-deep structure where the first guard fires; fixing it may surface another.
+Measured full round trips with guards removed survive 200 levels on a 1 MiB stack and overflow at 210.
+Internal patch only, grammar remains 0.21. JVM consumers must rebuild against the matching family.
+
+## 0.21.3 — Canonical YAML internal certification (superseded)
+
+**Depth guard incomplete — use 0.21.4.** This version remains published.
 
 The internal JVM grammar family adds `org.tatrman:ttr-yaml` and certifies the packaged model/profile
 schemas, canonical twins, C-7 and migration fixed points. The marker and grammar remain 0.21.

@@ -5,6 +5,9 @@
 // context. Good enough for a human to review a codemod's changes; not intended
 // to be byte-compatible with GNU diff in every edge case.
 
+// 4 Mi cells bounds the table while retaining the 2,002-line compatibility vector.
+const MAX_LCS_CELLS = 4_194_304;
+
 interface Op {
   tag: 'eq' | 'del' | 'add';
   line: string;
@@ -56,38 +59,27 @@ export function unifiedDiff(path: string, before: string, after: string, context
   const b = after.split('\n');
   let start = 0;
   while (start < a.length && start < b.length && a[start] === b[start]) start++;
-  let endA = a.length;
-  let endB = b.length;
-  while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) {
-    endA--;
-    endB--;
-  }
-  const n = endA - start;
-  const m = endB - start;
-  if (n * m > 4_000_000) {
+  const n = a.length - start;
+  const m = b.length - start;
+  if (n * m > MAX_LCS_CELLS) {
     return [
       `--- a/${path}`,
       `+++ b/${path}`,
       `@@ -${n ? start + 1 : start},${n} +${m ? start + 1 : start},${m} @@`,
-      ...a.slice(start, endA).map((line) => `-${line}`),
-      ...b.slice(start, endB).map((line) => `+${line}`),
+      ...a.slice(start).map((line) => `-${line}`),
+      ...b.slice(start).map((line) => `+${line}`),
     ].join('\n');
   }
-  // Preserve established LCS tie-breaking for small diffs; trim large unchanged regions.
-  const ops =
-    a.length * b.length <= 4_000_000
-      ? diffLines(a, b)
-      : [
-          ...a.slice(0, start).map((line, i): Op => ({ tag: 'eq', line, a: i + 1, b: i + 1 })),
-          ...diffLines(a.slice(start, endA), b.slice(start, endB)).map((op) => ({
-            ...op,
-            a: op.a ? op.a + start : 0,
-            b: op.b ? op.b + start : 0,
-          })),
-          ...a
-            .slice(endA)
-            .map((line, i): Op => ({ tag: 'eq', line, a: endA + i + 1, b: endB + i + 1 })),
-        ];
+  // Equal leading lines are always taken first by the original LCS walk. Keep the
+  // suffix in the table: trimming it changes tie-breaking for repeated lines.
+  const ops = [
+    ...a.slice(0, start).map((line, i): Op => ({ tag: 'eq', line, a: i + 1, b: i + 1 })),
+    ...diffLines(a.slice(start), b.slice(start)).map((op) => ({
+      ...op,
+      a: op.a ? op.a + start : 0,
+      b: op.b ? op.b + start : 0,
+    })),
+  ];
   const changed = ops.map((o) => o.tag !== 'eq');
 
   // Mark which ops to include: every change plus `context` equal lines around it.

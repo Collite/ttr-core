@@ -17,7 +17,13 @@ class CanonicalDocument internal constructor(
 )
 
 object CanonicalYaml {
-    /** Authored/canonical collection depth, including document/definition containers; measured on a 1 MiB stack. */
+    /**
+     * Canonical collection depth (also checked on authored YAML/TTR), including document/definition containers.
+     * About 19 nested automation objects fit; plain lists allow 64 minus the document/definition containers.
+     * Native TTR accepts deeper input that therefore cannot be converted or migrated by this codec.
+     * Full round trips with guards removed survived 200 levels and overflowed at 210 on a 1 MiB stack.
+     * Refusal is at a node inside the over-deep structure, where the first guard fires; fixing it may surface another.
+     */
     const val MAX_NESTING_DEPTH = 64
 
     init {

@@ -183,16 +183,60 @@ process.kill(process.pid, 'SIGKILL');`
     await expect(runYamlMigration([file], options())).rejects.toThrow(/bridge diagnostic.*SIGKILL/);
     expect(readFileSync(file, 'utf8')).toBe(before);
   });
-  it('keeps bridge stderr and timeout cause', async () => {
+  it('reports a timeout without attributing its own SIGTERM to the bridge', async () => {
     writeFileSync(
       bridge,
       `#!/usr/bin/env node
 require('node:fs').writeSync(2, 'waiting');
 setInterval(() => {}, 1000);`
     );
-    await expect(runYamlMigration([file], { ...options(), timeoutMs: 500 })).rejects.toThrow(
-      /waiting.*timed out after 0.5 s/
+    const error = await runYamlMigration([file], { ...options(), timeoutMs: 500 }).catch(
+      (error: Error) => error
     );
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/timed out after 0.5 s/);
+    expect((error as Error).message).not.toContain('killed by SIGTERM');
+  });
+  it('reports stderr and a non-protocol exit status', async () => {
+    writeFileSync(
+      bridge,
+      `#!/usr/bin/env node\nrequire('node:fs').writeSync(2, 'failed\\n'); process.exit(1);`
+    );
+    await expect(runYamlMigration([file], options())).rejects.toThrow(/failed.*bridge exited 1/);
+    expect(readFileSync(file, 'utf8')).toBe(before);
+  });
+  it('reports ENOBUFS without attributing its own SIGTERM to the bridge', async () => {
+    writeFileSync(
+      bridge,
+      `#!/usr/bin/env node\nrequire('node:fs').writeSync(1, 'x'.repeat(8192)); setInterval(() => {}, 1000);`
+    );
+    const error = await runYamlMigration([file], { ...options(), maxBuffer: 1024 }).catch(
+      (error: Error) => error
+    );
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('bridge output exceeded maxBuffer (ENOBUFS)');
+    expect((error as Error).message).not.toContain('killed by SIGTERM');
+    expect(readFileSync(file, 'utf8')).toBe(before);
+  });
+  it('checks every planned file before replacing the first file', async () => {
+    const second = join(root, 'second.yaml');
+    writeFileSync(second, before);
+    writeFileSync(
+      bridge,
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const r = JSON.parse(fs.readFileSync(0, 'utf8'));
+const counter = ${JSON.stringify(join(root, 'calls'))};
+if (fs.existsSync(counter)) fs.writeFileSync(${JSON.stringify(second)}, 'editor save');
+else fs.writeFileSync(counter, '1');
+process.stdout.write(JSON.stringify({source: ${JSON.stringify(after)}, changed: true}));`
+    );
+    await expect(runYamlMigration([file, second], options())).rejects.toThrow(
+      `${second}: input changed while planning migration`
+    );
+    expect(readFileSync(file, 'utf8')).toBe(before);
+    expect(readFileSync(second, 'utf8')).toBe('editor save');
+    expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
   });
   it('stops remaining replacements when an edit lands between two renames', async () => {
     const second = join(root, 'second.yaml');
@@ -201,7 +245,9 @@ setInterval(() => {}, 1000);`
       writeFileSync(second, 'editor save');
       race.afterRename = undefined;
     };
-    await expect(runYamlMigration([file, second], options())).rejects.toThrow(second);
+    await expect(runYamlMigration([file, second], options())).rejects.toThrow(
+      `${second}: input changed before replacement; already replaced: ${file}`
+    );
     expect(readFileSync(file, 'utf8')).toBe(after);
     expect(readFileSync(second, 'utf8')).toBe('editor save');
     expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);

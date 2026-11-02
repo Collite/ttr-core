@@ -5,5 +5,6 @@ defs:
     - kind: entity
       id: Customer
       properties:
+          labelPlural: 'Customer''s accounts' # retained string, discarded comment
           description: A customer
               with an account

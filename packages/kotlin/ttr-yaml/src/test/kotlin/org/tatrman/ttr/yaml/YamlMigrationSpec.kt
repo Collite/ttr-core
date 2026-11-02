@@ -85,6 +85,7 @@ class YamlMigrationSpec :
                 status shouldBe 2
                 stdout shouldBe ""
                 stderr.startsWith("<request>:1:1:") shouldBe true
+                stderr.trimEnd().lines().size shouldBe 1
             }
         }
         test("invalid UTF-8 is refused with no response") {

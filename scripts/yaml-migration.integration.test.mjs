@@ -119,7 +119,7 @@ test('real TS CLI refuses unsupported target versions without writing', () =>
     assert.equal(readFileSync(path, 'utf8'), input);
   }));
 
-test('real launcher refuses depth 1,000 with the first excessive node and no stack trace', () => {
+test('real launcher refuses depth 1,000 at the guard node and without a stack trace', () => {
   const source =
     "ttr: '0.21'\nmodel: automation\ndefs:\n  - kind: program\n    id: D\n    properties:\n      a: " +
     '['.repeat(1000) +
@@ -130,4 +130,18 @@ test('real launcher refuses depth 1,000 with the first excessive node and no sta
   assert.equal(result.status, 2);
   assert.equal(result.stdout, '');
   assert.equal(result.stderr, '<yaml>:7:70: nesting too deep (limit 64)\n');
+});
+
+test('real launcher locates 100,000 nested retained calc brackets at the argument scalar', () => {
+  const source =
+    "ttr: '0.21'\nmodel: md\ndefs:\n  - kind: map\n    id: Convert\n    properties:\n" +
+    "      calc:\n        name: convert\n        args:\n          input: '" +
+    '['.repeat(100000) +
+    '1' +
+    ']'.repeat(100000) +
+    "'\n";
+  const result = invoke(request(source));
+  assert.equal(result.status, 2);
+  assert.equal(result.stdout, '');
+  assert.equal(result.stderr, '<yaml>:10:18: nesting too deep (limit 64)\n');
 });

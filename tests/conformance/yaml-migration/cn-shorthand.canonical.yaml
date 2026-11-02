@@ -6,9 +6,9 @@ defs:
     id: "Person"
     properties:
       -
+        label:
+          en: "Person"
+      -
         custom:
           - "one"
           - "two"
-      -
-        label:
-          en: "Person"

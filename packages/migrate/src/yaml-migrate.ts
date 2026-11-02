@@ -12,6 +12,7 @@ export interface YamlMigrationOptions {
   bridge: string;
   dryRun?: boolean;
   timeoutMs?: number;
+  maxBuffer?: number;
 }
 
 export interface YamlMigrationWrite {
@@ -35,14 +36,14 @@ export async function runYamlMigration(
   const identities = new Map<string, string>();
   // Reject duplicate identities before any bridge call, including directory symlink aliases.
   for (const path of paths) {
-    const stat = await lstat(path);
-    if (!stat.isFile() || stat.nlink !== 1)
+    const stat = await lstat(path, { bigint: true });
+    if (!stat.isFile() || stat.nlink !== 1n)
       throw new Error(`${path}: expected a regular file with one link`);
     const identity = `${stat.dev}:${stat.ino}`;
     const previous = identities.get(identity);
     if (previous) throw new Error(`Duplicate migration file: ${previous} and ${path}`);
     identities.set(identity, path);
-    modes.set(path, stat.mode);
+    modes.set(path, Number(stat.mode));
   }
   // Validate every input before staging or replacing any file, including during a dry run.
   for (const path of paths) {
@@ -57,7 +58,7 @@ export async function runYamlMigration(
           source: before,
         }),
         encoding: 'utf-8',
-        maxBuffer: 64 * 1024 * 1024,
+        maxBuffer: options.maxBuffer ?? 64 * 1024 * 1024,
         timeout: options.timeoutMs ?? 60_000,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -74,7 +75,8 @@ export async function runYamlMigration(
       if (detail.code === 'ETIMEDOUT')
         causes.push(`bridge timed out after ${(options.timeoutMs ?? 60_000) / 1000} s`);
       if (detail.code === 'ENOBUFS') causes.push('bridge output exceeded maxBuffer (ENOBUFS)');
-      if (detail.signal) causes.push(`bridge killed by ${detail.signal}`);
+      if (detail.signal && detail.code !== 'ETIMEDOUT' && detail.code !== 'ENOBUFS')
+        causes.push(`bridge killed by ${detail.signal}`);
       if (typeof detail.status === 'number' && detail.status !== 2)
         causes.push(`bridge exited ${detail.status}`);
       const diagnostic = detail.stderr?.toString().trim();
@@ -118,17 +120,23 @@ export async function runYamlMigration(
       });
       await chmod(temp, modes.get(write.path)!);
     }
-    const checkUnchanged = async (write: YamlMigrationWrite) => {
+    const replaced: string[] = [];
+    const checkUnchanged = async (write: YamlMigrationWrite, replacing = false) => {
       const stat = await lstat(write.path);
       const current = decodeUtf8(write.path, await readFile(write.path));
       if (!stat.isFile() || stat.nlink !== 1 || current !== write.before) {
-        throw new Error(`${write.path}: input changed while planning migration`);
+        throw new Error(
+          replacing
+            ? `${write.path}: input changed before replacement; already replaced: ${replaced.join(', ') || 'none'}`
+            : `${write.path}: input changed while planning migration`
+        );
       }
     };
     for (const { write } of staged) await checkUnchanged(write);
     for (const { write, temp } of staged) {
-      await checkUnchanged(write);
+      await checkUnchanged(write, true);
       await rename(temp, write.path);
+      replaced.push(write.path);
     }
   } finally {
     await Promise.all(staged.map(({ temp }) => rm(temp, { force: true })));
