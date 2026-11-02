@@ -18,11 +18,22 @@ import { runYamlMigration } from '../yaml-migrate.js';
 const race = vi.hoisted(() => ({
   afterRename: undefined as (() => void) | undefined,
   failRename: undefined as string | undefined,
+  beforeLstat: undefined as ((path: unknown) => void) | undefined,
+  failRemove: undefined as { path: string; error: Error } | undefined,
 }));
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
   return {
     ...actual,
+    lstat: async (...args: Parameters<typeof actual.lstat>) => {
+      race.beforeLstat?.(args[0]);
+      return actual.lstat(...args);
+    },
+    rm: async (...args: Parameters<typeof actual.rm>) => {
+      if (race.failRemove && String(args[0]).startsWith(`${race.failRemove.path}.migrate-`))
+        throw race.failRemove.error;
+      return actual.rm(...args);
+    },
     rename: async (...args: Parameters<typeof actual.rename>) => {
       if (args[1] === race.failRename) throw new Error('simulated rename failure');
       await actual.rename(...args);
@@ -60,6 +71,9 @@ process.stdout.write(JSON.stringify({ source, changed: source !== r.source }));
   afterEach(() => {
     race.afterRename = undefined;
     race.failRename = undefined;
+    race.beforeLstat = undefined;
+    race.failRemove = undefined;
+    chmodSync(root, 0o755);
     rmSync(root, { recursive: true, force: true });
   });
   const options = () => ({ from: '0.21', to: '0.21', bridge });
@@ -274,6 +288,8 @@ process.stdout.write(JSON.stringify({source: ${JSON.stringify(after)}, changed: 
       expect(message.startsWith(`${second}: input changed before replacement (`)).toBe(true);
       expect(message).toContain(damage === 'delete' ? 'ENOENT' : 'not valid UTF-8');
       expect(message.endsWith(`); already replaced: ${file}`)).toBe(true);
+      expect((error as Error).cause).toBeInstanceOf(Error);
+      if (damage === 'delete') expect((error as Error).cause).toMatchObject({ code: 'ENOENT' });
       expect(readFileSync(file, 'utf8')).toBe(after);
       if (damage === 'invalid UTF-8')
         expect(readFileSync(second)).toEqual(Buffer.from([0xff, 0xfe]));
@@ -286,15 +302,64 @@ process.stdout.write(JSON.stringify({source: ${JSON.stringify(after)}, changed: 
     race.failRename = second;
     await expect(runYamlMigration([file, second], options())).rejects.toMatchObject({
       message: `${second}: replacement failed (simulated rename failure); already replaced: ${file}`,
+      cause: { message: 'simulated rename failure' },
     });
     expect(readFileSync(file, 'utf8')).toBe(after);
     expect(readFileSync(second, 'utf8')).toBe(before);
     expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
   });
-  it('keeps a first-replacement rename failure unchanged and removes its staged files', async () => {
+  it('reports none after a first-replacement rename failure and removes its staged files', async () => {
     race.failRename = file;
-    await expect(runYamlMigration([file], options())).rejects.toThrow(/^simulated rename failure$/);
+    await expect(runYamlMigration([file], options())).rejects.toMatchObject({
+      message: `${file}: replacement failed (simulated rename failure); already replaced: none`,
+      cause: { message: 'simulated rename failure' },
+    });
     expect(readFileSync(file, 'utf8')).toBe(before);
     expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
   });
+  it('reports none and retains ENOENT when file 1 disappears at its replacement recheck', async () => {
+    let calls = 0;
+    race.beforeLstat = (path) => {
+      // Discovery, pre-check, then the replace loop's check.
+      if (path === file && ++calls === 3) rmSync(file);
+    };
+    const error = await runYamlMigration([file], options()).catch((error: Error) => error);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message.startsWith(`${file}: input changed before replacement (ENOENT`)).toBe(true);
+    expect((error as Error).message.endsWith('); already replaced: none')).toBe(true);
+    expect((error as Error).cause).toMatchObject({ code: 'ENOENT' });
+    expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
+  });
+  it.skipIf(process.getuid?.() === 0)('preserves the replacement report when chmod also prevents cleanup', async () => {
+    const second = join(root, 'second.yaml');
+    writeFileSync(second, before);
+    race.afterRename = () => chmodSync(root, 0o555);
+    const error = await runYamlMigration([file, second], options()).catch((error: Error) => error);
+    expect(error).toBeInstanceOf(Error);
+    const message = (error as Error).message;
+    expect(message.startsWith(`${second}: replacement failed (EACCES`)).toBe(true);
+    expect(message).toContain(`already replaced: ${file}; could not remove: ${second}.migrate-`);
+    expect(message).not.toContain(`could not remove: ${file}.migrate-`);
+    expect((error as Error).cause).toMatchObject({ cause: { code: 'EACCES' } });
+    expect(readFileSync(file, 'utf8')).toBe(after);
+    expect(readFileSync(second, 'utf8')).toBe(before);
+    expect(readdirSync(root).filter((name) => name.includes('.migrate-'))).toHaveLength(1);
+  });
+  it('reports only failed cleanup paths after successful replacements, retaining the cleanup cause', async () => {
+    const second = join(root, 'second.yaml');
+    writeFileSync(second, before);
+    const cause = Object.assign(new Error('simulated cleanup failure'), { code: 'EACCES' });
+    race.failRemove = { path: second, error: cause };
+    const error = await runYamlMigration([file, second], options()).catch((error: Error) => error);
+    expect(error).toBeInstanceOf(Error);
+    const message = (error as Error).message;
+    expect(message.startsWith(`could not remove temporary files: ${second}.migrate-`)).toBe(true);
+    expect(message.endsWith(`; already replaced: ${file}, ${second}`)).toBe(true);
+    expect(message).not.toContain(`${file}.migrate-`);
+    expect((error as Error).cause).toBeInstanceOf(AggregateError);
+    expect(((error as Error).cause as AggregateError).errors).toEqual([cause]);
+    expect(readFileSync(file, 'utf8')).toBe(after);
+    expect(readFileSync(second, 'utf8')).toBe(after);
+  });
+
 });
