@@ -6,6 +6,16 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — Canonical YAML diagnostic and migration follow-ups (ttr-core#372)
+
+- Native syntax diagnostics use the earliest source position; retained calc arguments prefer an earlier
+  lexer failure over a misleading unmatched closer. Nesting guards still run before recursive parsing.
+- Every migration replacement-loop failure names completed paths, including `none` before the first rename.
+  Cleanup failures append only their failed temporary paths while preserving the original error and cause.
+- Tier-2 suffix hunk positions are regression-tested. Release-tag fixtures ignore inherited Git settings;
+  consumer documentation covers public/internal tags and pre-schema versions receive a clear refusal.
+- These fixes ship in the next internal grammar cut; no new release is cut by this follow-up.
+
 ### Fixed — Canonical YAML and migration follow-ups (ttr-core#370)
 
 - Large dry-run diffs preserve base tie-breaking within budget, then trim unchanged suffixes before
