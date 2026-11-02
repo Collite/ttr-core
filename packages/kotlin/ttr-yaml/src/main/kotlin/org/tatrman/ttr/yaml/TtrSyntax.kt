@@ -153,7 +153,7 @@ internal class TtrSyntax(
                 addErrorListener(listener)
             }
         val doc = parser.document()
-        if (errors.isNotEmpty()) throw errors.first()
+        errors.minWithOrNull(compareBy<CanonicalYamlException>({ it.line }, { it.column }))?.let { throw it }
         val directive = doc.named("modelDirective").firstOrNull()
         model = directive?.one("modelCode")?.text
         val result =

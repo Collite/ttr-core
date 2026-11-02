@@ -450,7 +450,8 @@ internal class TtrText(
 
     private fun retainedValue(value: JsonElement): String {
         val source = value.jsonPrimitive.content
-        var valid = true
+        val refusal = "Calc argument must contain exactly one retained TTR value"
+        var firstError: Pair<Int, Int>? = null
         val listener =
             object : BaseErrorListener() {
                 override fun syntaxError(
@@ -461,8 +462,7 @@ internal class TtrText(
                     msg: String?,
                     e: RecognitionException?,
                 ) {
-                    valid =
-                        false
+                    if (firstError == null) firstError = line to charPositionInLine
                 }
             }
         val lexer =
@@ -471,18 +471,30 @@ internal class TtrText(
                 addErrorListener(listener)
             }
         val tokens = CommonTokenStream(lexer)
-        TtrTokens.checkNesting(tokens) { _, message -> throw CanonicalValueException(value, message) }
+        TtrTokens.checkNesting(tokens) { token, message ->
+            // Only lexer errors exist here; a swallowed opener must not invent an unmatched closer.
+            val earlier = firstError
+            if (earlier != null &&
+                (
+                    earlier.first < token.line ||
+                        (earlier.first == token.line && earlier.second < token.charPositionInLine)
+                )
+            ) {
+                throw CanonicalValueException(value, refusal)
+            }
+            throw CanonicalValueException(value, message)
+        }
         val parser =
             TTRParser(tokens).apply {
                 removeErrorListeners()
                 addErrorListener(listener)
             }
         parser.value()
-        if (!valid ||
+        if (firstError != null ||
             tokens.tokens.any { it.channel != Token.DEFAULT_CHANNEL } ||
             parser.currentToken.type != Token.EOF
         ) {
-            throw CanonicalValueException(value, "Calc argument must contain exactly one retained TTR value")
+            throw CanonicalValueException(value, refusal)
         }
         return source
     }

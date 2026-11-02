@@ -108,6 +108,56 @@ class CanonicalYamlDepthSpec :
                 error.detail shouldBe "nesting too deep (limit 64)"
             }
         }
+        for (body in listOf(" a: :\n b: -x", " a: : -x")) {
+            test("earliest syntax position wins over later lexer errors in $body") {
+                val error =
+                    shouldThrow<CanonicalYamlException> {
+                        CanonicalYaml.fromTtr("model automation\ndef program D {\n$body\n}\n", "syntax.ttrm")
+                    }
+                error.file shouldBe "syntax.ttrm"
+                error.line shouldBe 3
+                error.column shouldBe 5
+                error.detail.substringBefore(" input") shouldBe if ('\n' in body) "extraneous" else "mismatched"
+            }
+        }
+        test("a later lexer error on the same line cannot mask the token depth refusal") {
+            smallStack {
+                val value = "[".repeat(65) + "1 -x" + "]".repeat(65)
+                val error =
+                    shouldThrow<CanonicalYamlException> {
+                        CanonicalYaml.fromTtr("model automation\ndef program D {\n a: $value\n}\n", "same-line.ttrm")
+                    }
+                error.file shouldBe "same-line.ttrm"
+                error.line shouldBe 3
+                error.column shouldBe 68
+                error.detail shouldBe "nesting too deep (limit 64)"
+            }
+        }
+        test("an immediately preceding lexer error uses the same column base as the guard") {
+            val error =
+                shouldThrow<CanonicalYamlException> {
+                    CanonicalYaml.fromTtr("model automation\ndef program D {\n a: 1 ~)\n}\n", "column.ttrm")
+                }
+            error.file shouldBe "column.ttrm"
+            error.line shouldBe 3
+            error.column shouldBe 7
+            error.detail shouldBe "token recognition error at: '~'"
+        }
+        for (value in listOf("-[1, 2]", "-{ x: 1 }", "1)")) {
+            test("retained calc argument $value reports its actual cause") {
+                val source =
+                    "ttr: '0.21'\nmodel: md\ndefs:\n" +
+                        "  - kind: map\n    id: Convert\n    properties:\n" +
+                        "      calc:\n        name: convert\n        args:\n" +
+                        "          input: '$value'\n"
+                val error = shouldThrow<CanonicalYamlException> { CanonicalYaml.read(source, "calc.yaml") }
+                error.file shouldBe "calc.yaml"
+                error.line shouldBe 10
+                error.column shouldBe 18
+                error.detail shouldBe
+                    if (value == "1)") "unmatched ')'" else "Calc argument must contain exactly one retained TTR value"
+            }
+        }
         test("native token guard refuses deep input before recursive parsing on a 1 MiB stack") {
             smallStack {
                 val error =
