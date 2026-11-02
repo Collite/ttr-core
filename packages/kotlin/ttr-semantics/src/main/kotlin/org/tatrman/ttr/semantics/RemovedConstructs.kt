@@ -61,8 +61,8 @@ object RemovedConstructs {
         ROLE_DELIVERY(16, "a role's `delivery:`", "the BPMN send task addresses the role's members"),
         ;
 
-        /** `CUT-001` — the number the validator names and the recipe checker's id carries. */
-        val ref: String get() = "CUT-%03d".format(number)
+        /** `CUT-001` — the number the validator names and the recipe checker's id carries (locale-free digits). */
+        val ref: String get() = "CUT-" + number.toString().padStart(3, '0')
 
         /** The finding's text, after `<what>: ` — what was removed, when, and what models it now. */
         val message: String

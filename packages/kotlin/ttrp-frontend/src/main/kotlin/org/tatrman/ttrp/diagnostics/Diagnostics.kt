@@ -696,7 +696,7 @@ enum class TtrpDiagnosticId(
 
     companion object {
         /** The `TTRP-CUT-nnn` id of a removed construct (D-142). */
-        fun of(cut: Cut): TtrpDiagnosticId = valueOf("CUT_%03d".format(cut.number))
+        fun of(cut: Cut): TtrpDiagnosticId = entries.single { it.id == "TTRP-${cut.ref}" }
 
         /** Guards against id-string collisions across the catalogue (Stage 1.3 DONE bar). */
         fun assertNoDuplicateIds() {
