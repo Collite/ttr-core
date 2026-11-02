@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 plugins { application }
 java { toolchain { languageVersion.set(JavaLanguageVersion.of(21)) } }
 repositories {
