@@ -136,8 +136,27 @@ internal class TtrSyntax(
                 removeErrorListeners()
                 addErrorListener(listener)
             }
+        val tokens = CommonTokenStream(lexer)
+        tokens.fill()
+        var depth = 0
+        for (token in tokens.tokens) {
+            when (token.text) {
+                "[", "{", "(" -> {
+                    depth++
+                    if (depth > CanonicalYaml.MAX_NESTING_DEPTH) {
+                        throw CanonicalYamlException(
+                            file,
+                            token.line,
+                            token.charPositionInLine + 1,
+                            "nesting too deep (limit ${CanonicalYaml.MAX_NESTING_DEPTH})",
+                        )
+                    }
+                }
+                "]", "}", ")" -> depth--
+            }
+        }
         val parser =
-            TTRParser(CommonTokenStream(lexer)).apply {
+            TTRParser(tokens).apply {
                 removeErrorListeners()
                 addErrorListener(listener)
             }

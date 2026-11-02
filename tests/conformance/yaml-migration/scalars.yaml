@@ -1,0 +1,9 @@
+# Plain and single-quoted strings, and a folded plain scalar.
+ttr: '0.21'
+model: er
+defs:
+    - kind: entity
+      id: Customer
+      properties:
+          description: A customer
+              with an account

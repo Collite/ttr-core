@@ -1,0 +1,6 @@
+ttr: '0.21'
+model: automation
+defs:
+    - kind: program
+      id: Numbers
+      properties: {a: 1.0, b: 1e3, c: -0.5}

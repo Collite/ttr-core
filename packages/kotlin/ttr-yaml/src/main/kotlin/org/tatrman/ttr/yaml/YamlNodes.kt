@@ -9,6 +9,9 @@ import com.networknt.schema.PathType
 import kotlinx.serialization.json.*
 import org.snakeyaml.engine.v2.api.LoadSettings
 import org.snakeyaml.engine.v2.api.lowlevel.Compose
+import org.snakeyaml.engine.v2.api.lowlevel.Parse
+import org.snakeyaml.engine.v2.events.CollectionStartEvent
+import org.snakeyaml.engine.v2.events.CollectionEndEvent
 import org.snakeyaml.engine.v2.exceptions.MarkedYamlEngineException
 import org.snakeyaml.engine.v2.exceptions.YamlEngineException
 import org.snakeyaml.engine.v2.exceptions.ReaderException
@@ -152,6 +155,25 @@ internal class YamlNodes(
                 .build()
         val node =
             try {
+                // Streaming events are safe even when composition/conversion would exhaust the stack.
+                var depth = 0
+                for (event in Parse(settings).parseString(source)) {
+                    when (event) {
+                        is CollectionStartEvent -> {
+                            depth++
+                            if (depth > CanonicalYaml.MAX_NESTING_DEPTH) {
+                                val mark = event.startMark.orElse(null)
+                                throw CanonicalYamlException(
+                                    file,
+                                    (mark?.line ?: 0) + 1,
+                                    (mark?.column ?: 0) + 1,
+                                    "nesting too deep (limit ${CanonicalYaml.MAX_NESTING_DEPTH})",
+                                )
+                            }
+                        }
+                        is CollectionEndEvent -> depth--
+                    }
+                }
                 Compose(settings).composeString(source).orElseThrow {
                     CanonicalYamlException(file, 1, 1, "Expected one canonical document")
                 }

@@ -44,7 +44,7 @@ class YamlMigrationSpec :
                 val (status, stdout, stderr) = invoke(request("invalid: [", from, to).toString().toByteArray())
                 status shouldBe 2
                 stdout shouldBe ""
-                stderr shouldContain "<yaml>:1:1: No registered canonical YAML migration"
+                stderr shouldContain "<request>:1:1: No registered canonical YAML migration"
             }
         }
         for (source in listOf(
@@ -79,13 +79,12 @@ class YamlMigrationSpec :
             request("{}").toString().replace("\"migrate\"", "\"execute\""),
             request("{}").toString().dropLast(1) + ",\"extra\":true}",
             request("{}").toString().replace("\"source\":\"{}\"", "\"source\":null"),
-            request("{}").toString().dropLast(1) + ",\"source\":\"{}\"}",
         )) {
             test("malformed or unsupported JSON request ${JsonPrimitive(input)}") {
                 val (status, stdout, stderr) = invoke(input.toByteArray())
                 status shouldBe 2
                 stdout shouldBe ""
-                stderr.isNotBlank() shouldBe true
+                stderr.startsWith("<request>:1:1:") shouldBe true
             }
         }
         test("invalid UTF-8 is refused with no response") {
@@ -94,9 +93,73 @@ class YamlMigrationSpec :
             stdout shouldBe ""
             stderr shouldContain "<request>:1:1:"
         }
+        test("duplicate JSON keys cannot bypass validation with a valid last source") {
+            val valid = request("ttr: \"0.21\"\n").toString()
+            val duplicate = valid.dropLast(1) + ",\"source\":" + JsonPrimitive("ttr: \"0.21\"\n") + "}"
+            val (status, stdout, stderr) = invoke(duplicate.toByteArray())
+            status shouldBe 2
+            stdout shouldBe ""
+            stderr.startsWith("<request>:1:1:") shouldBe true
+            stderr shouldContain "Duplicate field"
+        }
+        test("request byte limit refuses 64 MiB plus one before JSON decoding") {
+            val (status, stdout, stderr) = invoke(ByteArray(64 * 1024 * 1024 + 1) { 32 })
+            status shouldBe 2
+            stdout shouldBe ""
+            stderr shouldBe "<request>:1:1: Migration request exceeds 64 MiB\n"
+        }
+        test("typed parser errors refuse migration even when codec bytes round trip") {
+            val source = Files.readString(Path.of("../../../tests/conformance/yaml-cases/repeated.yaml"))
+            val (status, stdout, stderr) = invoke(request(source).toString().toByteArray())
+            status shouldBe 2
+            stdout shouldBe ""
+            stderr.startsWith("<yaml>:14:17: ttr/duplicate-property:") shouldBe true
+            stderr.lines().size shouldBe 2
+        }
+        for (error in listOf(StackOverflowError(), ExceptionInInitializerError("init failed"))) {
+            test("CLI last-resort boundary contains ${error.javaClass.simpleName}") {
+                val stdout = ByteArrayOutputStream()
+                val stderr = ByteArrayOutputStream()
+                val input =
+                    object : java.io.InputStream() {
+                        override fun read(): Int = throw error
+                    }
+                YamlMigrationCli.run(input, stdout, stderr) shouldBe 2
+                stdout.size() shouldBe 0
+                val message = stderr.toString(Charsets.UTF_8)
+                message shouldBe
+                    if (error is StackOverflowError) {
+                        "<yaml>:1:1: nesting too deep for the canonical YAML codec\n"
+                    } else {
+                        "<request>:1:1: internal error: ExceptionInInitializerError: init failed\n"
+                    }
+            }
+        }
+        val migrationRoot = Path.of("../../../tests/conformance/yaml-migration")
+        for (file in migrationInputs(migrationRoot)) {
+            test("changed-input migration retains AST and semantics: ${file.fileName}") {
+                val before = Files.readString(file)
+                val result = YamlMigration.migrate(request(before))
+                result["changed"] shouldBe JsonPrimitive(true)
+                val after = result.getValue("source").jsonPrimitive.content
+                after shouldBe
+                    Files.readString(
+                        file.resolveSibling(
+                            file.fileName.toString().removeSuffix(".yaml") + ".canonical.yaml",
+                        ),
+                    )
+                YamlMigration.migrate(request(after))["changed"] shouldBe JsonPrimitive(false)
+                val uri = file.fileName.toString()
+                val original = CanonicalYaml.read(before, uri).ast
+                val migrated = CanonicalYaml.read(after, uri).ast
+                ConformanceDump.dumpTree(migrated) shouldBe ConformanceDump.dumpTree(original)
+                SemanticsConformanceDump.dumpDocs(listOf(SemanticsConformanceDump.DocInput(uri, migrated))) shouldBe
+                    SemanticsConformanceDump.dumpDocs(listOf(SemanticsConformanceDump.DocInput(uri, original)))
+            }
+        }
         val roster = YamlFixtureRoster(Path.of("../../../tests/conformance/fixtures"))
         for (scenario in roster.positive) {
-            test("migration preserves canonical bytes AST and scenario semantics: ${scenario.name}") {
+            test("canonical roster migration fixed point: ${scenario.name}") {
                 val before = mutableListOf<SemanticsConformanceDump.DocInput>()
                 val after = mutableListOf<SemanticsConformanceDump.DocInput>()
                 for (file in scenario.files) {
@@ -116,3 +179,21 @@ class YamlMigrationSpec :
             }
         }
     })
+
+internal fun migrationInputs(root: Path): List<Path> =
+    Files.list(root).use { files ->
+        files.filter { it.toString().endsWith(".yaml") && !it.toString().endsWith(".canonical.yaml") }.sorted().toList()
+    }
+
+/** Deliberate local authoring command, never part of test or CI. */
+object GenerateYamlMigrationExpectations {
+    @JvmStatic
+    fun main(args: Array<String>) {
+        for (file in migrationInputs(Path.of("../../../tests/conformance/yaml-migration"))) {
+            Files.writeString(
+                file.resolveSibling(file.fileName.toString().removeSuffix(".yaml") + ".canonical.yaml"),
+                CanonicalYaml.write(CanonicalYaml.read(Files.readString(file))),
+            )
+        }
+    }
+}

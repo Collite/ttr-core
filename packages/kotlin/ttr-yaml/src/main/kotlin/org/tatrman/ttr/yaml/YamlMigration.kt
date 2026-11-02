@@ -17,7 +17,7 @@ object YamlMigration {
         mapOf((version to version) to { source -> CanonicalYaml.read(source) })
 
     fun migrate(request: JsonObject): JsonObject {
-        fun invalid(message: String): Nothing = throw CanonicalYamlException("<yaml>", 1, 1, message)
+        fun invalid(message: String): Nothing = throw CanonicalYamlException("<request>", 1, 1, message)
         if (request.keys != setOf("operation", "from", "to", "source")) {
             invalid("Expected exactly operation, from, to and source")
         }
@@ -70,7 +70,14 @@ object YamlMigrationCli {
             0
         } catch (e: Exception) {
             val message = if (e is CanonicalYamlException) e.message else "<request>:1:1: ${e.message}"
-            diagnostics.write((message + "\n").toByteArray(Charsets.UTF_8))
+            diagnostics.write((message.toString().lineSequence().joinToString(" ") + "\n").toByteArray(Charsets.UTF_8))
+            2
+        } catch (e: StackOverflowError) {
+            diagnostics.write("<yaml>:1:1: nesting too deep for the canonical YAML codec\n".toByteArray())
+            2
+        } catch (e: Throwable) {
+            val message = "<request>:1:1: internal error: ${e.javaClass.simpleName}: ${e.message}"
+            diagnostics.write((message.lineSequence().joinToString(" ") + "\n").toByteArray())
             2
         }
 

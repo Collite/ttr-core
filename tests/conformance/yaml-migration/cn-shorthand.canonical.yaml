@@ -1,0 +1,14 @@
+ttr: "0.21"
+model: "cn"
+defs:
+  -
+    kind: "kind"
+    id: "Person"
+    properties:
+      -
+        custom:
+          - "one"
+          - "two"
+      -
+        label:
+          en: "Person"

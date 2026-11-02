@@ -17,6 +17,9 @@ class CanonicalDocument internal constructor(
 )
 
 object CanonicalYaml {
+    /** Syntactic collection depth, including document/definition containers; measured on a 1 MiB stack. */
+    const val MAX_NESTING_DEPTH = 64
+
     init {
         GrammarCoverage.check()
     }
