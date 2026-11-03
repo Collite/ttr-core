@@ -68,3 +68,34 @@ publishing {
     }
 }
 
+// Inspect the resolved production graph, so a transitive metadata edge also fails the direction check.
+val runtimeProjects =
+    configurations.runtimeClasspath.map { configuration ->
+        configuration.incoming.resolutionResult.allComponents
+            .mapNotNull {
+                (it.id as? org.gradle.api.artifacts.component.ProjectComponentIdentifier)?.projectPath
+            }.sorted()
+            .joinToString(",")
+    }
+val parserJar = project(":packages:kotlin:ttr-parser").tasks.named<Jar>("jar")
+tasks.test {
+    dependsOn(tasks.jar, parserJar)
+    inputs.file(tasks.jar.flatMap { it.archiveFile })
+    inputs.file(parserJar.flatMap { it.archiveFile })
+    inputs.property("runtimeProjects", runtimeProjects)
+    systemProperty(
+        "profile.jar",
+        tasks.jar
+            .flatMap { it.archiveFile }
+            .get()
+            .asFile.absolutePath,
+    )
+    systemProperty(
+        "parser.jar",
+        parserJar
+            .flatMap { it.archiveFile }
+            .get()
+            .asFile.absolutePath,
+    )
+    doFirst { systemProperty("profile.runtimeProjects", runtimeProjects.get()) }
+}
