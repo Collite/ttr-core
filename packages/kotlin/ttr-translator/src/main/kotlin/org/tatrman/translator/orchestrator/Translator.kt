@@ -843,6 +843,12 @@ class Translator(
     ): UnparseResult {
         return try {
             if (plan.nodeCase == PlanNode.NodeCase.ROW_WRITES) {
+                if (plan.rowWrites.rowsCount > 1) {
+                    return UnparseResult.Failure(
+                        "row_writes_one_row",
+                        "unparse one RowWrite per call; the executor owns the order, seq and the transaction",
+                    )
+                }
                 org.tatrman.translator.dialects.Dialects
                     .requireRowWrites(targetDialect)
                 val statements =
@@ -859,7 +865,7 @@ class Translator(
                             .unparse(row, targetDialect, parameters, keys)
                     }
                 return UnparseResult.Success(
-                    output = statements.joinToString(";\n") { it.sql },
+                    output = statements.singleOrNull()?.sql.orEmpty(),
                     parameters = statements.flatMap { it.parameters },
                 )
             }

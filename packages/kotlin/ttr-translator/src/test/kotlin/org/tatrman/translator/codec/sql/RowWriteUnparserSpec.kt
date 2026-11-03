@@ -327,6 +327,31 @@ class RowWriteUnparserSpec :
                     .code shouldBe "row_writes_unsupported_dialect"
             }
         }
+        test("multi-row plans lower as a batch but SQL unparse requires one RowWrite per call") {
+            for (count in listOf(1, 2)) {
+                val node =
+                    PlanNode
+                        .newBuilder()
+                        .setRowWrites(
+                            RowWrites.newBuilder().addAllRows((1..count).map { insert(it.toLong()) }),
+                        ).build()
+                val physical =
+                    translator
+                        .parseToRelNode(
+                            node.toByteArray().toString(Charsets.ISO_8859_1),
+                            Language.REL_NODE,
+                            SchemaCode.DB,
+                        ).shouldBeInstanceOf<ParseResult.Success>()
+                        .plan
+                physical.rowWrites.rowsCount shouldBe count
+                val result = translator.unparseFromRelNode(physical, Language.SQL, SqlDialect.POSTGRESQL)
+                if (count == 1) {
+                    result.shouldBeInstanceOf<UnparseResult.Success>()
+                } else {
+                    result.shouldBeInstanceOf<UnparseResult.Failure>().code shouldBe "row_writes_one_row"
+                }
+            }
+        }
         test("UPDATE and DELETE require every primary-key equality, even without read_before") {
             val physical =
                 update()

@@ -83,9 +83,9 @@ round trip. Read walkers see no scans or output columns, including fingerprint c
 `RowWriteUnparser.unparse(row, POSTGRESQL, bindings, keyColumns)` returns one SQL statement and
 its parameters in placeholder order. Literals and named parameters are bound, identifiers quoted;
 the executor runs statements in order on one transaction and attaches `seq` to the answers.
-`Translator.unparseFromRelNode` supports the same path (a multi-row batch produces statements
-separated by semicolons and flattened positional bindings; consumers executing per row can send
-one row or call `RowWriteUnparser` directly). Postgres resolves tables through the connection’s
+`Translator.unparseFromRelNode` takes one `RowWrite` per call; a larger batch refuses with
+`row_writes_one_row`. The parse half can lower a whole batch before the executor splits it.
+Postgres resolves tables through the connection’s
 `search_path`, as on the read path.
 
 For `read_before`, a materialized key-only SELECT locks the row before the modifying CTE evaluates
