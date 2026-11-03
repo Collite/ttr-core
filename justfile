@@ -554,12 +554,12 @@ _release-ext kind release="false" level="" version="":
 #                    (public npmjs, FO ⚑1 — note the tag prefix ts-grammar/v*, distinct from
 #                    the Kotlin `bundle grammar` below despite the similar name; external cut
 #                    gated on Bora + NPM_TOKEN per FO ⚑2)
-#   designer         the eight-package Designer family (internal GitHub assets; public on RELEASE)
-#   edit             legacy alias: refuses; use designer (edit is family-locked)
+#   lsp              the open family the Studio consumes: @tatrman/{parser,tokens,edit,lsp}, four
+#                    tarballs at one version (internal GitHub assets; public npmjs on RELEASE). The
+#                    Designer family's GUI packages moved to ttr-platform (D-33, Studio Free), with the
+#                    viewer image; designer/v0.1.3 was the last family tag cut here.
+#   edit             legacy alias: refuses; use lsp (edit is family-locked)
 #   vscode | intellij  editor extensions (GitHub Release always; Marketplace on RELEASE)
-#   viewer           the Studio Viewer container image, ghcr.io/collite/ttr-viewer (release-viewer.yml;
-#                    GHCR is its only registry, so `release` gates nothing extra — the image tag is
-#                    always the bare x.y.z)
 #   bundle <name>    a named release lane — a lockstep set published together at one version:
 #                    grammar    THE TTR toolchain: ttr-parser + ttr-writer + ttr-semantics +
 #                               ttr-metadata + ttr-metadata-git + ttr-snapshot + ttr-md-resolver +
@@ -586,14 +586,13 @@ _release-ext kind release="false" level="" version="":
 #   just publish ttr-parser release set 0.6.0            # RELEASE, explicit version
 #   just publish packages/python/ttr-parser release       # PyPI release (path form)
 #   just publish ts-grammar set 4.4.0                       # TS grammar, explicit version
-#   just publish designer set 0.1.2                         # Designer family, internal GitHub assets
-#   just publish edit set 0.1.0                             # legacy: refuses; use designer
+#   just publish lsp set 0.1.4                              # lsp family, internal GitHub assets
+#   just publish edit set 0.1.0                             # legacy: refuses; use lsp
 #   just publish bundle grammar release set 1.0.0            # Kotlin bundle release
 #   just publish vscode                                        # ext: internal build, patch bump
 #   just publish vscode minor                                   # ext: internal build, minor bump
 #   just publish vscode release                                  # ext: promote current x.y.z → Marketplace
 #   just publish intellij release minor                          # ext: bump minor, publish to Marketplace
-#   just publish viewer set 0.11.4                                  # ttr-viewer image, explicit version
 publish *args:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -606,7 +605,7 @@ publish *args:
         NEXT=2
     fi
     if [ -z "$WHAT" ] || [ "$WHAT" = "bundle " ]; then
-        echo "❌ Usage: just publish <module|path|ts-grammar|edit|designer|vscode|intellij|viewer|bundle NAME> [release] [major|minor|patch|set VERSION]" >&2
+        echo "❌ Usage: just publish <module|path|ts-grammar|edit|lsp|vscode|intellij|bundle NAME> [release] [major|minor|patch|set VERSION]" >&2
         exit 1
     fi
     REST=("${ARGS[@]:$NEXT}")
@@ -693,14 +692,15 @@ publish *args:
             PREFIX=ts-grammar
             DESC="@tatrman/grammar (public npmjs)" ;;
         edit|packages/edit)
-            echo "❌ edit is released only with the Designer family; use: just publish designer set <family-version>" >&2
+            echo "❌ edit is released only with the lsp family; use: just publish lsp set <family-version>" >&2
             exit 1 ;;
-        designer|designer-core|packages/designer)
-            PREFIX=designer
-            DESC="Designer npm family (eight tarballs; internal GitHub Release by default)" ;;
-        viewer)
-            PREFIX=viewer
-            DESC="ghcr.io/collite/ttr-viewer (Studio Viewer container image, linux/amd64 + linux/arm64)" ;;
+        lsp|packages/lsp)
+            PREFIX=lsp
+            DESC="lsp npm family: @tatrman/{parser,tokens,edit,lsp} (four tarballs; internal GitHub Release by default)" ;;
+        designer|viewer)
+            echo "❌ the Designer family and the viewer image moved to ttr-platform (D-33, Studio Free);" >&2
+            echo "   designer/v0.1.3 was the last family tag here. ttr-core releases the open four: just publish lsp" >&2
+            exit 1 ;;
         *)
             MOD_PATH=$(just _resolve "$WHAT")
             MOD_NAME=$(basename "$MOD_PATH")
@@ -754,7 +754,7 @@ publish *args:
 
     # Match publish-ts.yml before creating a permanent release tag, including when
     # called from a branch whose own remote tip is current but is not merged yet.
-    if [ "$PREFIX" = edit ] || [ "$PREFIX" = designer ]; then
+    if [ "$PREFIX" = lsp ]; then
         git fetch -q origin master
         if ! git merge-base --is-ancestor HEAD origin/master; then
             echo "❌ ${PREFIX} releases must come from merged master history." >&2; exit 1
@@ -783,20 +783,15 @@ publish *args:
         NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
     fi
 
-    if [ "$PREFIX" = edit ]; then
-        EXPECTED=$(node -p "require('./packages/edit/package.json').version")
-        if [ "$NEW_VERSION" != "$EXPECTED" ]; then
-            echo "❌ edit tag version must equal packages/edit/package.json version ${EXPECTED}." >&2
-            echo "   Use: just publish edit set ${EXPECTED}" >&2; exit 1
-        fi
-    fi
-
-    if [ "$PREFIX" = designer ]; then
-        EXPECTED=$(node -p "require('./packages/designer/package.json').version")
-        if [ "$NEW_VERSION" != "$EXPECTED" ]; then
-            echo "❌ designer tag version must equal the family version ${EXPECTED}." >&2
-            echo "   Use: just publish designer set ${EXPECTED}" >&2; exit 1
-        fi
+    # Every member of the family carries the tag's version (scripts/lsp-family.mjs is the one list).
+    if [ "$PREFIX" = lsp ]; then
+        for MEMBER in $(node --input-type=module -e "import { family } from './scripts/lsp-family.mjs'; console.log(family.join(' '))"); do
+            EXPECTED=$(node -p "require('./packages/${MEMBER}/package.json').version")
+            if [ "$NEW_VERSION" != "$EXPECTED" ]; then
+                echo "❌ lsp tag version must equal every family version (packages/${MEMBER} is ${EXPECTED})." >&2
+                echo "   Bump all four together, or use: just publish lsp set ${EXPECTED}" >&2; exit 1
+            fi
+        done
     fi
 
     if git rev-parse -q --verify "refs/tags/${PREFIX}/v${NEW_VERSION}" >/dev/null || \
@@ -807,15 +802,10 @@ publish *args:
     NEW_TAG="${PREFIX}/v${NEW_VERSION}"
     [ "$RELEASE" = true ] && NEW_TAG="${NEW_TAG}-RELEASE"
 
-    if [ "$PREFIX" = viewer ]; then
-        LANES="GHCR — ghcr.io/collite/ttr-viewer:${NEW_VERSION} (the image's only registry; RELEASE gates nothing extra)"
-    elif [ "$PREFIX" = edit ]; then
-        LANES="PUBLIC npmjs — @tatrman/edit@${NEW_VERSION} (its only registry; bare tags also publish publicly)"
-    elif [ "$PREFIX" = designer ] && [ "$RELEASE" = false ]; then
-        LANES="INTERNAL GitHub Release — eight installable npm tarballs; no public registry publication"
-    elif [ "$PREFIX" = designer ]; then
-        EDIT_VERSION=$(node -p "require('./packages/edit/package.json').version")
-        LANES="GitHub Release + PUBLIC npmjs — Designer family (edit@${EDIT_VERSION}; already published coordinates reused)"
+    if [ "$PREFIX" = lsp ] && [ "$RELEASE" = false ]; then
+        LANES="INTERNAL GitHub Release — four installable npm tarballs; no public registry publication"
+    elif [ "$PREFIX" = lsp ]; then
+        LANES="GitHub Release + PUBLIC npmjs — the lsp family (already published coordinates reused)"
     elif [ "$RELEASE" = true ]; then
         LANES="GH Packages/PyPI (internal) + the public registry (Maven Central / PyPI) — published as bare ${NEW_VERSION}"
     else
@@ -837,16 +827,6 @@ publish *args:
     git push origin "${NEW_TAG}"
     echo "✅ Pushed ${NEW_TAG} — the matching workflow will publish: ${LANES}"
     echo "   Watch it: gh run watch  (or the repo's Actions tab)"
-
-# ── Studio Viewer image ─────────────────────────────────────────────────────────
-
-# The base images are private GHCR mirrors, so `docker login ghcr.io` first:
-#   gh auth token | docker login ghcr.io -u <github-user> --password-stdin
-# Run it against a Veles on the host:
-#   docker run --rm -p 8080:8080 -e VIEWER_CATALOG_UPSTREAM=http://host.docker.internal:7260 ttr-viewer:dev
-# Build the Studio Viewer container image locally (ttr-core#169; CI: release-viewer.yml)
-viewer-image tag="ttr-viewer:dev":
-    docker build -f packages/designer/Dockerfile -t {{tag}} .
 
 # MD landings and derived warehouse roles; diagnostics default to grounded MD elements.
 [positional-arguments]
