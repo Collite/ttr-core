@@ -67,7 +67,9 @@ const notice =
   `Tatrman — Table Transformation Manager\nCopyright 2026 Collite\n\nLicensed under the Apache License, Version 2.0; see LICENSE.\n\nThe lsp family distributes bundled worker/compiler code and uses the runtime\ndependencies below. This cumulative notice includes their license texts; some\ndependencies are installed separately rather than embedded in every family member.\n\n` +
   notices.join('\n\n========================================\n\n') +
   '\n';
-for (const name of family.filter((n) => n !== 'edit')) {
+// Every member gets the same cumulative notice, edit included: its bundle embeds antlr4ng, smol-toml
+// and the lexers generated from the vendored grammars (review-217 R6).
+for (const name of family) {
   writeFileSync(resolve(root, 'packages', name, 'LICENSE'), readFileSync(resolve(root, 'LICENSE')));
   writeFileSync(resolve(root, 'packages', name, 'NOTICE'), notice.replace(/\r\n?/g, '\n'));
 }
