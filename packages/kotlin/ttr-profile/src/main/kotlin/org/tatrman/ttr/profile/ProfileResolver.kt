@@ -4,9 +4,13 @@ package org.tatrman.ttr.profile
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.io.path.readText
+import org.tatrman.ttr.yaml.readProfileYaml
 
-/** All lookups are explicit and local. Catalog paths are root-relative; extends paths are file-relative. */
+/**
+ * All lookups are explicit and local. Catalog paths are root-relative; extends paths are file-relative.
+ * Declaring files are absolute, or relative to the resolver's root; the label also bases relative references.
+ * A chain that reaches 33 is refused as too deep, cyclic or not.
+ */
 class ProfileResolver(
     root: Path,
     catalog: Map<String, Path>,
@@ -14,12 +18,20 @@ class ProfileResolver(
     private val root = root.toRealPath()
     private val catalog = catalog.toMap()
 
+    /**
+     * The declaration's file is absolute, or relative to the resolver's root;
+     * this label is also the base for relative references.
+     */
     fun resolve(declaration: ProfileDeclaration?): List<ProfileDefinition> {
         if (declaration == null) return resolve("canonical/1", root.resolve("ttr.yaml"))
         checkRange(declaration.grammarRange, declaration.grammarLocation)
         return resolveAt(declaration.profile, Path.of(declaration.location.file), declaration.location)
     }
 
+    /**
+     * @param declaringFile absolute, or relative to the resolver's root;
+     * this label is also the base for relative references.
+     */
     fun resolve(
         reference: String,
         declaringFile: Path,
@@ -48,23 +60,17 @@ class ProfileResolver(
             if (depth > 32) throw ProfileException("ys/profile-invalid", at, "Profile chain exceeds 32 profiles")
             val profile =
                 if (bundled) {
-                    ProfileReader.read(
-                        requireNotNull(
-                            javaClass.getResourceAsStream("/profiles/canonical.yaml"),
-                        ) { "Missing bundled canonical profile" }
-                            .bufferedReader()
-                            .use { it.readText() },
-                        "<bundled>/profiles/canonical.yaml",
-                    )
+                    canonicalProfile
                 } else {
                     val source =
                         try {
-                            path!!.readText()
+                            profileRead { readProfileYaml(path!!) }
                         } catch (e: IOException) {
                             throw ProfileException("ys/profile-not-found", at, "Cannot read profile $ref: ${e.message}")
                         }
                     ProfileReader.read(source, path.toString())
                 }
+            if (!bundled && ref in catalog) checkCatalogIdentity(ref, profile)
             checkRange(profile.grammarRange, profile.locations.getValue("/grammar"))
             profile.extends?.let { parent ->
                 visit(
@@ -105,6 +111,38 @@ class ProfileResolver(
             throw ProfileException("ys/profile-not-found", at, "Profile not found: $ref")
         } catch (e: java.nio.file.InvalidPathException) {
             throw ProfileException("ys/profile-not-found", at, "Invalid profile path: $ref")
+        }
+    }
+
+    private fun checkCatalogIdentity(
+        key: String,
+        profile: ProfileDefinition,
+    ) {
+        val versioned = Regex("^.+/[0-9]+$").matches(key)
+        val matches =
+            if (versioned) {
+                key.substringBeforeLast('/') == profile.name &&
+                    key.substringAfterLast('/').toBigInteger() == profile.major
+            } else {
+                key == profile.name
+            }
+        if (!matches) {
+            throw ProfileException(
+                "ys/profile-invalid",
+                profile.locations.getValue("/profile"),
+                "Catalog entry $key loads ${profile.name}/${profile.major}",
+            )
+        }
+    }
+
+    companion object {
+        private val canonicalProfile: ProfileDefinition by lazy {
+            ProfileReader.read(
+                requireNotNull(ProfileResolver::class.java.getResourceAsStream("/profiles/canonical.yaml")) {
+                    "Missing bundled canonical profile"
+                }.bufferedReader().use { it.readText() },
+                "<bundled>/profiles/canonical.yaml",
+            )
         }
     }
 

@@ -11,13 +11,12 @@ import kotlin.io.path.readBytes
 class ProfileResourcesSpec :
     FunSpec({
         test("packaged canonical profile and parser schema equal their source bytes") {
-            listOf(
-                Triple("profile.jar", "profiles/canonical.yaml", "src/main/resources/profiles/canonical.yaml"),
-                Triple("parser.jar", "schemas/profile.schema.json", "../../grammar/schemas/profile.schema.json"),
-            ).forEach { (jarProperty, resource, source) ->
-                JarFile(System.getProperty(jarProperty)).use { jar ->
-                    jar.getInputStream(jar.getJarEntry(resource)).readBytes() shouldBe Path.of(source).readBytes()
-                }
+            JarFile(System.getProperty("profile.jar")).use { jar ->
+                jar.getInputStream(jar.getJarEntry("profiles/canonical.yaml")).readBytes() shouldBe
+                    Path.of("src/main/resources/profiles/canonical.yaml").readBytes()
+            }
+            ProfileReader::class.java.getResourceAsStream("/schemas/profile.schema.json")!!.use {
+                it.readBytes() shouldBe Path.of("../../grammar/schemas/profile.schema.json").readBytes()
             }
         }
         test("resolved production dependencies go from profile to yaml and parser without metadata") {

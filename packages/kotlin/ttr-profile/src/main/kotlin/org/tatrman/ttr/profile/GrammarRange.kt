@@ -9,6 +9,12 @@ class GrammarRange private constructor(
     val text: String,
     private val alternatives: List<List<Pair<String, Version>>>,
 ) {
+    override fun equals(other: Any?): Boolean = other is GrammarRange && text == other.text
+
+    override fun hashCode(): Int = text.hashCode()
+
+    override fun toString(): String = text
+
     fun admits(grammar: String = runningGrammar): Boolean {
         val actual = version(grammar)
         return alternatives.any { comparators ->
@@ -55,17 +61,11 @@ class GrammarRange private constructor(
                     val comparators =
                         matches.map { match ->
                             require(
-                                match.range.first == end ||
+                                (end == 0 && match.range.first == 0) ||
                                     (
                                         match.range.first > end &&
                                             value.substring(end, match.range.first).all(Char::isWhitespace)
                                     ),
-                            ) {
-                                "Comparators must be separated by whitespace"
-                            }
-                            // Adjacent version/comparator tokens are not an implicit AND.
-                            require(
-                                end == 0 || match.range.first > end,
                             ) { "Comparators must be separated by whitespace" }
                             end = match.range.last + 1
                             (match.groupValues[1].ifEmpty { "=" }) to version(match.groupValues[2])

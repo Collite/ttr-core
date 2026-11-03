@@ -88,6 +88,13 @@ object ProfileReader {
             val value = data.value
             val identity = value.getValue("profile").jsonPrimitive.content
             val locations = data.paths.associateWith { data.span(it) }
+            val operationLocations = mutableMapOf<Int, MutableMap<String, ProfileSpan>>()
+            locations.forEach { (path, span) ->
+                if (path.startsWith("/operations/")) {
+                    val index = path.removePrefix("/operations/").substringBefore('/').toInt()
+                    operationLocations.getOrPut(index) { linkedMapOf() }[path] = span
+                }
+            }
             ProfileDefinition(
                 identity.substringBeforeLast('/'),
                 identity.substringAfterLast('/').toBigInteger(),
@@ -100,7 +107,7 @@ object ProfileReader {
                     LocatedOp(
                         op.jsonObject,
                         data.span(path),
-                        locations.filterKeys { it == path || it.startsWith("$path/") },
+                        operationLocations[index]?.toMap() ?: emptyMap(),
                     )
                 },
                 locations,
@@ -109,6 +116,7 @@ object ProfileReader {
 }
 
 object DeclarationReader {
+    /** @param file absolute, or relative to the resolver's root; this label is also the base for relative references. */
     fun readTree(
         source: String,
         file: String = "ttr.yaml",
@@ -118,24 +126,36 @@ object DeclarationReader {
             declaration(data, data.value, "")
         }
 
+    /**
+     * A scalar ttr (including null or the canonical version) deliberately means no profile header.
+     * @param file absolute, or relative to the resolver's root; this label is also the base for relative references.
+     */
     fun readFile(
         source: String,
         file: String = "<yaml>",
     ): ProfileDeclaration? =
         profileRead {
-            val data = YamlData.read(source, file)
+            val data = YamlData.read(source, file, tagScope = "/ttr")
             val header = data.value["ttr"]
             if (header is JsonPrimitive || header == null) return@profileRead null
-            if (data.value.keys.first() != "ttr" || header !is JsonObject) {
+            if (data.value.keys.first() != "ttr") {
                 throw ProfileException(
                     "ys/profile-invalid",
                     data.span("/ttr", key = true),
                     "ttr header must be the first mapping key",
                 )
             }
+            if (header !is JsonObject) {
+                throw ProfileException(
+                    "ys/profile-invalid",
+                    data.span("/ttr", key = true),
+                    "ttr header must be a mapping {profile, grammar}",
+                )
+            }
             declaration(data, header, "/ttr")
         }
 
+    /** @param file absolute, or relative to the resolver's root; this label is also the base for relative references. */
     fun select(
         source: String,
         file: String,

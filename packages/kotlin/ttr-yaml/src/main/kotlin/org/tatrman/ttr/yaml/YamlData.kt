@@ -55,16 +55,15 @@ class YamlData private constructor(
         private val schemas = ConcurrentHashMap<Pair<String, Int>, JsonSchema>()
         val grammarVersion: String get() = CanonicalGrammar.version
 
+        /** !pl is refused only at or below [tagScope]; other safety checks cover the whole input. */
         fun read(
             source: String,
             file: String = "<yaml>",
+            tagScope: String = "",
         ): YamlData {
-            if (source.codePointCount(0, source.length) > MAX_YAML_CODE_POINTS) {
-                throw CanonicalYamlException(file, 1, 1, "YAML exceeds $MAX_YAML_CODE_POINTS code points")
-            }
             val nodes = YamlNodes(file)
             val value = nodes.read(source, canonical = false)
-            nodes.validateTags(emptySet())
+            nodes.validateTags(emptySet(), tagScope)
             return YamlData(value, nodes)
         }
     }

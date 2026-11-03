@@ -257,8 +257,8 @@ class ProfileLoadingSpec :
                     .code shouldBe "ys/profile-invalid"
                 root.resolve("p32.yaml").writeText(definition("p32/1"))
                 resolver.resolve("./p1.yaml", root.resolve("ttr.yaml")).size shouldBe 32
-                ProfileResolver(root, mapOf("demo-cs/1" to Path.of("p32.yaml")))
-                    .resolve("demo-cs/1", root.resolve("ttr.yaml"))
+                ProfileResolver(root, mapOf("p32/1" to Path.of("p32.yaml")))
+                    .resolve("p32/1", root.resolve("ttr.yaml"))
                     .single()
                     .name shouldBe "p32"
                 root.resolve("p32.yaml").writeText(definition("p32/1", extra = "extends: ./p1.yaml\n"))

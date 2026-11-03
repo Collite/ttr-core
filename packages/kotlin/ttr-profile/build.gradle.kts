@@ -77,22 +77,13 @@ val runtimeProjects =
             }.sorted()
             .joinToString(",")
     }
-val parserJar = project(":packages:kotlin:ttr-parser").tasks.named<Jar>("jar")
 tasks.test {
-    dependsOn(tasks.jar, parserJar)
+    dependsOn(tasks.jar)
     inputs.file(tasks.jar.flatMap { it.archiveFile })
-    inputs.file(parserJar.flatMap { it.archiveFile })
     inputs.property("runtimeProjects", runtimeProjects)
     systemProperty(
         "profile.jar",
         tasks.jar
-            .flatMap { it.archiveFile }
-            .get()
-            .asFile.absolutePath,
-    )
-    systemProperty(
-        "parser.jar",
-        parserJar
             .flatMap { it.archiveFile }
             .get()
             .asFile.absolutePath,

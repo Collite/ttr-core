@@ -8,7 +8,9 @@ internal class YamlEventPaths {
     private data class Frame(
         val path: String,
         val mapping: Boolean,
+        val keyOfParent: Boolean = false,
         var key: String? = null,
+        var expectingKey: Boolean = true,
         var index: Int = 0,
     )
 
@@ -18,37 +20,45 @@ internal class YamlEventPaths {
             if (frame.mapping && frame.key != null) "${frame.path}/${pointerKey(frame.key!!)}" else frame.path
         } ?: ""
 
-    val isMappingKey: Boolean get() = stack.lastOrNull()?.let { it.mapping && it.key == null } == true
+    val isMappingKey: Boolean get() = stack.lastOrNull()?.let { it.mapping && it.expectingKey } == true
 
     fun accept(event: Event): String {
         if (event is CollectionEndEvent) {
-            val path = stack.removeLast().path
-            complete()
-            return path
+            val frame = stack.removeLast()
+            complete(frame.keyOfParent)
+            return frame.path
         }
         if (event !is NodeEvent) return failurePath
         val parent = stack.lastOrNull()
-        if (parent != null && parent.mapping && parent.key == null && event is ScalarEvent) {
-            parent.key = event.value
+        val key = isMappingKey
+        if (key && event is ScalarEvent) {
+            parent!!.key = event.value
+            parent.expectingKey = false
             return "${parent.path}/${pointerKey(event.value)}"
         }
         val path =
             when {
                 parent == null -> ""
-                parent.mapping -> "${parent.path}/${pointerKey(parent.key ?: "")}"
+                parent.mapping && (key || parent.key == null) -> parent.path
+                parent.mapping -> "${parent.path}/${pointerKey(parent.key!!)}"
                 else -> "${parent.path}/${parent.index}"
             }
         if (event is CollectionStartEvent) {
-            stack.addLast(Frame(path, event is MappingStartEvent))
+            stack.addLast(Frame(path, event is MappingStartEvent, keyOfParent = key))
         } else {
-            complete()
+            complete(key)
         }
         return path
     }
 
-    private fun complete() {
+    private fun complete(key: Boolean = false) {
         stack.lastOrNull()?.let { parent ->
-            if (parent.mapping) parent.key = null else parent.index++
+            if (parent.mapping) {
+                parent.key = null
+                parent.expectingKey = !key
+            } else {
+                parent.index++
+            }
         }
     }
 }
