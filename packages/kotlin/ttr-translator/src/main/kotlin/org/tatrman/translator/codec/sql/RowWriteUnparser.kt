@@ -67,27 +67,24 @@ object RowWriteUnparser {
                             if (args.size < 2) fail("row_writes_expression", "$op needs at least two operands")
                             args.joinToString(if (op == "and") " AND " else " OR ", "(", ")") { expression(it, alias) }
                         }
-                        "eq", "ne", "neq", "gt", "ge", "gte", "lt", "le", "lte" -> {
+                        "eq", "ne", "gt", "ge", "lt", "le" -> {
                             if (args.size != 2) fail("row_writes_expression", "$op needs two operands")
                             val operator =
                                 mapOf(
                                     "eq" to "=",
                                     "ne" to "<>",
-                                    "neq" to "<>",
                                     "gt" to ">",
                                     "ge" to ">=",
-                                    "gte" to ">=",
                                     "lt" to "<",
                                     "le" to "<=",
-                                    "lte" to "<=",
                                 ).getValue(op)
                             "(${expression(args[0], alias)} $operator ${expression(args[1], alias)})"
                         }
-                        "in", "not_in" -> {
+                        "in" -> {
                             if (args.size < 2) fail("row_writes_expression", "$op needs a column and values")
                             val left = expression(args[0], alias)
                             val values = args.drop(1).joinToString(", ") { value(it) }
-                            "($left ${if (op == "in") "IN" else "NOT IN"} ($values))"
+                            "($left IN ($values))"
                         }
                         "is_null", "is_not_null" -> {
                             if (args.size != 1) fail("row_writes_expression", "$op needs one operand")

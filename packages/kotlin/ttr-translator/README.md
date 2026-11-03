@@ -99,6 +99,11 @@ without a PK and missing key equalities refuse with `row_writes_key`, with or wi
 read. Direct `RowWriteUnparser` callers must supply `keyColumns`; no key is inferred. Each statement returns exactly one row
 `(rows_affected bigint, prior text)`. Other dialects refuse with `row_writes_unsupported_dialect`.
 
+The predicate operators are `and`, `or`, `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `in`,
+`is_null`, and `is_not_null`. Values accept only literals and parameters; predicates accept
+column refs, literals, parameters and these functions. CAST, `not`, and aliases such as `neq`,
+`gte`, `lte`, or `not_in` refuse during lowering as well as unparse.
+
 The executed PG specs opt in with `TTRP_CONFORM_PG=1` and `TTR_CONN_ERP_PG` (the same URI convention
 as `ttrp-conform`); a configured, unreachable PG fails the suite. `RowWriteUnparserSpec` creates
 and drops its own schema. JVM consumers rebuild against the new proto/translator artifacts.

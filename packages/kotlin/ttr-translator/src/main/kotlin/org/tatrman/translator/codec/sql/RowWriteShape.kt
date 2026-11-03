@@ -78,9 +78,9 @@ internal object RowWriteShape {
                 val args = expr.function.operandsList
                 when (op) {
                     "and", "or" -> if (args.size < 2) fail("row_writes_expression", "$op needs at least two operands")
-                    "eq", "ne", "neq", "lt", "le", "lte", "gt", "ge", "gte" ->
+                    "eq", "ne", "lt", "le", "gt", "ge" ->
                         if (args.size != 2) fail("row_writes_expression", "$op needs two operands")
-                    "in", "not_in" -> {
+                    "in" -> {
                         if (args.size < 2) fail("row_writes_expression", "$op needs a column and values")
                         args.drop(1).forEach(::value)
                     }

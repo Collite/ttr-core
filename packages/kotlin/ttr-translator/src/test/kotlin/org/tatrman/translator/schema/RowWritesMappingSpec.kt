@@ -156,6 +156,38 @@ class RowWritesMappingSpec :
                 .single()
                 .name shouldBe "identity"
         }
+        test("predicate aliases and not refuse at both translation boundaries") {
+            val translator = Translator(model)
+            for (alias in listOf("neq", "gte", "lte", "not_in", "not")) {
+                val row =
+                    update().setWhere(
+                        call(
+                            "and",
+                            call("eq", col("order_number"), param("k")),
+                            call(alias, col("state"), param("from")),
+                        ),
+                    )
+                val input = node(row)
+                translator
+                    .parseToRelNode(
+                        input.toByteArray().toString(Charsets.ISO_8859_1),
+                        Language.REL_NODE,
+                        SchemaCode.DB,
+                    ).shouldBeInstanceOf<ParseResult.Failure>()
+                    .code shouldBe "row_writes_expression"
+                val physical =
+                    input
+                        .toBuilder()
+                        .setRowWrites(
+                            RowWrites.newBuilder().addRows(row.clone().setTarget(table)),
+                        ).build()
+                translator
+                    .unparseFromRelNode(physical, Language.SQL, org.tatrman.translate.v1.SqlDialect.POSTGRESQL)
+                    .shouldBeInstanceOf<org.tatrman.translator.orchestrator.UnparseResult.Failure>()
+                    .code shouldBe
+                    "row_writes_expression"
+            }
+        }
         test("parse and SQL unparse share the value and predicate shape checks") {
             val translator = Translator(model)
             val cast =
