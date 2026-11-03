@@ -1280,34 +1280,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operate/studio-viewer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Deploy the Studio Viewer
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../operate/policy-in-git/" class="md-nav__link">
         
   
@@ -1517,8 +1489,8 @@ test vectors any other implementation is held to.</em></p>
 <p>A <strong>layout</strong> is a schema (<code>er</code> or <code>db</code>), the <strong>cards</strong> it shows — entities for <code>er</code>, tables and views for
 <code>db</code> — and, optionally, their <strong>positions</strong>. It is written either as a YAML file or as a TTR <code>.ttrg</code>
 graph file; the two say the same thing in the same words, and every reader accepts both.</p>
-<p>You rarely write one by hand: the Studio Viewer draws it — pick the cards, drag them, <strong>Save as…</strong> — and
-opens one back (<a href="../../operate/studio-viewer/#layouts-pick-place-save">Layouts in the Studio Viewer</a>).</p>
+<p>You rarely write one by hand: the Studio draws it — pick the cards, drag them, <strong>Save as…</strong> — and
+opens one back.</p>
 <h2 id="the-document">The document<a class="headerlink" href="#the-document" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1696,9 +1668,10 @@ vectors.</p>
 <li><strong>Test vectors</strong>: <code>packages/package-sdk/schemas/layout-vectors/</code> in the same repository. Each case holds a
   document (<code>document.json</code>), its YAML and TTR files, a model index and the expected resolution, and its
   <code>README.md</code> states exactly what an implementation asserts: the writers reproduce both files <strong>byte for
-  byte</strong>, the readers give the document back, and resolution gives the expected result. Tatrman's own
-  readers and writers — the viewer's and the JVM libraries' — are tested against these files; another
-  implementation can copy the folder at a pinned commit and run the same checks.</li>
+  byte</strong>, the readers give the document back, and resolution gives the expected result. In ttr-core the
+  TTR reader and writer (<code>@tatrman/parser/layout</code>), the JSON Schema and the JVM libraries are tested
+  against these files in place; the Studio's YAML reader, writer and resolution test a pinned copy, and
+  another implementation can copy the folder at a pinned commit and run the same checks.</li>
 </ul>
 
 

@@ -1302,34 +1302,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operate/studio-viewer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Deploy the Studio Viewer
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../operate/policy-in-git/" class="md-nav__link">
         
   
@@ -1724,11 +1696,10 @@ first cut into meaning.</p>
 <h2 id="4-serve-the-model">4. Serve the model<a class="headerlink" href="#4-serve-the-model" title="Permanent link">&para;</a></h2>
 <p>Point Veles at your model repository — it reads the model from git, so shipping
 a new model is a <code>git push</code>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Veles reads METADATA_GIT_REMOTE_URI; set it via the chart's values</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="c1"># (or the model-repo field in the Designer viewer).</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>helm<span class="w"> </span>upgrade<span class="w"> </span>ttr<span class="w"> </span>oci://ghcr.io/collite/charts/tatrman-server<span class="w"> </span>--version<span class="w"> </span><span class="m">0</span>.9.0<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span>-n<span class="w"> </span>ttr<span class="w"> </span>--reuse-values<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span>--set<span class="w"> </span>veles.metadata.gitRemoteUri<span class="o">=</span><span class="s2">"https://github.com/you/erp-model.git"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Veles reads METADATA_GIT_REMOTE_URI; set it via the chart's values.</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>helm<span class="w"> </span>upgrade<span class="w"> </span>ttr<span class="w"> </span>oci://ghcr.io/collite/charts/tatrman-server<span class="w"> </span>--version<span class="w"> </span><span class="m">0</span>.9.0<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>-n<span class="w"> </span>ttr<span class="w"> </span>--reuse-values<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span>--set<span class="w"> </span>veles.metadata.gitRemoteUri<span class="o">=</span><span class="s2">"https://github.com/you/erp-model.git"</span>
 </code></pre></div>
 <p>Veles clones the <code>main</code> branch and reads the model from the repository root. A
 model on another branch or in a subdirectory names both in <code>veles.extraEnv</code> —
@@ -1772,7 +1743,7 @@ six shown, each trimmed to <code>id</code> and <code>name</code>):</p>
 <div class="admonition success">
 <p class="admonition-title">You should now see…</p>
 <p>The catalog answering: <code>get_model</code> / <code>get_entities</code> via <code>veles-mcp</code> returns
-your model, or the Designer viewer draws it.</p>
+your model.</p>
 </div>
 <h2 id="5-connect-an-agent">5. Connect an agent<a class="headerlink" href="#5-connect-an-agent" title="Permanent link">&para;</a></h2>
 <p>Register the MCP doors in any MCP client — Claude Desktop and Claude Code both
