@@ -12,6 +12,8 @@ import org.snakeyaml.engine.v2.api.lowlevel.Compose
 import org.snakeyaml.engine.v2.api.lowlevel.Parse
 import org.snakeyaml.engine.v2.events.CollectionStartEvent
 import org.snakeyaml.engine.v2.events.CollectionEndEvent
+import org.snakeyaml.engine.v2.events.NodeEvent
+import org.snakeyaml.engine.v2.events.ScalarEvent
 import org.snakeyaml.engine.v2.exceptions.MarkedYamlEngineException
 import org.snakeyaml.engine.v2.exceptions.YamlEngineException
 import org.snakeyaml.engine.v2.exceptions.ReaderException
@@ -23,6 +25,7 @@ class CanonicalYamlException(
     val line: Int,
     val column: Int,
     val detail: String,
+    val keyPath: String = "",
 ) : IllegalArgumentException("$file:$line:$column: $detail")
 
 internal class YamlNodes(
@@ -131,12 +134,18 @@ internal class YamlNodes(
     private fun fail(
         node: Node?,
         message: String,
+        path: String =
+            keys.entries.firstOrNull { it.value === node }?.key
+                ?: locations.entries.firstOrNull { it.value === node }?.key ?: "",
     ): Nothing {
         val mark = node?.startMark?.orElse(null)
-        throw CanonicalYamlException(file, (mark?.line ?: 0) + 1, (mark?.column ?: 0) + 1, message)
+        throw CanonicalYamlException(file, (mark?.line ?: 0) + 1, (mark?.column ?: 0) + 1, message, path)
     }
 
-    fun read(source: String): JsonObject {
+    fun read(
+        source: String,
+        canonical: Boolean = true,
+    ): JsonObject {
         inputText = source
         val settings =
             LoadSettings
@@ -151,13 +160,40 @@ internal class YamlNodes(
                     version
                 }.setAllowDuplicateKeys(false)
                 .setMaxAliasesForCollections(0)
-                .setCodePointLimit(3_000_000)
+                .setCodePointLimit(MAX_YAML_CODE_POINTS)
                 .build()
+        val eventPaths = YamlEventPaths()
         val node =
             try {
                 // Streaming events are safe even when composition/conversion would exhaust the stack.
                 var depth = 0
                 for (event in Parse(settings).parseString(source)) {
+                    val keyEvent = eventPaths.isMappingKey
+                    val path = eventPaths.accept(event)
+                    if (!canonical &&
+                        keyEvent &&
+                        event is ScalarEvent &&
+                        (event.value == "<<" || event.tag.orElse("") == Tag.MERGE.value)
+                    ) {
+                        val mark = event.startMark.orElse(null)
+                        throw CanonicalYamlException(
+                            file,
+                            (mark?.line ?: 0) + 1,
+                            (mark?.column ?: 0) + 1,
+                            "Merge keys are not supported",
+                            path,
+                        )
+                    }
+                    if (!canonical && event is NodeEvent && event.anchor.isPresent) {
+                        val mark = event.startMark.orElse(null)
+                        throw CanonicalYamlException(
+                            file,
+                            (mark?.line ?: 0) + 1,
+                            (mark?.column ?: 0) + 1,
+                            "Anchors and aliases are not supported",
+                            path,
+                        )
+                    }
                     when (event) {
                         is CollectionStartEvent -> {
                             depth++
@@ -168,6 +204,7 @@ internal class YamlNodes(
                                     (mark?.line ?: 0) + 1,
                                     (mark?.column ?: 0) + 1,
                                     "nesting too deep (limit ${CanonicalYaml.MAX_NESTING_DEPTH})",
+                                    path,
                                 )
                             }
                         }
@@ -184,6 +221,7 @@ internal class YamlNodes(
                     (mark?.line ?: 0) + 1,
                     (mark?.column ?: 0) + 1,
                     e.problem ?: "Invalid YAML",
+                    eventPaths.failurePath,
                 )
             } catch (e: ReaderException) {
                 val offset =
@@ -197,18 +235,20 @@ internal class YamlNodes(
                     prefix.count { it == '\n' } + 1,
                     prefix.length - prefix.lastIndexOf('\n'),
                     e.message ?: "Invalid YAML character",
+                    eventPaths.failurePath,
                 )
             } catch (e: YamlEngineException) {
                 throw CanonicalYamlException(file, 1, 1, e.message ?: "Invalid YAML")
             }
         val value = convert(node, "") as? JsonObject ?: fail(node, "Expected a canonical document mapping")
-        validate(value)
+        if (canonical) validate(value)
         return value
     }
 
     fun validate(
         value: JsonObject,
-        report: (String, String) -> Nothing = { path, message -> fail(node(path), message) },
+        selectedSchema: com.networknt.schema.JsonSchema = schema,
+        report: (String, String) -> Nothing = { path, message -> fail(node(path), message, path) },
     ) {
         fun jsonNode(
             v: JsonElement,
@@ -244,7 +284,7 @@ internal class YamlNodes(
         val normalized = jsonNode(value, "")
         val errors =
             try {
-                schema.validate(normalized)
+                selectedSchema.validate(normalized)
             } catch (e: RuntimeException) {
                 report(if (value["defs"] is JsonArray) "/defs/0" else "", e.message ?: "Invalid canonical value")
             }
@@ -287,6 +327,8 @@ internal class YamlNodes(
         message: String,
     ): Nothing = fail(valueNodes[value], message)
 
+    fun paths(): Set<String> = locations.keys.toSet()
+
     private fun convert(
         node: Node,
         path: String,
@@ -316,9 +358,17 @@ internal class YamlNodes(
                     if (key.tag != Tag.STR ||
                         key.value == "<<"
                     ) {
-                        fail(key, "Mapping keys must be strings; merge keys are not supported")
+                        fail(
+                            key,
+                            "Mapping keys must be strings; merge keys are not supported",
+                            "$path/${pointerKey(key.value)}",
+                        )
                     }
-                    if (key.value in result) fail(key, "Duplicate mapping key ${key.value}")
+                    if (key.value in
+                        result
+                    ) {
+                        fail(key, "Duplicate mapping key ${key.value}", "$path/${pointerKey(key.value)}")
+                    }
                     val childPath = "$path/${pointerKey(key.value)}"
                     keys[childPath] = key
                     result[key.value] = convert(tuple.valueNode, childPath)
@@ -478,3 +528,5 @@ internal object YamlText {
         }
     }
 }
+
+internal const val MAX_YAML_CODE_POINTS = 3_000_000
