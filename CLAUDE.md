@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**Tatrman** ("table transformation manager") — the TTR language family. Two languages live here: **TTR-M** (modeling; formerly "the TTR modeling language") and **TTR-P** (processing; in design under `docs/features/ttr-p/` — for anything TTR-P, read `project/tatrman/features/ttr-p/design/00-control-room.md` first; control rooms live in `project/`, not here). This repo was **forked from `Collite/modeler` on 2026-07-03** (full history; modeler is frozen/maintenance-only). TTR-M side: a VS Code plugin, a static React graphical designer, and (later) an IntelliJ plugin, all sharing one TypeScript LSP server. TTR is consumed at runtime by `ai-platform`/`kantheon` (separate repos); this repo is editor/compiler tooling only and never talks to those services. **(S6, PL-P0.S2):** the open (Apache-2.0) toolchain is a *client* of the platform's published snapshot contract — `ttr fetch` + `MetadataServerSource` resolve canon from Veles into the local cache — but it **never talks to a server mid-compile**: a compile is a pure function of resolved, cached inputs (hard parity, B-3).
+**Tatrman** ("table transformation manager") — the TTR language family. Two languages live here: **TTR-M** (modeling; formerly "the TTR modeling language") and **TTR-P** (processing; in design under `docs/features/ttr-p/` — for anything TTR-P, read `project/tatrman/features/ttr-p/design/00-control-room.md` first; control rooms live in `project/`, not here). This repo was **forked from `Collite/modeler` on 2026-07-03** (full history; modeler is frozen/maintenance-only). TTR-M side: a VS Code plugin and (later) an IntelliJ plugin, sharing one TypeScript LSP server with the Studio. **The Studio (viewer, modeler, reports …) is a Collite product in ttr-platform; its read-only tier Studio Free is free — see `TRADEMARKS.md`.** The Designer family's GUI packages moved there at SF-P1 (D-33); `designer/v0.1.3` was the last family release cut here. ttr-core keeps the formats and the four packages the Studio consumes (`lsp · parser · tokens · edit`, released together under `lsp/v*`). TTR is consumed at runtime by `ai-platform`/`kantheon` (separate repos); this repo is editor/compiler tooling only and never talks to those services. **(S6, PL-P0.S2):** the open (Apache-2.0) toolchain is a *client* of the platform's published snapshot contract — `ttr fetch` + `MetadataServerSource` resolve canon from Veles into the local cache — but it **never talks to a server mid-compile**: a compile is a pure function of resolved, cached inputs (hard parity, B-3).
 
 Naming canon (H session, 2026-07-03): **Tatrman** = the product/repo · **TTR** = the family · **TTR-M / TTR-P / TTR-B** = the languages · TTR-SQL / TTR-pandas = TTR-P fragment dialects. Extensions: `.ttrm`/`.ttrg` (TTR-M), `.ttrp` (TTR-P), `.ttr.sql`/`.ttr.py` (fragments), `.ttrl` (family-wide per-document view-state sidecar — TTR-M migrates off the v1.1 in-file layout block; amendment recorded in `docs/features/v1-1/design/v1.1-packages-and-graphs.md` §15 + contracts changelog v8; migration itself pending, gated on the TTR-P C1 session's `.ttrl` content schema).
 
@@ -29,7 +29,6 @@ Workspace uses pnpm 11 (see `packageManager`). Node 20+ required.
 | `pnpm -r lint` | Lint all packages |
 | `pnpm --filter @tatrman/<pkg> test` | Run one package's tests |
 | `pnpm --filter @tatrman/<pkg> test -- <pattern>` | Run a single test file/name |
-| `pnpm --filter @tatrman/designer-core dev` | Run the Designer dev server (Vite, http://localhost:5173) |
 
 ### Grammar regeneration
 
@@ -54,7 +53,7 @@ Open `packages/vscode-ext` in VS Code and press F5 to launch an Extension Develo
 
 Two build domains coexist in this repo and share **only** `packages/grammar/src/TTR.g4`:
 
-- **pnpm / TypeScript** (`packages/*`, commands above) — LSP, VS Code ext, Designer.
+- **pnpm / TypeScript** (`packages/*`, commands above) — LSP, VS Code ext, and the open packages the Studio consumes.
 - **Gradle / Kotlin** (`packages/kotlin/*`) — the published Maven artifacts
   `org.tatrman:ttr-parser` and `:ttr-writer` (and, from Phase 2, `:ttr-semantics`),
   consumed by the `ai-platform` repo. The Kotlin parser reads `TTR.g4` directly
@@ -98,26 +97,26 @@ This is a pnpm workspaces monorepo. All TS packages extend `tsconfig.base.json` 
 ### Dependency graph (one-way)
 
 ```
-grammar  →  parser  →  semantics  →  lsp  →  vscode-ext
-                          ↑           ↑   ↘
-              md-catalog ─┘           edit   designer
+grammar  →  parser  →  semantics  →  lsp  →  vscode-ext   (and the Studio, in ttr-platform)
+                          ↑           ↑
+              md-catalog ─┘           edit
 ```
 
 - **`@tatrman/grammar`** — owns `TTR.g4` and the generation/sync scripts. No runtime logic.
 - **`@tatrman/md-catalog`** — data-only leaf (beside `grammar`): the built-in MD calc-map catalog (`MD_CALC_CATALOG`) + `MD_CATALOG_VERSION` (the cross-repo sync key). No runtime logic; `semantics` depends on it and pre-loads the catalog as a read-only `calc:` source. Vendored to ai-platform (Phase 4).
 - **`@tatrman/parser`** — wraps the generated antlr4ng parser; exposes `parseString` / `parseFile` returning `{ ast, errors, source }`. Cross-references are kept as opaque strings here (resolved later). Comments route to the lexer's hidden channel (`TTR.g4`: `LINE_COMMENT`/`BLOCK_COMMENT -> channel(HIDDEN)`; `WS` stays `skip`) and are attached to AST nodes as `Trivia` (`leadingTrivia`/`trailingTrivia`, see `src/cst/{trivia,attach}.ts`) by `attachTrivia` during the walk. This is the lossless CST/trivia layer that the formatter, linter suppression, and (P4) trivia-preserving autofix read from; the edit synthesizer will preserve trivia once autofix lands. The subpath **`@tatrman/parser/layout`** holds the layout document and its `.ttrg` / `.ttrl` reader and writer (VL) and never imports the ANTLR runtime, so a host (the Studio Viewer) uses it without the generated parser; its keyword set (`TTR_NON_ID_WORDS`) is generated from `TTR.g4` by `packages/grammar/scripts/generate-ttr-id-words.mjs` during `prebuild`.
 - **`@tatrman/semantics`** — symbol table + reference resolver + per-kind validator. Pre-loads ai-platform's stock CNC vocab (`fact`, `dimension`, `structural`, `master`, `transaction`, `bridge`). This is where "unresolved reference"-class diagnostics come from.
-- **`@tatrman/edit`** — `WorkspaceEdit` synthesizer for structured graph operations from the Designer (placeholder until v1.1 when edit mode lands).
+- **`@tatrman/edit`** — `WorkspaceEdit` synthesizer for structured graph operations from graphical hosts (the Studio).
 - **`@tatrman/lsp`** — the single LSP server consumed by all hosts. Two entry points bundled with esbuild:
   - `server-stdio.ts` → Node child process for VS Code / IntelliJ
-  - `server-browser.ts` → Web Worker for the Designer
-  Implements standard LSP methods plus custom `modeler/*` methods (`getModelGraph`, `applyGraphEdit`, `getLayout`/`setLayout`, `getProjectInfo`) for Designer use.
+  - `server-browser.ts` → Web Worker for browser hosts (the Studio; shipped as `browser.worker.js`)
+  Implements standard LSP methods plus custom `modeler/*` methods (`getModelGraph`, `applyGraphEdit`, `getLayout`/`setLayout`, `getProjectInfo`) for the Studio's use.
 - **`ttr-modeler-vsc`** — thin shim: language registration, TextMate grammar, LSP client wiring, one stub command. No business logic here — anything understanding TTR belongs in the LSP.
-- **`@tatrman/designer-core`** — React 19 + Vite + React Flow (`@xyflow/react`) + Tailwind, with layout and the shared canvas primitives in `@tatrman/canvas-core` (ELK `layered` via `elkjs`). Forked from the Ontology Playground project; the original Cytoscape.js render path was replaced by React Flow in DS-P0 and no `cytoscape` dependency remains. v1 is read-only render of `db` / `er` schemas; edit mode (round-tripping through `modeler/applyGraphEdit`) lands in v1.1.
+- **The Studio's GUI packages** — no longer here: the Designer and its canvas packages moved to ttr-platform (D-33, Studio Free). Their contracts with this repo are the published `lsp · parser · tokens · edit` (the `lsp/v*` lane, `PUBLISHING.md`) and the open formats and schemas.
 
 ### Key invariants
 
-- **Text is canonical.** The Designer never owns model state independently — it issues structured edits via custom LSP requests, the LSP synthesizes `WorkspaceEdit`s, the host applies them, and the LSP re-parses. **Node positions moved back to a sidecar (TP-5, 2026-07-15, superseding the paragraph below as it read through v1.1):** each `.ttrg` file is now paired with an `x.ttrl` sidecar (grammar v4.3, C1-c-iii — a per-document file, NOT the old v1 project-wide `.modeler/layout.ttrl` D4 removed) read/written via `ttrm/getLayout`/`ttrm/setLayout` on `ttr-designer-server`'s `/ttrm` protocol (`packages/kotlin/ttr-designer-server`), which writes the sidecar to disk directly rather than returning a `WorkspaceEdit`. The migration tool is `@tatrman/migrate migrate-to-ttrl-sidecar`; TTR-P's `.ttrp`/`.ttrl` pairing (Phase 5.2) predates and is unrelated code (`ttrp-lsp`'s `LayoutService`, not reused — see `TtrmLayoutService`'s doc comment for why). **Decided 2026-07-15 (T5.2):** the TS LSP's own `modeler/getLayout`/`modeler/setLayout` (still reading/writing the old in-file `layout` block, `packages/lsp/src/server.ts`) **stays** as the intentional offline fallback — it works with no `ttr-designer-server` process running, which the WS-mode path (`packages/designer`'s `?ws=` path) requires. Two working paths by design, not drift: `modeler/*` (TS, in-file layout, Worker mode) and `ttrm/*` (Kotlin, `.ttrl` sidecar, WS mode). Detail: `project/tatrman/features/ttr-p/implementation/ttrl-migration/`.
+- **Text is canonical.** The Designer never owns model state independently — it issues structured edits via custom LSP requests, the LSP synthesizes `WorkspaceEdit`s, the host applies them, and the LSP re-parses. **Node positions moved back to a sidecar (TP-5, 2026-07-15, superseding the paragraph below as it read through v1.1):** each `.ttrg` file is now paired with an `x.ttrl` sidecar (grammar v4.3, C1-c-iii — a per-document file, NOT the old v1 project-wide `.modeler/layout.ttrl` D4 removed) read/written via `ttrm/getLayout`/`ttrm/setLayout` on `ttr-designer-server`'s `/ttrm` protocol (`packages/kotlin/ttr-designer-server`), which writes the sidecar to disk directly rather than returning a `WorkspaceEdit`. The migration tool is `@tatrman/migrate migrate-to-ttrl-sidecar`; TTR-P's `.ttrp`/`.ttrl` pairing (Phase 5.2) predates and is unrelated code (`ttrp-lsp`'s `LayoutService`, not reused — see `TtrmLayoutService`'s doc comment for why). **Decided 2026-07-15 (T5.2):** the TS LSP's own `modeler/getLayout`/`modeler/setLayout` (still reading/writing the old in-file `layout` block, `packages/lsp/src/server.ts`) **stays** as the intentional offline fallback — it works with no `ttr-designer-server` process running, which the WS-mode path (the Studio's `?ws=` path, now in ttr-platform) requires. Two working paths by design, not drift: `modeler/*` (TS, in-file layout, Worker mode) and `ttrm/*` (Kotlin, `.ttrl` sidecar, WS mode). Detail: `project/tatrman/features/ttr-p/implementation/ttrl-migration/`.
 - **One LSP across hosts.** Don't add per-host language logic. New language features go in `parser` / `semantics` / `lsp`; hosts stay thin.
 - **Parser stays mechanical.** It mirrors ai-platform's Kotlin parser. Don't add resolution logic to `@tatrman/parser` — that belongs in `@tatrman/semantics`.
 - **Project root resolution.** Walk up looking for `modeler.toml`; otherwise treat the LSP `workspaceFolder` as root with convention defaults. Manifest schema is in §5 of the architecture doc. `.modeler/` is a build artifact — never commit it (see `.gitignore`).

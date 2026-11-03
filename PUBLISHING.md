@@ -21,8 +21,8 @@ group to **two lanes** (SV-P1 S4, 2026-07-12; lane-gating polarity flipped
 See [§ Maven Central — the public lane](#maven-central--the-public-lane-sv-p1-s4) below.
 
 > Two build domains coexist in this repo. The **pnpm/TypeScript** workspace
-> (`packages/*`, built with `pnpm -r build`) ships the LSP, VS Code extension,
-> and Designer. The **Gradle/Kotlin** build (`packages/kotlin/*`) ships the
+> (`packages/*`, built with `pnpm -r build`) ships the LSP, the VS Code extension,
+> and the open packages the Studio consumes. The **Gradle/Kotlin** build (`packages/kotlin/*`) ships the
 > published Maven artifacts described here. They share only the canonical
 > grammar at `packages/grammar/src/TTR.g4`; nothing else crosses between them.
 
@@ -262,7 +262,7 @@ external cut wait behind a green, published-artifact-shaped check. Only the
 **grammar** is published, not `@tatrman/parser`: consumers run their own ANTLR
 generation from the shipped `.g4` (exactly what modeler does).
 
-In-repo TS consumers (Designer, VS Code ext) build from `packages/parser`
+In-repo TS consumers (the VS Code extensions) build from `packages/parser`
 directly and need no publish — this lane is for **external** repos only.
 
 ## Semver discipline
@@ -281,81 +281,82 @@ Per [`contracts.md`](docs/grammar-master/contracts.md) §7:
   staging lane and off the Central quota (§ Release lanes). Local builds
   without `-Pversion` get `0.0.1-LOCAL` (see below).
 
-### Designer family — internal artifacts by default
+### lsp family — internal artifacts by default
 
-The eight-package closure is `@tatrman/{parser,tokens,canvas-core,deep-links,perspectives,edit,lsp,designer-core}`,
-all version **0.1.2**. The initial 0.1.0 cut reused the already public `edit@0.1.0`; subsequent cuts version all eight together. The
-packages have independent compiler-free distribution entries; LSP bundles private compiler modules and
-inlines their declaration dependencies. Designer ships its prebuilt module worker and scoped CSS.
-React/ReactDOM 19 are host peers. `canvas-core` has no React dependency.
+The four open packages the Studio consumes are one release closure:
+`@tatrman/{parser,tokens,edit,lsp}`, all at one version (**0.1.4** on master; `scripts/lsp-family.mjs`
+is the one list). The packages have compiler-free distribution entries; LSP bundles the private
+compiler modules, inlines their declaration dependencies, and ships the browser worker
+(`@tatrman/lsp/browser.worker.js`) that browser hosts load as a module Worker.
 
-Use the usual recipe **after this PR is merged**, from a clean checkout at the remote branch tip:
+The Designer family's GUI packages moved to ttr-platform (D-33, Studio Free): the Studio (viewer,
+modeler, reports …) is a Collite product; its read-only tier Studio Free is free — see
+[TRADEMARKS.md](TRADEMARKS.md). The last eight-package `designer/v*` release cut here is
+`designer/v0.1.3`; that lane, `just publish designer` and `just publish viewer` are gone.
+
+Use the usual recipe **after the version bump is merged**, from a clean checkout at the remote branch tip:
 
 ```sh
-just publish designer set 0.1.2
-# Alias: just publish packages/designer set 0.1.2
+just publish lsp set 0.1.4
+# Alias: just publish packages/lsp set 0.1.4
 ```
 
-The recipe checks the version, remote tip, merged-master ancestry, and existing tags before asking
-for the tag push. The bare `designer/v0.1.2` tag creates an **internal GitHub Release** with all eight
-npm tarballs, `manifest.json`, and `SHA256SUMS`. It needs no npm publishing token and does not publish
-to a public registry. Download the assets together, verify hashes, then install them in one command:
+The recipe checks that all four package versions equal the tag's, the remote tip, merged-master
+ancestry, and existing tags before asking for the tag push. The bare `lsp/v0.1.4` tag creates an
+**internal GitHub Release** with the four npm tarballs, `manifest.json`, and `SHA256SUMS` (the shape
+ttr-platform's vendor check reads). It needs no npm publishing token and does not publish to a public
+registry. Download the assets together, verify hashes, then install them in one command:
 
 ```sh
-gh release download designer/v0.1.2 --repo Collite/ttr-core --dir designer-0.1.2
-cd designer-0.1.2
+gh release download lsp/v0.1.4 --repo Collite/ttr-core --dir lsp-0.1.4
+cd lsp-0.1.4
 shasum -a 256 -c SHA256SUMS
-npm install ./tatrman-*.tgz react@^19 react-dom@^19
+npm install ./tatrman-*.tgz
 ```
 
 For a local cut without Git mutations or a release:
 
 ```sh
-pnpm --filter '@tatrman/designer-core...' build
+pnpm --filter '@tatrman/lsp...' --filter '@tatrman/tokens...' build
 node scripts/prepare-family-licenses.mjs
-node scripts/pack-designer-family.mjs
-node scripts/designer-consumer-smoke.mjs
+node scripts/pack-lsp-family.mjs
+node scripts/lsp-consumer-smoke.mjs
 ```
 
-The last command runs both npm and isolated pnpm installs of only the actual tarballs and public dependencies in fresh directories
-outside the workspace. It checks runtime imports, public TypeScript declarations, and real-browser
-Vite development/production hosts, including the worker, dark MD canvas, CSS isolation and navigation.
-See `docs/manual/studio-hosting.md` for the Vite dependency-optimization configuration. Optional arguments
-are the artifact folder, evidence folder, and a model checkout (for example `../hartland`). Linux CI
-installs Chromium with `pnpm exec playwright-core install --with-deps chromium`; macOS uses Chrome,
-or set `CHROME_BIN`. Evidence includes screenshots and package hashes. No deployment is involved.
-The pnpm leg vendors the hash-checked tarballs and puts all eight overrides in pnpm-workspace.yaml;
-package.json `pnpm.overrides` is ignored by pnpm 11. For the exact release consumption recipe, see
-[the hosting manual](docs/manual/studio-hosting.md#pnpm-hosts-internal-release-artifacts).
-Use exact internal release-asset URLs or the verified vendored tarballs for both direct dependencies
-and overrides. Platform's source-file/link/workspace bans remain in force.
+The last command runs both npm and isolated pnpm installs of only the actual tarballs and public
+dependencies in fresh directories outside the workspace. It checks runtime imports, public TypeScript
+declarations (strict NodeNext), the stdio server, and the browser worker booted from the installed
+tarball in a real Chromium Worker. Optional arguments are the artifact folder and the evidence folder.
+Linux CI installs Chromium with `pnpm exec playwright-core install --with-deps chromium`; macOS uses
+Chrome, or set `CHROME_BIN`. The pnpm leg vendors the hash-checked tarballs and puts all four
+overrides in pnpm-workspace.yaml; package.json `pnpm.overrides` is ignored by pnpm 11.
 
-`publish-ts.yml` performs the same artifact consumer check for relevant PRs and Designer tags.
-It covers Designer source/build/CSS config, LSP/canvas/parser sources, release scripts and pnpm-lock.yaml,
-and builds the viewer Dockerfile (with assertions excluding library/package trees from nginx output).
-The root `pnpm test:family` runs in CI and `just test`; Designer's own test command remains filterable. A single
-ordered family job avoids publishing partial per-package matrices before the closure is checked.
-`prepare-family-licenses.mjs` gathers the installed runtime license closure, including worker dependencies;
-CI fails if generated NOTICE/LICENSE files drift. Tarball checks reject private/workspace runtime deps,
-test declarations, source maps, and consumer-side worker transforms.
+`publish-ts.yml` (job `lsp-family`) performs the same build, pack and consumer check for relevant PRs,
+for `workflow_dispatch` (a dry run from any ref: nothing is released) and for `lsp/v*` tags. It covers
+the four packages' sources, the compiler sources LSP bundles, release scripts and pnpm-lock.yaml.
+The root `pnpm test:family` runs in CI and `just test`. A single ordered family job avoids publishing
+partial per-package matrices before the closure is checked. `prepare-family-licenses.mjs` gathers the
+installed runtime license closure, including worker dependencies; CI fails if generated NOTICE/LICENSE
+files drift. Tarball checks reject private/workspace runtime deps, test declarations and source maps.
 
-Only an explicitly requested `just publish designer release set <version>` adds public npm publication
+Only an explicitly requested `just publish lsp release set <version>` adds public npm publication
 using `NPM_TOKEN`. This lane is not required on 0.x. Public publication uses the verified tarballs;
-every name@version already present on npm is reused, including edit at any version. All family
+every name@version already present on npm is reused, including edit at any version. All four
 versions must be bumped together before a later cut, and an internal version cannot be reused as a
 second release tag. The release step reuses an existing GitHub release and uploads verified assets
 with --clobber, so a failed publishing run can resume. npm preflight refuses registry/auth failures;
 it publishes only coordinates that returned E404. New edit releases are family-only: the separate
-`just publish edit` command and new edit tags now refuse. Historical edit/v0.1.0 remains valid;
+`just publish edit` command and new `edit/v*` tags refuse. Historical edit/v0.1.0 remains valid;
 the grammar publisher keeps its established behavior.
 
 ### TypeScript edit synthesizer (historical P1 release)
 
 `edit/v0.1.0` published the standalone Apache-2.0 synthesizer to public npm as `@tatrman/edit@0.1.0`.
 Its bare tag was public; it did not use the RELEASE marker. That immutable debut remains available.
-Since P3 the package is version-locked to the Designer family: use `just publish designer set <version>`
-for internal artifacts or the explicit family RELEASE action for public npm. `just publish edit` and
-new `edit/v*` runs at family-locked heads refuse, preventing two publishers for the same coordinate.
+Since P3 the package is version-locked to its family — the Designer family until `designer/v0.1.3`,
+the lsp family since SF-P1: use `just publish lsp set <version>` for internal artifacts or the explicit
+family RELEASE action for public npm. `just publish edit` and new `edit/v*` tags refuse, preventing
+two publishers for the same coordinate.
 
 Build with `pnpm --filter "@tatrman/edit..." build`. The internal workspace entry stays unbundled;
 the published JS/declarations bundle compiler dependencies and retain LICENSE/NOTICE. Canvas forms,

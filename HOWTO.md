@@ -1,62 +1,14 @@
 # HOWTO
 
-End-user-flavoured instructions for the two shipping artefacts: the Designer and the VS Code extension. For developer-facing docs (architecture, contributing, plan), see [`docs/`](docs/) and the per-package READMEs.
+End-user-flavoured instructions for the VS Code extension and the model export. The graphical Designer is no longer in this repository (§1). For developer-facing docs (architecture, contributing, plan), see [`docs/`](docs/) and the per-package READMEs.
 
-> **Prerequisites for everything below:** Node.js 20+, pnpm 11+ (the repo pins `pnpm@11.1.3` via `packageManager` — Corepack picks it up automatically), and a clone of this repo with `pnpm install` **and `pnpm -r build`** run once. `pnpm install` alone is not enough: the Designer imports workspace packages (`@tatrman/canvas-core`, `@tatrman/lsp`, …) through their `dist/` entry points, so an unbuilt checkout fails at startup with `Failed to resolve entry for package "@tatrman/canvas-core"`.
+> **Prerequisites for everything below:** Node.js 20+, pnpm 11+ (the repo pins `pnpm@11.1.3` via `packageManager` — Corepack picks it up automatically), and a clone of this repo with `pnpm install` **and `pnpm -r build`** run once. `pnpm install` alone is not enough: the extension and the tools import workspace packages (`@tatrman/lsp`, `@tatrman/parser`, …) through their `dist/` entry points, which only a build creates.
 
 ---
 
-## 1. Running the Designer
+## 1. The Designer is part of the Studio
 
-The Designer is a static React app. Three ways to run it.
-
-### 1.1 Local dev server (hot reload)
-
-```bash
-pnpm --filter "@tatrman/designer-core^..." build   # once — builds the workspace deps into dist/
-pnpm --filter @tatrman/designer-core dev
-```
-
-Opens [http://localhost:5173](http://localhost:5173). Vite watches for source changes and reloads.
-
-* **Load a project**: click **Load Project Folder** (works in all evergreen browsers) and select a folder containing `.ttrm` files plus a `modeler.toml` — for example, `samples/v1.1-mini/` from this repo. Chromium-based browsers can also use **Open Folder** (File System Access API) for direct folder access.
-* **Try the demo**: click **Open Demo (v1.1-mini)** on the landing card, or visit [http://localhost:5173/?demo=v1.1-mini](http://localhost:5173/?demo=v1.1-mini).
-
-> `v1.1-mini` is the only sample the dev server serves — `SAMPLE_NAME` in `packages/designer/vite.config.ts` selects it, and requests for any other `/samples/<name>/` fall through to the SPA fallback (the demo loader then chokes on `<!DOCTYPE …>`). The older flat-layout `samples/v1-metadata/` predates the v1.1 `package` declarations; use it only as a v1-format reference.
-
-### 1.2 Local production build (serve the static bundle)
-
-```bash
-pnpm --filter @tatrman/designer-core build      # outputs to packages/designer/dist/
-npx http-server packages/designer/dist -p 8080
-```
-
-Open [http://localhost:8080/?demo=v1.1-mini](http://localhost:8080/?demo=v1.1-mini). The build includes the bundled LSP web worker and the sample project copied into `dist/samples/v1.1-mini/`.
-
-### 1.3 The deployed Viewer (container image)
-
-The Designer is not published to GitHub Pages: repo Pages serves the docs site (`docs-publish.yml`). The deployable form is the **Studio Viewer image**, `ghcr.io/collite/ttr-viewer`, a static bundle behind unprivileged nginx that reads the model a Veles catalog serves. `release-viewer.yml` publishes it from a `viewer/v<x.y.z>` tag (`just publish viewer`). Its base path, catalog URL and default language are environment variables read when the container starts, so one image serves any deployment.
-
-How to run it, configure it, and put it behind a login: [Deploy the Studio Viewer](docs-site/docs/operate/studio-viewer.md).
-
-To build and try it locally against a Veles on your machine:
-
-```bash
-gh auth token | docker login ghcr.io -u <github-user> --password-stdin   # the base images are private GHCR mirrors
-just viewer-image                                                         # → ttr-viewer:dev
-docker run --rm -p 8080:8080 -e VIEWER_CATALOG_UPSTREAM=http://host.docker.internal:7260 ttr-viewer:dev
-```
-
-Then open [http://localhost:8080/](http://localhost:8080/).
-
-### 1.4 What the Designer does
-
-* **Schema toggle (`db` / `er`)** — switch which schema's graph is rendered. The other schema's graph is cached, so toggling back is instant.
-* **Display-mode toggle (`just-names` / `with-types` / `with-constraints`)** — controls how much detail appears in each node. Doesn't trigger an auto-layout; positions are preserved.
-* **Inspector panel** — click any node or edge to see its details, source `file:line` (clickable to copy), tags, and "Referenced by" links (clickable to navigate).
-* **Layout persistence** — positions, viewport, and display mode round-trip to disk in Node mode (VS Code workspace) via `<project>/.modeler/layout.ttrl`. In browser mode they stay in memory; use **Export Layout** in the header to download the current `.ttrl` for re-import or to commit alongside your project.
-
-Edit mode (round-tripping graph edits back into `.ttrm` text) is **not** in v1 — the Designer is read-only.
+The Studio (viewer, modeler, reports …) is a Collite product in ttr-platform; its read-only tier Studio Free is free — see [TRADEMARKS.md](TRADEMARKS.md). The graphical Designer, its canvas packages and the viewer image moved there in November 2026 (D-33, Studio Free). Everything the Studio reads stays open here: the TTR formats and schemas, and the four packages it is built on — `@tatrman/lsp`, `@tatrman/parser`, `@tatrman/tokens` and `@tatrman/edit`, released together under `lsp/v*` (see [PUBLISHING.md](PUBLISHING.md)). The last Designer family release cut from this repository is `designer/v0.1.3`.
 
 ---
 
@@ -168,9 +120,6 @@ If you're suspicious that an extension change broke something, run `test:smoke` 
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Designer landing card never appears in dev mode | LSP worker failed to load — check the browser console | `pnpm --filter @tatrman/lsp build` and reload |
-| Designer demo button shows "Failed to load demo: Demo manifest not found" | `samples/v1.1-mini/index.json` missing from the build output, or a `?demo=` name other than `SAMPLE_NAME` | `pnpm --filter @tatrman/designer-core build` (the Vite plugin writes it on `closeBundle`); in dev, use `?demo=v1.1-mini` |
-| Dev server exits with `Failed to resolve entry for package "@tatrman/canvas-core"` | Workspace deps never built — Vite resolves them through `dist/`, which `pnpm install` does not create | `pnpm --filter "@tatrman/designer-core^..." build` from the repo root, then re-run `dev` |
 | F5 in `packages/vscode-ext` doesn't open the dev host | Build artefacts missing | `pnpm -r build` first; F5 uses `dist/extension.js` |
 | Extension Development Host loads but `.ttrm` files show no diagnostics | LSP server failed to start — open **Output → TTR Language Server** to see why | Most often: forgot to `pnpm --filter @tatrman/lsp build` after pulling |
 | Symlink dev install isn't picked up | VS Code didn't pick up the symlink at startup | **Developer: Reload Window**; if still missing, restart VS Code entirely |
@@ -181,7 +130,6 @@ If you're suspicious that an extension change broke something, run `test:smoke` 
 
 ## Where to go next
 
-* The Designer's own [README](packages/designer/README.md) has more on its toggles, env vars, deploy workflow, and the future embed story.
 * The extension's [README](packages/vscode-ext/README.md) documents the smoke test cases and how the package handles the CJS/ESM split with the LSP.
 * The [LSP README](packages/lsp/README.md) lists every method (standard + custom `modeler/*`) the server exposes.
 * [docs/v1/design/architecture.md](docs/v1/design/architecture.md) §11 has the Designer ↔ LSP control-flow diagram for the deployed shape.
