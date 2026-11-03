@@ -11,6 +11,8 @@ import org.tatrman.plan.v1.QualifiedName
 import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.plan.v1.TableScanNode
 import org.tatrman.plan.v1.schemaCodeToToken
+import org.tatrman.translator.codec.sql.RowWriteShape
+import org.tatrman.translator.codec.sql.RowWriteUnparseException
 import org.tatrman.translator.framework.EntityMapping
 import org.tatrman.translator.framework.ModelColumn
 import org.tatrman.translator.framework.ModelHandle
@@ -89,6 +91,8 @@ object MapToPhysical {
     ): MapToPhysicalResult =
         try {
             MapToPhysicalResult.Success(rewrite(plan, model, visited = emptySet()))
+        } catch (e: RowWriteUnparseException) {
+            MapToPhysicalResult.Failure(e.code, e.message ?: "")
         } catch (e: MapToPhysicalException) {
             MapToPhysicalResult.Failure(e.code, e.message ?: "")
         }
@@ -122,6 +126,7 @@ object MapToPhysical {
         }
         val rows =
             plan.rowWrites.rowsList.map { row ->
+                RowWriteShape.check(row)
                 val er = row.target.schemaCode == SchemaCode.ER
                 val mapping = if (er) model.entityMapping(row.target) else null
                 val table =
@@ -218,12 +223,6 @@ object MapToPhysical {
                                                 expression(it)
                                             },
                                         ),
-                                ).build()
-                        Expression.ExprCase.CAST ->
-                            expr
-                                .toBuilder()
-                                .setCast(
-                                    expr.cast.toBuilder().setValue(expression(expr.cast.value)),
                                 ).build()
                         Expression.ExprCase.LITERAL, Expression.ExprCase.PARAMETER -> expr
                         else -> throw MapToPhysicalException(

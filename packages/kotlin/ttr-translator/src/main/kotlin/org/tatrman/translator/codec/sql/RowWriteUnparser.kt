@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.translator.codec.sql
 
-import org.tatrman.plan.v1.ColumnValue
 import org.tatrman.plan.v1.Expression
 import org.tatrman.plan.v1.Literal
 import org.tatrman.plan.v1.ParameterBinding
@@ -177,47 +176,7 @@ object RowWriteUnparser {
         ) {
             fail("row_writes_target_schema", "Row writes must be mapped to a DB table before SQL unparse")
         }
-        if (row.op == RowWriteOp.ROW_WRITE_OP_UNSPECIFIED ||
-            row.op == RowWriteOp.UNRECOGNIZED
-        ) {
-            fail("row_writes_op", "Unspecified row write operation")
-        }
-        if (row.op != RowWriteOp.INSERT &&
-            !row.hasWhere()
-        ) {
-            fail("row_writes_where", "UPDATE/DELETE requires a where predicate")
-        }
-        if (row.op == RowWriteOp.INSERT &&
-            (row.hasWhere() || row.readBeforeCount > 0)
-        ) {
-            fail("row_writes_insert", "INSERT takes neither where nor read_before")
-        }
-        if (row.op != RowWriteOp.INSERT && row.ifAbsent) fail("row_writes_if_absent", "if_absent is INSERT only")
-        if ((row.op == RowWriteOp.DELETE) !=
-            (row.valuesCount == 0)
-        ) {
-            fail("row_writes_values", "INSERT/UPDATE needs values; DELETE takes none")
-        }
-        val names = row.valuesList.map(ColumnValue::getName)
-        if (names.size != names.toSet().size ||
-            names.any(String::isEmpty)
-        ) {
-            fail("row_writes_values", "Duplicate or empty target column")
-        }
-        if (row.priorKeysCount > 0 &&
-            (
-                row.priorKeysCount != row.readBeforeCount ||
-                    row.priorKeysList.any(String::isEmpty) ||
-                    row.priorKeysCount != row.priorKeysList.toSet().size
-            )
-        ) {
-            fail("row_writes_prior", "prior_keys must contain one non-empty, distinct key per read_before column")
-        }
-        if (row.readBeforeList.size !=
-            row.readBeforeList.toSet().size
-        ) {
-            fail("row_writes_prior", "Duplicate read_before column")
-        }
+        RowWriteShape.check(row)
     }
 
     private fun conjuncts(expr: Expression): List<Expression> =

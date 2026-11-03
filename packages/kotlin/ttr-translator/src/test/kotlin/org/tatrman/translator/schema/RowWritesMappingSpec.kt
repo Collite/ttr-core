@@ -156,6 +156,41 @@ class RowWritesMappingSpec :
                 .single()
                 .name shouldBe "identity"
         }
+        test("parse and SQL unparse share the value and predicate shape checks") {
+            val translator = Translator(model)
+            val cast =
+                Expression
+                    .newBuilder()
+                    .setCast(
+                        CastExpression.newBuilder().setValue(param("next")).setTargetType("text"),
+                    ).build()
+            for ((row, code) in listOf(
+                update().clearValues().addValues(ColumnValue.newBuilder().setName("state").setValue(cast)) to
+                    "row_writes_value",
+                update().clearValues().addValues(ColumnValue.newBuilder().setName("state").setValue(col("held_for"))) to
+                    "row_writes_value",
+                update().setWhere(call("eq", col("order_number"), cast)) to "row_writes_expression",
+            )) {
+                val input = node(row)
+                translator
+                    .parseToRelNode(
+                        input.toByteArray().toString(Charsets.ISO_8859_1),
+                        Language.REL_NODE,
+                        SchemaCode.DB,
+                    ).shouldBeInstanceOf<ParseResult.Failure>()
+                    .code shouldBe code
+                val physical =
+                    input
+                        .toBuilder()
+                        .setRowWrites(
+                            RowWrites.newBuilder().addRows(row.clone().setTarget(table)),
+                        ).build()
+                translator
+                    .unparseFromRelNode(physical, Language.SQL, org.tatrman.translate.v1.SqlDialect.POSTGRESQL)
+                    .shouldBeInstanceOf<org.tatrman.translator.orchestrator.UnparseResult.Failure>()
+                    .code shouldBe code
+            }
+        }
         test("ER values, prior and predicates refuse physical names and unlisted entities") {
             for (row in listOf(
                 update("so_state"),
