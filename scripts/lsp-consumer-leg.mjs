@@ -108,13 +108,35 @@ resolveManifest(undefined,'');`
     timeout: 20_000,
   });
 
+  // Every subpath an installed tarball declares types for gets a type-only import, so a new or
+  // broken one is checked without editing this list (`./browser.worker.js` declares none).
+  const typedSubpaths = receipt.artifacts.flatMap((a) => {
+    // Read from node_modules: the packages do not export ./package.json.
+    const { exports = {} } = JSON.parse(
+      readFileSync(join(scratch, 'node_modules', a.name, 'package.json'), 'utf8')
+    );
+    return Object.entries(exports)
+      .filter(([, target]) => typeof target === 'object' && target?.types)
+      .map(([subpath]) => a.name + subpath.slice(1));
+  });
+  assert.ok(typedSubpaths.includes('@tatrman/parser/layout'), JSON.stringify(typedSubpaths));
+  assert.ok(typedSubpaths.includes('@tatrman/lsp/browser'), JSON.stringify(typedSubpaths));
   writeFileSync(
     join(scratch, 'type-probe.ts'),
     `import { parseString } from '@tatrman/parser';
 import { renderDataType } from '@tatrman/lsp';import { createServerConnection } from '@tatrman/lsp/server';
 import { synthesize } from '@tatrman/edit';import * as tokens from '@tatrman/tokens';
+import * as layout from '@tatrman/parser/layout';import type * as browserEntry from '@tatrman/lsp/browser';
 const errors: number = parseString('model er').errors.length;
-void errors;void renderDataType;void createServerConnection;void synthesize;void tokens;`
+const doc: layout.LayoutDocument | undefined = undefined;
+const write: typeof layout.writeTtrg = layout.writeTtrg;
+const entry: typeof browserEntry | undefined = undefined;
+void errors;void renderDataType;void createServerConnection;void synthesize;void tokens;void doc;void write;void entry;
+` +
+      typedSubpaths
+        .map((s, i) => `import type * as t${i} from '${s}';\nexport type T${i} = typeof t${i};`)
+        .join('\n') +
+      '\n'
   );
   execFileSync(
     process.execPath,
@@ -130,7 +152,7 @@ void errors;void renderDataType;void createServerConnection;void synthesize;void
       'ES2022',
       join(scratch, 'type-probe.ts'),
     ],
-    { cwd: scratch, stdio: 'pipe' }
+    { cwd: scratch, stdio: 'inherit' }
   );
 
   // The Studio loads the worker file the tarball ships; serve exactly that file to a module Worker.
@@ -152,12 +174,37 @@ void errors;void renderDataType;void createServerConnection;void synthesize;void
   const page = await browser.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
+  // A dedicated worker's console reaches the page's console event (ConsoleMessage.worker()).
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(`console.error: ${m.text()}`);
+  });
   await page.goto(`http://127.0.0.1:${server.address().port}/`);
   const worker = await page.evaluate(async () => {
     const worker = new Worker('/worker.js', { type: 'module' });
     const pending = new Map();
+    // Anything that went wrong without failing a request: worker errors (also after the last reply)
+    // and Error-level window/logMessage or window/showMessage (how the server reports a failing
+    // notification handler). The server's other messages are listed in the report.
+    const problems = [];
+    const serverMessages = [];
     let id = 0;
     worker.onmessage = ({ data }) => {
+      if (data.method !== undefined) {
+        serverMessages.push(data.method);
+        if (
+          (data.method === 'window/logMessage' || data.method === 'window/showMessage') &&
+          data.params?.type === 1
+        )
+          problems.push(`${data.method}: ${data.params.message}`);
+        // A server request must not settle a client request; answer it so the server is not left waiting.
+        if (data.id !== undefined)
+          worker.postMessage({
+            jsonrpc: '2.0',
+            id: data.id,
+            error: { code: -32601, message: `smoke client does not handle ${data.method}` },
+          });
+        return;
+      }
       if (!pending.has(data.id)) return;
       const { resolve, reject, timer } = pending.get(data.id);
       pending.delete(data.id);
@@ -166,18 +213,26 @@ void errors;void renderDataType;void createServerConnection;void synthesize;void
       else resolve(data.result);
     };
     worker.onerror = (event) => {
+      problems.push(`worker error: ${event.message}`);
       for (const p of pending.values()) p.reject(new Error(event.message));
     };
     const request = (method, params) =>
       new Promise((resolve, reject) => {
         const key = ++id;
-        const timer = setTimeout(() => reject(new Error(`Worker request timed out: ${method}`)), 20000);
+        const timer = setTimeout(
+          () => reject(new Error(`Worker request timed out: ${method}`)),
+          20000
+        );
         pending.set(key, { resolve, reject, timer });
         worker.postMessage({ jsonrpc: '2.0', id: key, method, params });
       });
     const notify = (method, params) => worker.postMessage({ jsonrpc: '2.0', method, params });
     try {
-      const init = await request('initialize', { processId: null, rootUri: null, capabilities: {} });
+      const init = await request('initialize', {
+        processId: null,
+        rootUri: null,
+        capabilities: {},
+      });
       const root = 'file:///lsp-smoke';
       await request('modeler/setProjectRoot', { projectRoot: root, manifest: '' });
       notify('textDocument/didOpen', {
@@ -189,9 +244,13 @@ void errors;void renderDataType;void createServerConnection;void synthesize;void
         },
       });
       const symbols = await request('modeler/listSymbols', { kind: 'entity', limit: 50 });
+      // A late error (a timer, a deferred handler) surfaces within this window, before terminate.
+      await new Promise((r) => setTimeout(r, 500));
       return {
         capabilities: Object.keys(init.capabilities ?? {}).length,
         entities: symbols.symbols.map((s) => s.qname),
+        serverMessages,
+        problems,
       };
     } finally {
       worker.terminate();
@@ -202,12 +261,14 @@ void errors;void renderDataType;void createServerConnection;void synthesize;void
     worker.entities.some((q) => q.endsWith('customer')),
     JSON.stringify(worker)
   );
+  assert.deepEqual(worker.problems, [], JSON.stringify(worker));
   assert.deepEqual(errors, []);
   const result = {
     manager,
     artifacts: receipt,
     worker,
     externalTypes: 'Strict NodeNext consumer passed against installed package declarations',
+    typedSubpaths,
     packages: `${receipt.artifacts.length} packed tarballs installed with ${manager} outside the workspace. No workspace links, aliases or worker plugin.`,
   };
   writeFileSync(join(out, 'report.json'), JSON.stringify(result, null, 2) + '\n');
