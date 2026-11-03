@@ -758,8 +758,8 @@ version and copies a standalone Java consumer into a fresh directory under `buil
 published Maven artifacts (no composite builds or mavenLocal) and checks canonical read/write/native
 fixed points, located rejection, offline schemas and the actual runtime closure. Expected schemas come
 from `grammar/v<version>`, falling back to `grammar/v<version>-RELEASE`; if both exist, they must name
-the same source commit. The selected tag must contain canonical YAML schemas (grammar 0.21 or later);
-older public versions such as 0.18.5 are refused. A public tag name alone does not establish schema support.
+the same source commit. The selected tag must contain canonical YAML schemas (grammar 0.21.1 or later);
+0.21.0 and older versions such as 0.18.5 are refused. A public tag name alone does not establish schema support.
 Set `GITHUB_ACTOR`/`GITHUB_TOKEN` for GitHub Packages; otherwise the script uses the existing `gh` login without persisting credentials. `--repository <path>` selects an
 isolated file repository for pre-publication checks. The default is the authenticated internal registry.
 No public registry publish or deployment is involved. Rebuild dependent JVM modules against the chosen

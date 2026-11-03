@@ -106,13 +106,13 @@ export async function runYamlMigration(
   }
   if (options.dryRun) return { writes };
   const staged: { write: YamlMigrationWrite; temp: string }[] = [];
+  const unrenamed = new Set<string>();
   const replaced: string[] = [];
   const replacementError = (path: string, action: string, cause: unknown) =>
     new Error(
       `${path}: ${action} (${errorMessage(cause)}); already replaced: ${replaced.join(', ') || 'none'}`,
       { cause }
     );
-  let failed = false;
   let failure: unknown;
   try {
     // Same-directory temp + rename keeps each replacement atomic. Batch validation is all-or-nothing;
@@ -120,6 +120,7 @@ export async function runYamlMigration(
     for (const write of writes) {
       const temp = `${write.path}.migrate-${randomUUID()}`;
       staged.push({ write, temp });
+      unrenamed.add(temp);
       await writeFile(temp, write.after, {
         encoding: 'utf-8',
         flag: 'wx',
@@ -154,25 +155,20 @@ export async function runYamlMigration(
       } catch (error) {
         throw replacementError(write.path, 'replacement failed', error);
       }
+      unrenamed.delete(temp);
       replaced.push(write.path);
     }
   } catch (error) {
-    failed = true;
     failure = error;
     throw error;
   } finally {
-    const cleanup = await Promise.allSettled(staged.map(({ temp }) => rm(temp, { force: true })));
-    const pending = staged.filter((_, i) => cleanup[i].status === 'rejected').map(({ temp }) => temp);
-    if (pending.length) {
-      if (failed)
-        throw new Error(`${errorMessage(failure)}; could not remove: ${pending.join(', ')}`, {
-          cause: failure,
-        });
-      throw new Error(
-        `could not remove temporary files: ${pending.join(', ')}; already replaced: ${replaced.join(', ') || 'none'}`,
-        { cause: new AggregateError(cleanup.filter((r) => r.status === 'rejected').map((r) => r.reason)) }
-      );
-    }
+    const remaining = [...unrenamed];
+    const cleanup = await Promise.allSettled(remaining.map((temp) => rm(temp, { force: true })));
+    const pending = remaining.filter((_, i) => cleanup[i].status === 'rejected');
+    if (pending.length)
+      throw new Error(`${errorMessage(failure)}; could not remove: ${pending.join(', ')}`, {
+        cause: failure,
+      });
   }
   return { writes };
 }

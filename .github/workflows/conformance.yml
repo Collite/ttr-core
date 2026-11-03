@@ -43,6 +43,10 @@ jobs:
           GIT_DIR: ${{ runner.temp }}/absent-canonical-yaml.git
           GIT_WORK_TREE: ${{ runner.temp }}/absent-canonical-yaml-tree
           GIT_INDEX_FILE: ${{ runner.temp }}/absent-canonical-yaml-index
+          GIT_CONFIG_COUNT: '1'
+          GIT_CONFIG_KEY_0: tag.gpgSign
+          GIT_CONFIG_VALUE_0: 'true'
+          GIT_CONFIG_PARAMETERS: "'commit.gpgsign'='true'"
         run: |
           printf '[commit]\n gpgsign = true\n[tag]\n gpgSign = true\n' > "$GIT_CONFIG_GLOBAL"
           node --test scripts/canonical-yaml-release-tag.test.mjs

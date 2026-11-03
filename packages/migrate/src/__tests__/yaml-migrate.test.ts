@@ -20,6 +20,7 @@ const race = vi.hoisted(() => ({
   failRename: undefined as string | undefined,
   beforeLstat: undefined as ((path: unknown) => void) | undefined,
   failRemove: undefined as { path: string; error: Error } | undefined,
+  removed: [] as string[],
 }));
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
@@ -30,6 +31,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       return actual.lstat(...args);
     },
     rm: async (...args: Parameters<typeof actual.rm>) => {
+      race.removed.push(String(args[0]));
       if (race.failRemove && String(args[0]).startsWith(`${race.failRemove.path}.migrate-`))
         throw race.failRemove.error;
       return actual.rm(...args);
@@ -73,6 +75,7 @@ process.stdout.write(JSON.stringify({ source, changed: source !== r.source }));
     race.failRename = undefined;
     race.beforeLstat = undefined;
     race.failRemove = undefined;
+    race.removed = [];
     chmodSync(root, 0o755);
     rmSync(root, { recursive: true, force: true });
   });
@@ -323,6 +326,21 @@ process.stdout.write(JSON.stringify({source: ${JSON.stringify(after)}, changed: 
     expect(readFileSync(file, 'utf8')).toBe(before);
     expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
   });
+  it('keeps pre-check I/O errors raw and removes staged files', async () => {
+    let calls = 0;
+    race.beforeLstat = (path) => {
+      // Discovery, then the pre-check before any replacement.
+      if (path === file && ++calls === 2) rmSync(file);
+    };
+    const error = await runYamlMigration([file], options()).catch((error: Error) => error);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({
+      message: `ENOENT: no such file or directory, lstat '${file}'`,
+      code: 'ENOENT',
+    });
+    expect((error as Error).message).not.toContain('already replaced');
+    expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
+  });
   it('reports none and retains ENOENT when file 1 disappears at its replacement recheck', async () => {
     let calls = 0;
     race.beforeLstat = (path) => {
@@ -351,21 +369,21 @@ process.stdout.write(JSON.stringify({source: ${JSON.stringify(after)}, changed: 
     expect(readFileSync(second, 'utf8')).toBe(before);
     expect(readdirSync(root).filter((name) => name.includes('.migrate-'))).toHaveLength(1);
   });
-  it('reports only failed cleanup paths after successful replacements, retaining the cleanup cause', async () => {
-    const second = join(root, 'second.yaml');
-    writeFileSync(second, before);
-    const cause = Object.assign(new Error('simulated cleanup failure'), { code: 'EACCES' });
-    race.failRemove = { path: second, error: cause };
-    const error = await runYamlMigration([file, second], options()).catch((error: Error) => error);
-    expect(error).toBeInstanceOf(Error);
-    const message = (error as Error).message;
-    expect(message.startsWith(`could not remove temporary files: ${second}.migrate-`)).toBe(true);
-    expect(message.endsWith(`; already replaced: ${file}, ${second}`)).toBe(true);
-    expect(message).not.toContain(`${file}.migrate-`);
-    expect((error as Error).cause).toBeInstanceOf(AggregateError);
-    expect(((error as Error).cause as AggregateError).errors).toEqual([cause]);
-    expect(readFileSync(file, 'utf8')).toBe(after);
-    expect(readFileSync(second, 'utf8')).toBe(after);
-  });
+  for (const failedCleanup of ['first', 'second']) {
+    it(`does not remove renamed temp paths when ${failedCleanup} temp removal would fail`, async () => {
+      const second = join(root, 'second.yaml');
+      writeFileSync(second, before);
+      race.failRemove = {
+        path: failedCleanup === 'first' ? file : second,
+        error: Object.assign(new Error('simulated cleanup failure'), { code: 'EACCES' }),
+      };
+      const result = await runYamlMigration([file, second], options());
+      expect(result.writes.map((write) => write.path)).toEqual([file, second]);
+      expect(race.removed).toEqual([]);
+      expect(readFileSync(file, 'utf8')).toBe(after);
+      expect(readFileSync(second, 'utf8')).toBe(after);
+      expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
+    });
+  }
 
 });

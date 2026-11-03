@@ -6,6 +6,14 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — Canonical YAML coverage and migration cleanup (ttr-core#374)
+
+- Successful YAML migrations no longer attempt to remove temporary paths already renamed into place.
+  Failed batches still clean remaining temporary files and preserve the original error and completed-file report.
+- Regression coverage pins calc-argument diagnostic order and raw pre-check I/O errors. Release-tag fixtures
+  ignore all inherited Git configuration variables; the documented canonical schema floor is grammar 0.21.1.
+- No JVM runtime change or release cut is included in this follow-up.
+
 ### Fixed — Canonical YAML diagnostic and migration follow-ups (ttr-core#372)
 
 - Native syntax diagnostics use the earliest source position; retained calc arguments prefer an earlier
