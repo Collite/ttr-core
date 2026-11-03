@@ -1,4 +1,7 @@
 // release_order.ttrp — derived from releasing-a-placed-order.md
+// AU-core-P0 shared fixture: AU design `17` §3, verbatim but for the TTR-P comment marker (`#` → `//`).
+// F1: `outage = (out_.warehouse is not null)` — an arg-form `calc` binding's right side is one operand
+// of `=`, so an `is` predicate needs its parentheses.
 uses world "hartland.worlds.demo"
 import hartland.*
 import hartland.automation.*
@@ -23,7 +26,7 @@ recipe {
         out_  = load(er.entity.warehouse_outage) -> filter(from_date <= :as_of and to_date >= :as_of)
         lines -> join(right: stock, kind: left, on: left.item = right.item and left.warehouse = right.warehouse)
               -> join(right: out_,  kind: left, on: left.warehouse = right.warehouse)
-              -> calc(on_hand = coalesce(stock.quantity_on_hand, 0), outage = out_.warehouse is not null)
+              -> calc(on_hand = coalesce(stock.quantity_on_hand, 0), outage = (out_.warehouse is not null))
               -> filter(outage or on_hand < quantity)
               -> select(order_number, line_no, item, quantity, on_hand, outage, short = quantity - on_hand)
               -> rows

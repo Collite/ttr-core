@@ -1,9 +1,10 @@
 # Hartland engine recipes
 
 CG-2 pre-flight fixture for AU design `20-recipes-retyped-engine.md` §1–§4,
-with candidates, context and decision bodies from `17-recipes-retyped.md` §3–§4.
-The four action blocks come from `20`; the recipe bodies retain `17` verbatim
-apart from the native comment marker (`#` → `//`), following the existing hero fixtures.
+with candidates, context and decision bodies from Core’s shared hero recipes
+in the parent directory (including the F1/F2 respellings).
+The four action blocks come from `20`; the bodies above `actions {` are copied
+verbatim from the shared hero recipes, per the planner’s 2026-11-03 correction.
 
 The automation definitions and the world automation members come from `20` §1–§2.
 Native TTR-M notation follows the existing Core fixtures: `package` then `model`,
@@ -22,6 +23,6 @@ ttrp check monitor_inbound.ttrp
 ttrp check settle.ttrp
 ```
 
-The CG-2 list requires these pre-flight checks to fail only on its three new
-attributes before implementation starts. The stage list and PR describe the
-current gate; this directory contains inputs, not generated reports or bundles.
+The published predecessor accepts the attributes silently. Before implementation,
+each check is expected to fail only on the missing `process_engine` executor base.
+CG-2 adds that manifest and carries all four engine attributes into the bundle.

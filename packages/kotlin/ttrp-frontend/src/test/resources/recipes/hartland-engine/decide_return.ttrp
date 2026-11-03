@@ -1,4 +1,8 @@
 // decide_return.ttrp — derived from handling-a-return-request.md §Deciding
+// AU-core-P0 shared fixture: AU design `17` §4.1, verbatim but for the TTR-P comment marker (`#` → `//`).
+// F2: `return_share` is restated without scalar subqueries (TTR-SQL has none, TTRP-SQL-006) — see there.
+// F3 (AU-core-P1 S1.3 T7): 17's `:as_of - 365` is `:as_of - days(365)` — an integer next to a date is read as
+// days with a warning; a duration in an expression is a call.
 uses world "hartland.worlds.demo"
 import hartland.*
 import hartland.automation.*
@@ -12,8 +16,9 @@ recipe {
     candidates received(out lines) target erp """sql
         SELECT l.line_id, l.request_number, l.item, l.quantity, l.unit_price, l.quantity * l.unit_price AS line_value,
                l.reason, l.requested_resolution, l.requested_variant,
-               r.customer, r.order_number, r.requested_date
+               r.customer, c.email AS customer_email, r.order_number, r.requested_date
         FROM   er.entity.return_request_line l JOIN er.entity.return_request r ON r.request_number = l.request_number
+        LEFT JOIN er.entity.customer c ON c.sk = r.customer
         WHERE  l.state = 'received'
     """
 
@@ -27,16 +32,27 @@ recipe {
         LEFT JOIN er.entity.sales_line s ON s.order_number = q.order_number AND s.item = q.item
     """
 
-    // per candidate: the customer's 12-month return share — two correlated aggregates, no fan-out (D-85)
+    // per candidate: the customer's 12-month return share — two per-customer aggregates, no fan-out (D-85).
+    // AU-core-P0 restatement (fixture F2): `17` wrote two correlated scalar subqueries; TTR-SQL's fragment
+    // cut has none (TTRP-SQL-006, C2-b), so each aggregate is a lookup CTE (it reads no candidates port)
+    // left-joined on the candidate's customer — the same value per line, still per candidate.
     context return_share(in lines, out rows) target erp """sql
-        SELECT q.line_id,
-               COALESCE((SELECT SUM(rl.quantity * rl.unit_price)
-                         FROM   er.entity.return_request_line rl JOIN er.entity.return_request rr ON rr.request_number = rl.request_number
-                         WHERE  rr.customer = q.customer AND rr.requested_date >= :as_of - days(365) AND rl.state <> 'rejected'), 0)
-               / NULLIF((SELECT SUM(s.ext_sales_price)
-                         FROM   er.entity.sales_line s
-                         WHERE  s.customer = q.customer AND s.sold_date >= :as_of - days(365)), 0) AS share
+        WITH returned AS (
+            SELECT rr.customer, SUM(rl.quantity * rl.unit_price) AS returned_value
+            FROM   er.entity.return_request_line rl JOIN er.entity.return_request rr ON rr.request_number = rl.request_number
+            WHERE  rr.requested_date >= :as_of - days(365) AND rl.state <> 'rejected'
+            GROUP  BY rr.customer
+        ),
+        bought AS (
+            SELECT s.customer, SUM(s.ext_sales_price) AS bought_value
+            FROM   er.entity.sales_line s
+            WHERE  s.sold_date >= :as_of - days(365)
+            GROUP  BY s.customer
+        )
+        SELECT q.line_id, COALESCE(r.returned_value, 0) / NULLIF(b.bought_value, 0) AS share
         FROM   lines q
+        LEFT JOIN returned r ON r.customer = q.customer
+        LEFT JOIN bought   b ON b.customer = q.customer
     """
 
     // lookup (reads no candidates port): the request's total value from the MODEL, not from the candidates —

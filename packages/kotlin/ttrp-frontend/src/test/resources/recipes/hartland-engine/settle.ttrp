@@ -1,4 +1,5 @@
 // settle.ttrp — derived from handling-a-return-request.md §Outbound
+// AU-core-P0 shared fixture: AU design `17` §4.3, verbatim but for the TTR-P comment marker (`#` → `//`).
 uses world "hartland.worlds.demo"
 import hartland.*
 import hartland.automation.*
