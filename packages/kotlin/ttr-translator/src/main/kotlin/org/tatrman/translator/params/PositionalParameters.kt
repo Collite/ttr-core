@@ -99,11 +99,7 @@ object PositionalParameters {
             // A parametrised write ({name} in the RHS SELECT) carries its ParameterRefs under
             // `store.input`; missing this arm makes positional binding silently drop them.
             PlanNode.NodeCase.STORE -> collectPlan(plan.store.input, acc)
-            PlanNode.NodeCase.ROW_WRITES ->
-                plan.rowWrites.rowsList.forEach { row ->
-                    row.valuesList.forEach { collectExpr(it.value, acc) }
-                    if (row.hasWhere()) collectExpr(row.where, acc)
-                }
+            // Row writes bind by name in RowWriteUnparser, without positional_index.
             // TABLE_SCAN / SCAN / VALUES (Literal cells) / WORKSPACE_REF carry no ParameterRefs.
             else -> Unit
         }

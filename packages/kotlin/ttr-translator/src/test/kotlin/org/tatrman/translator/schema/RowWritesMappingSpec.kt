@@ -311,6 +311,10 @@ class RowWritesMappingSpec :
                 .single()
                 .target shouldBe table
         }
+        test("row writes do not participate in read positional-index collection") {
+            org.tatrman.translator.params.PositionalParameters
+                .namesByIndex(node(update())) shouldBe emptyMap()
+        }
         test("read walkers, fingerprint columns and read-only codecs recognize a row-write root") {
             val input = node(update())
             org.tatrman.translator.joiner.JoinerPlanWalker
