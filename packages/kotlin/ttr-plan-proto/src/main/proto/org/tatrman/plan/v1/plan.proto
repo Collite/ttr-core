@@ -60,6 +60,8 @@ message PlanNode {
     // nests inside another node's input. Unparsed to SQL DML (INSERT…SELECT /
     // MERGE / UPDATE) by the SQL codec; a native kantheon executor is deferred.
     StoreNode       store        = 17;
+    // AU D-163: ordered row DML; root-only, no relational result set.
+    RowWrites       row_writes   = 18;
   }
   reserved 12 to 15;
 }
@@ -226,6 +228,28 @@ message StoreNode {
   reserved 8, 11 to 15;                     // 8 = the removed `technical` fills (review-071 R3): never
                                              // read by any service; provenance rides as constants, and
                                              // version=max+1 will mint its own vocabulary when built.
+}
+
+// AU Server contracts.md, amendment 2026-11-03, "The door's write wire" (D-163).
+// One storage; the worker executes rows in order in ONE transaction.
+message RowWrites { repeated RowWrite rows = 1; }
+message RowWrite {
+  QualifiedName target = 1;       // ER entity before lowering; DB table afterwards
+  RowWriteOp op = 2;
+  repeated ColumnValue values = 3;
+  Expression where = 4;           // key equality plus optional compare-and-set guard
+  bool if_absent = 5;             // INSERT only: ON CONFLICT DO NOTHING
+  repeated string read_before = 6; // locked before UPDATE/DELETE, returned as prior JSON
+}
+enum RowWriteOp {
+  ROW_WRITE_OP_UNSPECIFIED = 0;
+  INSERT = 1;
+  UPDATE = 2;
+  DELETE = 3;
+}
+message ColumnValue {
+  string name = 1;
+  Expression value = 2;           // literal or parameter; always bound, never SQL text
 }
 
 // Writeback spread strategy (contracts §5 R21). Only PROPORTIONAL changes the DML

@@ -196,6 +196,7 @@ object Unfold {
                 plan.union.inputsList
                     .firstOrNull()
                     ?.let(::countOutputColumns) ?: 0
+            PlanNode.NodeCase.STORE, PlanNode.NodeCase.ROW_WRITES -> 0 // No relational result set.
             else -> 0
         }
 
@@ -221,6 +222,7 @@ object Unfold {
                 plan.union.inputsList
                     .firstOrNull()
                     ?.let(::collectOutputNames) ?: emptyList()
+            PlanNode.NodeCase.STORE, PlanNode.NodeCase.ROW_WRITES -> emptyList() // Fingerprints have no read columns.
             else -> emptyList()
         }
 

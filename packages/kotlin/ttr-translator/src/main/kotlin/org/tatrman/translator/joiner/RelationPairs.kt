@@ -99,6 +99,7 @@ internal object RelationPairs {
                     reachesScan(model, plan.join.left, depth) || reachesScan(model, plan.join.right, depth)
                 PlanNode.NodeCase.FILTER -> reachesScan(model, plan.filter.input, depth)
                 PlanNode.NodeCase.PROJECT -> reachesScan(model, plan.project.input, depth)
+                PlanNode.NodeCase.ROW_WRITES -> false
                 else -> false
             }
 

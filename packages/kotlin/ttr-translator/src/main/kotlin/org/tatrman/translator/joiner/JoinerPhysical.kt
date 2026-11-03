@@ -216,6 +216,7 @@ object JoinerPhysical {
                     plan.project.input,
                     listOf(aliasMap(plan.project)) + projections,
                 )
+            PlanNode.NodeCase.ROW_WRITES -> emptyList()
             else -> emptyList()
         }
 

@@ -42,7 +42,7 @@ jobs:
       - name: ttrp-conform suite (offline comparator/invoker) + live A4 proof (HeroConformLiveTest)
         # The live A4 proof (HeroConformLiveTest) lives in ttrp-cli — it needs PlacementVariants
         # (ttrp-cli) + ConformRunner (ttrp-conform); ttrp-conform can't depend on ttrp-cli.
-        run: ./gradlew :packages:kotlin:ttrp-conform:test :packages:kotlin:ttrp-cli:test
+        run: ./gradlew :packages:kotlin:ttrp-conform:test :packages:kotlin:ttrp-cli:test :packages:kotlin:ttr-translator:test
         env:
           TTRP_CONFORM_PG: "1"
           TTRP_CONFORM_POLARS: "1"

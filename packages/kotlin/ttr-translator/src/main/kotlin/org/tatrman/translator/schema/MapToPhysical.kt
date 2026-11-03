@@ -103,12 +103,138 @@ object MapToPhysical {
         visited: Set<QualifiedName>,
     ): PlanNode {
         val withChildren = JoinerPlanWalker.rewriteChildren(plan) { rewrite(it, model, visited) }
+        if (withChildren.nodeCase == PlanNode.NodeCase.ROW_WRITES) return rewriteRowWrites(withChildren, model)
         if (withChildren.nodeCase == PlanNode.NodeCase.PROJECT && withChildren.project.hasExpandedFrom()) {
             return closeBoundary(withChildren)
         }
         if (withChildren.nodeCase != PlanNode.NodeCase.SCAN) return withChildren
         if (withChildren.scan.getObject().schemaCode != SchemaCode.ER) return withChildren
         return rewriteEntityScan(withChildren, model, visited)
+    }
+
+    /** CW: use the read binding, but never guess a column absent from the mapped table. */
+    private fun rewriteRowWrites(
+        plan: PlanNode,
+        model: ModelHandle,
+    ): PlanNode {
+        val rows =
+            plan.rowWrites.rowsList.map { row ->
+                val er = row.target.schemaCode == SchemaCode.ER
+                val mapping = if (er) model.entityMapping(row.target) else null
+                val table =
+                    if (er) {
+                        when (mapping) {
+                            null -> throw MapToPhysicalException(
+                                "entity_unmapped",
+                                "Entity ${qnameToken(row.target)} has no physical mapping",
+                            )
+                            is EntityMapping.ToQuery -> throw MapToPhysicalException(
+                                "mapping_kind_not_supported",
+                                "Row write target ${qnameToken(row.target)} is query-backed",
+                            )
+                            is EntityMapping.ToTable -> {
+                                if (mapping.whereFilter != null) {
+                                    throw MapToPhysicalException(
+                                        "row_writes_filtered_mapping",
+                                        "Row write target ${qnameToken(row.target)} has a binding filter",
+                                    )
+                                }
+                                mapping.table
+                            }
+                        }
+                    } else {
+                        row.target
+                    }
+                if (table.schemaCode !=
+                    SchemaCode.DB
+                ) {
+                    throw MapToPhysicalException(
+                        "row_writes_target_schema",
+                        "Row write target ${qnameToken(table)} must be ER or DB",
+                    )
+                }
+                val columns = model.columns(table).map { it.name }.toSet()
+                if (columns.isEmpty()) {
+                    throw MapToPhysicalException(
+                        "row_writes_target_unmapped",
+                        "Row write target ${qnameToken(table)} has no physical columns",
+                    )
+                }
+                val renames = if (er) model.attributeColumnRenames(row.target) else emptyMap()
+
+                fun column(attr: String): String {
+                    val name = renames[attr] ?: attr
+                    if (name !in columns) {
+                        throw MapToPhysicalException(
+                            "row_writes_attribute_unmapped",
+                            "Attribute $attr on ${qnameToken(
+                                row.target,
+                            )} resolves to missing column $name of ${qnameToken(table)}",
+                        )
+                    }
+                    return name
+                }
+
+                fun expression(expr: Expression): Expression =
+                    when (expr.exprCase) {
+                        Expression.ExprCase.COLUMN_REF ->
+                            expr
+                                .toBuilder()
+                                .setColumnRef(
+                                    expr.columnRef.toBuilder().setName(column(expr.columnRef.name)),
+                                ).build()
+                        Expression.ExprCase.FUNCTION ->
+                            expr
+                                .toBuilder()
+                                .setFunction(
+                                    expr.function
+                                        .toBuilder()
+                                        .clearOperands()
+                                        .addAllOperands(
+                                            expr.function.operandsList.map {
+                                                expression(it)
+                                            },
+                                        ),
+                                ).build()
+                        Expression.ExprCase.CAST ->
+                            expr
+                                .toBuilder()
+                                .setCast(
+                                    expr.cast.toBuilder().setValue(expression(expr.cast.value)),
+                                ).build()
+                        Expression.ExprCase.LITERAL, Expression.ExprCase.PARAMETER -> expr
+                        else -> throw MapToPhysicalException(
+                            "row_writes_expression",
+                            "Unsupported row write expression ${expr.exprCase}",
+                        )
+                    }
+                val result =
+                    row
+                        .toBuilder()
+                        .setTarget(table)
+                        .clearValues()
+                        .clearReadBefore()
+                        .addAllValues(
+                            row.valuesList.map {
+                                it
+                                    .toBuilder()
+                                    .setName(
+                                        column(it.name),
+                                    ).setValue(expression(it.value))
+                                    .build()
+                            },
+                        ).addAllReadBefore(row.readBeforeList.map(::column))
+                if (row.hasWhere()) result.setWhere(expression(row.where))
+                result.build()
+            }
+        return plan
+            .toBuilder()
+            .setRowWrites(
+                plan.rowWrites
+                    .toBuilder()
+                    .clearRows()
+                    .addAllRows(rows),
+            ).build()
     }
 
     private fun rewriteEntityScan(

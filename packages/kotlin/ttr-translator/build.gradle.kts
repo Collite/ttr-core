@@ -41,6 +41,7 @@ dependencies {
 
     testImplementation(libs.bundles.kotest)
     testImplementation(libs.mockk)
+    testImplementation(libs.postgresql) // CW: executed row-write SQL (opt in via TTR_CONN_ERP_PG).
 
     // calcite-ext custom-parser codegen (decision D7) — see the codegen task block below.
     codegenFmpp(libs.fmpp)

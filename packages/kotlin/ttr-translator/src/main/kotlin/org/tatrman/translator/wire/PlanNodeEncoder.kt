@@ -201,6 +201,7 @@ object PlanNodeEncoder {
                     .setStore(
                         plan.store.toBuilder().setInput(stampHints(plan.store.input, hintsByTable)),
                     ).build()
+            PlanNode.NodeCase.ROW_WRITES -> plan // No scans to stamp.
             else -> plan
         }
 

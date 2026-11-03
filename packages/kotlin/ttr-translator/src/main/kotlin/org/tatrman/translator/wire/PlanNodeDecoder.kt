@@ -89,8 +89,8 @@ object PlanNodeDecoder {
             // A StoreNode is a write root with no query-RelNode form; it is intercepted by the DML
             // unparse path (StoreDmlUnparser) before reaching the generic decoder. Its `input` is
             // decoded there, never inline here (that would break RelBuilder stack discipline).
-            PlanNode.NodeCase.STORE -> throw UnsupportedOperationException(
-                "StoreNode has no RelNode form; write plans unparse to DML via StoreDmlUnparser",
+            PlanNode.NodeCase.STORE, PlanNode.NodeCase.ROW_WRITES -> throw UnsupportedOperationException(
+                "Write plans have no RelNode form; use their SQL DML unparser",
             )
             else -> throw UnsupportedOperationException(
                 "PlanNode case '${plan.nodeCase}' is not in the v1 wire format",
