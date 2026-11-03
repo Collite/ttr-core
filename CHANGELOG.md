@@ -6,6 +6,17 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — CG-2 engine attributes (D-144/D-145/D-158/D-161)
+
+- Validate `def action.by` against declared roles and require it for approval-required actions; validate `due`
+  as a whole non-negative duration. Validate every deployment `startable_by` role and executor `egress_url` strings.
+- Carry `by`/`due`, `startableBy` and `egressUrl` through typed metadata, the generated catalog, manifest v3 and
+  the exporter projection. Optional additions are omitted for unaffected bundles. Authoring completions offer them.
+- Ship the data-only `process_engine` capability manifest (C7 capabilities with the grammar-cut ports and sinks).
+  Rendering and deployment remain the exporters' next stage. No grammar production changes; release on 0.22.x.
+- JVM metadata/SPI consumers must rebuild against the new bundle because data-class constructors gain fields.
+
+
 ### Fixed — Canonical YAML coverage and migration cleanup (ttr-core#374)
 
 - Successful YAML migrations no longer attempt to remove temporary paths already renamed into place.
