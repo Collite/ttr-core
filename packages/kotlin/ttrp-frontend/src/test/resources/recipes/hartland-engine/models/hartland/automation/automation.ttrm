@@ -1,0 +1,111 @@
+package hartland.automation
+model automation
+
+// ---- parameters: unchanged from 17 §1 ----
+def parameter tolerance              { type: decimal,  value: 0.01,  label: { en: "Price tolerance", cs: "Cenová tolerance" } }
+def parameter confirmation_threshold { type: decimal,  value: 50000, label: { en: "Confirmation threshold", cs: "Limit pro potvrzení" } }
+def parameter return_window          { type: days,     value: 30 }
+def parameter abuse_share            { type: decimal,  value: 0.40 }
+def parameter small_value            { type: decimal,  value: 15 }
+def parameter care_threshold         { type: decimal,  value: 500 }
+def parameter inbound_reminder       { type: days,     value: 14 }
+def parameter inbound_close          { type: days,     value: 30 }
+def parameter settlement             { type: working_days, value: 5 }
+
+// ---- actions: writer sinks unchanged; engine actions carry no native sink ----
+def action release {
+    columns:    [def column order { type: order.order_number }]
+    transition: order.state -> released { from: [placed, held] }
+    sinks:      { native: transition, n8n: door, process_engine: door }
+    approval:   none
+    dry_run:    { en: "would release order {order}", cs: "uvolnil by objednávku {order}" }
+}
+def action release_confirmed {                                   // was: ask { who: sales_manager, action: release, due, on_due }
+    columns:    [def column order { type: order.order_number }, def column value { type: order.value }]
+    transition: order.state -> released { from: [placed, held] }
+    sinks:      { native: transition, n8n: door, process_engine: door }
+    approval:   required
+    by:         role.sales_manager                                // → user task, candidateGroups = hartland-sales-managers (D-161)
+    due:        2 working_days                                    // → the user task's due date; the fallback is BPMN (rule 2)
+    dry_run:    { en: "would ask {by} to confirm the release of {order} ({value})" }
+}
+def action hold {
+    columns:    [def column order { type: order.order_number }, def column department { type: text }]
+    set:        order.held_for = department
+    transition: order.state -> held { from: placed }              // held → held implicit silent self-transition (D-85)
+    sinks:      { native: transition, n8n: door, process_engine: door }
+    approval:   none
+    dry_run:    { en: "would hold order {order} for {department}" }
+}
+def action notify {                                               // engine action: the BPMN's send task (D-148)
+    columns:    [def column who { type: role }, def column detail { type: rows }, def column template { type: text, optional: true }]
+    sinks:      { process_engine: "send task", n8n: "n8n-nodes-base.emailSend", hebe: message }
+    approval:   none
+    dry_run:    { en: "would notify {who} with {detail.count} rows" }
+}
+def action notify_customer {                                      // engine action
+    columns:    [def column customer { type: customer.customer_sk }, def column template { type: text }]
+    sinks:      { process_engine: "send task", n8n: "n8n-nodes-base.emailSend" }
+    approval:   none
+}
+def action review {                                               // was: task { who, about, detail } — a user task with no transition
+    columns:    [def column who { type: role }, def column about { type: text }, def column detail { type: rows, optional: true }]
+    sinks:      { process_engine: "user task", hebe: task, n8n: door }
+    approval:   none
+}
+def action set_state {
+    columns:    [def column line { type: return_request_line.line_id }, def column to { type: text }, def column way { type: text, optional: true }]
+    transition: return_request_line.state -> {to}
+    set:        return_request_line.way = way
+    sinks:      { native: transition, n8n: door, process_engine: door }
+    approval:   none
+}
+def action decide_way {                                           // was: ask { who: customer_care, action: set_state, group_by: request }
+    columns:    [def column line { type: return_request_line.line_id }, def column request { type: return_request.request_number },
+                 def column to { type: text }, def column way { type: text }]
+    transition: return_request_line.state -> {to}
+    set:        return_request_line.way = way
+    sinks:      { native: transition, process_engine: door }
+    approval:   required
+    by:         role.customer_care
+    due:        3 working_days
+}
+def action expect {
+    columns:    [def column line { type: return_request_line.line_id }, def column kind { type: text }, def column due { type: date }]
+    sinks:      { native: obligation }
+    approval:   none
+}
+def action fulfil {
+    columns:    [def column line { type: return_request_line.line_id }, def column kind { type: text }, def column to { type: text } ]
+    transition: obligation.state -> {to}                          // no signal — the BPMN loop notices (D-147)
+    sinks:      { native: obligation }
+    approval:   none
+}
+// removed: def action ask · def action task · def action start (the outbound face is a BPMN call activity / message, D-142)
+
+// ---- roles: no delivery addresses (D-142); approvals of rule changes unchanged (D-13) ----
+def role sales          { resolve: keycloak_group "hartland-sales" }
+def role ar             { resolve: keycloak_group "hartland-ar" }
+def role sales_manager  { resolve: keycloak_group "hartland-sales-managers" }     // Maya
+def role customer_care  { resolve: keycloak_group "hartland-care" }
+def role finance        { resolve: keycloak_group "hartland-finance" }
+def role logistics      { resolve: keycloak_group "hartland-logistics" }
+def role process_owner  { resolve: keycloak_group "hartland-process-owners" }
+def role ops            { resolve: keycloak_group "hartland-ops" }
+
+def approval recipe     { by: role.process_owner, quorum: 1 }
+def approval values     { by: role.process_owner, quorum: 1 }
+def approval program    { by: role.process_owner, quorum: 1 }
+def approval deployment { by: role.ops,           quorum: 1 }
+
+// ---- programs: mode and port only; no deliver / schedule / event (rule 4) ----
+def program morning_release        { recipe: release_order,   port: none, mode: batch,    as_of: run }
+def program release_on_placement   { recipe: release_order,   port: key,  mode: on_event, as_of: event }
+
+def program decide_on_request      { recipe: decide_return,   port: key,  mode: on_event, as_of: event }
+def program decide_catch_up        { recipe: decide_return,   port: none, mode: batch,    as_of: run }
+def program inbound_on_receipt     { recipe: monitor_inbound, port: key,  mode: on_event, as_of: event }
+def program inbound_daily          { recipe: monitor_inbound, port: none, mode: batch,    as_of: run }
+def program settle_on_document     { recipe: settle,          port: key,  mode: on_event, as_of: event }
+def program settle_daily           { recipe: settle,          port: none, mode: batch,    as_of: run }
+// removed: def schema line_received / receipt_posted / settlement_posted — the ERP's events are engine messages (D-143)

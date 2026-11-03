@@ -36,6 +36,7 @@ object RecipeCatalogEmitter {
         detailColumns: List<OutputColumn>,
         document: String?,
         fingerprints: RecipeFingerprints,
+        engine: RecipeEngineMetadata = RecipeEngineMetadata(),
     ): Catalog {
         val name = model.name
         val pkg = (model.programPackage ?: "automation") + ".generated"
@@ -55,6 +56,35 @@ object RecipeCatalogEmitter {
                 append("    kinds: ${list(model.kinds.map { str(it) })},\n")
                 append("    mode: ${str(model.mode.spelling)},\n")
                 document?.let { append("    document: ${str(it)},\n") }
+                engine.actions?.let { actions ->
+                    append("    actions: ")
+                    append(
+                        actions.entries.joinToString(", ", "{ ", " },\n") { (name, action) ->
+                            val entries =
+                                listOfNotNull(
+                                    action.by?.let { "by: $it" },
+                                    action.due?.let { "due: ${it.amount} ${it.unit}" },
+                                )
+                            "$name: ${entries.joinToString(", ", "{ ", " }") }"
+                        },
+                    )
+                }
+                engine.deployments?.let { deployments ->
+                    append("    deployments: ")
+                    append(
+                        deployments.entries.joinToString(", ", "{ ", " },\n") { (name, deployment) ->
+                            "$name: { startable_by: ${list(deployment.startableBy)} }"
+                        },
+                    )
+                }
+                engine.executors?.let { executors ->
+                    append("    executors: ")
+                    append(
+                        executors.entries.joinToString(", ", "{ ", " },\n") { (name, executor) ->
+                            "$name: { egress_url: ${str(executor.egressUrl)} }"
+                        },
+                    )
+                }
                 append(
                     "    fingerprints: { text: ${str(fingerprints.text)}, values: ${str(fingerprints.values)}, " +
                         "labels: ${str(fingerprints.labels)} }\n",
@@ -115,6 +145,12 @@ object RecipeCatalogEmitter {
         )
         sb.append("\n    ]\n}\n")
     }
+
+    private fun number(value: Double) =
+        java.math.BigDecimal
+            .valueOf(value)
+            .stripTrailingZeros()
+            .toPlainString()
 
     private fun list(items: List<String>) = items.joinToString(", ", "[", "]")
 

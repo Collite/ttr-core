@@ -1,0 +1,45 @@
+package hartland.worlds
+model world
+
+def world demo {
+    def engine erp        { type: postgres }
+    def engine automation { type: postgres }
+
+    def storage erp_db        { type: postgres, via: erp, hosts: [hartland],
+                                writable: [order.state, order.held_for, return_request_line.state, return_request_line.way,
+                                           reorder_proposal, winback_mail] }
+    def storage automation_db { type: postgres, via: automation,
+                                writable: [obligation, state_history, "*_verdict", "*_verdict_detail", approvals] }
+    def storage stage         { type: local_dir, staging: true }
+
+
+    def identity automation_decider { principal: "svc-hartland-automation", credential: TTR_CONN_AUTOMATION_DECIDER }   // D-132
+    def identity process_engine     { principal: "process-engine",          credential: TTR_CONN_PROCESS_ENGINE }       // the engine's own client (D-150)
+    def identity maya               { principal: "persona-maya",            credential: TTR_CONN_PERSONA_MAYA }         // F1d persona (D-158)
+
+    def executor engine { extends: process_engine, url: "http://process-engine.<ns>.svc/engine-rest",
+                          egress_url: "http://process-engine-egress/automation", connection: engine_bp_dsk }         // D-145, D-158
+    def executor n8n    { extends: n8n_l1, url: "https://n8n.hartland…", connection: n8n_hartland }
+    def executor py     { extends: python_client }
+    // removed: def executor bpmn { extends: camunda_8 } (file-only target) — the engine target deploys (D-145)
+
+    def grant { who: identity.process_engine, program: *,                    as: identity.automation_decider }   // F1a (D-158)
+    def grant { who: role.ops,                program: *,                    as: identity.automation_decider }
+    def grant { who: role.sales_manager,      program: release_on_placement, as: identity.maya }                  // "release 4711" from Hebe runs as Maya's persona
+    def grant { who: role.process_owner,      program: *,                    as: identity.automation_decider }   // debug runs (D-93)
+
+    // H-1 — one program per deployment; the timer / message start lives in the BPMN
+    def deployment release_morning  { program: morning_release,      target: engine, run_as: identity.automation_decider }
+    def deployment release_event    { program: release_on_placement, target: engine, run_as: identity.automation_decider, startable_by: role.sales_manager }
+    def deployment release_n8n      { program: release_on_placement, target: n8n,    run_as: identity.automation_decider, granularity: parts }
+    def deployment release_py       { program: release_on_placement, target: py,     run_as: identity.automation_decider }
+
+    // H-2 — three on_event deployments the authored `returns.bpmn` calls, three batch deployments the catch-up timer calls
+    def deployment decide_event     { program: decide_on_request,  target: engine, run_as: identity.automation_decider }
+    def deployment inbound_event    { program: inbound_on_receipt, target: engine, run_as: identity.automation_decider }
+    def deployment settle_event     { program: settle_on_document, target: engine, run_as: identity.automation_decider }
+    def deployment decide_batch     { program: decide_catch_up,    target: engine, run_as: identity.automation_decider }
+    def deployment inbound_batch    { program: inbound_daily,      target: engine, run_as: identity.automation_decider }
+    def deployment settle_batch     { program: settle_daily,       target: engine, run_as: identity.automation_decider }
+    // removed: def process return_line_flow + deployment returns_n8n — the flow is hartland/processes/returns.bpmn (rule 5)
+}

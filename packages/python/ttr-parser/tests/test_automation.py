@@ -154,3 +154,25 @@ def test_automation_number_keeps_its_text() -> None:
     assert isinstance(p, AutomationDef)
     value = _entry(p.body.entries, "value")
     assert isinstance(value, AutoNum) and value.raw == 0.4 and value.text == "0.40"
+
+
+def test_engine_attributes_use_existing_generic_ast() -> None:
+    action = parse_string("model automation\ndef action release { by: role.manager, due: 2 working_days }")
+    assert action.errors == ()
+    definition = action.definitions[0]
+    assert isinstance(definition, AutomationDef)
+    by = _entry(definition.body.entries, "by")
+    assert isinstance(by, AutoId) and by.parts == ("role", "manager")
+    due = _entry(definition.body.entries, "due")
+    assert isinstance(due, AutoDuration) and (due.amount, due.unit) == (2.0, "working_days")
+    world = parse_string('model world\ndef world demo { def executor engine { egress_url: "http://egress/automation" } def deployment run { startable_by: [role.manager, role.ops] } }')
+    assert world.errors == ()
+    w = world.definitions[0]
+    assert isinstance(w, WorldDef)
+    from ttr_parser.model import AutoList, StringValue
+
+    assert isinstance(w.executors[0].manifest["egress_url"], StringValue)
+    assert w.executors[0].manifest["egress_url"].raw == "http://egress/automation"
+    startable = _entry(w.deployments[0].body.entries, "startable_by")
+    assert isinstance(startable, AutoList)
+    assert [value.parts for value in startable.items if isinstance(value, AutoId)] == [("role", "manager"), ("role", "ops")]

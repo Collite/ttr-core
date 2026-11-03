@@ -98,6 +98,15 @@ data class WorldExecutor(
     val sourceLocation: SourceLocation? = null,
 ) : ModelObject {
     override val kind: String = "executor"
+
+    /** Engine egress endpoint (D-158), retained in the manifest's raw property map too. */
+    val egressUrl: String?
+        get() =
+            when (val value = manifest["egress_url"]) {
+                is PropertyValue.StringValue -> value.raw
+                is PropertyValue.TripleStringValue -> value.raw
+                else -> null
+            }
 }
 
 data class WorldStorage(

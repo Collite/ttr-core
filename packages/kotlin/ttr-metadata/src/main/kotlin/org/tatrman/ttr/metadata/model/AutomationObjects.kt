@@ -125,6 +125,8 @@ data class AutomationAction(
     val due: AutomationDuration? = null,
     /** The `dry_run:` text, `{ en: …, cs: … }`. */
     val dryRun: LocalizedText = LocalizedText.EMPTY,
+    /** Approving role; required for `approval: required` (D-144/D-161). */
+    val byRole: String? = null,
 ) : AutomationObject {
     override val kind: String = "action"
 }
@@ -367,6 +369,8 @@ data class WorldDeployment(
     val oboOnly: Boolean = false,
     val properties: List<Pair<String, AutoValue>> = emptyList(),
     val sourceLocation: SourceLocation? = null,
+    /** Null when absent; an explicitly empty list permits no role to start it (D-161). */
+    val startableBy: List<String>? = null,
 ) : ModelObject {
     override val kind: String = "deployment"
 }

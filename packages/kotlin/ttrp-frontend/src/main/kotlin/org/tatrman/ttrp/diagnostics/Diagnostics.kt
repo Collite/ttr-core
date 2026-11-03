@@ -103,6 +103,13 @@ enum class TtrpDiagnosticId(
     ),
 
     // ---- AU-core-P1 — the recipe checker (AU contracts §4): roles, wiring, parameters, key lineage, time ----
+    ACT_001(
+        "TTRP-ACT-001",
+        "declare `by: role.<name>` on an approval-required action and resolve it against `def role`",
+    ),
+    ACT_002("TTRP-ACT-002", "use `startable_by: role.<name>` or a list of declared roles"),
+    ACT_003("TTRP-ACT-003", "use a whole, non-negative duration, for example `2 working_days`"),
+    ACT_004("TTRP-ACT-004", "write `egress_url:` as a string"),
     REC_000("TTRP-REC-000", "one recipe per file, and no `program` beside it"),
     REC_001(
         "TTRP-REC-001",

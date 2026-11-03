@@ -497,7 +497,7 @@ class WriterDefaultFingerprintsSpec :
                     { it.replace("expression: \"'released'\"", "context: started_at") },
                     { it.replace("type: order.state, optional: true", "type: order.held_for, optional: true") },
                     { it.replace("sinks: { native: writer }", "sinks: { native: transition }") },
-                    { it.replace("approval: none", "approval: required") },
+                    { it.replace("approval: none", "approval: required\n    by: role.process_owner") },
                     // Every directly wired action is covered once a recipe uses defaults, not only the writer.
                     { it.replace("order.held_for = department", "order.state = department") },
                 )

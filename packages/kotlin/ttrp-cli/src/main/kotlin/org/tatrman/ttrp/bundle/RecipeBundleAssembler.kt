@@ -146,6 +146,9 @@ class RecipeBundleAssembler(
             checkNotNull(RecipeActionDependencies.wiredActions(plan, model)) {
                 "recipe `${model.name}` has no checked automation scope"
             }
+        val engine =
+            org.tatrman.ttrp.emit.recipe.RecipeEngineMetadata
+                .capture(plan, model, actions)
         val captured = RecipeFingerprints.capture(plan, model, model.protocol, model.asOf, actions)
         val fingerprints = captured.fingerprints
         val keyTypes = keyTypes(model, statements)
@@ -185,6 +188,7 @@ class RecipeBundleAssembler(
                 detailColumns,
                 model.document,
                 fingerprints,
+                engine,
             )
         write(bundleDir, catalog.recipeFile, catalog.recipeText, files)
         write(bundleDir, catalog.verdictFile, catalog.verdictText, files)
@@ -282,6 +286,9 @@ class RecipeBundleAssembler(
                 parts = parts.ifEmpty { null },
                 tests = tests.ifEmpty { null },
                 approvalDependencies = captured.approvalDependencies,
+                actions = engine.actions,
+                deployments = engine.deployments,
+                executors = engine.executors,
             )
 
         val readme =

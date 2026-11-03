@@ -229,3 +229,14 @@ describe('validateAutomationProject (grammar 0.16)', () => {
     expect(schema.resolved && schema.symbol.qname).toBe('hartland.automation.db.dbo.schema.line_received');
   });
 });
+
+
+it('CG-2 checks by and every startable_by role, and requires approval by', () => {
+  const action = parseString('model automation\ndef role manager { members: ["maya"] }\ndef action release { columns: [def column x { type: text }], sinks: { native: writer }, approval: required, by: role.nobody }\ndef program p { recipe: r, port: none, mode: batch }');
+  const world = parseString('model world\ndef world demo { def executor engine { extends: native } def deployment d { program: p, target: engine, run_as: caller, startable_by: [role.manager, role.absent] } }');
+  expect(action.errors).toEqual([]);
+  expect(world.errors).toEqual([]);
+  expect(validateAutomationProject([action.ast!, world.ast!]).filter((d) => d.severity !== 'info').map((d) => d.code)).toEqual(['ttr/automation-unknown-reference', 'ttr/automation-unknown-reference']);
+  const missing = parseString('model automation\ndef action a { columns: [def column x { type: text }], sinks: { native: writer }, approval: required }');
+  expect(validateAutomationProject([missing.ast!]).find((d) => d.message.includes('by'))?.code).toBe('ttr/automation-missing-property');
+});

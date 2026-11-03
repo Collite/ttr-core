@@ -6,6 +6,19 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — CG-2 engine attributes (D-144/D-145/D-158/D-161)
+
+- Validate `def action.by` against declared roles and require it for approval-required actions; validate `due`
+  as a whole non-negative duration. Validate every deployment `startable_by` role; `ttrp check` validates executor `egress_url` strings (ACT-004).
+- Carry `by`/`due`, `startableBy` and `egressUrl` through typed metadata, the generated catalog, manifest v3 and
+  the exporter projection. Optional additions are omitted when absent. Authoring completions offer them.
+- A bundle keeps its bytes when its wired actions declare no `by`/`due`, and its deployments and their executors
+  declare no `startable_by`/`egress_url`. A `due:` written before CG-2 now adds `recipe.actions.<a>.due` and the
+  catalog's `actions:` line.
+- Ship the data-only `process_engine` capability manifest (C7 capabilities with the grammar-cut ports and sinks).
+  Rendering and deployment remain the exporters' next stage. No grammar production changes; release on 0.22.x.
+- JVM metadata/SPI consumers must rebuild against the new bundle because data-class constructors gain fields.
+
 ### Removed — Designer family moved to ttr-platform (D-33 Studio Free)
 
 - The four GUI packages (`packages/designer` = `@tatrman/designer-core`, `packages/canvas-core`, `packages/perspectives`,

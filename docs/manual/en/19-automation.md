@@ -313,3 +313,46 @@ Exit codes are **0** for agreement/seeds/world skips, **3** for disagreement, an
 HTTP errors. The JSON report identifies every cell and its missing/extra rows. The current local HTTP
 suite uses contract-derived responses; the captured Server H-1 responses and live Hartland certification
 are required before AU-export P0 exits.
+
+### Engine attributes (CG-2)
+
+`def action.by: role.<name>` names the group that approves an action. It is required
+when `approval: required`; the role must have a `def role` declaration. The compiler
+reports `TTRP-ACT-001` for a missing, malformed or unknown approving role. The
+engine uses this role for its user task's candidate group (D-144/D-161).
+
+`def action.due: 2 working_days` sets the engine user task's due date (D-144).
+The optional duration must have a whole, non-negative amount and a unit of
+`seconds`, `minutes`, `hours`, `days`, `working_days`, `weeks` or `months`.
+Invalid values produce `TTRP-ACT-003`. A timer boundary and its fallback remain
+part of the authored BPMN process. This is the action's declared default (D-98).
+A wiring call's `due:` wins for that call and is carried in `wiring[].columns.due`.
+
+`def deployment.startable_by: role.sales_manager` limits who can start that
+deployment (D-161). A list such as `[role.sales_manager, role.ops]` is also accepted;
+every entry must resolve to a declared role (`TTRP-ACT-002`). An explicit empty
+list is retained and permits no role to start the deployment. Absence leaves
+start permissions unspecified. `recipe.deployments` is a build-time copy for exporters.
+No bundle fingerprint covers deployments, so the start check reads `startable_by`
+from the live world, never from a bundle.
+
+`def executor.egress_url: "http://process-engine-egress/automation"` declares the
+engine's egress endpoint (D-158). The optional value must be a string
+(`TTRP-ACT-004`); the compiler carries it as data for consumers.
+
+The `process_engine` executor type (D-145) ships a capability manifest. Declare
+`def executor engine { extends: process_engine }` inside the world. It supports
+`none`, `key` and `keys` ports and the C7 modes, kinds and control capabilities;
+its sinks include `user: "user task"` and `call: "call activity"` and exclude the
+removed `task`, `ask`, `start` and `wait` sinks. Rendering and deployment belong
+to the exporters' adoption stage.
+
+Manifest v3 adds optional `recipe.actions` (`by`, `due: { amount, unit }`),
+`recipe.deployments` (`startableBy`) and `recipe.executors` (`egressUrl`) maps.
+Role references retain their `role.` prefix. The generated recipe catalog carries
+the same data with TTR-M property spelling. Empty additions are omitted.
+A bundle keeps its bytes when its wired actions declare no `by`/`due`, and its deployments and their executors
+declare no `startable_by`/`egress_url`. A `due:` written before CG-2 now adds `recipe.actions.<a>.due` and the
+catalog's `actions:` line. JVM consumers must
+rebuild against the released grammar bundle because metadata and SPI data-class
+constructors gain fields; the grammar remains 0.22.

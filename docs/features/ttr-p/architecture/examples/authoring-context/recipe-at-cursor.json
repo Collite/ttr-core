@@ -3319,6 +3319,26 @@
       "suggestedAlternative": "the time sugar (`latest`, `within`, `working_days`, `age`) compiles with a recipe — move the op into a recipe's island, or spell it with the base ops"
     },
     {
+      "id": "TTRP-ACT-001",
+      "area": "ACT",
+      "suggestedAlternative": "declare `by: role.<name>` on an approval-required action and resolve it against `def role`"
+    },
+    {
+      "id": "TTRP-ACT-002",
+      "area": "ACT",
+      "suggestedAlternative": "use `startable_by: role.<name>` or a list of declared roles"
+    },
+    {
+      "id": "TTRP-ACT-003",
+      "area": "ACT",
+      "suggestedAlternative": "use a whole, non-negative duration, for example `2 working_days`"
+    },
+    {
+      "id": "TTRP-ACT-004",
+      "area": "ACT",
+      "suggestedAlternative": "write `egress_url:` as a string"
+    },
+    {
       "id": "TTRP-REC-000",
       "area": "REC",
       "suggestedAlternative": "one recipe per file, and no `program` beside it"

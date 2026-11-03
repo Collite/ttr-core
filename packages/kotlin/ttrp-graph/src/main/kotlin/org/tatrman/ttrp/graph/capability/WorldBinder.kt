@@ -112,6 +112,15 @@ class WorldBinder(
     companion object {
         /** The automation executor types (AU exporters contracts §1, spelled as TTR-M ids). */
         val AUTOMATION_EXECUTOR_TYPES =
-            setOf("native", "n8n_l1", "camunda_7", "camunda_8", "python_client", "python_offline", "sql_job")
+            setOf(
+                "native",
+                "n8n_l1",
+                "camunda_7",
+                "camunda_8",
+                "process_engine",
+                "python_client",
+                "python_offline",
+                "sql_job",
+            )
     }
 }

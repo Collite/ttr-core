@@ -53,6 +53,16 @@ data class RecipeManifest(
     val tests: List<String>? = null,
     /** Native preview dependencies v1; absent for recipes with no directly wired writer defaults. */
     val approvalDependencies: RecipeApprovalDependencies? = null,
+    /** CG-2 engine action metadata; absent when no wired action declares `by` or `due`. */
+    val actions: Map<String, RecipeAction>? = null,
+    /**
+     * Start permissions for deployments of this recipe's programs (D-161).
+     * This is a build-time copy for exporters. No bundle fingerprint covers deployments, so the start check
+     * reads `startable_by` from the live world, never from a bundle.
+     */
+    val deployments: Map<String, RecipeDeployment>? = null,
+    /** Egress endpoints of the executors those deployments target (D-158). */
+    val executors: Map<String, RecipeExecutor>? = null,
 )
 
 /** Explicit coverage evidence, bound into text/2. Consumers must verify it against pinned action/ER metadata. */
@@ -162,4 +172,31 @@ data class RecipeFingerprints(
     val text: String,
     val values: String,
     val labels: String,
+)
+
+/** Additive engine metadata in manifest v3 (D-144/D-158/D-161). Role refs keep the `role.` prefix. */
+@Serializable
+data class RecipeAction(
+    val by: String? = null,
+    /**
+     * The action's declared default (D-98). A wiring call's `due:` wins for that call and is carried in
+     * `wiring[].columns.due`.
+     */
+    val due: RecipeDuration? = null,
+)
+
+@Serializable
+data class RecipeDuration(
+    val amount: Long,
+    val unit: String,
+)
+
+@Serializable
+data class RecipeDeployment(
+    val startableBy: List<String>,
+)
+
+@Serializable
+data class RecipeExecutor(
+    val egressUrl: String,
 )

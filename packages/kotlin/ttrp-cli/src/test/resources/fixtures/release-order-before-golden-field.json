@@ -822,10 +822,19 @@
       "values": "sha256:54e165c4463646ed8b9ae490dc1a830b34e76dda883caa0f3df407699c7ae888",
       "labels": "sha256:c5c1b1d184cae956a8f24a43ddc346019550d754206b1069f367e4a977006ac0"
     },
-    "protocol": "always"
+    "protocol": "always",
+    "actions": {
+      "ask": {
+        "by": "role.process_owner",
+        "due": {
+          "amount": 2,
+          "unit": "working_days"
+        }
+      }
+    }
   },
   "files": {
-    "catalog/release_order.ttrm": "sha256:b96a8f28750313e960d2f324fe19aaeca67a10423c0fcebd27f315fa39c3f57a",
+    "catalog/release_order.ttrm": "sha256:092e6ff5914d9ce49624f0e9fdb6503522f5f01435b99c402d87bcca550a3fcd",
     "catalog/release_order_verdict.ttrm": "sha256:1172675861546a966ea9a1daca8c805386898e3dec5bd81790dd6739123f8909",
     "islands/overdue.rows.sql": "sha256:3730c48e4975b3a5052a7e1a246a7c02f3c783c51505461e037842f503e6755a",
     "islands/placed_orders.orders.sql": "sha256:87fc1d71dba0be2a03e674da6d79188432e2ec439625472e0c33201c7e640ce0",

@@ -178,3 +178,16 @@ describe('grammar 0.16 — model automation', () => {
     expect(entry(ast!.definitions[0] as AutomationDef, 'value')).toMatchObject({ kind: 'number', value: 0.4, raw: '0.40' });
   });
 });
+
+it('CG-2 carries engine attributes through the generic AST without grammar changes', () => {
+  const action = parseString('model automation\ndef action release { by: role.manager, due: 2 working_days }');
+  expect(action.errors).toEqual([]);
+  const def = action.ast!.definitions[0] as AutomationDef;
+  expect(entry(def, 'by')).toMatchObject({ kind: 'id', path: 'role.manager' });
+  expect(entry(def, 'due')).toMatchObject({ kind: 'duration', amount: 2, unit: 'working_days' });
+  const world = parseString('model world\ndef world demo { def executor engine { egress_url: "http://egress/automation" } def deployment run { startable_by: [role.manager, role.ops] } }');
+  expect(world.errors).toEqual([]);
+  const w = world.ast!.definitions[0] as WorldDef;
+  expect(w.executors![0].manifest!['egress_url']).toMatchObject({ kind: 'string', value: 'http://egress/automation' });
+  expect(entry(w.deployments![0], 'startable_by')).toMatchObject({ kind: 'autoList', items: [{ path: 'role.manager' }, { path: 'role.ops' }] });
+});

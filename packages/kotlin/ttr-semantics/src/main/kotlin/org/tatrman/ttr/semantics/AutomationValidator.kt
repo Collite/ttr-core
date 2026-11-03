@@ -51,6 +51,8 @@ data class AutomationDiagnostic(
  */
 object AutomationValidator {
     private val PARAMETER_TYPES = setOf("decimal", "int", "text", "date", "days", "working_days", "bool")
+
+    // Keep aligned with EngineAttributes.UNITS and the TypeScript duration() validator.
     private val DURATION_UNITS = setOf("seconds", "minutes", "hours", "days", "working_days", "weeks", "months")
     private val COLUMN_TYPES = setOf("text", "int", "decimal", "date", "timestamp", "bool", "rows", "role", "action")
     private val NATIVE_SINKS = setOf("transition", "writer", "obligation")
@@ -81,7 +83,7 @@ object AutomationValidator {
     private val KNOWN =
         mapOf(
             "parameter" to setOf("value"),
-            "action" to setOf("sinks", "approval", "deliverable", "due", "dry_run"),
+            "action" to setOf("sinks", "approval", "by", "deliverable", "due", "dry_run"),
             "service" to setOf("request", "response", "timeout", "budget", "write", "idempotency"),
             "approval" to setOf("by", "quorum"),
             "program" to
@@ -89,7 +91,13 @@ object AutomationValidator {
             "role" to setOf("resolve", "members"),
             "identity" to setOf("principal", "credential"),
             "grant" to setOf("who", "program", "as"),
-            "deployment" to setOf("program", "run_as", "granularity", "read_ceiling") + DEPLOYMENT_FLAGS,
+            "deployment" to setOf(
+                "program",
+                "run_as",
+                "granularity",
+                "read_ceiling",
+                "startable_by",
+            ) + DEPLOYMENT_FLAGS,
         )
 
     /**
@@ -299,6 +307,15 @@ object AutomationValidator {
                 else -> shape(what, "sinks", "an object `{ native: …, <target>: … }`", sinks)
             }
             body["approval"]?.let { enumId(what, "approval", it, setOf("none", "required")) }
+            when (val by = body["by"]) {
+                null ->
+                    if ((body["approval"] as? AutoValue.Id)?.ref?.path ==
+                        "required"
+                    ) {
+                        missing(what, "by", def.source)
+                    }
+                else -> roleRef(what, "by", by)
+            }
             body["deliverable"]?.let { bool(what, "deliverable", it) }
             body["due"]?.let { duration(what, "due", it) }
             body["dry_run"]?.let {
@@ -683,6 +700,10 @@ object AutomationValidator {
             commonEntries("deployment", what, d.body)
             misplaced("deployment", what, d.body, d.source)
             removed("deployment", what, d.body.entries)
+            d.body["startable_by"]?.let { value ->
+                val refs = if (value is AutoValue.ListV) value.items else listOf(value)
+                refs.forEach { roleRef(what, "startable_by", it) }
+            }
             val program = d.body["program"]
             // a deployment that ran a process (`process:`, refused by [removed]) is not also told it lacks a program
             if (program == null && d.body["process"] == null) missing(what, "program", d.source)

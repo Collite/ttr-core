@@ -12,6 +12,13 @@ The canonical version lives in the `// @grammar-version:` marker at the top of
 `src/generated/version.ts`, re-exported from `@tatrman/grammar` as
 `TTR_GRAMMAR_VERSION`.
 
+## 0.22.x — CG-2 engine attributes (D-144/D-145/D-158/D-161)
+
+No grammar productions or AST shapes change: `by`, `due`, `startable_by` and `egress_url` already parse through
+free-form entries on all three targets. The checker validates their types and role references; metadata, the catalog,
+manifest v3 and exporter projection retain them. The shipped `process_engine` executor manifest advertises the
+post-cut capabilities. JVM consumers must rebuild for the metadata/SPI constructor additions.
+
 ## 0.22 — the grammar cut (AU-core CG, D-142)
 
 The process engine in the estate owns flow, waits, human tasks, schedules and delivery (D-141…D-148); the automation
