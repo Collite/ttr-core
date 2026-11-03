@@ -26,12 +26,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm -r build
-      # FO-21 wall (FO-P0.S2): the open `@tatrman/designer` build IS the Studio
-      # Viewer — it must ship no edit-surface code. Greps the built bundle for the
-      # `@tatrman/edit` specifier, edit-affordance text, and edit-RPC method names
-      # (the LSP worker is excluded — its WorkspaceEdit synthesis stays open). Runs
-      # after `pnpm -r build` so the designer dist exists.
-      - run: node scripts/check-viewer-bundle.mjs
       - run: pnpm -r test
       - run: pnpm test:family
       - run: pnpm -r lint

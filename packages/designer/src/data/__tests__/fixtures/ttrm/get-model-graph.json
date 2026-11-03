@@ -1,1 +1,0 @@
-{"jsonrpc":"2.0","id":3,"result":{"nodes":[{"qname":"acme.erp.db.customers","kind":"table","label":"customers","schema":"db","pkg":"acme.erp"},{"qname":"acme.erp.db.orders","kind":"table","label":"orders","schema":"db","pkg":"acme.erp"}],"edges":[{"from":"acme.erp.db.orders","to":"acme.erp.db.customers","type":"REFERENCES"}]}}

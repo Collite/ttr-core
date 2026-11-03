@@ -51,9 +51,9 @@ Rename a symbol (`F2`) and the editor updates the definition **and every referen
 
 The extension formats `.ttrm` files on request, normalizing indentation and spacing so diffs stay about meaning rather than whitespace. Where a diagnostic has an obvious remedy, a **quick fix** (the lightbulb) offers it — for example removing an unused import. There are also refactoring actions, such as extracting an inline definition into a standalone one.
 
-## The graphical designer
+## The graphical view
 
-Alongside the text editor, the designer renders [graphs](11-graphs.md) visually: open a `.ttrg` and see the entities and relations laid out as a diagram. The same language server backs it, so the picture and the text never disagree — they are two views of one model. Arrange nodes in the designer and the positions are written back into the `.ttrg` file as plain text you can review.
+The extension and the language server behind it are open tooling, and a [graph](11-graphs.md) — the objects it shows and their saved positions — is plain text you can review. The graphical view of a model is the Studio, a Collite product; its read-only tier, Studio Free, is free (see `TRADEMARKS.md` in the ttr-core repository). The Studio runs the same language server, so the picture and the text never disagree — they are two views of one model.
 
 ## Why this is the argument for TTR
 

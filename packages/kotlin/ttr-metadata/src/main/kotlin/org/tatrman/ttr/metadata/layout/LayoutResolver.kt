@@ -48,8 +48,8 @@ data class LayoutResolution(
 )
 
 /**
- * The resolution rule (VL contracts §4, V-15, V-16) — the JVM twin of the viewer's `resolveRefs`
- * (`packages/designer/src/layout/resolve.ts`), held to it by the shared vectors' `expect.json`.
+ * The resolution rule (VL contracts §4, V-15, V-16) — the JVM twin of the Studio viewer's `resolveRefs`
+ * (in ttr-platform since D-33), held to it by the shared vectors' `expect.json`.
  *
  * A ref resolves against the cards of the layout's schema, in order; the first step that matches
  * decides, and a step matching more than one card is AMBIGUOUS (never guessed, P2):

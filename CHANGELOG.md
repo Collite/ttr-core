@@ -19,6 +19,19 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   Rendering and deployment remain the exporters' next stage. No grammar production changes; release on 0.22.x.
 - JVM metadata/SPI consumers must rebuild against the new bundle because data-class constructors gain fields.
 
+### Removed — Designer family moved to ttr-platform (D-33 Studio Free)
+
+- The four GUI packages (`packages/designer` = `@tatrman/designer-core`, `packages/canvas-core`, `packages/perspectives`,
+  `packages/deep-links`) left this repository with their history: they are Studio code, workspace siblings in
+  ttr-platform since SF-P0. The Studio (viewer, modeler, reports …) is a Collite product; its read-only tier Studio
+  Free is free — see `TRADEMARKS.md`. With them went the viewer image (`release-viewer.yml`, `just viewer-image`),
+  the Studio hosting manual, the operate page *Deploy the Studio Viewer*, and the `check-viewer-bundle` CI step.
+- The `designer/v*` lane is gone; `designer/v0.1.3` was its last release. `lsp · parser · tokens · edit` stay open
+  and are released together by the new **`lsp/v*`** lane (`just publish lsp`, `publish-ts.yml` job `lsp-family`):
+  four tarballs with `SHA256SUMS` and `manifest.json` as an internal GitHub release, public npm only on `-RELEASE`.
+  The four move to **0.1.4**; `edit/v*` tags still refuse. No release is cut by this change.
+- The VS Code placeholder command *Open in Designer* (`modeler.openInDesigner`) is gone, and the manual, the
+  quickstart and the issue template no longer present a Designer as part of the open tooling.
 
 ### Fixed — Canonical YAML coverage and migration cleanup (ttr-core#374)
 

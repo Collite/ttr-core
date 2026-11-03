@@ -12,9 +12,11 @@ where policy lives, and how to answer "why did it say that?" six months later.
   honours, what it does, and what happens if you leave it at its default.
 - [**OIDC and Keycloak**](identity-and-oidc.md) — wiring your IdP, and the
   verification duty that stays yours.
-- [**Deploy the Studio Viewer**](studio-viewer.md) — the read-only model viewer
-  as a container next to Veles: runtime config, the read-only catalog proxy, and
-  the cookie-session edge it expects.
+- **Studio Free** — the read-only model viewer is a tier of the Studio, a Collite
+  product: free of charge, not open source (see the
+  [trademark policy](https://github.com/Collite/ttr-core/blob/master/TRADEMARKS.md)).
+  Its deployment guide ships with the Studio: ttr-platform
+  `docs/operate/studio-free.md`.
 - [**Policy in git**](policy-in-git.md) — the open validator store: writing,
   reviewing, and shipping policy the same way you ship the model.
 - [**Upgrade and versioning**](upgrade-and-versioning.md) — what the product

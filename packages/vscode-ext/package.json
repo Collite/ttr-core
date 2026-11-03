@@ -143,11 +143,6 @@
     },
     "commands": [
       {
-        "command": "modeler.openInDesigner",
-        "title": "Open in Designer",
-        "description": "Opens the current TTR file in the graphical designer."
-      },
-      {
         "command": "modeler.mdHopReport",
         "title": "TTR: md → er hop report"
       },

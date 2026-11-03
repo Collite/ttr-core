@@ -1,7 +1,8 @@
 # @tatrman/edit
 
-Apache-2.0 · `@tatrman/edit@0.1.3`, family-locked with the eight Designer packages and released
-as internal `designer/v*` assets. Historical public release: `@tatrman/edit@0.1.0` (`edit/v0.1.0`).
+Apache-2.0 · `@tatrman/edit@0.1.4`, family-locked with `lsp · parser · tokens` and released as internal
+`lsp/v*` assets (until `designer/v0.1.3`, with the eight-package Designer family). Historical public release:
+`@tatrman/edit@0.1.0` (`edit/v0.1.0`).
 
 Pure TTR-M edit synthesis shared by the Node and browser LSP. Text is canonical: callers apply the
 returned `WorkspaceEdit` and reparse their cache. The Studio plan and request contract live in
@@ -81,7 +82,7 @@ The npm artifact bundles its runtime and declaration dependencies, so installing
 `@tatrman/*` packages. Workspace builds retain their unbundled entry points; `publishConfig` switches only the
 published `main`/`types`/`exports` to `dist/package/`. CI runs `node scripts/edit-consumer-smoke.mjs`: publish dry run,
 tarball install outside the workspace, a canonical four-file synthesis and strict TypeScript consumer compilation.
-New edit releases use the Designer family lane; bare `designer/v*` tags publish internal GitHub assets.
+New edit releases use the lsp family lane; bare `lsp/v*` tags publish internal GitHub assets.
 Public npm publication requires an explicit family release; dry runs do not publish.
 
 Schema resolution follows file schema → package `default-schema` → `[defaults].schema` → conventional db default.

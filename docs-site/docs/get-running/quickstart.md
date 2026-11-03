@@ -207,8 +207,7 @@ Point Veles at your model repository — it reads the model from git, so shippin
 a new model is a `git push`.
 
 ```bash
-# Veles reads METADATA_GIT_REMOTE_URI; set it via the chart's values
-# (or the model-repo field in the Designer viewer).
+# Veles reads METADATA_GIT_REMOTE_URI; set it via the chart's values.
 helm upgrade ttr oci://ghcr.io/collite/charts/tatrman-server --version 0.9.0 \
   -n ttr --reuse-values \
   --set veles.metadata.gitRemoteUri="https://github.com/you/erp-model.git"
@@ -268,7 +267,7 @@ six shown, each trimmed to `id` and `name`):
 !!! success "You should now see…"
 
     The catalog answering: `get_model` / `get_entities` via `veles-mcp` returns
-    your model, or the Designer viewer draws it.
+    your model.
 
 ## 5. Connect an agent
 

@@ -1,1 +1,0 @@
-{"jsonrpc":"2.0","id":2,"result":{"packages":["acme.erp"],"schemas":["db","er"],"areas":[],"counts":{"objects":42,"schemas":2,"areas":0},"modelVersion":"m-3f9a"}}

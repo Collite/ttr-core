@@ -1,1 +1,0 @@
-{"jsonrpc":"2.0","id":10,"result":{"exists":true,"version":1,"canvases":[{"key":"all_er","skin":null,"mode":"manual","nodes":[{"qname":"acme.erp.db.customers","x":320,"y":180}],"collapsed":[]}],"orphaned":[],"errors":[]}}
