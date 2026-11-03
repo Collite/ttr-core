@@ -2,7 +2,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-// Importing the release list makes this a closure check rather than a second package list.
+// The first case pins D-33's membership on purpose, so adding a member is a decision. The second case is
+// the closure check: it imports the release list rather than keeping a second one.
 // @ts-expect-error Plain JavaScript release tooling.
 import { family } from './lsp-family.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));

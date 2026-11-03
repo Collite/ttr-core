@@ -5,6 +5,6 @@ export default defineConfig({
   root: fileURLToPath(new URL('../', import.meta.url)),
   test: {
     environment: 'node',
-    include: ['scripts/publish-family.test.ts', 'scripts/family-publish.test.ts'],
+    include: ['scripts/lsp-family-closure.test.ts', 'scripts/family-publish.test.ts'],
   },
 });

@@ -325,19 +325,25 @@ node scripts/lsp-consumer-smoke.mjs
 
 The last command runs both npm and isolated pnpm installs of only the actual tarballs and public
 dependencies in fresh directories outside the workspace. It checks runtime imports, public TypeScript
-declarations (strict NodeNext), the stdio server, and the browser worker booted from the installed
-tarball in a real Chromium Worker. Optional arguments are the artifact folder and the evidence folder.
+declarations (strict NodeNext, every subpath a tarball declares types for), the stdio server, and the
+browser worker booted from the installed tarball in a real Chromium Worker. The worker check fails on a
+worker error (also one after the last reply), a console error, or an Error-level `window/logMessage` /
+`window/showMessage`. Optional arguments are the artifact folder and the evidence folder.
 Linux CI installs Chromium with `pnpm exec playwright-core install --with-deps chromium`; macOS uses
 Chrome, or set `CHROME_BIN`. The pnpm leg vendors the hash-checked tarballs and puts all four
 overrides in pnpm-workspace.yaml; package.json `pnpm.overrides` is ignored by pnpm 11.
 
 `publish-ts.yml` (job `lsp-family`) performs the same build, pack and consumer check for relevant PRs,
 for `workflow_dispatch` (a dry run from any ref: nothing is released) and for `lsp/v*` tags. It covers
-the four packages' sources, the compiler sources LSP bundles, release scripts and pnpm-lock.yaml.
-The root `pnpm test:family` runs in CI and `just test`. A single ordered family job avoids publishing
-partial per-package matrices before the closure is checked. `prepare-family-licenses.mjs` gathers the
-installed runtime license closure, including worker dependencies; CI fails if generated NOTICE/LICENSE
-files drift. Tarball checks reject private/workspace runtime deps, test declarations and source maps.
+the four packages' sources, the compiler sources LSP bundles, their build configs, LICENSE/NOTICE,
+release scripts and pnpm-lock.yaml. It holds a read-only token; on a pushed `lsp/v*` tag the job
+`lsp-family-release` creates the GitHub release from that job's uploaded artifact, and it is the only
+job with write access. The root `pnpm test:family` runs in CI and `just test`. A single ordered family
+job avoids publishing partial per-package matrices before the closure is checked.
+`prepare-family-licenses.mjs` gathers the installed runtime license closure, including worker
+dependencies and the vendored grammars the SQL lexers are generated from, and writes the same NOTICE
+into all four packages; CI fails if generated NOTICE/LICENSE files drift. Tarball checks reject
+private/workspace runtime deps, test declarations and source maps.
 
 Only an explicitly requested `just publish lsp release set <version>` adds public npm publication
 using `NPM_TOKEN`. This lane is not required on 0.x. Public publication uses the verified tarballs;

@@ -13,9 +13,10 @@ name: Publish TypeScript packages (npm)
 #   ts-grammar/v<x.y.z>   →   @tatrman/grammar   (packages/grammar), public npmjs  (job `publish`)
 #   lsp/v<x.y.z>          →   the open family the Studio consumes, @tatrman/{parser,tokens,edit,lsp}:
 #                             four tarballs at one version, an internal GitHub release; public npmjs
-#                             only on lsp/v<x.y.z>-RELEASE  (job `lsp-family`)
+#                             only on lsp/v<x.y.z>-RELEASE  (jobs `lsp-family`, `lsp-family-release`)
 #   edit/v<x.y.z>         →   refused: edit is released only with its family (lsp/v*). The historical
 #                             public edit/v0.1.0 stays valid.
+#   designer/v<x.y.z>     →   refused: the Designer family moved to ttr-platform (D-33).
 # The Designer family's GUI packages moved to ttr-platform (D-33, Studio Free); `designer/v0.1.3`
 # was the last `designer/v*` release cut here, and that lane is gone.
 #
@@ -31,8 +32,10 @@ on:
     tags:
       - 'ts-grammar/v*'
       - 'lsp/v*'
-      # Kept so a stray edit tag fails loudly (job `edit-tag-refused`) instead of doing nothing.
+      # Kept so a stray edit or designer tag fails loudly (jobs `edit-tag-refused`,
+      # `designer-tag-refused`) instead of doing nothing.
       - 'edit/v*'
+      - 'designer/v*'
   # A dry run of the lsp family lane from any ref: build, pack, consumer smoke; nothing is released.
   workflow_dispatch:
   pull_request:
@@ -53,7 +56,13 @@ on:
       - 'packages/sql/src/**'
       - 'packages/sql/vendor/**'
       - 'packages/grammar/src/**'
+      - 'packages/grammar/scripts/**'
       - 'packages/md-catalog/src/**'
+      - 'packages/*/tsconfig*.json'
+      - 'packages/*/LICENSE'
+      - 'packages/*/NOTICE'
+      - 'tsconfig.base.json'
+      - 'LICENSE'
       - 'pnpm-lock.yaml'
       - '.github/workflows/publish-ts.yml'
 
@@ -161,16 +170,23 @@ jobs:
           echo "::error::edit is released only with the lsp family; use lsp/v* (just publish lsp set <version>)"
           exit 1
 
+  designer-tag-refused:
+    if: startsWith(github.ref, 'refs/tags/designer/v')
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::error::the Designer family moved to ttr-platform (D-33, Studio Free); designer/v0.1.3 was the last tag here. ttr-core releases lsp/v* (just publish lsp)"
+          exit 1
+
   lsp-family:
     # The four open packages the Studio consumes (D-33; design.md inv. 10), as one ordered closure at
     # one version. A bare lsp tag creates internal downloadable artifacts: tarballs + SHA256SUMS +
     # manifest.json, the shape ttr-platform's vendor check reads (R144-A(a)). Public npm is opt-in.
-    # PRs and workflow_dispatch run everything up to the upload: the dry run, nothing released.
+    # PRs and workflow_dispatch run this job only: the dry run, nothing released. It holds a read-only
+    # token; the release itself is the next job's.
     # The locked Playwright browser installer supports Ubuntu 24.04, not the latest runner image.
     runs-on: ubuntu-24.04
     if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/lsp/v')
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -209,8 +225,27 @@ jobs:
           path: |
             build/lsp-family/
             build/lsp-consumer/
+
+  lsp-family-release:
+    # A pushed lsp tag releases the artifact the job above built, packed and smoke-tested. The write
+    # token lives in this job alone, which installs and builds nothing.
+    needs: lsp-family
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/lsp/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+      # The artifact's root is build/: lsp-family/ and lsp-consumer/ land where the job above wrote them.
+      - uses: actions/download-artifact@v4
+        with:
+          name: lsp-family
+          path: build
       - name: Internal GitHub release
-        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -221,7 +256,7 @@ jobs:
           fi
           gh release upload "$GITHUB_REF_NAME" build/lsp-family/* --clobber
       - name: Public npm publication (explicit RELEASE tags only)
-        if: github.event_name == 'push' && endsWith(github.ref_name, '-RELEASE')
+        if: endsWith(github.ref_name, '-RELEASE')
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: node scripts/publish-lsp-family.mjs build/lsp-family
