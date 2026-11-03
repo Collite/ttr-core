@@ -187,6 +187,7 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#lsp/v}"
           version="${version%-RELEASE}"
+          # Reads packages/lsp only: pack-lsp-family.mjs then asserts every member carries this version.
           expected=$(node -p "require('./packages/lsp/package.json').version")
           [ "$version" = "$expected" ] || { echo 'Tag must match the family manifests'; exit 1; }
           git fetch --no-tags origin master

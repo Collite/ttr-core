@@ -764,9 +764,9 @@ publish *args:
     # Single version line per prefix — internal and RELEASE tags share it (a
     # RELEASE tag always mints a brand-new number, never reuses one already spent
     # by an internal tag), so a stripped RELEASE version never collides with an
-    # already-published internal one on the same registry.
-    LATEST=$(git tag -l "${PREFIX}/v*" | sed -E "s|^${PREFIX}/v||; s/-RELEASE\$//" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)
-    LATEST="${LATEST:-0.0.0}"
+    # already-published internal one on the same registry. lsp's line spans two
+    # prefixes (_line-prefixes).
+    LATEST=$(just _latest-version "$PREFIX")
 
     if [ "$LEVEL" = "set" ]; then
         if ! [[ "$CUSTOM_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -785,19 +785,16 @@ publish *args:
 
     # Every member of the family carries the tag's version (scripts/lsp-family.mjs is the one list).
     if [ "$PREFIX" = lsp ]; then
-        for MEMBER in $(node --input-type=module -e "import { family } from './scripts/lsp-family.mjs'; console.log(family.join(' '))"); do
-            EXPECTED=$(node -p "require('./packages/${MEMBER}/package.json').version")
-            if [ "$NEW_VERSION" != "$EXPECTED" ]; then
-                echo "❌ lsp tag version must equal every family version (packages/${MEMBER} is ${EXPECTED})." >&2
-                echo "   Bump all four together, or use: just publish lsp set ${EXPECTED}" >&2; exit 1
-            fi
-        done
+        just _lsp-family-check "$NEW_VERSION"
     fi
 
-    if git rev-parse -q --verify "refs/tags/${PREFIX}/v${NEW_VERSION}" >/dev/null || \
-       git rev-parse -q --verify "refs/tags/${PREFIX}/v${NEW_VERSION}-RELEASE" >/dev/null; then
-        echo "❌ Version ${NEW_VERSION} already used (as a bare or RELEASE tag) for ${PREFIX}."; exit 1
-    fi
+    LINE_PREFIXES=$(just _line-prefixes "$PREFIX")
+    for P in $LINE_PREFIXES; do
+        if git rev-parse -q --verify "refs/tags/${P}/v${NEW_VERSION}" >/dev/null || \
+           git rev-parse -q --verify "refs/tags/${P}/v${NEW_VERSION}-RELEASE" >/dev/null; then
+            echo "❌ Version ${NEW_VERSION} already used (as a bare or RELEASE tag) for ${P}."; exit 1
+        fi
+    done
 
     NEW_TAG="${PREFIX}/v${NEW_VERSION}"
     [ "$RELEASE" = true ] && NEW_TAG="${NEW_TAG}-RELEASE"
@@ -827,6 +824,40 @@ publish *args:
     git push origin "${NEW_TAG}"
     echo "✅ Pushed ${NEW_TAG} — the matching workflow will publish: ${LANES}"
     echo "   Watch it: gh run watch  (or the repo's Actions tab)"
+
+# The tag prefixes of one version line. lsp's line began under designer/v*: designer/v0.1.0–0.1.3 cut
+# these same four coordinates (D-33 moved the GUI packages out), so lsp reads and refuses versions
+# across both prefixes.
+_line-prefixes prefix:
+    @if [ "{{prefix}}" = lsp ]; then echo "lsp designer"; else echo "{{prefix}}"; fi
+
+# The newest bare x.y.z on a prefix's version line, or 0.0.0: `just _latest-version lsp`.
+_latest-version prefix:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    PREFIXES=$(just _line-prefixes "{{prefix}}")
+    LATEST=$(for P in $PREFIXES; do git tag -l "${P}/v*" | sed -E "s|^${P}/v||; s/-RELEASE\$//"; done \
+        | { grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -V | tail -n 1)
+    echo "${LATEST:-0.0.0}"
+
+# Every lsp family member (scripts/lsp-family.mjs is the one list) is at VERSION: `just _lsp-family-check
+# 0.1.4`. Its own recipe so it runs without publish's release guards. The list is read into a variable
+# first: a failing command inside a `for` word list does not trip `set -e`, and the check would pass
+# without checking anything.
+_lsp-family-check version:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    VERSION="{{version}}"
+    MEMBERS=$(node --input-type=module -e "import { family } from './scripts/lsp-family.mjs'; console.log(family.join(' '))")
+    [ -n "$MEMBERS" ] || { echo "❌ scripts/lsp-family.mjs gave no family members." >&2; exit 1; }
+    for MEMBER in $MEMBERS; do
+        EXPECTED=$(node -p "require('./packages/${MEMBER}/package.json').version")
+        if [ "$VERSION" != "$EXPECTED" ]; then
+            echo "❌ lsp tag version must equal every family version (packages/${MEMBER} is ${EXPECTED})." >&2
+            echo "   Bump all four together, or use: just publish lsp set ${EXPECTED}" >&2; exit 1
+        fi
+    done
+    echo "✓ lsp family at ${VERSION}: ${MEMBERS}"
 
 # MD landings and derived warehouse roles; diagnostics default to grounded MD elements.
 [positional-arguments]
