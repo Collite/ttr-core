@@ -20,13 +20,15 @@ import org.snakeyaml.engine.v2.exceptions.ReaderException
 import org.snakeyaml.engine.v2.nodes.*
 import org.snakeyaml.engine.v2.schema.CoreSchema
 
-class CanonicalYamlException(
-    val file: String,
-    val line: Int,
-    val column: Int,
-    val detail: String,
-    val keyPath: String = "",
-) : IllegalArgumentException("$file:$line:$column: $detail")
+class CanonicalYamlException
+    @JvmOverloads
+    constructor(
+        val file: String,
+        val line: Int,
+        val column: Int,
+        val detail: String,
+        val keyPath: String = "",
+    ) : IllegalArgumentException("$file:$line:$column: $detail")
 
 internal class YamlNodes(
     private val file: String,
@@ -169,7 +171,18 @@ internal class YamlNodes(
                 var depth = 0
                 for (event in Parse(settings).parseString(source)) {
                     val keyEvent = eventPaths.isMappingKey
+                    val parentPath = eventPaths.failurePath
                     val path = eventPaths.accept(event)
+                    if (!canonical && keyEvent && event is CollectionStartEvent) {
+                        val mark = event.startMark.orElse(null)
+                        throw CanonicalYamlException(
+                            file,
+                            (mark?.line ?: 0) + 1,
+                            (mark?.column ?: 0) + 1,
+                            "Mapping keys must be strings",
+                            parentPath,
+                        )
+                    }
                     if (!canonical &&
                         keyEvent &&
                         event is ScalarEvent &&
@@ -354,7 +367,7 @@ internal class YamlNodes(
                 if (node.tag != Tag.MAP) fail(node, "Unsupported YAML tag ${node.tag}")
                 val result = linkedMapOf<String, JsonElement>()
                 node.value.forEach { tuple ->
-                    val key = tuple.keyNode as? ScalarNode ?: fail(tuple.keyNode, "Mapping keys must be strings")
+                    val key = tuple.keyNode as? ScalarNode ?: fail(tuple.keyNode, "Mapping keys must be strings", path)
                     if (key.tag != Tag.STR ||
                         key.value == "<<"
                     ) {

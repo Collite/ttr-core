@@ -40,12 +40,12 @@ class ProfileResolver(
             at: ProfileSpan,
             depth: Int,
         ) {
-            if (depth > 32) throw ProfileException("ys/profile-invalid", at, "Profile chain exceeds 32 profiles")
             val bundled = ref == "canonical" || ref == "canonical/1"
             val path = if (bundled) null else confined(ref, from, at)
             if (path != null && !visiting.add(path)) {
                 throw ProfileException("ys/profile-cycle", at, "Profile cycle through $ref")
             }
+            if (depth > 32) throw ProfileException("ys/profile-invalid", at, "Profile chain exceeds 32 profiles")
             val profile =
                 if (bundled) {
                     ProfileReader.read(

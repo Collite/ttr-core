@@ -37,7 +37,7 @@ class GrammarRange private constructor(
     companion object {
         val runningGrammar: String get() = YamlData.grammarVersion
         private val versionPattern = Regex("[0-9]+\\.[0-9]+(?:\\.[0-9]+)?")
-        private val comparator = Regex("(>=|<=|>|<|=)?\\s*([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)")
+        private val comparator = Regex("(?:(>=|<=|>|<|=)\\s*)?([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)")
 
         private fun version(text: String): Version {
             require(versionPattern.matches(text)) { "Expected a version with two or three numeric components" }

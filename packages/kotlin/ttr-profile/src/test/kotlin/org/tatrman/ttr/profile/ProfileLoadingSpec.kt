@@ -101,6 +101,7 @@ class ProfileLoadingSpec :
                     "overlay: {x: {v: .nan}}\n" to "/overlay/x/v",
                     "overlay: {x: {v: 1, v: 2}}\n" to "/overlay/x/v",
                     "overlay: {x: {1: value}}\n" to "/overlay/x/1",
+                    "overlay: {x: {? [a, b]: value}}\n" to "/overlay/x",
                     "overlay: {x: {v: [unterminated}}\n" to "/overlay/x/v",
                 )
             cases.forEach { (extra, path) ->
@@ -143,6 +144,9 @@ class ProfileLoadingSpec :
                 ">=1.0 || <0.18" to false,
                 ">= 0.18 < 1.0" to true,
                 "0.22.1" to false,
+                "0.22 0.22" to true,
+                ">=0.18 0.22" to true,
+                "0.22 0.23" to false,
             ).forEach { (range, accepted) -> GrammarRange.parse(range).admits("0.22") shouldBe accepted }
             listOf(
                 "^0.22",
@@ -155,6 +159,7 @@ class ProfileLoadingSpec :
                 "0.22.0.1",
                 "0",
                 ">=0.22 junk",
+                "0.22>=0.18",
             ).forEach { range ->
                 shouldThrow<ProfileException> { ProfileReader.read(definition(grammar = range), "range.yaml") }
                     .also {
@@ -256,6 +261,9 @@ class ProfileLoadingSpec :
                     .resolve("demo-cs/1", root.resolve("ttr.yaml"))
                     .single()
                     .name shouldBe "p32"
+                root.resolve("p32.yaml").writeText(definition("p32/1", extra = "extends: ./p1.yaml\n"))
+                shouldThrow<ProfileException> { resolver.resolve("./p1.yaml", root.resolve("ttr.yaml")) }
+                    .code shouldBe "ys/profile-cycle"
             }
         }
 
