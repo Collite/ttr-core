@@ -143,8 +143,17 @@ class CanonicalYamlDepthSpec :
             error.column shouldBe 7
             error.detail shouldBe "token recognition error at: '~'"
         }
-        for (value in listOf("-[1, 2]", "-{ x: 1 }", "1)", "1) ~", "1 ~\n)", "-[1, 2] ~")) {
-            test("retained calc argument $value reports its actual cause") {
+        val retainedValueRefusal = "Calc argument must contain exactly one retained TTR value"
+        for ((value, detail) in listOf(
+            "-[1, 2]" to retainedValueRefusal,
+            "-{ x: 1 }" to retainedValueRefusal,
+            "1)" to "unmatched ')'",
+            "1) ~" to "unmatched ')'",
+            "1 ~\n)" to retainedValueRefusal,
+            "-[1, 2] ~" to retainedValueRefusal,
+            "1 )\n~" to "unmatched ')'",
+        )) {
+            test("retained calc argument ${value.replace("\n", "\\n")} reports its actual cause") {
                 val source =
                     "ttr: '0.22'\nmodel: md\ndefs:\n" +
                         "  - kind: map\n    id: Convert\n    properties:\n" +
@@ -158,12 +167,7 @@ class CanonicalYamlDepthSpec :
                 error.file shouldBe "calc.yaml"
                 error.line shouldBe 10
                 error.column shouldBe 18
-                error.detail shouldBe
-                    if (value.startsWith("1)")) {
-                        "unmatched ')'"
-                    } else {
-                        "Calc argument must contain exactly one retained TTR value"
-                    }
+                error.detail shouldBe detail
             }
         }
         test("native token guard refuses deep input before recursive parsing on a 1 MiB stack") {
