@@ -164,8 +164,28 @@ object MapToPhysical {
                     )
                 }
                 val renames = if (er) model.attributeColumnRenames(row.target) else emptyMap()
+                val attributes =
+                    if (er) {
+                        model
+                            .entities(
+                                SchemaCode.ER,
+                                row.target.namespace,
+                            )[row.target]
+                            ?.attributes
+                            ?.map { it.name }
+                            ?.toSet()
+                            .orEmpty()
+                    } else {
+                        emptySet()
+                    }
 
                 fun column(attr: String): String {
+                    if (er && attr !in attributes) {
+                        throw MapToPhysicalException(
+                            "row_writes_attribute_unknown",
+                            "Unknown attribute $attr on entity ${qnameToken(row.target)}",
+                        )
+                    }
                     val name = renames[attr] ?: attr
                     if (name !in columns) {
                         throw MapToPhysicalException(

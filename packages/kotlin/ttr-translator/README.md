@@ -75,7 +75,8 @@ The authoritative wire and answer contract is [AU Server contracts.md, “The do
 (D-163)](https://github.com/Collite/project/blob/master/kantheon/features/automation-agents/implementation/ttr-server/contracts.md).
 
 `MapToPhysical.apply` maps an ER target through `ModelHandle.entityMapping` (`ToTable` only).
-Values, `read_before`, and predicate columns use `attributeColumnRenames[attr] ?: attr`, then
+Values, `read_before`, and predicate columns must be declared attributes of the ER entity; physical
+column names alone refuse with `row_writes_attribute_unknown`. Declared attributes use `attributeColumnRenames[attr] ?: attr`, then
 must exist in `columns(table)`; missing entities/columns produce named diagnostics. Query-backed
 or filtered bindings refuse. The REL_NODE front half preserves writes without a Calcite read
 round trip. Read walkers see no scans or output columns, including fingerprint callers.

@@ -156,6 +156,28 @@ class RowWritesMappingSpec :
                 .single()
                 .name shouldBe "identity"
         }
+        test("ER values, prior and predicates refuse physical names and unlisted entities") {
+            for (row in listOf(
+                update("so_state"),
+                update().addReadBefore("so_state"),
+                update().setWhere(call("eq", col("so_state"), param("from"))),
+            )) {
+                val refusal = MapToPhysical.apply(node(row), model).shouldBeInstanceOf<MapToPhysicalResult.Failure>()
+                refusal.code shouldBe "row_writes_attribute_unknown"
+                refusal.message shouldContain "so_state"
+                refusal.message shouldContain "order"
+            }
+            val unlisted =
+                InMemoryModelHandle(
+                    tables = listOf(ModelTable(table, model.columns(table))),
+                    entityMappings = mapOf(entity to EntityMapping.ToTable(table)),
+                    attributeRenames = mapOf(entity to renames),
+                )
+            MapToPhysical
+                .apply(node(update()), unlisted)
+                .shouldBeInstanceOf<MapToPhysicalResult.Failure>()
+                .code shouldBe "row_writes_attribute_unknown"
+        }
         test("a missing physical column names both the attribute and attempted column") {
             val result =
                 MapToPhysical
@@ -167,6 +189,7 @@ class RowWritesMappingSpec :
             val badRename =
                 InMemoryModelHandle(
                     tables = listOf(ModelTable(table, listOf(ModelColumn("so_state", SurfaceType.TEXT)))),
+                    entities = listOf(ModelEntity(entity, model.attributes(entity))),
                     entityMappings = mapOf(entity to EntityMapping.ToTable(table)),
                     attributeRenames =
                         mapOf(
