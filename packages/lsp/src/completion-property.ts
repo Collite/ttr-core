@@ -7,11 +7,15 @@ import {
 import type {
   Document,
   Definition,
+  ExecutorDef,
+  DeploymentDef,
 } from '@tatrman/parser';
 import type { DefinitionKind, PropertyInfo } from '@tatrman/grammar';
 import { PROPERTY_MAP, SEARCH_SUB_PROPERTIES } from '@tatrman/grammar';
 import { inferPackageFromUri } from '@tatrman/semantics';
 import { detectReferenceProperty } from './completion-reference.js';
+
+type PropertyDef = Definition | ExecutorDef | DeploymentDef;
 
 export interface PropertyCompletionOptions {
   position: { line: number; character: number };
@@ -53,6 +57,12 @@ export interface PackageNameCompletionOptions {
  * Grammar 0.22 (D-142): properties the grammar still RECOGNISES for one release, only so the automation validator
  * refuses them (`ttr/automation-removed`) — never offered.
  */
+const ENGINE_PROPERTIES: Record<string, PropertyInfo[]> = {
+  action: [{ name: 'by', type: 'role reference' }, { name: 'due', type: 'duration' }],
+  deployment: [{ name: 'startable_by', type: 'role reference or list of role references' }],
+  executor: [{ name: 'egress_url', type: 'string' }],
+};
+
 const REMOVED_PROPERTIES: Partial<Record<string, ReadonlySet<string>>> = { role: new Set(['delivery']) };
 
 export function getPropertyNameCompletions(
@@ -74,7 +84,7 @@ export function getPropertyNameCompletions(
     };
   }
 
-  const props = PROPERTY_MAP[def.kind as DefinitionKind] ?? [];
+  const props = [...(PROPERTY_MAP[def.kind as DefinitionKind] ?? []), ...(ENGINE_PROPERTIES[def.kind] ?? [])];
   const presentProps = getPresentProperties(def);
 
   const available = props.filter(
@@ -94,7 +104,7 @@ export function getPropertyNameCompletions(
 function detectPropertyPosition(
   doc: Document,
   position: { line: number; character: number }
-): { def: Definition; searchSubProperty: string | null } | null {
+): { def: PropertyDef; searchSubProperty: string | null } | null {
   const line = position.line + 1;
   const char = position.character;
 
@@ -125,7 +135,7 @@ function detectPropertyPosition(
 }
 
 function detectSearchSubProperty(
-  def: Definition,
+  def: PropertyDef,
   line: number,
   char: number
 ): string | null {
@@ -137,7 +147,7 @@ function detectSearchSubProperty(
   return '';
 }
 
-function getPresentProperties(def: Definition): Set<string> {
+function getPresentProperties(def: PropertyDef): Set<string> {
   const present = new Set<string>();
   const obj = def as unknown as Record<string, unknown>;
 
@@ -158,11 +168,15 @@ function getPresentProperties(def: Definition): Set<string> {
     present.add(key);
   }
 
+  if ('entries' in def) for (const entry of def.entries ?? []) present.add(entry.key);
+  if ('manifest' in def) for (const key of Object.keys(def.manifest ?? {})) present.add(key);
   return present;
 }
 
-function nestedDefArray(def: Definition): Definition[] {
+function nestedDefArray(def: Definition): PropertyDef[] {
   switch (def.kind) {
+    case 'world':
+      return [...(def.executors ?? []), ...(def.deployments ?? [])];
     case 'entity':
       return def.attributes ?? [];
     case 'table':

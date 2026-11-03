@@ -53,6 +53,12 @@ data class RecipeManifest(
     val tests: List<String>? = null,
     /** Native preview dependencies v1; absent for recipes with no directly wired writer defaults. */
     val approvalDependencies: RecipeApprovalDependencies? = null,
+    /** CG-2 engine action metadata; absent when no wired action declares `by` or `due`. */
+    val actions: Map<String, RecipeAction>? = null,
+    /** Start permissions for deployments of this recipe's programs (D-161). */
+    val deployments: Map<String, RecipeDeployment>? = null,
+    /** Egress endpoints of the executors those deployments target (D-158). */
+    val executors: Map<String, RecipeExecutor>? = null,
 )
 
 /** Explicit coverage evidence, bound into text/2. Consumers must verify it against pinned action/ER metadata. */
@@ -162,4 +168,27 @@ data class RecipeFingerprints(
     val text: String,
     val values: String,
     val labels: String,
+)
+
+/** Additive engine metadata in manifest v3 (D-144/D-158/D-161). Role refs keep the `role.` prefix. */
+@Serializable
+data class RecipeAction(
+    val by: String? = null,
+    val due: RecipeDuration? = null,
+)
+
+@Serializable
+data class RecipeDuration(
+    val amount: Double,
+    val unit: String,
+)
+
+@Serializable
+data class RecipeDeployment(
+    val startableBy: List<String>,
+)
+
+@Serializable
+data class RecipeExecutor(
+    val egressUrl: String,
 )

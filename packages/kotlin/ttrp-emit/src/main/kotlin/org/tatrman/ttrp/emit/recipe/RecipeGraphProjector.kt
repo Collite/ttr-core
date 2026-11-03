@@ -69,6 +69,7 @@ object RecipeGraphProjector {
                             put("from", t.from.joinToString(","))
                         }
                     },
+                    by = a.byRole?.let { "role.$it" },
                 )
             }
         return RecipeGraph(
@@ -109,6 +110,8 @@ object RecipeGraphProjector {
                 deployment.dryRun,
                 deployment.ungoverned,
                 emptyMap(), // D-142 took the connectors (`deliver`, `ask`, `start`)
+                startableBy = deployment.startableBy?.map { "role.$it" },
+                egressUrl = executor?.egressUrl,
             ),
             Roles(
                 recipe.roles.candidates,

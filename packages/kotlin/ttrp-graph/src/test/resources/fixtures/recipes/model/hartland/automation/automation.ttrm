@@ -48,6 +48,7 @@ def action ask {
     columns:    [def column who { type: role }, def column about { type: text }, def column action { type: action }, def column detail { type: rows, optional: true }]
     sinks:      { hebe: task, camunda: "user task", n8n: door }                  // n8n: perform ask, then Wait (D-109)
     approval:   required
+    by:         role.process_owner
     due:        2 working_days                                                  // program/action default (D-98)
 }
 def action task {

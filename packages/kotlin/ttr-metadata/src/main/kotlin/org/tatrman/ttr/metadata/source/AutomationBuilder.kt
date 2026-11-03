@@ -331,8 +331,6 @@ internal object AutomationBuilder {
             val problem =
                 when {
                     badFlags.isNotEmpty() -> "has non-boolean ${badFlags.joinToString { "`$it:`" }}"
-                    b["startable_by"] != null && roleNames(b["startable_by"]) == null ->
-                        "has malformed `startable_by:` (expected role.<r> or a list of roles)"
                     runAs == null -> "has a missing or malformed `run_as:`"
                     target == null -> "has a missing or malformed `target:`"
                     // D-142: it ran a process; the flow moves to the engine, it does not gain a program
@@ -364,7 +362,8 @@ internal object AutomationBuilder {
                 approvalOverride = bool(b["approval_override"]) ?: false,
                 readCeiling = int(b["read_ceiling"]),
                 oboOnly = bool(b["obo_only"]) ?: false,
-                startableBy = roleNames(b["startable_by"]),
+                // A present malformed permission never becomes unspecified; retain raw entries for the checker.
+                startableBy = b["startable_by"]?.let { roleNames(it) ?: emptyList() },
                 properties = b.entries.map { it.key to it.value },
                 sourceLocation = d.source,
             )

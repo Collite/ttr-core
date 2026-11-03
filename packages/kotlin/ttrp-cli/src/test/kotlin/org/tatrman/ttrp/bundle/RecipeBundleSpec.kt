@@ -576,9 +576,9 @@ class RecipeBundleSpec :
             val json = Files.readString(r.dir.resolve("manifest.json"))
             ObjectMapper().readTree(json).path("recipe").has("tests") shouldBe false
             r.manifest.recipe!!.tests shouldBe null
-            // Baseline from f400192's CLI with its unconditional empty tests key removed: the pre-field wire shape.
+            // The no-tests baseline includes CG-2 action metadata; the optional tests field stays omitted.
             val baseline = Path.of("src/test/resources/fixtures/release-order-before-golden-field.json")
-            // P3 adds the derived README to files; every other wire byte keeps the pre-field baseline.
+            // README is derived separately; retain the rest of this recipe's expected wire bytes.
             val beforeReadme =
                 json
                     .lineSequence()

@@ -24,6 +24,37 @@ import java.nio.file.Paths
 class AutomationValidatorSpec :
     StringSpec({
 
+        "CG-2 resolves action by and every startable_by role" {
+            val action =
+                TtrLoader.parseString(
+                    """
+                    model automation
+                    def role manager { members: ["maya"] }
+                    def action release { columns: [def column x { type: text }], sinks: { native: writer }, approval: required, by: role.nobody }
+                    def program p { recipe: r, port: none, mode: batch }
+                    """.trimIndent(),
+                )
+            val world =
+                TtrLoader.parseString(
+                    """
+                    model world
+                    def world demo {
+                        def executor engine { extends: native }
+                        def deployment d { program: p, target: engine, run_as: caller, startable_by: [role.manager, role.absent] }
+                    }
+                    """.trimIndent(),
+                )
+            val findings = AutomationValidator.validate(listOf(action, world)).filter { it.severity != "info" }
+            findings.map { it.code } shouldContainExactly
+                listOf("ttr/automation-unknown-reference", "ttr/automation-unknown-reference")
+            val missing =
+                TtrLoader.parseString(
+                    "model automation\ndef action a { columns: [def column x { type: text }], sinks: { native: writer }, approval: required }",
+                )
+            AutomationValidator.validate(listOf(missing)).single { it.message.contains("by") }.code shouldBe
+                "ttr/automation-missing-property"
+        }
+
         fun hartland(): List<ParseResult> =
             listOf("automation.ttrm", "programs.ttrm", "demo-world.ttrm").map {
                 parse(locate("packages/kotlin/ttr-parser/src/test/resources/automation").resolve(it))

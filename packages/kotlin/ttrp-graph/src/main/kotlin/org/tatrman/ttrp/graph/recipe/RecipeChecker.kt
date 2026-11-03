@@ -127,6 +127,7 @@ class RecipeChecker(
 
         checkShape(recipe)
         checkRemoved(recipe)
+        model?.let { diags += EngineAttributes.check(it) }
         checkIslandSchemas(recipe)
         checkRoleWiring(rg)
         val candidatesRow = candidatesId?.let { id -> container(id)?.let { outRow(rows, it) } }

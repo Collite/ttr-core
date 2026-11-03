@@ -53,6 +53,8 @@ data class DeploymentMeta(
     val dryRun: Boolean,
     val ungoverned: Boolean,
     val connectors: Map<String, String>,
+    val startableBy: List<String>? = null,
+    val egressUrl: String? = null,
 )
 
 data class Roles(
@@ -92,6 +94,7 @@ data class ActionMeta(
     val due: String?,
     val dryRunText: Map<String, String>,
     val transition: Map<String, String>?,
+    val by: String? = null,
 )
 
 data class ProcessMeta(

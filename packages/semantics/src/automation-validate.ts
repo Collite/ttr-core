@@ -73,7 +73,7 @@ const TYPED: Record<string, Set<string>> = {
 /** Known free-form keys per kind (the typed alternatives are always allowed). */
 const KNOWN: Record<string, Set<string>> = {
   parameter: new Set(['value']),
-  action: new Set(['sinks', 'approval', 'deliverable', 'due', 'dry_run']),
+  action: new Set(['sinks', 'approval', 'by', 'deliverable', 'due', 'dry_run']),
   service: new Set(['request', 'response', 'timeout', 'budget', 'write', 'idempotency']),
   approval: new Set(['by', 'quorum']),
   program: new Set([
@@ -82,7 +82,7 @@ const KNOWN: Record<string, Set<string>> = {
   role: new Set(['resolve', 'members']),
   identity: new Set(['principal', 'credential']),
   grant: new Set(['who', 'program', 'as']),
-  deployment: new Set(['program', 'run_as', 'granularity', 'read_ceiling', ...DEPLOYMENT_FLAGS]),
+  deployment: new Set(['program', 'run_as', 'granularity', 'read_ceiling', 'startable_by', ...DEPLOYMENT_FLAGS]),
 };
 
 /** A project needs the stdlib when a document declares `model automation` (an import path segment does not count). */
@@ -323,6 +323,9 @@ class Ctx {
     } else this.shape(what, 'sinks', 'an object `{ native: …, <target>: … }`', sinks);
     const approval = entry(def, 'approval');
     if (approval) this.enumId(what, 'approval', approval, new Set(['none', 'required']));
+    const by = entry(def, 'by');
+    if (by) this.roleRef(what, 'by', by);
+    else if (approval?.kind === 'id' && approval.path === 'required') this.missing(what, 'by', def.source);
     const deliverable = entry(def, 'deliverable');
     if (deliverable) this.bool(what, 'deliverable', deliverable);
     const due = entry(def, 'due');
@@ -568,6 +571,10 @@ class Ctx {
     this.commonEntries('deployment', what, d);
     this.misplaced('deployment', what, d, d.source);
     this.removed('deployment', what, d.entries);
+    const startable = entry(d, 'startable_by');
+    if (startable) {
+      for (const ref of startable.kind === 'autoList' ? startable.items : [startable]) this.roleRef(what, 'startable_by', ref);
+    }
     const program = entry(d, 'program');
     // a deployment that ran a process (`process:`, refused by `removed`) is not also told it lacks a program
     if (program === undefined && entry(d, 'process') === undefined) this.missing(what, 'program', d.source);
