@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { expect, it, vi } from 'vitest';
 // @ts-expect-error JavaScript release tooling.
-import { publishMissingArtifacts } from './designer-publish.mjs';
+import { publishMissingArtifacts } from './family-publish.mjs';
 const artifacts = [
   { name: '@tatrman/edit', version: '0.2.0', file: 'edit.tgz' },
   { name: '@tatrman/parser', version: '0.2.0', file: 'parser.tgz' },

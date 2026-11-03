@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { readFileSync, readdirSync, writeFileSync, realpathSync, existsSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { family } from './designer-family.mjs';
+import { family } from './lsp-family.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const seen = new Set(),
   notices = [];
@@ -64,7 +64,7 @@ for (const path of [
 }
 notices.sort();
 const notice =
-  `Tatrman — Table Transformation Manager\nCopyright 2026 Collite\n\nLicensed under the Apache License, Version 2.0; see LICENSE.\n\nThe Designer family distributes bundled worker/compiler code and uses the runtime\ndependencies below. This cumulative notice includes their license texts; some\ndependencies are installed separately rather than embedded in every family member.\n\n` +
+  `Tatrman — Table Transformation Manager\nCopyright 2026 Collite\n\nLicensed under the Apache License, Version 2.0; see LICENSE.\n\nThe lsp family distributes bundled worker/compiler code and uses the runtime\ndependencies below. This cumulative notice includes their license texts; some\ndependencies are installed separately rather than embedded in every family member.\n\n` +
   notices.join('\n\n========================================\n\n') +
   '\n';
 for (const name of family.filter((n) => n !== 'edit')) {

@@ -6,12 +6,12 @@ import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
-import { family } from './designer-family.mjs';
+import { family } from './lsp-family.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
-const output = resolve(process.argv[2] ?? 'build/designer-family');
+const output = resolve(process.argv[2] ?? 'build/lsp-family');
 mkdirSync(output, { recursive: true });
 const version = JSON.parse(
-  readFileSync(join(root, 'packages/designer/package.json'), 'utf8')
+  readFileSync(join(root, 'packages/lsp/package.json'), 'utf8')
 ).version;
 assert.match(version, /^\d+\.\d+\.\d+$/);
 const artifacts = [];
@@ -34,19 +34,10 @@ for (const name of family) {
     !files.some((f) => /(__tests__|\.test\.|\.spec\.|\.map$)/.test(f)),
     `${name}: test/source-map leak`
   );
-  if (name === 'designer') {
-    const entry = execFileSync('tar', ['-xzOf', path, 'package/dist/package/index.js'], {
-      encoding: 'utf8',
-    });
-    assert.ok(
-      !entry.includes('?url') && !entry.includes('?worker'),
-      'Consumer must not transform the worker'
-    );
-    assert.ok(
-      entry.includes('new URL("./browser.worker.js", import.meta.url)'),
-      'Worker must use the emitted sidecar'
-    );
-  }
+  // The Studio loads this worker file from the tarball; the editor hosts spawn the stdio server.
+  if (name === 'lsp')
+    for (const entry of ['browser.worker.js', 'server-stdio.js'])
+      assert.ok(files.includes(`package/dist/package/${entry}`), `lsp: ${entry} missing`);
   for (const [dep, version] of Object.entries(manifest.dependencies ?? {})) {
     assert.ok(!version.startsWith('workspace:'), `${name}: workspace dependency ${dep}`);
     if (dep.startsWith('@tatrman/'))
@@ -77,7 +68,7 @@ writeFileSync(
   join(output, 'manifest.json'),
   JSON.stringify(
     {
-      family: 'designer',
+      family: 'lsp',
       version,
       commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
       artifacts,
@@ -90,4 +81,4 @@ writeFileSync(
   join(output, 'SHA256SUMS'),
   artifacts.map((a) => `${a.sha256}  ${a.file}`).join('\n') + '\n'
 );
-console.log(`Verified ${artifacts.length} Designer family tarballs in ${output}`);
+console.log(`Verified ${artifacts.length} lsp family tarballs in ${output}`);

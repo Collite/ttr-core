@@ -5,8 +5,8 @@ import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
-const artifacts = resolve(process.argv[2] ?? 'build/designer-family');
-const output = resolve(process.argv[3] ?? 'build/designer-consumer');
+const artifacts = resolve(process.argv[2] ?? 'build/lsp-family');
+const output = resolve(process.argv[3] ?? 'build/lsp-consumer');
 const receipt = JSON.parse(readFileSync(join(artifacts, 'manifest.json'), 'utf8'));
 for (const a of receipt.artifacts)
   assert.equal(
@@ -23,12 +23,11 @@ for (const manager of ['npm', 'pnpm']) {
   execFileSync(
     process.execPath,
     [
-      fileURLToPath(new URL('./designer-consumer-leg.mjs', import.meta.url)),
+      fileURLToPath(new URL('./lsp-consumer-leg.mjs', import.meta.url)),
       artifacts,
       out,
-      ...(process.argv[4] ? [resolve(process.argv[4])] : []),
     ],
-    { stdio: 'inherit', env: { ...process.env, DESIGNER_PACKAGE_MANAGER: manager } }
+    { stdio: 'inherit', env: { ...process.env, LSP_PACKAGE_MANAGER: manager } }
   );
   reports[manager] = JSON.parse(readFileSync(join(out, 'report.json'), 'utf8'));
 }
