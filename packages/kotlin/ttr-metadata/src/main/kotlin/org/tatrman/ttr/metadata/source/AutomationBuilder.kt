@@ -98,6 +98,7 @@ internal object AutomationBuilder {
                     deliverable = bool(b["deliverable"]) ?: false,
                     due = duration(b["due"]),
                     dryRun = localizedOf(b["dry_run"]),
+                    byRole = roleName(b["by"]),
                 )
             "service" ->
                 AutomationService(
@@ -294,6 +295,16 @@ internal object AutomationBuilder {
             else -> null
         }
 
+    private fun roleName(value: AutoValue?): String? =
+        (value as? AutoValue.Id)?.parts?.takeIf { it.size == 2 && it[0] == "role" }?.get(1)
+
+    private fun roleNames(value: AutoValue?): List<String>? =
+        when (value) {
+            is AutoValue.Id -> roleName(value)?.let(::listOf)
+            is AutoValue.ListV -> value.items.map { roleName(it) ?: return null }
+            else -> null
+        }
+
     private val DEPLOYMENT_FLAGS =
         listOf("dry_run", "enabled", "debug", "ungoverned", "allow_restricted_view", "approval_override", "obo_only")
 
@@ -320,6 +331,8 @@ internal object AutomationBuilder {
             val problem =
                 when {
                     badFlags.isNotEmpty() -> "has non-boolean ${badFlags.joinToString { "`$it:`" }}"
+                    b["startable_by"] != null && roleNames(b["startable_by"]) == null ->
+                        "has malformed `startable_by:` (expected role.<r> or a list of roles)"
                     runAs == null -> "has a missing or malformed `run_as:`"
                     target == null -> "has a missing or malformed `target:`"
                     // D-142: it ran a process; the flow moves to the engine, it does not gain a program
@@ -351,6 +364,7 @@ internal object AutomationBuilder {
                 approvalOverride = bool(b["approval_override"]) ?: false,
                 readCeiling = int(b["read_ceiling"]),
                 oboOnly = bool(b["obo_only"]) ?: false,
+                startableBy = roleNames(b["startable_by"]),
                 properties = b.entries.map { it.key to it.value },
                 sourceLocation = d.source,
             )
