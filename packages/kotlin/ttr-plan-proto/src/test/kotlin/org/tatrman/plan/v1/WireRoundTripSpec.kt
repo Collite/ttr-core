@@ -107,7 +107,8 @@ class WireRoundTripSpec :
                                             call("eq", column("order_number"), key),
                                             call("in", column("state"), placed),
                                         ),
-                                    ).addReadBefore("state"),
+                                    ).addReadBefore("so_state")
+                                    .addPriorKeys("state"),
                             ).addRows(
                                 RowWrite
                                     .newBuilder()
@@ -118,7 +119,7 @@ class WireRoundTripSpec :
                     ).build()
             PlanNode.parseFrom(root.toByteArray()) shouldBe root
             PlanNode.getDescriptor().findFieldByName("row_writes").number shouldBe 18
-            RowWrite.getDescriptor().fields.map { it.number } shouldBe (1..6).toList()
+            RowWrite.getDescriptor().fields.map { it.number } shouldBe (1..7).toList()
             ColumnValue.getDescriptor().fields.map { it.number } shouldBe listOf(1, 2)
         }
 

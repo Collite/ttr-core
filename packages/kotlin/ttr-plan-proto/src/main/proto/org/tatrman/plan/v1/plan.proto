@@ -240,6 +240,7 @@ message RowWrite {
   Expression where = 4;           // key equality plus optional compare-and-set guard
   bool if_absent = 5;             // INSERT only: ON CONFLICT DO NOTHING
   repeated string read_before = 6; // locked before UPDATE/DELETE, returned as prior JSON
+  repeated string prior_keys = 7;  // prior JSON keys, one per read_before; set by lowering from names as sent; empty = read_before
 }
 enum RowWriteOp {
   ROW_WRITE_OP_UNSPECIFIED = 0;

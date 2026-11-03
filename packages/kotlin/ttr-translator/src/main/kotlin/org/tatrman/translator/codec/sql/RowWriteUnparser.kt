@@ -20,7 +20,7 @@ import org.tatrman.translate.v1.SqlDialect
  * A prior read is materialized and locked by key alone; the CAS predicate is evaluated on that
  * locked row, so a miss still reports prior and retains the lock. The modifying CTE depends on
  * prior through FROM/USING, rather than relying on textual CTE order. JSON contains only the
- * requested read_before columns (physical names after lowering), never the extra lock/key fields.
+ * requested read_before columns, aliased to prior_keys (or read_before when empty), never the extra lock/key fields.
  */
 object RowWriteUnparser {
     data class Statement(
@@ -123,7 +123,12 @@ object RowWriteUnparser {
             prefix =
                 "WITH prior AS MATERIALIZED (SELECT _rw_target.* FROM $target AS _rw_target WHERE $keySql FOR UPDATE), "
             // Project only read_before; row_to_json retains identifier spelling and null values.
-            val selected = row.readBeforeList.joinToString(", ") { "_rw_prior.${quote(it)}" }
+            val selected =
+                row.readBeforeList
+                    .mapIndexed { index, column ->
+                        val key = if (row.priorKeysCount == 0) column else row.getPriorKeys(index)
+                        "_rw_prior.${quote(column)} AS ${quote(key)}"
+                    }.joinToString(", ")
             prior =
                 "(SELECT row_to_json(_rw_before)::text FROM (SELECT $selected FROM prior AS _rw_prior) AS _rw_before)"
             join = keys.joinToString(" AND ") { "_rw_target.${quote(it)} = _rw_prior.${quote(it)}" }
@@ -199,6 +204,15 @@ object RowWriteUnparser {
             names.any(String::isEmpty)
         ) {
             fail("row_writes_values", "Duplicate or empty target column")
+        }
+        if (row.priorKeysCount > 0 &&
+            (
+                row.priorKeysCount != row.readBeforeCount ||
+                    row.priorKeysList.any(String::isEmpty) ||
+                    row.priorKeysCount != row.priorKeysList.toSet().size
+            )
+        ) {
+            fail("row_writes_prior", "prior_keys must contain one non-empty, distinct key per read_before column")
         }
         if (row.readBeforeList.size !=
             row.readBeforeList.toSet().size

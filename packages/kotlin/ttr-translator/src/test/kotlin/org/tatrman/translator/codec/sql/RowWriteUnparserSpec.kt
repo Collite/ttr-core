@@ -9,7 +9,8 @@ import io.kotest.matchers.types.shouldBeInstanceOf
 import org.tatrman.plan.v1.*
 import org.tatrman.translate.v1.Language
 import org.tatrman.translate.v1.SqlDialect
-import org.tatrman.translator.framework.InMemoryModelHandle
+import org.tatrman.translator.framework.*
+import org.tatrman.translator.orchestrator.ParseResult
 import org.tatrman.translator.orchestrator.Translator
 import org.tatrman.translator.orchestrator.UnparseResult
 import java.net.URI
@@ -27,10 +28,35 @@ class RowWriteUnparserSpec :
         val target =
             QualifiedName
                 .newBuilder()
+                .setSchemaCode(SchemaCode.ER)
+                .setNamespace("entity")
+                .setName("order")
+                .build()
+
+        val table =
+            target
+                .toBuilder()
                 .setSchemaCode(SchemaCode.DB)
                 .setNamespace("dbo")
-                .setName("orders")
+                .setName("sales_order")
                 .build()
+        val renames =
+            mapOf("id" to "so_order_number", "state" to "so_state", "held_for" to "so_held_for")
+        val model =
+            InMemoryModelHandle(
+                tables =
+                    listOf(
+                        ModelTable(
+                            table,
+                            renames.values.map { ModelColumn(it, SurfaceType.TEXT) },
+                            listOf("so_order_number"),
+                        ),
+                    ),
+                entities = listOf(ModelEntity(target, renames.keys.map { ModelAttribute(it, SurfaceType.TEXT) })),
+                entityMappings = mapOf(target to EntityMapping.ToTable(table)),
+                attributeRenames = mapOf(target to renames),
+            )
+        val translator = Translator(model)
 
         fun connection(): Connection {
             val endpoint = requireNotNull(uri) { "TTRP_CONFORM_PG=1 requires TTR_CONN_ERP_PG" }
@@ -96,13 +122,33 @@ class RowWriteUnparserSpec :
             .setOp(RowWriteOp.UPDATE)
             .addValues(ColumnValue.newBuilder().setName("state").setValue(param("next")))
             .addReadBefore("state")
+            .addReadBefore("held_for")
             .setWhere(call("and", call("eq", col("id"), number(id)), call("in", col("state"), text(from))))
             .build()
 
         fun sql(
             row: RowWrite,
             params: List<ParameterBinding> = emptyList(),
-        ) = RowWriteUnparser.unparse(row, SqlDialect.POSTGRESQL, params, listOf("id"))
+        ): RowWriteUnparser.Statement {
+            val node = PlanNode.newBuilder().setRowWrites(RowWrites.newBuilder().addRows(row)).build()
+            val parsed =
+                translator.parseToRelNode(
+                    node.toByteArray().toString(Charsets.ISO_8859_1),
+                    Language.REL_NODE,
+                    SchemaCode.DB,
+                )
+            if (parsed is ParseResult.Failure) throw RowWriteUnparseException(parsed.code, parsed.message)
+            val result =
+                translator.unparseFromRelNode(
+                    (parsed as ParseResult.Success).plan,
+                    Language.SQL,
+                    SqlDialect.POSTGRESQL,
+                    parameters = params,
+                )
+            if (result is UnparseResult.Failure) throw RowWriteUnparseException(result.code, result.message)
+            result as UnparseResult.Success
+            return RowWriteUnparser.Statement(result.output, result.parameters)
+        }
 
         fun execute(
             c: Connection,
@@ -135,7 +181,9 @@ class RowWriteUnparserSpec :
                 connection().use { c ->
                     c.createStatement().use { s ->
                         s.execute("CREATE SCHEMA $schema")
-                        s.execute("CREATE TABLE orders (id bigint PRIMARY KEY, state text)")
+                        s.execute(
+                            "CREATE TABLE sales_order (so_order_number bigint PRIMARY KEY, so_state text, so_held_for text)",
+                        )
                     }
                 }
             }
@@ -147,7 +195,13 @@ class RowWriteUnparserSpec :
                 }
             }
         }
-        beforeTest { if (enabled) connection().use { c -> c.createStatement().use { it.execute("TRUNCATE orders") } } }
+        beforeTest {
+            if (enabled) {
+                connection().use { c ->
+                    c.createStatement().use { it.execute("TRUNCATE sales_order") }
+                }
+            }
+        }
 
         test("live PostgreSQL harness answers SELECT 1").config(enabled = enabled) {
             connection().use { c ->
@@ -171,7 +225,7 @@ class RowWriteUnparserSpec :
                 execute(c, statement) shouldBe (1L to null)
                 execute(c, sql(insert(1, absent = true))) shouldBe (0L to null)
                 c.createStatement().use { s ->
-                    s.executeQuery("SELECT state FROM orders").use { r ->
+                    s.executeQuery("SELECT so_state FROM sales_order").use { r ->
                         r.next()
                         r.getString(1) shouldBe
                             payload
@@ -193,8 +247,8 @@ class RowWriteUnparserSpec :
                         Value.newBuilder().setIntValue(1).build(),
                         Value.newBuilder().setStringValue("placed").build(),
                     )
-                execute(c, change) shouldBe (1L to "{\"state\":\"placed\"}")
-                execute(c, change) shouldBe (0L to "{\"state\":\"held\"}")
+                execute(c, change) shouldBe (1L to "{\"state\":\"placed\",\"held_for\":null}")
+                execute(c, change) shouldBe (0L to "{\"state\":\"held\",\"held_for\":null}")
                 execute(c, sql(update(id = 99), listOf(binding("next", "held")))) shouldBe (0L to null)
                 c.rollback()
             }
@@ -206,18 +260,20 @@ class RowWriteUnparserSpec :
                     owner.autoCommit = false
                     contender.autoCommit = false
                     execute(owner, sql(update(), listOf(binding("next", "cancelled")))) shouldBe
-                        (0L to "{\"state\":\"held\"}")
+                        (0L to "{\"state\":\"held\",\"held_for\":null}")
                     contender.createStatement().use { it.execute("SET LOCAL lock_timeout = '200ms'") }
                     shouldThrow<SQLException> {
                         contender.createStatement().use {
-                            it.executeUpdate("UPDATE orders SET state = 'cancelled' WHERE id = 1")
+                            it.executeUpdate("UPDATE sales_order SET so_state = 'cancelled' WHERE so_order_number = 1")
                         }
                     }.sqlState shouldBe
                         "55P03"
                     contender.rollback()
                     owner.commit()
                     contender.createStatement().use {
-                        it.executeUpdate("UPDATE orders SET state = 'cancelled' WHERE id = 1") shouldBe
+                        it.executeUpdate(
+                            "UPDATE sales_order SET so_state = 'cancelled' WHERE so_order_number = 1",
+                        ) shouldBe
                             1
                     }
                     contender.rollback()
@@ -247,7 +303,7 @@ class RowWriteUnparserSpec :
                 shouldThrow<SQLException> { execute(c, sql(insert(1))) }.sqlState shouldBe "23505"
                 c.rollback()
                 c.createStatement().use { s ->
-                    s.executeQuery("SELECT count(*) FROM orders").use { r ->
+                    s.executeQuery("SELECT count(*) FROM sales_order").use { r ->
                         r.next()
                         r.getLong(1) shouldBe
                             0
@@ -257,12 +313,25 @@ class RowWriteUnparserSpec :
         }
         test("every non-Postgres dialect refuses through Translator with the row-write diagnostic") {
             val translator = Translator(InMemoryModelHandle(tables = emptyList()))
-            val node = PlanNode.newBuilder().setRowWrites(RowWrites.newBuilder().addRows(insert(1))).build()
+            val node =
+                PlanNode
+                    .newBuilder()
+                    .setRowWrites(
+                        RowWrites.newBuilder().addRows(insert(1).toBuilder().setTarget(table)),
+                    ).build()
             for (dialect in SqlDialect.entries.filter { it != SqlDialect.POSTGRESQL }) {
                 translator
                     .unparseFromRelNode(node, Language.SQL, dialect)
                     .shouldBeInstanceOf<UnparseResult.Failure>()
                     .code shouldBe "row_writes_unsupported_dialect"
+            }
+        }
+        test("prior_keys must match read_before and contain distinct non-empty keys") {
+            val row = update().toBuilder().setTarget(table)
+            for (keys in listOf(listOf("state"), listOf("state", "state"), listOf("state", ""))) {
+                shouldThrow<RowWriteUnparseException> {
+                    RowWriteUnparser.unparse(row.clone().addAllPriorKeys(keys).build(), SqlDialect.POSTGRESQL)
+                }.code shouldBe "row_writes_prior"
             }
         }
         test("unsafe write shapes and unbound values refuse before producing SQL") {

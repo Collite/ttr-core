@@ -99,13 +99,20 @@ class RowWritesMappingSpec :
             for (column in renames.values) text shouldContain "target: { column: db.dbo.sales_order.$column }"
         }
         test("values, read_before and nested key plus CAS predicates lower through the binding") {
-            val input = node(update().addValues(ColumnValue.newBuilder().setName("held_for").setValue(param("reason"))))
+            val input =
+                node(
+                    update()
+                        .addReadBefore(
+                            "held_for",
+                        ).addValues(ColumnValue.newBuilder().setName("held_for").setValue(param("reason"))),
+                )
             val result = MapToPhysical.apply(input, model).shouldBeInstanceOf<MapToPhysicalResult.Success>().plan
             val row = result.rowWrites.rowsList.single()
             row.target shouldBe table
             row.valuesList.map { it.name } shouldBe listOf("so_state", "so_held_for")
             row.valuesList.map { it.value.parameter.name } shouldBe listOf("next", "reason")
-            row.readBeforeList shouldBe listOf("so_state")
+            row.readBeforeList shouldBe listOf("so_state", "so_held_for")
+            row.priorKeysList shouldBe listOf("state", "held_for")
             row.where.function.operandsList[0]
                 .function.operandsList[0]
                 .columnRef.name shouldBe "so_order_number"
@@ -113,6 +120,31 @@ class RowWritesMappingSpec :
                 .function.operandsList[0]
                 .columnRef.name shouldBe "so_state"
             MapToPhysical.apply(result, model).shouldBeInstanceOf<MapToPhysicalResult.Success>().plan shouldBe result
+        }
+        test("two prior attributes sharing one column refuse and name both attributes") {
+            val aliased =
+                InMemoryModelHandle(
+                    tables = listOf(ModelTable(table, listOf(ModelColumn("so_state", SurfaceType.TEXT)))),
+                    entities =
+                        listOf(
+                            ModelEntity(
+                                entity,
+                                listOf(
+                                    ModelAttribute("state", SurfaceType.TEXT),
+                                    ModelAttribute("held_for", SurfaceType.TEXT),
+                                ),
+                            ),
+                        ),
+                    entityMappings = mapOf(entity to EntityMapping.ToTable(table)),
+                    attributeRenames = mapOf(entity to mapOf("state" to "so_state", "held_for" to "so_state")),
+                )
+            val result =
+                MapToPhysical
+                    .apply(node(update().addReadBefore("held_for")), aliased)
+                    .shouldBeInstanceOf<MapToPhysicalResult.Failure>()
+            result.code shouldBe "row_writes_prior"
+            result.message shouldContain "state"
+            result.message shouldContain "held_for"
         }
         test("an identity-mapped attribute uses its own physical column name") {
             MapToPhysical

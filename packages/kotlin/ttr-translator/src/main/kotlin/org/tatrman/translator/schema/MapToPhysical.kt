@@ -224,6 +224,18 @@ object MapToPhysical {
                                     .build()
                             },
                         ).addAllReadBefore(row.readBeforeList.map(::column))
+                if (er && row.priorKeysCount == 0) result.addAllPriorKeys(row.readBeforeList)
+                val duplicates =
+                    row.readBeforeList
+                        .groupBy(::column)
+                        .values
+                        .firstOrNull { it.size > 1 }
+                if (duplicates != null) {
+                    throw MapToPhysicalException(
+                        "row_writes_prior",
+                        "read_before attributes $duplicates resolve to the same column",
+                    )
+                }
                 if (row.hasWhere()) result.setWhere(expression(row.where))
                 result.build()
             }

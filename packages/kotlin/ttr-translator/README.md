@@ -90,7 +90,9 @@ one row or call `RowWriteUnparser` directly). Postgres resolves tables through t
 
 For `read_before`, a materialized key-only SELECT locks the row before the modifying CTE evaluates
 its guard. A CAS miss still returns the locked prior; an absent key returns null. `prior` contains
-only `read_before` columns, using their physical names after lowering. Supply the physical primary
+only `read_before` columns, aliased to `prior_keys` (field 7): the names originally sent, so an ER
+writer reads attribute names such as `prior.state`. Empty `prior_keys` means use `read_before` as keys
+(for direct DB-coded calls). Supply the physical primary
 key columns when available; otherwise the unparser uses top-level equality predicates outside
 `read_before`, and refuses a missing key predicate. Each statement returns exactly one row
 `(rows_affected bigint, prior text)`. Other dialects refuse with `row_writes_unsupported_dialect`.
