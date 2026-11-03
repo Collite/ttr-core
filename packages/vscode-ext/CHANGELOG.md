@@ -7,6 +7,8 @@ the grammar/IDE-support line owned by the `tatrman` repo.
 
 Grammar 0.17.1 — the cn semantics in the editor.
 
+- **Removed: "Open in Designer"** (`modeler.openInDesigner`). It was a placeholder that only said the Designer
+  would be wired later. The graphical view of a model is the Studio, a Collite product (D-33, Studio Free).
 - **Checked.** cn references resolve (bare in a cn slot, or with the `cn.` head, among concepts only), `grounds:` and
   `concept { }` desugar to bindings, and the model-level `cn/*` diagnostics show as you type (lint category `cn`;
   the hygiene ones off under `recommended`). Goto, find-references and rename work across concept defs, bindings,

@@ -7,7 +7,7 @@
 import { planTtrlExtraction, isSkip, type TtrlMigrationResult, type TtrlMigrationSkip } from './ttrl-migrate.js';
 
 // `dist`/`build` are gitignored generated output (caught at T5's real run: a stale
-// bundled copy of the v1.1-mini samples under packages/designer/dist/ was found and
+// bundled copy of the v1.1-mini samples under the Designer's dist/ (then in this repo) was found and
 // would have been "migrated" as if it were source — never touch generated output).
 const SKIP_DIRS = new Set(['.modeler', 'node_modules', '.git', 'dist', 'build']);
 

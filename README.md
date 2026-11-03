@@ -2,7 +2,7 @@
 
 **Tatrman** ("table transformation manager") — the home of the **TTR** language family:
 
-- **TTR-M** — the modeling language: a VS Code extension, a static React graphical designer, and a shared TypeScript LSP server. All consumers share one parser, one semantic engine, and one LSP.
+- **TTR-M** — the modeling language: a VS Code extension and a shared TypeScript LSP server. All consumers share one parser, one semantic engine, and one LSP.
 - **TTR-P** — the processing language (in design; see [`docs/features/ttr-p/`](docs/features/ttr-p/)): dataflow programs over TTR-M models, compiled to SQL/Polars and executed across engines. Fragment dialects TTR-SQL / TTR-pandas; NL surface TTR-B.
 
 The runtime side of TTR is consumed by `ai-platform`/`kantheon` (separate repos); this repo is editor/compiler tooling only.
@@ -21,10 +21,16 @@ after intent — translation, row-level security, execution — is deterministic
 auditable by construction. Governance is applied to the *plan*, not to the answer.
 
 This repository is the **language and toolchain** home of that ecosystem: the TTR
-grammar, the shared LSP, the graphical Designer, and the published parser/writer
-artifacts. The governed **read spine** that turns a question into an answer lives
-in the companion [`tatrman-server`](https://github.com/Collite/ttr-server)
-repo.
+grammar, the shared LSP, and the published parser/writer artifacts. The governed
+**read spine** that turns a question into an answer lives in the companion
+[`tatrman-server`](https://github.com/Collite/ttr-server) repo.
+
+**The Studio.** The Studio (viewer, modeler, reports …) is a Collite product in
+ttr-platform; its read-only tier Studio Free is free — see [TRADEMARKS.md](TRADEMARKS.md).
+The graphical Designer moved there in November 2026. Everything the Studio reads
+stays open here: the TTR formats and schemas, and the four packages it is built on
+(`@tatrman/lsp`, `@tatrman/parser`, `@tatrman/tokens`, `@tatrman/edit`, released
+together under `lsp/v*` — see [PUBLISHING.md](PUBLISHING.md)).
 
 **Status labels** used across the docs: **live** (running at a production pilot) ·
 **extracted** (implemented in the open lineage) · **planned** (designed, not
@@ -34,8 +40,8 @@ built) · **parked** (deliberately deferred). A one-command quickstart and the
 ## What ships in v1
 
 - **VS Code extension** — `.ttrm` syntax highlighting, diagnostics, hover, go-to-definition, find-references, workspace symbol search.
-- **Graphical Designer** — read-only React + React Flow renderer for `db` and `er` schemas. Display-mode toggle (just-names / with-types / with-constraints), schema toggle (db ↔ er), inspector panel with symbol details and reference navigation, per-graph layout persistence via `.ttrg` files. Deployed via GitHub Pages; `?demo=v1.1-mini` query loads the sample project without an upload.
-- **Tatrman LSP** — single TypeScript server, two transports: stdio for VS Code / IntelliJ, Web Worker for the Designer. Custom `modeler/*` methods documented in [packages/lsp/README.md](packages/lsp/README.md).
+- **Graphical Designer** — read-only React + React Flow renderer for `db` and `er` schemas. Display-mode toggle (just-names / with-types / with-constraints), schema toggle (db ↔ er), inspector panel with symbol details and reference navigation, per-graph layout persistence via `.ttrg` files. Since November 2026 part of the Studio (see *The Studio* above).
+- **Tatrman LSP** — single TypeScript server, two transports: stdio for VS Code / IntelliJ, Web Worker for browser hosts such as the Studio. Custom `modeler/*` methods documented in [packages/lsp/README.md](packages/lsp/README.md).
 
 ## What ships in v1.1
 
@@ -79,7 +85,6 @@ pnpm -r typecheck
 ### Per-package commands
 
 ```bash
-pnpm --filter @tatrman/designer-core dev          # Vite dev server on http://localhost:5173
 pnpm --filter ttr-modeler-vsc test:smoke # boots VS Code, runs 5 smoke cases
 pnpm --filter @tatrman/integration-tests test
 ```
@@ -95,7 +100,6 @@ For the VS Code extension dev cycle, open `packages/vscode-ext` in VS Code and p
 | [`@tatrman/semantics`](packages/semantics/README.md) | Symbol table, resolver, validator, reference index — browser-safe core plus a Node-only subpath for disk I/O |
 | [`@tatrman/lsp`](packages/lsp/README.md) | LSP server (stdio + browser worker), Phase-3 custom `modeler/*` methods |
 | [`ttr-modeler-vsc`](packages/vscode-ext/README.md) | VS Code extension — thin shim, all language logic lives in the LSP |
-| [`@tatrman/designer-core`](packages/designer/README.md) | React + React Flow Designer; deployed via GitHub Pages |
 
 ## Documentation
 

@@ -1,1 +1,0 @@
-{"jsonrpc":"2.0","id":5,"result":{"hits":[{"qname":"acme.erp.db.customers","score":0.98,"matchedField":"name"}]}}

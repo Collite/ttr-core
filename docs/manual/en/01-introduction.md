@@ -2,7 +2,7 @@
 
 ## What TTR is
 
-TTR is a **modeling language**. You use it to write down — in plain text — what your data looks like: the tables in your database, the business entities they represent, and how those two views line up. The files you write are checked, navigated, and visualized by editor tooling (a VS Code extension and a graphical designer), but TTR itself is just text. It is version-controlled like code, reviewed like code, and diffed like code.
+TTR is a **modeling language**. You use it to write down — in plain text — what your data looks like: the tables in your database, the business entities they represent, and how those two views line up. The files you write are checked and navigated by editor tooling (a VS Code extension and its language server) and drawn as diagrams by the Studio, a Collite product, but TTR itself is just text. It is version-controlled like code, reviewed like code, and diffed like code.
 
 TTR describes data; it does not run it. There is no TTR query engine and no TTR migration tool baked into this language. A TTR model is a *description* that other systems read. Think of it the way you think of a database schema diagram — except precise enough for a machine to validate.
 

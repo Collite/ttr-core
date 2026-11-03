@@ -1,6 +1,6 @@
 # Graphs and diagrams
 
-A model of any size has too many objects to show at once. A **graph** — a `.ttrg` file — is a curated slice: a named, hand-picked set of objects from one model (perspective), optionally with saved positions, that the graphical designer renders as a diagram. Graphs are how you make focused, shareable pictures of a model without exporting anything.
+A model of any size has too many objects to show at once. A **graph** — a `.ttrg` file — is a curated slice: a named, hand-picked set of objects from one model (perspective), optionally with saved positions, that a graphical viewer such as the Studio renders as a diagram. Graphs are how you make focused, shareable pictures of a model without exporting anything.
 
 ## What a graph is
 
@@ -31,7 +31,7 @@ graph sales_er {
 
 ## What gets drawn
 
-The designer draws an object only if it is **listed in `objects`**. For an edge — a relation or a foreign key — to appear, both of its endpoints *and* the edge object itself must be in the list. This is deliberate: a graph shows exactly what you put in it, with no surprise nodes pulled in by association.
+A viewer draws an object only if it is **listed in `objects`**. For an edge — a relation or a foreign key — to appear, both of its endpoints *and* the edge object itself must be in the list. This is deliberate: a graph shows exactly what you put in it, with no surprise nodes pulled in by association.
 
 In the example above, the relation `shop.sales.er.entity.order_customer` is listed alongside both entities it connects (`order` and `customer`), so the edge is drawn. Drop the relation from the list and the two entities still appear, just unconnected.
 
@@ -59,7 +59,7 @@ graph sales_er {
 - **`viewport`** — the saved zoom and pan, plus a `displayMode` (for example `"with-types"` to show attribute types on the nodes).
 - **`nodes`** — an `{ x, y }` position per object. Objects without a saved position are auto-placed.
 
-You normally do not hand-write `layout`. You arrange the diagram in the designer and it writes these positions back into the `.ttrg` file. Because the result is plain text, layout changes diff and review like any other change — you can see in a pull request that someone moved the fact to the center.
+You normally do not hand-write `layout`. You arrange the diagram in the Studio and it writes these positions back into the `.ttrg` file. Because the result is plain text, layout changes diff and review like any other change — you can see in a pull request that someone moved the fact to the center.
 
 ## Graphs vs. the model
 
@@ -78,7 +78,7 @@ Both a `.ttrg` graph and a [`def area`](10-packages-and-imports.md#areas) are cu
 | Purpose | a **picture** for people | a **scope** for downstream consumers |
 | Lists | individual qnames, one model | whole packages (recursive) + individual entities |
 | Has layout / positions | yes | no |
-| Read by | the graphical designer | tools that load a slice of the model (e.g. an agent) |
+| Read by | a graphical viewer (the Studio) | tools that load a slice of the model (e.g. an agent) |
 
 A graph says "draw exactly these objects"; an area says "this named slice of the model is what such-and-such consumer may see." They are independent — you can have a graph and an area over the same slice, or either without the other.
 

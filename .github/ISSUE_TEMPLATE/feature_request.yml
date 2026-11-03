@@ -15,7 +15,7 @@ body:
       options:
         - Language (TTR-M / TTR-P / grammar / semantics)
         - Server (services, MCP surface, contracts, plan)
-        - Toolchain (parser/writer, IDE, Designer, CLI)
+        - Toolchain (parser/writer, IDE, CLI)
         - Docs / DX
         - Not sure
     validations:

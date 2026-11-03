@@ -1,10 +1,13 @@
 # Tatrman layout — shared test vectors (format 1)
 
 **This folder is published.** It is the contract every implementation of the Tatrman layout format is
-tested against — Tatrman's own (in TypeScript `@tatrman/parser/layout` and the Studio Viewer's YAML form
-and resolution; on the JVM `TtrgLayoutWriter` / `TtrgGraphReader` / `TtrgLayoutReader` / `LayoutResolver`) and any third party's. A third party may copy
-it (pin the commit it was copied from) and assert the same equalities below. Change a file here only
-together with every implementation; the tests read these files directly, never a copy.
+tested against. In this repository the tests read these files directly, never a copy: TypeScript
+`@tatrman/parser/layout` (the TTR form), the JSON Schema (every `layout.yaml` validates against
+`layout.schema.json`), and on the JVM `TtrgLayoutWriter` / `TtrgGraphReader` / `TtrgLayoutReader` /
+`LayoutResolver`. The reference YAML writer and reader and the TypeScript resolution are the Studio's, in
+ttr-platform (Collite), which tests a pinned copy of this folder. A third party may copy it the same way
+(pin the commit it was copied from) and assert the same equalities below. Change a file here only together
+with every implementation in this repository; a copy follows at its next pin.
 
 The format itself — the document, both serializations, the resolution rule — is described on the docs
 page [Layout files](https://docs.tatrman.org/model/layout-files/); the YAML form has a JSON Schema,

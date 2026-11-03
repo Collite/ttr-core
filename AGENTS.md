@@ -53,33 +53,8 @@ skills later.
 
 ## Designer canvas
 
-### Workspace deps must be built before the Vite dev server starts
-
-- `packages/designer` imports `@tatrman/canvas-core`, `@tatrman/lsp`,
-  `@tatrman/perspectives`, `@tatrman/tokens`, and `@tatrman/deep-links`
-  through their `dist/` entry points (`"main": "./dist/index.js"`), so
-  `pnpm install` alone leaves them unresolvable — `pnpm run dev` dies at
-  dep-scan with `Failed to resolve entry for package "@tatrman/canvas-core"`.
-- Run `pnpm --filter "@tatrman/designer-core^..." build` (or `pnpm -r build`) from
-  the repo root once after cloning or after cleaning `dist/`.
-
-### One `SAMPLE_NAME` drives both the dev server and the build
-
-- `packages/designer/vite.config.ts` holds a single `SAMPLE_NAME` const wired
-  to *both* the dev middleware serving `/samples/<name>/*` and the
-  `closeBundle` copy into `dist/samples/`. `?demo=<any-other-name>` is not
-  served: the request falls through to the SPA fallback and the demo loader's
-  `JSON.parse` chokes on the returned `<!DOCTYPE …>`.
-- Switching demos means editing that const, not just the URL.
-
-### A mocked render engine hides every render-time bug
-
-- Mocking the canvas engine (React Flow, ELK) in a unit test makes the test
-  blind to everything only the real engine does: a node measured at 0×0, a
-  layout that never settles, an edge pointing at a handle id that doesn't
-  exist, a graph shape the engine renders as a pile of boxes. Mocked tests are
-  necessary, not sufficient.
-- Either exercise a real instance against a fixture (jsdom runs real React
-  Flow once `src/test-setup.ts` stubs `ResizeObserver` and `matchMedia`), or
-  budget for render-time bugs being found by looking at the running app — the
-  dev server, or the built bundle / container image in a real browser.
+- Moved: the Designer and its canvas packages left this repo for ttr-platform
+  (D-33, Studio Free). The three notes that were here described that code
+  (workspace deps built before the Vite dev server, the one `SAMPLE_NAME`, a
+  mocked render engine hiding render-time bugs); they stay in this file's git
+  history.

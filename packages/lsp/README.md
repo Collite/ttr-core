@@ -2,14 +2,14 @@
 
 **Status:** v1, 2026-05-18. Full Phase 3 implementation shipped.
 
-LSP server for TTR (Tatrman) language. Powers VS Code extension, Designer (browser worker), and IntelliJ plugin.
+LSP server for TTR (Tatrman) language. Powers VS Code extension, the Studio (browser worker), and IntelliJ plugin.
 
 ## Entry Points
 
 | File | Transport | Used by |
 |------|-----------|---------|
 | `dist/server-stdio.js` | stdio | VS Code extension, IntelliJ plugin |
-| `dist/server-browser.js` | Web Worker | Designer (browser) |
+| `dist/server-browser.js` | Web Worker | the Studio (browser; published as `browser.worker.js`) |
 
 ## Standard LSP Methods
 
