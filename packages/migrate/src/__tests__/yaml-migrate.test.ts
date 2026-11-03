@@ -18,8 +18,8 @@ import { runYamlMigration } from '../yaml-migrate.js';
 const race = vi.hoisted(() => ({
   afterRename: undefined as (() => void) | undefined,
   failRename: undefined as string | undefined,
+  failWrite: undefined as string | undefined,
   beforeLstat: undefined as ((path: unknown) => void) | undefined,
-  failRemove: undefined as { path: string; error: Error } | undefined,
   removed: [] as string[],
 }));
 vi.mock('node:fs/promises', async (importOriginal) => {
@@ -30,10 +30,13 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       race.beforeLstat?.(args[0]);
       return actual.lstat(...args);
     },
+    writeFile: async (...args: Parameters<typeof actual.writeFile>) => {
+      await actual.writeFile(...args);
+      if (race.failWrite && String(args[0]).startsWith(`${race.failWrite}.migrate-`))
+        throw Object.assign(new Error('simulated write failure'), { code: 'ENOSPC' });
+    },
     rm: async (...args: Parameters<typeof actual.rm>) => {
       race.removed.push(String(args[0]));
-      if (race.failRemove && String(args[0]).startsWith(`${race.failRemove.path}.migrate-`))
-        throw race.failRemove.error;
       return actual.rm(...args);
     },
     rename: async (...args: Parameters<typeof actual.rename>) => {
@@ -73,8 +76,8 @@ process.stdout.write(JSON.stringify({ source, changed: source !== r.source }));
   afterEach(() => {
     race.afterRename = undefined;
     race.failRename = undefined;
+    race.failWrite = undefined;
     race.beforeLstat = undefined;
-    race.failRemove = undefined;
     race.removed = [];
     chmodSync(root, 0o755);
     rmSync(root, { recursive: true, force: true });
@@ -315,6 +318,19 @@ process.stdout.write(JSON.stringify({source: ${JSON.stringify(after)}, changed: 
     });
     expect(readFileSync(file, 'utf8')).toBe(after);
     expect(readFileSync(second, 'utf8')).toBe(before);
+    expect(race.removed.filter((path) => path.startsWith(`${file}.migrate-`))).toEqual([]);
+    expect(race.removed.filter((path) => path.startsWith(`${second}.migrate-`))).toHaveLength(1);
+    expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
+  });
+  it('keeps staging write errors raw and removes partly written temporary files', async () => {
+    const second = join(root, 'second.yaml');
+    writeFileSync(second, before);
+    race.failWrite = second;
+    const error = await runYamlMigration([file, second], options()).catch((error: Error) => error);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({ message: 'simulated write failure', code: 'ENOSPC' });
+    expect(readFileSync(file, 'utf8')).toBe(before);
+    expect(readFileSync(second, 'utf8')).toBe(before);
     expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
   });
   it('reports none after a first-replacement rename failure and removes its staged files', async () => {
@@ -369,21 +385,14 @@ process.stdout.write(JSON.stringify({source: ${JSON.stringify(after)}, changed: 
     expect(readFileSync(second, 'utf8')).toBe(before);
     expect(readdirSync(root).filter((name) => name.includes('.migrate-'))).toHaveLength(1);
   });
-  for (const failedCleanup of ['first', 'second']) {
-    it(`does not remove renamed temp paths when ${failedCleanup} temp removal would fail`, async () => {
-      const second = join(root, 'second.yaml');
-      writeFileSync(second, before);
-      race.failRemove = {
-        path: failedCleanup === 'first' ? file : second,
-        error: Object.assign(new Error('simulated cleanup failure'), { code: 'EACCES' }),
-      };
-      const result = await runYamlMigration([file, second], options());
-      expect(result.writes.map((write) => write.path)).toEqual([file, second]);
-      expect(race.removed).toEqual([]);
-      expect(readFileSync(file, 'utf8')).toBe(after);
-      expect(readFileSync(second, 'utf8')).toBe(after);
-      expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
-    });
-  }
-
+  it('does not remove renamed temporary paths after a successful migration', async () => {
+    const second = join(root, 'second.yaml');
+    writeFileSync(second, before);
+    const result = await runYamlMigration([file, second], options());
+    expect(result.writes.map((write) => write.path)).toEqual([file, second]);
+    expect(race.removed).toEqual([]);
+    expect(readFileSync(file, 'utf8')).toBe(after);
+    expect(readFileSync(second, 'utf8')).toBe(after);
+    expect(readdirSync(root).some((name) => name.includes('.migrate-'))).toBe(false);
+  });
 });
