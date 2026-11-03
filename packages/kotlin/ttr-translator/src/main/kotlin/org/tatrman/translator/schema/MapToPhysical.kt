@@ -117,6 +117,9 @@ object MapToPhysical {
         plan: PlanNode,
         model: ModelHandle,
     ): PlanNode {
+        if (plan.rowWrites.rowsCount == 0) {
+            throw MapToPhysicalException("row_writes_empty", "RowWrites must contain at least one RowWrite")
+        }
         val rows =
             plan.rowWrites.rowsList.map { row ->
                 val er = row.target.schemaCode == SchemaCode.ER

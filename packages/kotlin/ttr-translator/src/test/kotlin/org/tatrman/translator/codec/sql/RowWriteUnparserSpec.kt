@@ -327,6 +327,20 @@ class RowWriteUnparserSpec :
                     .code shouldBe "row_writes_unsupported_dialect"
             }
         }
+        test("empty RowWrites refuses in both parse and unparse halves") {
+            val empty = PlanNode.newBuilder().setRowWrites(RowWrites.getDefaultInstance()).build()
+            translator
+                .parseToRelNode(
+                    empty.toByteArray().toString(Charsets.ISO_8859_1),
+                    Language.REL_NODE,
+                    SchemaCode.DB,
+                ).shouldBeInstanceOf<ParseResult.Failure>()
+                .code shouldBe "row_writes_empty"
+            translator
+                .unparseFromRelNode(empty, Language.SQL, SqlDialect.POSTGRESQL)
+                .shouldBeInstanceOf<UnparseResult.Failure>()
+                .code shouldBe "row_writes_empty"
+        }
         test("multi-row plans lower as a batch but SQL unparse requires one RowWrite per call") {
             for (count in listOf(1, 2)) {
                 val node =

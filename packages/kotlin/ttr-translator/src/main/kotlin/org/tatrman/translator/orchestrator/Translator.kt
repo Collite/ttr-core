@@ -843,6 +843,9 @@ class Translator(
     ): UnparseResult {
         return try {
             if (plan.nodeCase == PlanNode.NodeCase.ROW_WRITES) {
+                if (plan.rowWrites.rowsCount == 0) {
+                    return UnparseResult.Failure("row_writes_empty", "RowWrites must contain at least one RowWrite")
+                }
                 if (plan.rowWrites.rowsCount > 1) {
                     return UnparseResult.Failure(
                         "row_writes_one_row",
@@ -865,7 +868,7 @@ class Translator(
                             .unparse(row, targetDialect, parameters, keys)
                     }
                 return UnparseResult.Success(
-                    output = statements.singleOrNull()?.sql.orEmpty(),
+                    output = statements.single().sql,
                     parameters = statements.flatMap { it.parameters },
                 )
             }
