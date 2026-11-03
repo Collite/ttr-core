@@ -5,6 +5,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.tatrman.plan.v1.*
 import org.tatrman.translate.v1.Language
@@ -290,9 +291,9 @@ class RowWriteUnparserSpec :
                         .setTarget(
                             target,
                         ).setOp(RowWriteOp.DELETE)
-                        .setWhere(call("in", col("id"), number(1), number(2)))
+                        .setWhere(call("eq", col("id"), number(1)))
                         .build()
-                execute(c, sql(delete)) shouldBe (2L to null)
+                execute(c, sql(delete)) shouldBe (1L to null)
                 execute(c, sql(delete)) shouldBe (0L to null)
             }
         }
@@ -324,6 +325,89 @@ class RowWriteUnparserSpec :
                     .unparseFromRelNode(node, Language.SQL, dialect)
                     .shouldBeInstanceOf<UnparseResult.Failure>()
                     .code shouldBe "row_writes_unsupported_dialect"
+            }
+        }
+        test("UPDATE and DELETE require every primary-key equality, even without read_before") {
+            val physical =
+                update()
+                    .toBuilder()
+                    .setTarget(table)
+                    .clearReadBefore()
+                    .clearWhere()
+            val pk = "so_order_number"
+            for (op in listOf(RowWriteOp.UPDATE, RowWriteOp.DELETE)) {
+                val write = physical.clone().setOp(op)
+                if (op == RowWriteOp.DELETE) write.clearValues()
+                for (where in listOf(
+                    call("in", col("so_state"), text("cancelled")),
+                    call("eq", number(1), number(1)),
+                    call("or", call("eq", col(pk), number(1)), call("eq", col(pk), number(2))),
+                )) {
+                    shouldThrow<RowWriteUnparseException> {
+                        RowWriteUnparser.unparse(
+                            write.clone().setWhere(where).build(),
+                            SqlDialect.POSTGRESQL,
+                            keyColumns = listOf(pk),
+                        )
+                    }.code shouldBe "row_writes_key"
+                }
+            }
+        }
+        test("a target without a primary key refuses with or without a prior read, including direct API calls") {
+            val noKey = Translator(InMemoryModelHandle(tables = listOf(ModelTable(table, model.columns(table)))))
+            for (op in listOf(RowWriteOp.UPDATE, RowWriteOp.DELETE)) {
+                for (read in listOf(emptyList(), listOf("so_state"))) {
+                    val row =
+                        update()
+                            .toBuilder()
+                            .setTarget(table)
+                            .setOp(op)
+                            .clearReadBefore()
+                            .addAllReadBefore(read)
+                            .setWhere(
+                                call(
+                                    "and",
+                                    call("eq", col("so_order_number"), number(12)),
+                                    call("eq", col("version"), number(3)),
+                                ),
+                            )
+                    if (op == RowWriteOp.DELETE) row.clearValues()
+                    val node = PlanNode.newBuilder().setRowWrites(RowWrites.newBuilder().addRows(row)).build()
+                    val refusal =
+                        noKey
+                            .unparseFromRelNode(node, Language.SQL, SqlDialect.POSTGRESQL)
+                            .shouldBeInstanceOf<UnparseResult.Failure>()
+                    refusal.code shouldBe "row_writes_key"
+                    refusal.message shouldContain "sales_order"
+                    shouldThrow<RowWriteUnparseException> {
+                        RowWriteUnparser.unparse(row.build(), SqlDialect.POSTGRESQL)
+                    }.code shouldBe "row_writes_key"
+                }
+            }
+        }
+        test("composite primary keys require both top-level equalities") {
+            val keys = listOf("sl_order_number", "sl_line_no")
+            val row = RowWrite.newBuilder().setTarget(table.toBuilder().setName("sales_line")).setOp(RowWriteOp.DELETE)
+            val order = call("eq", col(keys[0]), number(1))
+            val line = call("eq", number(2), col(keys[1]))
+            val statement =
+                RowWriteUnparser.unparse(
+                    row.clone().setWhere(call("and", order, line)).build(),
+                    SqlDialect.POSTGRESQL,
+                    keyColumns = keys,
+                )
+            statement.parameters.size shouldBe 2
+            for (where in listOf(order, call("or", order, line))) {
+                val refusal =
+                    shouldThrow<RowWriteUnparseException> {
+                        RowWriteUnparser.unparse(
+                            row.clone().setWhere(where).build(),
+                            SqlDialect.POSTGRESQL,
+                            keyColumns = keys,
+                        )
+                    }
+                refusal.code shouldBe "row_writes_key"
+                refusal.message shouldContain "sl_"
             }
         }
         test("prior_keys must match read_before and contain distinct non-empty keys") {

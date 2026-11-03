@@ -92,9 +92,10 @@ For `read_before`, a materialized key-only SELECT locks the row before the modif
 its guard. A CAS miss still returns the locked prior; an absent key returns null. `prior` contains
 only `read_before` columns, aliased to `prior_keys` (field 7): the names originally sent, so an ER
 writer reads attribute names such as `prior.state`. Empty `prior_keys` means use `read_before` as keys
-(for direct DB-coded calls). Supply the physical primary
-key columns when available; otherwise the unparser uses top-level equality predicates outside
-`read_before`, and refuses a missing key predicate. Each statement returns exactly one row
+(for direct DB-coded calls). UPDATE/DELETE require the table's physical primary key from the
+model, with a top-level `eq(column, literal | parameter)` conjunct for every key column. Tables
+without a PK and missing key equalities refuse with `row_writes_key`, with or without a prior
+read. Direct `RowWriteUnparser` callers must supply `keyColumns`; no key is inferred. Each statement returns exactly one row
 `(rows_affected bigint, prior text)`. Other dialects refuse with `row_writes_unsupported_dialect`.
 
 The executed PG specs opt in with `TTRP_CONFORM_PG=1` and `TTR_CONN_ERP_PG` (the same URI convention

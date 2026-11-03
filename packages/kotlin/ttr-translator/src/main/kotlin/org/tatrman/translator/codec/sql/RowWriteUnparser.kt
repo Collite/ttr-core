@@ -104,21 +104,20 @@ object RowWriteUnparser {
         val prefix: String
         val prior: String
         val join: String
-        if (locked) {
-            val equalities = conjuncts(row.where).filter { keyEquality(it) != null }
-            val keys =
-                keyColumns.ifEmpty {
-                    equalities
-                        .mapNotNull(
-                            ::keyEquality,
-                        ).filterNot { it in row.readBeforeList }
+        val predicates =
+            if (row.op == RowWriteOp.INSERT) {
+                emptyList()
+            } else {
+                if (keyColumns.isEmpty()) {
+                    fail("row_writes_key", "Table ${row.target.name} has no primary key; a row write needs one")
                 }
-            if (keys.isEmpty()) fail("row_writes_key", "read_before requires a key equality")
-            val predicates =
-                keys.map { key ->
+                val equalities = conjuncts(row.where).filter { keyEquality(it) != null }
+                keyColumns.map { key ->
                     equalities.firstOrNull { keyEquality(it) == key }
-                        ?: fail("row_writes_key", "Missing equality for key $key")
+                        ?: fail("row_writes_key", "Missing equality for primary-key column $key of ${row.target.name}")
                 }
+            }
+        if (locked) {
             val keySql = predicates.joinToString(" AND ") { expression(it, "_rw_target") }
             prefix =
                 "WITH prior AS MATERIALIZED (SELECT _rw_target.* FROM $target AS _rw_target WHERE $keySql FOR UPDATE), "
@@ -131,7 +130,7 @@ object RowWriteUnparser {
                     }.joinToString(", ")
             prior =
                 "(SELECT row_to_json(_rw_before)::text FROM (SELECT $selected FROM prior AS _rw_prior) AS _rw_before)"
-            join = keys.joinToString(" AND ") { "_rw_target.${quote(it)} = _rw_prior.${quote(it)}" }
+            join = keyColumns.joinToString(" AND ") { "_rw_target.${quote(it)} = _rw_prior.${quote(it)}" }
         } else {
             prefix = "WITH "
             prior = "NULL::text"
