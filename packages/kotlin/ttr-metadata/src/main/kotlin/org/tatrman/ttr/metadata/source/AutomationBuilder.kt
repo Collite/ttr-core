@@ -295,6 +295,7 @@ internal object AutomationBuilder {
             else -> null
         }
 
+    // Keep the role.<name> shape aligned with EngineAttributes.role and the validator twins.
     private fun roleName(value: AutoValue?): String? =
         (value as? AutoValue.Id)?.parts?.takeIf { it.size == 2 && it[0] == "role" }?.get(1)
 

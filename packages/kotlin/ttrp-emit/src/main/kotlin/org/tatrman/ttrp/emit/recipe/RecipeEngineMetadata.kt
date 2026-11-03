@@ -10,7 +10,11 @@ import org.tatrman.ttrp.bundle.RecipeExecutor
 import org.tatrman.ttrp.graph.TtrpPipeline
 import org.tatrman.ttrp.graph.recipe.RecipeModel
 
-/** One projection shared by the catalog and manifest; empty additions are omitted for byte compatibility. */
+/**
+ * One projection shared by the catalog and manifest. A bundle keeps its bytes when its wired actions declare no
+ * `by`/`due`, and its deployments and their executors declare no `startable_by`/`egress_url`. A `due:` written before
+ * CG-2 now adds `recipe.actions.<a>.due` and the catalog's `actions:` line.
+ */
 data class RecipeEngineMetadata(
     val actions: Map<String, RecipeAction>? = null,
     val deployments: Map<String, RecipeDeployment>? = null,
@@ -42,7 +46,7 @@ data class RecipeEngineMetadata(
                                 name to
                                     RecipeAction(
                                         by = action.byRole?.let { "role.$it" },
-                                        due = action.due?.let { RecipeDuration(it.amount, it.unit) },
+                                        due = action.due?.let { RecipeDuration(it.amount.toLong(), it.unit) },
                                     )
                             }
                         }.toMap()

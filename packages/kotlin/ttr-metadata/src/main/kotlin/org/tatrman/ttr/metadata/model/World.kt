@@ -100,7 +100,13 @@ data class WorldExecutor(
     override val kind: String = "executor"
 
     /** Engine egress endpoint (D-158), retained in the manifest's raw property map too. */
-    val egressUrl: String? get() = (manifest["egress_url"] as? PropertyValue.StringValue)?.raw
+    val egressUrl: String?
+        get() =
+            when (val value = manifest["egress_url"]) {
+                is PropertyValue.StringValue -> value.raw
+                is PropertyValue.TripleStringValue -> value.raw
+                else -> null
+            }
 }
 
 data class WorldStorage(

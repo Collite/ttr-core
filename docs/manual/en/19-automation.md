@@ -325,13 +325,16 @@ engine uses this role for its user task's candidate group (D-144/D-161).
 The optional duration must have a whole, non-negative amount and a unit of
 `seconds`, `minutes`, `hours`, `days`, `working_days`, `weeks` or `months`.
 Invalid values produce `TTRP-ACT-003`. A timer boundary and its fallback remain
-part of the authored BPMN process.
+part of the authored BPMN process. This is the action's declared default (D-98).
+A wiring call's `due:` wins for that call and is carried in `wiring[].columns.due`.
 
 `def deployment.startable_by: role.sales_manager` limits who can start that
 deployment (D-161). A list such as `[role.sales_manager, role.ops]` is also accepted;
 every entry must resolve to a declared role (`TTRP-ACT-002`). An explicit empty
 list is retained and permits no role to start the deployment. Absence leaves
-start permissions unspecified.
+start permissions unspecified. `recipe.deployments` is a build-time copy for exporters.
+No bundle fingerprint covers deployments, so the start check reads `startable_by`
+from the live world, never from a bundle.
 
 `def executor.egress_url: "http://process-engine-egress/automation"` declares the
 engine's egress endpoint (D-158). The optional value must be a string
@@ -347,7 +350,9 @@ to the exporters' adoption stage.
 Manifest v3 adds optional `recipe.actions` (`by`, `due: { amount, unit }`),
 `recipe.deployments` (`startableBy`) and `recipe.executors` (`egressUrl`) maps.
 Role references retain their `role.` prefix. The generated recipe catalog carries
-the same data with TTR-M property spelling. Empty additions are omitted, so
-bundles unaffected by these attributes retain their bytes. JVM consumers must
+the same data with TTR-M property spelling. Empty additions are omitted.
+A bundle keeps its bytes when its wired actions declare no `by`/`due`, and its deployments and their executors
+declare no `startable_by`/`egress_url`. A `due:` written before CG-2 now adds `recipe.actions.<a>.due` and the
+catalog's `actions:` line. JVM consumers must
 rebuild against the released grammar bundle because metadata and SPI data-class
 constructors gain fields; the grammar remains 0.22.

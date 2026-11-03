@@ -827,7 +827,7 @@
       "ask": {
         "by": "role.process_owner",
         "due": {
-          "amount": 2.0,
+          "amount": 2,
           "unit": "working_days"
         }
       }

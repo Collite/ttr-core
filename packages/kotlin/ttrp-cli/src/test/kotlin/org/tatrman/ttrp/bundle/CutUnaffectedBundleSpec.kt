@@ -9,10 +9,12 @@ import java.nio.file.Path
 import java.security.MessageDigest
 
 /**
- * AU-core CG (D-142) T1 — the grammar cut leaves an unaffected bundle byte-identical. The two `17` hero recipes unaffected by CG-2 approval metadata
- * are built over the Core fixture model as cut (no removed construct anywhere); every file of every bundle —
- * manifest v3, islands, catalog, README — must hash as it did when the digests were recorded with the toolchain
- * BEFORE the cut (grammar 0.21, `-DupdateGolden=true` on master 0c1e3d74 with the cut fixtures).
+ * AU-core CG (D-142): all four hero bundles retain their pre-cut digests after stripping only CG-2 additions.
+ * A bundle keeps its bytes when its wired actions declare no `by`/`due`, and its deployments and their executors
+ * declare no `startable_by`/`egress_url`. A `due:` written before CG-2 now adds `recipe.actions.<a>.due` and the
+ * catalog's `actions:` line. Only these additions are stripped from release_order and decide_return; every other
+ * byte is pinned to the pre-cut toolchain (grammar 0.21, master 0c1e3d74 with the cut fixtures).
+ * Re-recording writes all four recipes' stripped digests, preserving the complete golden.
  */
 class CutUnaffectedBundleSpec :
     StringSpec({
@@ -37,9 +39,9 @@ class CutUnaffectedBundleSpec :
         fun sha256(bytes: ByteArray): String =
             MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
-        "the hero bundles over a model without removed constructs are byte-identical to the pre-cut toolchain's" {
+        "all four hero bundles match the pre-cut bytes after stripping only the CG-2 additions" {
             val lines =
-                listOf("monitor_inbound", "settle").flatMap { name ->
+                listOf("release_order", "decide_return", "monitor_inbound", "settle").flatMap { name ->
                     val out = Files.createTempDirectory("cut-unaffected-$name")
                     val result =
                         BundleAssembler("1.0.0").build(
@@ -50,23 +52,44 @@ class CutUnaffectedBundleSpec :
                             modelsRoot = fixtures.resolve("model"),
                             outDir = out,
                         )
+                    val stripEngineMetadata = name in setOf("release_order", "decide_return")
+                    val catalogPath = "catalog/$name.ttrm"
+                    val strippedCatalog =
+                        Files
+                            .readString(result.dir.resolve(catalogPath))
+                            .lineSequence()
+                            .filterNot { stripEngineMetadata && it.trimStart().startsWith("actions: ") }
+                            .joinToString("\n")
+                    val catalogHash = sha256(strippedCatalog.toByteArray())
+                    val decoded = RunManifest.fromJson(result.manifest.toJson())
+                    val strippedManifest =
+                        decoded
+                            .copy(
+                                recipe = decoded.recipe!!.copy(actions = null, deployments = null, executors = null),
+                                files = decoded.files + (catalogPath to "sha256:$catalogHash"),
+                            ).toJson()
                     Files.walk(result.dir).use { paths ->
                         paths
                             .filter { Files.isRegularFile(it) }
                             .map {
-                                "$name/${result.dir.relativize(it).toString().replace('\\', '/')}" to
-                                    sha256(Files.readAllBytes(it))
+                                val relative =
+                                    result.dir
+                                        .relativize(it)
+                                        .toString()
+                                        .replace('\\', '/')
+                                val bytes =
+                                    when {
+                                        !stripEngineMetadata -> Files.readAllBytes(it)
+                                        relative == catalogPath -> strippedCatalog.toByteArray()
+                                        relative == "manifest.json" -> strippedManifest.toByteArray()
+                                        else -> Files.readAllBytes(it)
+                                    }
+                                "$name/$relative" to sha256(bytes)
                             }.toList()
                     }
                 }
             val text = lines.sortedBy { it.first }.joinToString("") { (file, sha) -> "$sha  $file\n" }
             if (System.getProperty("updateGolden") == "true") Files.writeString(golden, text)
-            Files
-                .readAllLines(golden)
-                .filter {
-                    it.substringAfter("  ").substringBefore('/') in
-                        setOf("monitor_inbound", "settle")
-                }.joinToString("", postfix = "") { "$it\n" } shouldBe
-                text
+            Files.readString(golden) shouldBe text
         }
     })

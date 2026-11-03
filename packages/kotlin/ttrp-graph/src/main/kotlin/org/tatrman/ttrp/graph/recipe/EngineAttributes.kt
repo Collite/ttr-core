@@ -44,6 +44,7 @@ internal object EngineAttributes {
                 add(TtrpDiagnostic(id, Severity.ERROR, message, location))
             }
 
+            // Keep the role.<name> shape aligned with AutomationBuilder.roleName and the validator twins.
             fun role(
                 value: AutoValue,
                 what: String,
@@ -98,11 +99,11 @@ internal object EngineAttributes {
                 }
                 for (executor in world.executors) {
                     executor.manifest["egress_url"]?.let { value ->
-                        if (value !is PropertyValue.StringValue) {
+                        if (value !is PropertyValue.StringValue && value !is PropertyValue.TripleStringValue) {
                             refuse(
                                 TtrpDiagnosticId.ACT_004,
                                 "executor `${executor.qname.name}` `egress_url:` must be a string",
-                                executor.sourceLocation,
+                                value.source,
                             )
                         }
                     }
@@ -110,5 +111,6 @@ internal object EngineAttributes {
             }
         }
 
+    // Keep aligned with AutomationValidator.DURATION_UNITS and the TypeScript duration() validator.
     private val UNITS = setOf("seconds", "minutes", "hours", "days", "working_days", "weeks", "months")
 }

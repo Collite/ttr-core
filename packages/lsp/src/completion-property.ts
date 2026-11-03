@@ -53,16 +53,17 @@ export interface PackageNameCompletionOptions {
   projectSymbols: import('@tatrman/semantics').ProjectSymbolTable;
 }
 
-/**
- * Grammar 0.22 (D-142): properties the grammar still RECOGNISES for one release, only so the automation validator
- * refuses them (`ttr/automation-removed`) — never offered.
- */
+/** CG-2: free-form keys the checker types, offered by name. */
 const ENGINE_PROPERTIES: Record<string, PropertyInfo[]> = {
   action: [{ name: 'by', type: 'role reference' }, { name: 'due', type: 'duration' }],
   deployment: [{ name: 'startable_by', type: 'role reference or list of role references' }],
   executor: [{ name: 'egress_url', type: 'string' }],
 };
 
+/**
+ * Grammar 0.22 (D-142): properties the grammar still RECOGNISES for one release, only so the automation validator
+ * refuses them (`ttr/automation-removed`) — never offered.
+ */
 const REMOVED_PROPERTIES: Partial<Record<string, ReadonlySet<string>>> = { role: new Set(['delivery']) };
 
 export function getPropertyNameCompletions(

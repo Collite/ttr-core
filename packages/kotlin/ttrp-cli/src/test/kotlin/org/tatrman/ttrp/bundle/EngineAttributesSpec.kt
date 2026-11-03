@@ -75,6 +75,13 @@ class EngineAttributesSpec :
         val automation = "models/hartland/automation/automation.ttrm"
         val world = "models/hartland/worlds/demo.ttrm"
 
+        fun worldModel(checked: TtrpPipeline.PlanResult) =
+            checked.frontendReport!!
+                .modelIndex!!
+                .objectsByQname.values
+                .filterIsInstance<org.tatrman.ttr.metadata.model.World>()
+                .single { it.qname.name == "demo" }
+
         "startable_by checks every role in a list" {
             val dir = project()
             edit(dir, world, "startable_by: role.sales_manager", "startable_by: [role.sales_manager, role.nobody]")
@@ -89,6 +96,16 @@ class EngineAttributesSpec :
                 val checked = plan(dir)
                 checked.ok shouldBe false
                 checked.diagnostics.any { it.id.id == "TTRP-ACT-002" } shouldBe true
+                worldModel(checked).deployment("release_event")!!.startableBy shouldBe emptyList()
+            }
+        }
+        "absent and explicit empty startable_by remain distinct in metadata" {
+            for ((entry, expected) in listOf("" to null, "startable_by: []" to emptyList<String>())) {
+                val dir = project()
+                edit(dir, world, "startable_by: role.sales_manager", entry)
+                val checked = plan(dir)
+                checked.ok shouldBe true
+                worldModel(checked).deployment("release_event")!!.startableBy shouldBe expected
             }
         }
         "an empty startable_by list is preserved and egress_url must be a string" {
@@ -107,7 +124,9 @@ class EngineAttributesSpec :
             edit(dir, world, "egress_url: \"http://process-engine-egress/automation\"", "egress_url: 42")
             val checked = plan(dir)
             checked.ok shouldBe false
-            checked.diagnostics.any { it.id.id == "TTRP-ACT-004" } shouldBe true
+            val diagnostic = checked.diagnostics.single { it.id.id == "TTRP-ACT-004" }
+            val line = Files.readAllLines(dir.resolve(world))[diagnostic.location.line - 1]
+            line.substring(diagnostic.location.column).startsWith("42") shouldBe true
         }
         "action by checks the declared role" {
             val dir = project()
@@ -192,6 +211,72 @@ class EngineAttributesSpec :
                 RunManifest.fromJson(bundled.manifest.toJson()) shouldBe bundled.manifest
             }
         }
+        "only this recipe's deployments and their targeted executors enter its bundle" {
+            val dir = project()
+            edit(
+                dir,
+                world,
+                "program: decide_on_request,  target: engine, run_as: identity.automation_decider",
+                "program: decide_on_request,  target: engine, run_as: identity.automation_decider, startable_by: role.customer_care",
+            )
+            edit(
+                dir,
+                world,
+                "def executor py",
+                "def executor spare { extends: n8n_l1, egress_url: \"http://spare\" }\n    def executor py",
+            )
+            val release = build(dir)
+            release.manifest.recipe!!
+                .deployments!!
+                .keys shouldBe setOf("release_event")
+            release.manifest.recipe!!
+                .executors!!
+                .keys shouldBe setOf("engine")
+            val catalog = Files.readString(release.dir.resolve("catalog/release_order.ttrm"))
+            catalog shouldContain "deployments: { release_event:"
+            catalog shouldContain "executors: { engine:"
+            ("decide_event" in catalog) shouldBe false
+            ("spare" in catalog) shouldBe false
+            val decide = build(dir, "decide_return")
+            decide.manifest.recipe!!
+                .deployments!!
+                .getValue("decide_event")
+                .startableBy shouldBe
+                listOf("role.customer_care")
+            Files.readString(decide.dir.resolve("catalog/decide_return.ttrm")) shouldContain
+                "decide_event: { startable_by: [role.customer_care] }"
+        }
+        "triple-quoted egress_url checks and reaches manifest and SPI" {
+            val dir = project()
+            val url = "http://process-engine-egress/automation"
+            val triple = "\"\"\""
+            edit(dir, world, "egress_url: \"$url\"", "egress_url: $triple$url$triple")
+            val checked = plan(dir)
+            checked.ok shouldBe true
+            val model = worldModel(checked)
+            model.executors.single { it.qname.name == "engine" }.egressUrl shouldBe url
+            val bundled = build(dir)
+            bundled.manifest.recipe!!
+                .executors!!
+                .getValue("engine")
+                .egressUrl shouldBe url
+            val deployment = model.deployment("release_event")!!
+            val program =
+                checked.frontendReport!!
+                    .modelIndex!!
+                    .automationAll()
+                    .filterIsInstance<org.tatrman.ttr.metadata.model.AutomationProgram>()
+                    .single { it.qname.name == deployment.program }
+            val graph =
+                org.tatrman.ttrp.emit.recipe.RecipeGraphProjector.project(
+                    bundled.manifest,
+                    model,
+                    program,
+                    deployment,
+                    RecipeActionDependenciesForTest.actions(checked).values.toList(),
+                )
+            graph.deployment.egressUrl shouldBe url
+        }
         "by due startable_by and egress_url survive catalog and manifest round-trips" {
             val dir = project()
             edit(dir, world, "startable_by: role.sales_manager", "startable_by: [role.sales_manager, role.ops]")
@@ -213,8 +298,7 @@ class EngineAttributesSpec :
                 .getValue("due")
                 .jsonObject
                 .getValue("amount")
-                .jsonPrimitive.content
-                .toDouble() shouldBe 2.0
+                .jsonPrimitive.content shouldBe "2"
             action
                 .getValue("due")
                 .jsonObject

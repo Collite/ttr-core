@@ -436,6 +436,6 @@ class EmitCommand : CliktCommand(name = "emit") {
 
     companion object {
         val RECIPE_TYPES =
-            setOf("native", "n8n_l1", "camunda_7", "camunda_8", "python_client", "python_offline", "sql_job")
+            org.tatrman.ttrp.graph.capability.WorldBinder.AUTOMATION_EXECUTOR_TYPES
     }
 }

@@ -51,6 +51,8 @@ data class AutomationDiagnostic(
  */
 object AutomationValidator {
     private val PARAMETER_TYPES = setOf("decimal", "int", "text", "date", "days", "working_days", "bool")
+
+    // Keep aligned with EngineAttributes.UNITS and the TypeScript duration() validator.
     private val DURATION_UNITS = setOf("seconds", "minutes", "hours", "days", "working_days", "weeks", "months")
     private val COLUMN_TYPES = setOf("text", "int", "decimal", "date", "timestamp", "bool", "rows", "role", "action")
     private val NATIVE_SINKS = setOf("transition", "writer", "obligation")

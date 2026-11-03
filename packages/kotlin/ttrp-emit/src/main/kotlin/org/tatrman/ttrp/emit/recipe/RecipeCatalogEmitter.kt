@@ -63,7 +63,7 @@ object RecipeCatalogEmitter {
                             val entries =
                                 listOfNotNull(
                                     action.by?.let { "by: $it" },
-                                    action.due?.let { "due: ${number(it.amount)} ${it.unit}" },
+                                    action.due?.let { "due: ${it.amount} ${it.unit}" },
                                 )
                             "$name: ${entries.joinToString(", ", "{ ", " }") }"
                         },

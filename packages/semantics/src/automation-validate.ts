@@ -47,6 +47,7 @@ export interface AutomationDiagnostic {
 }
 
 const PARAMETER_TYPES = new Set(['decimal', 'int', 'text', 'date', 'days', 'working_days', 'bool']);
+// Keep aligned with Kotlin AutomationValidator.DURATION_UNITS and EngineAttributes.UNITS.
 const DURATION_UNITS = new Set(['seconds', 'minutes', 'hours', 'days', 'working_days', 'weeks', 'months']);
 const COLUMN_TYPES = new Set(['text', 'int', 'decimal', 'date', 'timestamp', 'bool', 'rows', 'role', 'action']);
 const NATIVE_SINKS = new Set(['transition', 'writer', 'obligation']);

@@ -966,7 +966,8 @@
                       "months"
                     ]
                   }
-                }
+                },
+                "description": "The action's declared default (D-98). A wiring call's due: wins for that call and is carried in wiring[].columns.due."
               }
             }
           }
@@ -988,7 +989,8 @@
                 }
               }
             }
-          }
+          },
+          "description": "This is a build-time copy for exporters. No bundle fingerprint covers deployments, so the start check reads startable_by from the live world, never from a bundle."
         },
         "executors": {
           "type": "object",

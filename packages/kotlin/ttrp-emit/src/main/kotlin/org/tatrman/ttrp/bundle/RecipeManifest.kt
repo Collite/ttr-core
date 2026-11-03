@@ -55,7 +55,11 @@ data class RecipeManifest(
     val approvalDependencies: RecipeApprovalDependencies? = null,
     /** CG-2 engine action metadata; absent when no wired action declares `by` or `due`. */
     val actions: Map<String, RecipeAction>? = null,
-    /** Start permissions for deployments of this recipe's programs (D-161). */
+    /**
+     * Start permissions for deployments of this recipe's programs (D-161).
+     * This is a build-time copy for exporters. No bundle fingerprint covers deployments, so the start check
+     * reads `startable_by` from the live world, never from a bundle.
+     */
     val deployments: Map<String, RecipeDeployment>? = null,
     /** Egress endpoints of the executors those deployments target (D-158). */
     val executors: Map<String, RecipeExecutor>? = null,
@@ -174,12 +178,16 @@ data class RecipeFingerprints(
 @Serializable
 data class RecipeAction(
     val by: String? = null,
+    /**
+     * The action's declared default (D-98). A wiring call's `due:` wins for that call and is carried in
+     * `wiring[].columns.due`.
+     */
     val due: RecipeDuration? = null,
 )
 
 @Serializable
 data class RecipeDuration(
-    val amount: Double,
+    val amount: Long,
     val unit: String,
 )
 
