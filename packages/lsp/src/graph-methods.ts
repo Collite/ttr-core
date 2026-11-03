@@ -138,8 +138,8 @@ export function listGraphs(
 
 // ---- binding map (DS-P4.S1) — the er↔db binding-model data, canonicalized so its qnames
 // match the er/db ModelGraph node/row qnames. Feeds BOTH the binding perspective and the
-// er-canvas show-bindings decoration. Structurally compatible with @tatrman/perspectives'
-// BindingMap (the designer adapter passes this straight into the generator).
+// er-canvas show-bindings decoration. Structurally compatible with the Studio's BindingMap
+// (ttr-platform since D-33; its adapter passes this straight into the generator).
 
 export interface BindingMapEntity {
   entityQname: string;

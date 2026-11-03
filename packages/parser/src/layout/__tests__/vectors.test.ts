@@ -2,7 +2,7 @@
 // The shared layout vectors (VL contracts V-46): `packages/package-sdk/schemas/layout-vectors/`, read in
 // place. The document half: every `document.json` is canonical; the TTR writer reproduces `layout.ttrg`
 // byte for byte — or, with no `layout.ttrg`, refuses (A-VL-5); the readers give the document back. The
-// YAML form and the resolution are held to the same vectors by the viewer (`@tatrman/designer`), the JVM
+// YAML form and the resolution are held to the same vectors by the Studio's viewer (ttr-platform), the JVM
 // implementation by ttr-parser / ttr-writer / ttr-metadata.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';

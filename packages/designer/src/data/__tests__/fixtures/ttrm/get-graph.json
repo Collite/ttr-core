@@ -1,1 +1,0 @@
-{"jsonrpc":"2.0","id":21,"result":{"schema":"er","nodes":[{"qname":"acme.erp.db.customers","kind":"table","label":"customers","schema":"db","pkg":"acme.erp"}],"edges":[],"missingObjects":["acme.erp.db.ghost"]}}
