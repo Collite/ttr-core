@@ -140,6 +140,7 @@ vectors.
 - **Test vectors**: `packages/package-sdk/schemas/layout-vectors/` in the same repository. Each case holds a
   document (`document.json`), its YAML and TTR files, a model index and the expected resolution, and its
   `README.md` states exactly what an implementation asserts: the writers reproduce both files **byte for
-  byte**, the readers give the document back, and resolution gives the expected result. Tatrman's own
-  readers and writers — the viewer's and the JVM libraries' — are tested against these files; another
-  implementation can copy the folder at a pinned commit and run the same checks.
+  byte**, the readers give the document back, and resolution gives the expected result. In ttr-core the
+  TTR reader and writer (`@tatrman/parser/layout`), the JSON Schema and the JVM libraries are tested
+  against these files in place; the Studio's YAML reader, writer and resolution test a pinned copy, and
+  another implementation can copy the folder at a pinned commit and run the same checks.

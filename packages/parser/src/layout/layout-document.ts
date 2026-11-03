@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // The layout document (VL contracts §1, V-1…V-5) — one named picture of a schema: the CARDS it shows
-// and, optionally, where they sit. Format-neutral: `layout-yaml.ts` and `layout-ttr.ts` are its two
-// serializations of equal standing; `resolve.ts` maps its refs onto the current model.
+// and, optionally, where they sit. Format-neutral: `layout-ttr.ts` is its serialization in this package;
+// the YAML form (of equal standing) and the resolution of its refs onto the current model live with the
+// Studio (ttr-platform since D-33).
 //
 // Derived, never stored (V-2): `mode` (manual iff positions is non-empty), the edges, the hop edges,
 // missing / ambiguous / ignored refs — and never the viewport (C1-b / invariant 6).

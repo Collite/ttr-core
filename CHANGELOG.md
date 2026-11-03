@@ -17,6 +17,8 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   and are released together by the new **`lsp/v*`** lane (`just publish lsp`, `publish-ts.yml` job `lsp-family`):
   four tarballs with `SHA256SUMS` and `manifest.json` as an internal GitHub release, public npm only on `-RELEASE`.
   The four move to **0.1.4**; `edit/v*` tags still refuse. No release is cut by this change.
+- The VS Code placeholder command *Open in Designer* (`modeler.openInDesigner`) is gone, and the manual, the
+  quickstart and the issue template no longer present a Designer as part of the open tooling.
 
 ### Fixed — Canonical YAML coverage and migration cleanup (ttr-core#374)
 

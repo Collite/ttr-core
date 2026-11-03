@@ -50,9 +50,6 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('modeler.openInDesigner', () => {
-      vscode.window.showInformationMessage('Designer integration will be wired in Phase 3.');
-    }),
     // Invoked by the "N references" code lens.
     vscode.commands.registerCommand('modeler.showReferences', (qname?: string) => {
       vscode.window.showInformationMessage(
