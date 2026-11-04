@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions id="er.query.order_totals_decision_definitions" name="er.query.order_totals" namespace="https://tatrman.org/dmn/hartland.worlds.demo" xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/">
+  <decision id="er.query.order_totals_decision" name="er.query.order_totals_decision">
+    <decisionTable hitPolicy="FIRST" id="er.query.order_totals_decision_table">
+      <input id="er.query.order_totals_decision_input_0" label="total">
+        <inputExpression id="er.query.order_totals_decision_expression_0" typeRef="number">
+          <text>total</text>
+        </inputExpression>
+      </input>
+      <input id="er.query.order_totals_decision_input_1" label="approved">
+        <inputExpression id="er.query.order_totals_decision_expression_1" typeRef="boolean">
+          <text>approved</text>
+        </inputExpression>
+      </input>
+      <input id="er.query.order_totals_decision_input_2" label="row_count">
+        <inputExpression id="er.query.order_totals_decision_expression_2" typeRef="number">
+          <text>row_count</text>
+        </inputExpression>
+      </input>
+      <output id="er.query.order_totals_decision_output" name="outcome" typeRef="string" />
+    </decisionTable>
+  </decision>
+</definitions>
+

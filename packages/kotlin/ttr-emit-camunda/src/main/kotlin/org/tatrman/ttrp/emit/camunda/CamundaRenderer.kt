@@ -840,22 +840,19 @@ internal class CamundaRenderer(
         [FEEL timezone conversion](https://unsupported.docs.camunda.io/8.5/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-conversion/)
         are available there (timezone conversion is already documented in 8.5).
 
-        C7 requires Camunda Connect's HTTP connector, Spin JSON and Groovy for Retry-After normalization and process
-        obligation readiness. Configure TTR_CONN_AUTOMATION
+        C7 requires Camunda Connect's HTTP connector, Spin JSON and Groovy for Retry-After normalization. Configure TTR_CONN_AUTOMATION
         with url (origin, no trailing slash) and token. C8 uses the standard REST outbound connector
         io.camunda:http-json:1; supply TTR_AUTOMATION_URL and connector secret TTR_CONN_AUTOMATION.
-        Credentials are referenced by name and never embedded. C7 cron timers use the engine JVM timezone:
-        ${scheduleZone ?: "UTC (no batch timer)"}. C8 calendar timers use zoned ISO repeating intervals.
+        Credentials are referenced by name and never embedded. Start this one-program BPMN externally;
+        configure scheduling and composition in the engine modeller.
 
         Start with ttrInput={key:..., at:"offset ISO instant"}, keys, or event. Event payload is nested under event;
         at is separate. On C7, ttrInput is a Java Map, including nested maps/lists for events or keys; a REST
         Object variable must deserialize to a Map, rather than a Spin Json variable. This input contract is
         expression-tested; no REST start on a live C7 engine is certified here. On-event deduplication requires a
-        stable at; absent at is a new run. First batch steps use
-        the engine execution id (C8 saves ttrExecutionId, generating one if absent). Every later step uses
-        ttrAnchor + ':<step>', anchored on the first run id, including its recovered re-open id. A duplicate may
-        claim a later step before the original; the original follows its 202 handle without repeating effects.
-        Clocks and Open bodies are saved after process waits, once per step; retries reuse the saved body.
+        stable at; absent at is a new run. A batch program uses the engine execution id
+        (C8 saves ttrExecutionId, generating one if absent). The Open body and its clock are saved once;
+        retries reuse that body.
 
         201 alone drives evaluation. 200 replay completes the step; 202 polls, closed/waiting completes,
         abandoned/failed allows one re-open. A second non-201 recovery refuses. 409 raises TTR_STALE and reaches
@@ -877,8 +874,8 @@ internal class CamundaRenderer(
         enforced by the Server. Read every route page using offset and the Server's default page size; do not
         override its displayRows limit. Empty/short pages before rowCount or inconsistent counts refuse before
         any row action. Missing obligations/actions refuse, never count as empty evidence.
-        Digest delivery is not rendered: every digest program or process step refuses export. Use n8n_l1 or
-        deliver: immediate; Camunda digest rendering is a planned follow-up.
+        Compose obligation watching and digest policies in the engine; recipe process/delivery/schedule
+        constructs were removed in grammar 0.22.
 
         Send tasks are customer template nodes using TTR_CONN_MAIL (C7 external task / C8 job type). Their worker
         belongs to Platform and is not bundled. Resolve TTR_MAIL_RECIPIENTS for role recipients; per-row addresses
@@ -887,8 +884,9 @@ internal class CamundaRenderer(
         explicitly be wet, with the action selected for this key. Required approval is a Camunda user task carrying
         ttrAction/ttrKey; connect its completion to the exchange's task/approval integration before deployment.
 
-        Stale when any step's recipe text/values/labels, program, deployment, world, toolchain or target version
-        differs from the served bundle: re-export. The manifest covers all steps. The structure driver checks
-        route branches, tasks, connections and named calls only; it does not execute connectors or compare verdicts.
+        Stale when model, recipe text/values/labels, program, deployment, world, toolchain or target version
+        differs from the served bundle: re-export. The manifest inventories all emitted artifacts. The structure
+        driver checks routes, tasks, named calls, template bindings and DMN associations offline; it does not
+        execute connectors or compare verdicts.
         """.trimIndent() + "\n"
 }

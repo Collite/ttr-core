@@ -207,10 +207,11 @@ otherwise ordinary declared due durations apply, with an hourly backstop for cal
 an instant. Evaluation and handle polls honour Retry-After (default 15 s)
 with a program-budget plus two-minute recovery-grace bound.
 
-When supplying `--bundle` for a process, point it at a directory containing one ordinary bundle directory per
-recipe name. A plugin must declare process support; native currently refuses process deployments. SPI v2 JVM
-callers must rebuild with the updated toolchain and explicitly declare `spiRevision = 1`; the host refuses older
-v2 plugins before rendering. SPI v1 remains compatible and the grammar version is unchanged.
+`--bundle` supplies the selected program's verified recipe bundle. Camunda exports also read other deployed
+programs' `.ttrp` parameter declarations from the project and resolve their types/values through metadata.
+SPI v2 JVM callers must rebuild with this toolchain and declare `spiRevision = 2`; the host refuses an older
+revision before rendering. SPI v1 stays compatible; this API change does not change the grammar's 0.22 minor.
+The removed process, delivery and schedule SPI fields have no compatibility shims.
 Hartland H-2/winback customer-mail exports refuse until its model supplies the address column. H-2 live
 certification also requires the Server's planned obligations status field.
 
@@ -226,20 +227,19 @@ Its [Zeebe user tasks](https://unsupported.docs.camunda.io/8.6/docs/components/m
 [FEEL timezone conversion](https://unsupported.docs.camunda.io/8.5/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-conversion/)
 are also available by that version. Server clocks use offset ISO instants.
 
-C7 uses Camunda Connect HTTP, Spin JSON and Groovy for response-header and obligation-time handling. Its
+C7 uses Camunda Connect HTTP, Spin JSON and Groovy for response-header handling. Its
 `TTR_CONN_AUTOMATION` runtime bean supplies the Server origin and bearer. C8 uses the standard REST outbound
 connector, the `TTR_AUTOMATION_URL` variable and connector secret `TTR_CONN_AUTOMATION`. The generated README
-names the complete input and adapter requirements. C7 cron schedules require the engine JVM timezone to match
-the authored hint; C8 calendar schedules emit zoned ISO repeating intervals. Minute intervals use ISO cycles.
+names the complete input and adapter requirements. Start the exported one-program workflow externally;
+author schedules and larger compositions in the engine.
 
-Only a newly claimed run drives effects. Replays finish that step; live handles poll and permit one re-open
-after abandonment/failure. Later process steps share the first run ID plus the step name as a caller key,
-including after recovery. The diagram includes parallel contexts, route branches, per-row action tasks, bounded
-evaluation, stale-export boundaries and obligation message/timer waits. Missing obligation/action evidence or
+Only a newly claimed run drives effects. Replays finish that program; live handles poll and permit one re-open
+after abandonment/failure. Batch caller keys use the engine execution ID. The diagram includes parallel contexts,
+route branches, per-row action tasks, bounded evaluation and stale-export boundaries. Missing action evidence or
 incomplete route pages refuses rather than finishing with partial effects. Every route is paged with offset using
 the Server's default page size, then all rows are processed. Route forks and joins are inclusive in every mode;
-exclusivity is enforced per row by the Server. Camunda refuses digest delivery in any program or process step;
-use `deliver: immediate` or n8n L1 until the digest follow-up is implemented.
+exclusivity is enforced per row by the Server. Grammar 0.22 removed recipe process, delivery and schedule constructs.
+Obligation watching and digest policies belong to engine composition.
 
 HTTP 409 takes the stale boundary; other 4xx except 408/429 take the drawn refusal task. HTTP 408/429, 5xx and
 transport errors retry, then become incidents. C8 error retries honour numeric or HTTP-date Retry-After,
@@ -252,6 +252,18 @@ Mail and approval nodes are customer integration templates. The mail worker (`TT
 approval integration belong to Platform; this export does not bundle or certify them. The file and its Modeler
 opening are the Camunda acceptance artefacts; no live Camunda deployment is part of this exporter.
 
+The export also contains `templates/c7/<step>.json` or `templates/c8/<step>.json`, plus
+`dmn/<query>_decision.dmn` for each metadata `def query`. Copy the matching templates into your Modeler project's
+`.camunda/element-templates` directory and restart Modeler. The choice dropdown lists this world's deployed programs
+and model queries. Inputs bind by parameter name; query outputs expose their typed row columns and `row_count`.
+Configure the governed HTTP task and its variables derivation in Modeler before running it.
+
+Each DMN 1.3 skeleton has typed inputs, hit policy FIRST and no rules. Author the business rules and outcome in
+Modeler; inline SQL and Golem questions have no generated skeleton. Templates carry identity
+`tatrman.<world>.<step>` and a fingerprint-derived version. After model/bundle changes, regenerate into a new export
+folder and reinstall the templates. Preserve authored rules separately: regeneration creates empty skeletons.
+The README lists artifact paths; the manifest records hashes and step/DMN associations.
+
 Offline structure conformance needs the export directory and a pinned fixture, with no Server or token:
 
 ```sh
@@ -259,7 +271,8 @@ ttrp conform --replay replay-release.yaml --cells camunda_8.on_event --export re
 ```
 
 The driver checks the manifest call inventory against actual BPMN tasks, connector paths, route branches and
-graph reachability. Success is `structure-agree`, which makes no verdict/action execution claim. A removed task
+graph reachability, template bindings, DMN associations and artifact hashes. Success is `structure-agree`, which
+makes no verdict/action execution claim. A removed task
 or branch returns exit 3 with a structural diff; malformed/unsafe XML returns driver-error exit 2. XML validation
 uses the bundled standard BPMN schemas and explicitly local schemas for the supported extension subset.
 

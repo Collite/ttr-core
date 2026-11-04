@@ -1,0 +1,104 @@
+{
+    "$schema": "https://unpkg.com/@camunda/zeebe-element-templates-json-schema@0.31.0/resources/schema.json",
+    "name": "Tatrman release_on_placement",
+    "id": "tatrman.hartland.worlds.demo.release_on_placement",
+    "version": 1161553417238202,
+    "appliesTo": [
+        "bpmn:ServiceTask"
+    ],
+    "properties": [
+        {
+            "id": "ttr_source",
+            "label": "World program or query",
+            "type": "Dropdown",
+            "value": "release_on_placement",
+            "choices": [
+                {
+                    "name": "er.query.order_totals",
+                    "value": "er.query.order_totals"
+                },
+                {
+                    "name": "release_on_placement",
+                    "value": "release_on_placement"
+                }
+            ],
+            "binding": {
+                "type": "zeebe:input",
+                "name": "ttr_source"
+            }
+        },
+        {
+            "id": "n_d314cb345485a459e7b5",
+            "condition": {
+                "property": "ttr_source",
+                "equals": "er.query.order_totals"
+            },
+            "label": "limit",
+            "type": "String",
+            "value": "=limit",
+            "binding": {
+                "type": "zeebe:input",
+                "name": "limit"
+            }
+        },
+        {
+            "id": "n_0043ee1e1be18af18b1e",
+            "condition": {
+                "property": "ttr_source",
+                "equals": "er.query.order_totals"
+            },
+            "label": "total",
+            "type": "String",
+            "value": "total",
+            "binding": {
+                "type": "zeebe:output",
+                "source": "=total"
+            }
+        },
+        {
+            "id": "n_f25e2a388e6e752f2b4c",
+            "condition": {
+                "property": "ttr_source",
+                "equals": "er.query.order_totals"
+            },
+            "label": "approved",
+            "type": "String",
+            "value": "approved",
+            "binding": {
+                "type": "zeebe:output",
+                "source": "=approved"
+            }
+        },
+        {
+            "id": "n_06017566c86ef379e49a",
+            "condition": {
+                "property": "ttr_source",
+                "equals": "er.query.order_totals"
+            },
+            "label": "row_count",
+            "type": "String",
+            "value": "row_count",
+            "binding": {
+                "type": "zeebe:output",
+                "source": "=row_count"
+            }
+        },
+        {
+            "id": "n_953e3d3d5873e40934bd",
+            "condition": {
+                "property": "ttr_source",
+                "equals": "release_on_placement"
+            },
+            "label": "tolerance",
+            "type": "String",
+            "value": "=0.01",
+            "binding": {
+                "type": "zeebe:input",
+                "name": "tolerance"
+            }
+        }
+    ],
+    "metadata": {
+        "fingerprint": "4206d3ad276bae83a788510f584274b9c4bbdef5c0ea317f6db33be5d5c4549b"
+    }
+}

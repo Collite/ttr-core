@@ -96,7 +96,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                     org.tatrman.ttrp.graph.capability.RegistryGrid
                         .executorType(world, deployment),
                 )
-            val temp = if (bundlePath == null) Files.createTempDirectory("ttrp-export-build") else null
+            val temp = Files.createTempDirectory("ttrp-export-build")
             try {
                 data class Loaded(
                     val graph: org.tatrman.ttrp.emit.spi.RecipeGraph,
@@ -122,33 +122,38 @@ class EmitCommand : CliktCommand(name = "emit") {
                     resolved is org.tatrman.ttr.metadata.world.WorldResolution.Ok,
                 ) { "cannot resolve export world: $resolved" }
 
+                val selectedRecipe = program.recipe
+
                 fun load(program: AutomationProgram): Loaded {
                     val recipeName = requireNotNull(program.recipe)
                     val dir =
-                        bundlePath?.let { base -> Path.of(base).toAbsolutePath().normalize() } ?: run {
-                            val sources =
-                                Files.walk(root).use { paths ->
-                                    paths
-                                        .filter {
-                                            Files.isRegularFile(it) &&
-                                                it.fileName.toString() == "$recipeName.ttrp"
-                                        }.toList()
-                                }
-                            val source =
-                                requireNotNull(
-                                    sources.singleOrNull(),
-                                ) { "expected one $recipeName.ttrp; use --bundle for an existing bundle" }
-                            BundleAssembler(
-                                ToolchainVersion.current,
-                            ).build(
-                                source = Files.readString(source),
-                                fileName = source.toString(),
-                                recipeDir = source.parent,
-                                pipelineManifest = config.manifest,
-                                modelsRoot = config.manifest.modelsRoot(),
-                                outDir = temp!!,
-                            ).dir
+                        bundlePath?.takeIf { recipeName == selectedRecipe }?.let { base ->
+                            Path.of(base).toAbsolutePath().normalize()
                         }
+                            ?: run {
+                                val sources =
+                                    Files.walk(root).use { paths ->
+                                        paths
+                                            .filter {
+                                                Files.isRegularFile(it) &&
+                                                    it.fileName.toString() == "$recipeName.ttrp"
+                                            }.toList()
+                                    }
+                                val source =
+                                    requireNotNull(
+                                        sources.singleOrNull(),
+                                    ) { "expected one $recipeName.ttrp; use --bundle for an existing bundle" }
+                                BundleAssembler(
+                                    ToolchainVersion.current,
+                                ).build(
+                                    source = Files.readString(source),
+                                    fileName = source.toString(),
+                                    recipeDir = source.parent,
+                                    pipelineManifest = config.manifest,
+                                    modelsRoot = config.manifest.modelsRoot(),
+                                    outDir = temp.resolve(recipeName),
+                                ).dir
+                            }
                     val bundle = RunManifest.fromJson(Files.readString(dir.resolve("manifest.json")))
                     require(
                         bundle.world.fingerprint ==
@@ -260,12 +265,65 @@ class EmitCommand : CliktCommand(name = "emit") {
                         dir,
                     )
                 }
-                val programGraphs = mutableMapOf<String, Loaded>()
-
-                fun cached(program: AutomationProgram): Loaded =
-                    programGraphs.getOrPut(program.qname.dotted()) { load(program) }
-                val choices = WorldChoicesProjector.project(loaded.model, world) { cached(it).graph }
-                val loaded = cached(program)
+                val selected = load(program)
+                val index = ModelIndex(registrySnapshot, packageOf)
+                val choices =
+                    if (plugin.targetId in setOf("camunda_7", "camunda_8")) {
+                        WorldChoicesProjector.project(loaded.model, world) { choice ->
+                            if (choice.recipe == program.recipe) {
+                                selected.graph.recipe.parameters
+                            } else {
+                                val recipe =
+                                    requireNotNull(choice.recipe) { "program ${choice.qname.name} has no recipe" }
+                                val source =
+                                    Files
+                                        .walk(root)
+                                        .use { paths ->
+                                            paths
+                                                .filter {
+                                                    Files.isRegularFile(
+                                                        it,
+                                                    ) &&
+                                                        it.fileName.toString() == "$recipe.ttrp"
+                                                }.toList()
+                                        }.singleOrNull() ?: error("expected one $recipe.ttrp for world program choices")
+                                val parsed =
+                                    org.tatrman.ttrp.parser.TtrpParser
+                                        .parseFile(source)
+                                require(parsed.diagnostics.none { it.severity.name == "ERROR" }) {
+                                    "cannot read $recipe parameters: ${parsed.diagnostics.joinToString { it.render() }}"
+                                }
+                                val decl =
+                                    parsed.document.statements
+                                        .filterIsInstance<org.tatrman.ttrp.ast.RecipeDecl>()
+                                        .singleOrNull()
+                                        ?: error("expected one recipe in $source")
+                                val scope =
+                                    index
+                                        .automationInScope(ModelIndex.importsOf(parsed.document))
+                                        .filterIsInstance<org.tatrman.ttr.metadata.model.AutomationParameter>()
+                                decl.parameters.map { ref ->
+                                    val param =
+                                        scope.singleOrNull { it.qname.name == ref.text }
+                                            ?: error("unknown or ambiguous parameter ${ref.text} in $recipe")
+                                    org.tatrman.ttrp.emit.spi.ParameterMeta(
+                                        ref.text,
+                                        requireNotNull(param.type) { "parameter ${ref.text} has no type" },
+                                        param.value?.let { value ->
+                                            when (value) {
+                                                is org.tatrman.ttr.parser.model.AutoValue.Str -> value.raw
+                                                else -> AutomationFingerprints.render(value)
+                                            }
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        org.tatrman.ttrp.emit.spi
+                            .WorldChoices()
+                    }
+                val loaded = selected
                 val modelFingerprint =
                     "sha256:" +
                         MessageDigest
@@ -502,7 +560,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                                             ),
                                         )
                                     },
-                            ),
+                            ).filterKeys { it != "authoring" || plugin.targetId in setOf("camunda_7", "camunda_8") },
                     )
                 ExportFolderWriter.write(
                     folder,
@@ -523,7 +581,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                     echo(stale)
                 }
             } finally {
-                temp?.toFile()?.deleteRecursively()
+                temp.toFile().deleteRecursively()
             }
         } catch (e: Exception) {
             echo("ttrp emit: ${e.message}", err = true)

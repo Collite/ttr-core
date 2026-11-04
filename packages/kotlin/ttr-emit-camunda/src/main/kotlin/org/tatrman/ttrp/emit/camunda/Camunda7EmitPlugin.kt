@@ -34,8 +34,29 @@ internal fun emitCamunda(
             "${request.graph.recipe.name}.${dialect.suffix}.bpmn" to xml.toByteArray(Charsets.UTF_8),
             "README.md" to
                 (
-                    renderer.readme() + "\nInstall templates/" + dialect.suffix +
-                        " in the Modeler project .camunda/element-templates directory.\nDMN files in dmn/ are empty FIRST tables: author rules and the outcome before execution.\nRegenerate and reinstall after any fingerprint change. Templates map named task inputs and outputs;\nconfigure the governed program/query HTTP task and its variables derivation in the modeller.\n"
+                    renderer.readme() +
+                        "\nAuthoring artifacts:\n" + artifacts.keys.sorted().joinToString("\n") { "- `$it`" } +
+                        "\n\n" +
+                        """
+                        Install templates/${dialect.suffix} in the Modeler project's .camunda/element-templates
+                        directory, then restart Modeler. Choose the world program or query in the dropdown.
+                        Inputs map by parameter name; query outputs expose the typed row columns and row_count
+                        as task variables. Configure the governed program/query HTTP task and its variables
+                        derivation in Modeler.
+
+                        DMN files are empty DMN 1.3 FIRST tables. Author business rules and the outcome before
+                        execution; the export invents no rules. Inline SQL and Golem questions have no generated
+                        DMN skeleton.
+
+                        The host reads deployed programs from this world, recipe parameter declarations from
+                        .ttrp sources, and query columns from the metadata query compiler. Keep other programs'
+                        sources in the project even when --bundle supplies the selected program's verified bundle.
+
+                        Templates carry a bundle/model fingerprint version. After any fingerprint change,
+                        regenerate into a new export folder and reinstall its templates. Preserve authored DMN
+                        rules separately; regeneration creates fresh skeletons. The manifest inventories every
+                        exported artifact.
+                        """.trimIndent() + "\n"
                 ).toByteArray(Charsets.UTF_8),
             "conformance.json" to request.conformanceJson.toByteArray(Charsets.UTF_8),
         ).apply { putAll(artifacts) },

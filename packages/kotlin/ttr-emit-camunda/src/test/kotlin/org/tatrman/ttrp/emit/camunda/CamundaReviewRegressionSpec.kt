@@ -119,16 +119,10 @@ class ReviewExecution(
 
 class CamundaReviewRegressionSpec :
     StringSpec({
-        "C1 C7 inputs resolve in their parent scope without sibling inputs for both goldens and three steps" {
+        "C1 C7 inputs resolve in their parent scope without sibling inputs for event and batch programs" {
             val base = releaseGraph()
-            val steps =
-                (1..3).map { n ->
-                    val graph = base.copy(program = base.program.copy(name = "step$n"))
-                    StepMeta("step$n", graph.program.name, "key", emptyList(), null, emptyList(), graph)
-                }
-            val process = base.copy(process = ProcessMeta("three_steps", "order_number", steps))
             val expressions = ReviewExpressions(Dialect.C7)
-            for (graph in listOf(base, releaseGraph(batch = true), process)) {
+            for (graph in listOf(base, releaseGraph(batch = true))) {
                 val root = reviewDocument(graph, Dialect.C7)
                 val evaluation =
                     expressions.value(
@@ -258,8 +252,8 @@ class CamundaReviewRegressionSpec :
                 for (zone in listOf("UTC", "Europe/Prague")) {
                     TimeZone.setDefault(TimeZone.getTimeZone(zone))
                     for (dialect in Dialect.entries) {
-                        val graph = processGraph(dialect.choose("camunda_7", "camunda_8"))
-                        // Include mail outcome clocks and first-step/following-step clocks.
+                        val graph = releaseGraph(dialect.choose("camunda_7", "camunda_8"), true)
+                        // Include mail outcome clocks and event/batch program clocks.
                         for (g in listOf(graph, releaseGraph(dialect.choose("camunda_7", "camunda_8")))) {
                             val root = reviewDocument(g, dialect)
                             val inputs =
@@ -541,24 +535,6 @@ class CamundaReviewRegressionSpec :
                 parent.containsKey("ttrPage") shouldBe false
             }
         }
-        "C6 digest delivery refuses in a program or any process step while immediate renders" {
-            for (dialect in Dialect.entries) {
-                val graph = releaseGraph(dialect.choose("camunda_7", "camunda_8"), true)
-                val digest = graph.copy(program = graph.program.copy(deliver = "{digest:{by:who,per:day}}"))
-                shouldThrow<IllegalArgumentException> { reviewDocument(digest, dialect) }.message!! shouldContain
-                    "do not render digest"
-                val process = processGraph(graph.deployment.type)
-                val steps = process.process!!.steps.toMutableList()
-                steps[1] =
-                    steps[1].copy(
-                        graph = steps[1].graph!!.let { it.copy(program = it.program.copy(deliver = "digest")) },
-                    )
-                shouldThrow<IllegalArgumentException> {
-                    reviewDocument(process.copy(process = process.process!!.copy(steps = steps)), dialect)
-                }
-                reviewDocument(graph, dialect)
-            }
-        }
         "C7 budgets support days and fractional seconds and refuse unknown units" {
             for (dialect in Dialect.entries) {
                 val base = releaseGraph(dialect.choose("camunda_7", "camunda_8"), true)
@@ -625,34 +601,13 @@ class CamundaReviewRegressionSpec :
             val authored = base.copy(program = base.program.copy(budget = mapOf("sync" to "7 seconds")))
             val authoredBatch = batch.copy(program = batch.program.copy(budget = mapOf("batch" to "45 seconds")))
             val later = base.copy(program = base.program.copy(name = "later", budget = mapOf("sync" to "17 seconds")))
-            val process =
-                authored.copy(
-                    process =
-                        ProcessMeta(
-                            "budget_steps",
-                            "order_number",
-                            listOf(
-                                StepMeta(
-                                    "first",
-                                    authored.program.name,
-                                    "key",
-                                    emptyList(),
-                                    null,
-                                    emptyList(),
-                                    authored,
-                                ),
-                                StepMeta("later", later.program.name, "key", emptyList(), null, emptyList(), later),
-                            ),
-                        ),
-                )
             val cases =
                 listOf(
                     Triple(reviewDocument(base, Dialect.C8), 180L, "default sync"),
                     Triple(reviewDocument(batch, Dialect.C8), 1920L, "default batch"),
                     Triple(reviewDocument(authored, Dialect.C8), 127L, "authored sync"),
                     Triple(reviewDocument(authoredBatch, Dialect.C8), 165L, "authored batch"),
-                    Triple(reviewDocument(process, Dialect.C8).named("first"), 127L, "process first"),
-                    Triple(reviewDocument(process, Dialect.C8).named("later"), 137L, "process later"),
+                    Triple(reviewDocument(later, Dialect.C8), 137L, "independent program budget"),
                 )
             val expr = ReviewExpressions(Dialect.C8)
             for ((scope, cap, label) in cases) {

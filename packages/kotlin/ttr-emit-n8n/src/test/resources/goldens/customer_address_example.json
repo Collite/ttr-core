@@ -4,21 +4,17 @@
         {
             "id": "c7d08e09-a44d-3b45-be7e-eecebf0a8daf",
             "name": "trigger",
-            "type": "n8n-nodes-base.scheduleTrigger",
-            "typeVersion": 1.2,
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.0,
             "position": [
                 0,
                 0
             ],
             "parameters": {
-                "rule": {
-                    "interval": [
-                        {
-                            "field": "cronExpression",
-                            "expression": "0 0 8 1 * *"
-                        }
-                    ]
-                }
+                "httpMethod": "POST",
+                "path": "release_n8n",
+                "responseMode": "onReceived",
+                "options": {}
             }
         },
         {
@@ -1970,7 +1966,7 @@
     },
     "settings": {
         "executionOrder": "v1",
-        "timezone": "Europe/Prague"
+        "timezone": "UTC"
     },
     "active": false,
     "pinData": {},

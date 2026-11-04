@@ -284,6 +284,18 @@ class RecipeExportSpec :
                         modelsRoot = bundleModels,
                         outDir = temporaryDirectory("camunda-h1-bundle"),
                     )
+                // World choices need each deployed program's own recipe metadata.
+                Files.createDirectories(project.resolve("recipes"))
+                Files.list(source.parent).use { paths ->
+                    paths.filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".ttrp") }.forEach {
+                        Files.copy(it, project.resolve("recipes").resolve(it.fileName))
+                    }
+                }
+                Files.writeString(
+                    project.resolve("models/hartland/export-query.ttrm"),
+                    "package hartland\nmodel er\ndef query order_totals { sourceText: \"\"\"sql\n" +
+                        "SELECT order_number, CAST(1 AS DECIMAL(12,2)) AS total FROM er.entity.\"order\"\n\"\"\" }\n",
+                )
                 val out = temporaryDirectory("camunda-real-h1")
                 val result =
                     TtrpCommand()
@@ -315,6 +327,14 @@ class RecipeExportSpec :
                         .parseToJsonElement(
                             Files.readString(folder.resolve("manifest.json")),
                         ).jsonObject
+                val authoring = manifest.getValue("authoring").jsonObject
+                authoring.getValue("steps").jsonArray.size shouldBe 9
+                org.tatrman.ttrp.conform.replay.CamundaStructureDriver
+                    .compareArtifacts(folder) shouldBe emptyList()
+                val queryDmn = folder.resolve("dmn/er.query.order_totals_decision.dmn")
+                Files.readString(queryDmn) shouldContain "typeRef=\"number\""
+                Files.readString(folder.resolve("templates/$suffix/release_on_placement.json")) shouldContain
+                    "tolerance"
                 manifest.getValue("calls") shouldBe contract.getValue("calls")
                 contract
                     .getValue("calls")
@@ -410,7 +430,7 @@ class RecipeExportSpec :
             Files.readString(folder.resolve("README.md")) shouldContain "tatrman-automation"
             Files.readString(folder.resolve("README.md")) shouldContain "Stale when"
         }
-        "D-142: a batch n8n export refuses — the program has no `schedule:` hint any more" {
+        "D-142: batch n8n export uses an external webhook without an embedded schedule" {
             val bundle = build("release_order")
             val graph =
                 org.tatrman.ttrp.emit.recipe.RecipeGraphProjector.project(
@@ -420,16 +440,14 @@ class RecipeExportSpec :
                     deployment.copy(target = "n8n"),
                     actions,
                 )
-            graph.program.schedule shouldBe null
-            graph.program.deliver shouldBe null
-            val e =
-                io.kotest.assertions.throwables.shouldThrow<IllegalArgumentException> {
-                    EmitPluginLoader.builtin("n8n_l1").emitRecipe(
-                        org.tatrman.ttrp.emit.spi
-                            .RecipeEmitRequest(graph, "{}", "stale rule", "{}"),
-                    )
-                }
-            e.message shouldContain "schedule hint"
+            val result =
+                EmitPluginLoader.builtin("n8n_l1").emitRecipe(
+                    org.tatrman.ttrp.emit.spi
+                        .RecipeEmitRequest(graph, "{}", "stale rule", "{}"),
+                )
+            val workflow = result.files.getValue("workflow.json").decodeToString()
+            workflow shouldContain "n8n-nodes-base.webhook"
+            workflow.contains("n8n-nodes-base.scheduleTrigger") shouldBe false
         }
         "H-2 export addresses customer mail per row (decide_return on n8n)" {
             val project = exportProject()

@@ -18,7 +18,7 @@ internal object WorldChoicesProjector {
     fun project(
         model: Model,
         world: World,
-        graph: (AutomationProgram) -> RecipeGraph,
+        parameters: (AutomationProgram) -> List<ParameterMeta>,
     ): WorldChoices {
         val objects = model.objectByQname().values
         val programs =
@@ -32,13 +32,18 @@ internal object WorldChoicesProjector {
                     ) {
                         "TTRP-EXPORT-REF: unknown or ambiguous world program $name"
                     }
-                val resolved = graph(program)
+                val params =
+                    try {
+                        parameters(program)
+                    } catch (e: Exception) {
+                        throw IllegalArgumentException("TTRP-EXPORT-REF: cannot resolve program $name: ${e.message}", e)
+                    }
                 ProgramChoice(
                     name,
-                    resolved.recipe.name,
+                    requireNotNull(program.recipe) { "TTRP-EXPORT-REF: program $name has no recipe" },
                     program.port,
-                    resolved.recipe.parameters.also { params ->
-                        params.forEach { ExportTypes.family(it.type) }
+                    params.also { declared ->
+                        declared.forEach { ExportTypes.family(it.type) }
                     },
                 )
             }
@@ -142,7 +147,7 @@ private class SnapshotQueryHandle(
                 query.qname,
             )
         ) {
-            throw IllegalArgumentException("Cyclic saved query '${query.qname.dotted()}'")
+            throw IllegalArgumentException("TTRP-EXPORT-REF: cyclic saved query '${query.qname.dotted()}'")
         }
         try {
             val language =
@@ -151,7 +156,7 @@ private class SnapshotQueryHandle(
                     "TRANSFORMATION_DSL", "TRANSDSL" -> Language.TRANSFORMATION_DSL
                     "DATAFRAME_DSL", "DFDSL" -> Language.DATAFRAME_DSL
                     else -> throw IllegalArgumentException(
-                        "Unsupported query language '${query.sourceLanguage}'",
+                        "TTRP-EXPORT-REF: unsupported query language '${query.sourceLanguage}'",
                     )
                 }
             val lane = if (query.qname.schemaCode == SchemaCode.ER) WireSchema.ER else WireSchema.DB
@@ -174,7 +179,7 @@ private class SnapshotQueryHandle(
             return when (result) {
                 is ParseResult.Success -> result.plan.also { plans[query.qname] = it }
                 is ParseResult.Failure -> throw IllegalArgumentException(
-                    "${query.qname.dotted()}: ${result.code}: ${result.message}",
+                    "TTRP-EXPORT-QUERY: ${query.qname.dotted()}: ${result.code}: ${result.message}",
                 )
             }
         } finally {
@@ -265,7 +270,9 @@ private class SnapshotQueryHandle(
         if (found.size !=
             1
         ) {
-            throw IllegalArgumentException("Saved query '${queryQname.name}' must identify one program")
+            throw IllegalArgumentException(
+                "TTRP-EXPORT-REF: saved query '${queryQname.name}' must identify one program",
+            )
         }
         val q = found.single()
         return SavedQueryBody(

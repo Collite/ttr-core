@@ -34,7 +34,7 @@ class TemplatesDmnSpec :
         fun result(target: String) =
             (if (target == "camunda_7") Camunda7EmitPlugin() else Camunda8EmitPlugin()).emitRecipe(
                 RecipeEmitRequest(
-                    authoringGraph(target),
+                    releaseGraph(target),
                     """{"world":"hartland.worlds.demo"}""",
                     "",
                     "{}",
@@ -73,6 +73,36 @@ class TemplatesDmnSpec :
                     org.tatrman.ttrp.conform.replay.CamundaStructureDriver
                         .compareArtifacts(folder)
                 differences() shouldBe emptyList()
+                val inventory =
+                    kotlinx.serialization.json.buildJsonObject {
+                        put("authoring", Json.parseToJsonElement(manifest).jsonObject.getValue("authoring"))
+                        put(
+                            "files",
+                            kotlinx.serialization.json.buildJsonObject {
+                                files.forEach { (name, bytes) ->
+                                    put(
+                                        name,
+                                        "sha256:" +
+                                            java.security.MessageDigest
+                                                .getInstance(
+                                                    "SHA-256",
+                                                ).digest(bytes)
+                                                .joinToString("") { "%02x".format(it) },
+                                    )
+                                }
+                            },
+                        )
+                    }
+                java.nio.file.Files
+                    .writeString(folder.resolve("manifest.json"), inventory.toString())
+                differences() shouldBe emptyList()
+                java.nio.file.Files
+                    .writeString(folder.resolve("README.md"), "changed")
+                differences().any { "inventory hash differs" in it.toString() } shouldBe true
+                java.nio.file.Files
+                    .write(folder.resolve("README.md"), files.getValue("README.md"))
+                java.nio.file.Files
+                    .writeString(folder.resolve("manifest.json"), manifest)
                 val template = folder.resolve("templates/c7/release_on_placement.json")
                 java.nio.file.Files
                     .delete(template)
@@ -117,13 +147,15 @@ class TemplatesDmnSpec :
                         .getInstance(
                             com.networknt.schema.SpecVersion.VersionFlag.V7,
                         ).getSchema(schemaStream)
-                schema
-                    .validate(
-                        com.fasterxml.jackson.databind
-                            .ObjectMapper()
-                            .readTree(template.toString()),
-                    ).map { it.message } shouldBe
-                    emptyList()
+                files.filterKeys { it.startsWith("templates/") }.values.forEach { bytes ->
+                    schema
+                        .validate(
+                            com.fasterxml.jackson.databind
+                                .ObjectMapper()
+                                .readTree(bytes),
+                        ).map { it.message } shouldBe
+                        emptyList()
+                }
                 val properties = template.getValue("properties").jsonArray.map { it.jsonObject }
                 properties
                     .flatMap {
@@ -171,9 +203,23 @@ class TemplatesDmnSpec :
             "dialect $dialect exports deterministically and retains the H-1 BPMN" {
                 val first = result(target).files
                 val second = result(target).files
+                first.filterKeys { it.startsWith("templates/") || it.startsWith("dmn/") }.forEach { (relative, bytes) ->
+                    val path =
+                        java.nio.file.Path
+                            .of("src/test/resources/goldens/authoring/$relative")
+                    if (System.getenv("UPDATE_AU_EXPORT_GOLDENS") == "1") {
+                        java.nio.file.Files
+                            .createDirectories(path.parent)
+                        java.nio.file.Files
+                            .write(path, bytes)
+                    }
+                    java.nio.file.Files
+                        .readAllBytes(path)
+                        .contentEquals(bytes) shouldBe true
+                }
                 first.keys shouldBe second.keys
                 first.forEach { (path, bytes) -> bytes.contentEquals(second.getValue(path)) shouldBe true }
-                validateAuthoringBpmn(first.getValue("release_order.$dialect.bpmn").decodeToString())
+                validateBpmn(first.getValue("release_order.$dialect.bpmn").decodeToString())
             }
         }
     })

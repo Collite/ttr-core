@@ -23,38 +23,7 @@ class CamundaExpressionSpec :
     StringSpec({
         fun expressions(target: String): List<String> {
             val graph = releaseGraph(target)
-            val bare = graph.copy(routes = emptyList(), actions = emptyMap(), wirings = emptyList())
-            val second =
-                bare.copy(
-                    recipe = bare.recipe.copy(name = "second"),
-                    program = bare.program.copy(name = "second"),
-                )
-            val process =
-                bare.copy(
-                    process =
-                        ProcessMeta(
-                            "process",
-                            "order_number",
-                            listOf(
-                                StepMeta("first", bare.program.name, "key", emptyList(), null, emptyList(), bare),
-                                StepMeta(
-                                    "second",
-                                    second.program.name,
-                                    "key",
-                                    listOf("inbound"),
-                                    null,
-                                    listOf("fulfilled", "due", "absent"),
-                                    second,
-                                ),
-                            ),
-                        ),
-                )
-            val hints = listOf("06:00 Europe/Prague", "Mon 09:00 Europe/Prague", "1st 09:00 Europe/Prague", "*/7")
-            val scheduled =
-                hints.map { hint ->
-                    releaseGraph(target, true).let { it.copy(program = it.program.copy(schedule = hint)) }
-                }
-            return (listOf(graph, process) + scheduled)
+            return listOf(graph, releaseGraph(target, true))
                 .flatMap { g ->
                     val xml =
                         CamundaRenderer(
@@ -167,66 +136,6 @@ class CamundaExpressionSpec :
                     true
             }
             CamundaSchedule.parse("*/7", Dialect.C8).cycle shouldBe "R/PT7M"
-        }
-        "C7 obligation glue evaluates until and nearest due instants, refusing a missing array" {
-            GroovyClassLoader().use { loader ->
-                // Test-only engine exception adapter: the shipped exporter has no engine dependency.
-                loader.parseClass(
-                    "package org.camunda.bpm.engine.delegate; class BpmnError extends RuntimeException { BpmnError(String code, String message) { super(code + ': ' + message) } }",
-                )
-
-                fun run(
-                    until: List<String>,
-                    body: String,
-                ): Map<String, Any> {
-                    val xml =
-                        CamundaRenderer(
-                            RecipeEmitRequest(processGraph("camunda_7", until), "{}", "", "{}"),
-                            Dialect.C7,
-                        ).render()
-                    val doc =
-                        DocumentBuilderFactory
-                            .newInstance()
-                            .apply {
-                                isNamespaceAware = true
-                            }.newDocumentBuilder()
-                            .parse(InputSource(StringReader(xml)))
-                    val script =
-                        doc
-                            .getElementsByTagNameNS(
-                                "http://camunda.org/schema/1.0/bpmn",
-                                "executionListener",
-                            ).item(0)
-                            .textContent
-                    val execution = ScriptExecution(Json.parseToJsonElement(body))
-                    GroovyShell(loader, Binding(mapOf("execution" to execution))).evaluate(script)
-                    return execution.values
-                }
-                val past = """{"obligations":[{"kind":"inbound","state":"pending","dueAt":"2000-01-01T00:00:00Z"}]}"""
-                run(listOf("fulfilled"), past)["ttrObligationReady"] shouldBe false
-                run(listOf("due"), past)["ttrObligationReady"] shouldBe true
-                val future =
-                    java.time.OffsetDateTime
-                        .now()
-                        .plusSeconds(90)
-                        .toString()
-                val result =
-                    run(
-                        listOf("fulfilled"),
-                        """{"obligations":[{"kind":"inbound","state":"pending","dueAt":"$future"}]}""",
-                    )
-                val seconds =
-                    java.time.Duration
-                        .parse(result.getValue("ttrObligationDelay") as String)
-                        .seconds
-                (seconds in 1..90) shouldBe true
-                io.kotest.assertions.throwables
-                    .shouldThrow<RuntimeException> {
-                        run(listOf("absent"), "{}")
-                    }.message!!
-                    .contains("no obligations array") shouldBe
-                    true
-            }
         }
         "both dialects normalize numeric date and missing Retry-After values" {
             val feel = FeelEngineBuilder.forJava().build()
@@ -374,11 +283,11 @@ class CamundaExpressionSpec :
                 }
             }
         }
-        "both dialects preserve step clocks and anchor later caller keys; none ports stay untimed" {
+        "both dialects preserve event clocks and batch caller keys; none ports stay untimed" {
             val feel = FeelEngineBuilder.forJava().build()
             val factory = ExpressionFactoryImpl()
             for (target in listOf("camunda_7", "camunda_8")) {
-                for (graph in listOf(processGraph(target), releaseGraph(target, true))) {
+                for (graph in listOf(releaseGraph(target), releaseGraph(target, true))) {
                     val dialect = if (target == "camunda_7") Dialect.C7 else Dialect.C8
                     val xml = CamundaRenderer(RecipeEmitRequest(graph, "{}", "", "{}"), dialect).render()
                     val doc =
@@ -432,7 +341,7 @@ class CamundaExpressionSpec :
                     variables.forEach { (name, value) ->
                         context.setVariable(name, factory.createValueExpression(value, Any::class.java))
                     }
-                    for ((index, body) in bodies.withIndex()) {
+                    for (body in bodies) {
                         val result: Map<*, *> =
                             if (dialect == Dialect.C7) {
                                 val node =
@@ -461,15 +370,11 @@ class CamundaExpressionSpec :
                                 require(evaluated.isSuccess && evaluated.result() is Map<*, *>) { evaluated.toString() }
                                 evaluated.result() as Map<*, *>
                             }
-                        if (graph.process != null) {
-                            if (index == 0) {
-                                result.containsKey("idempotencyKey") shouldBe false
-                            } else {
-                                result["idempotencyKey"] shouldBe "first-run:second"
-                            }
+                        if (graph.program.port != "none") {
+                            result.containsKey("idempotencyKey") shouldBe false
                             val at = (result["port"] as Map<*, *>)["at"].toString()
                             java.time.Instant.parse(at)
-                            if (index == 0) at shouldBe "2026-11-01T10:00:00Z"
+                            at shouldBe "2026-11-01T10:00:00Z"
                         } else {
                             (result["port"] as Map<*, *>).keys shouldBe setOf("none")
                             result["idempotencyKey"] shouldBe "execution"

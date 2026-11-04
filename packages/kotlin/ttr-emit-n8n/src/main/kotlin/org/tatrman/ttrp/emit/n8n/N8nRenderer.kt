@@ -855,33 +855,27 @@ internal class N8nRenderer(
         this deployment and the `tatrman-mail` SMTP credential for engine-side mail. Set `TTR_AUTOMATION_URL` to the
         Server origin (without `/automation`), `TTR_MAIL_FROM`, and `TTR_MAIL_RECIPIENTS` to a JSON object mapping role
         names to email addresses. Enable environment access for these expressions on the n8n worker.
-        The workflow imports inactive; review the credentials and schedule before activation.
+        The workflow imports inactive; review the credentials before activation; schedule external webhook calls in your orchestration system.
 
         On-event input is posted to `/webhook/${root.deployment.name}` with the recipe key fields (or `key`), `keys`,
         or the declared event body. On-event callers must send `at` as an ISO instant with an offset for duplicate events
         to be recognised. Without `at`, every POST is a new run. The clock is excluded from event columns; an event
-        schema declaring `at` is refused. A first or standalone batch step uses the n8n execution id.
-        Every later process step, in either mode, uses the first step's run id plus `:<step name>` as its caller key,
-        taking the re-opened run id if the first step recovered from abandonment. Redeliveries share these keys.
-        A duplicate execution may claim a later step before the original reaches it; the original then handles its
-        202 response. Each step still claims once, and its saved clock supplies port.at/asOf for that claim.
+        schema declaring `at` is refused. A batch program uses the n8n execution id as its caller key.
+        Its Open body and clock are saved once, so retries reuse the same claim.
         A 202 Open handle belongs to another execution: wait for closed/abandoned, and never repeat its actions.
         A closed or waiting handle completes that step. After failure/abandonment there is one re-open with the same
         saved body; a second 202 refuses. A lost Open response can wait until the Server's budget plus recovery grace
-        abandons the orphan, then recover through that single re-open. Later step clocks are saved after waits.
+        abandons the orphan, then recover through that single re-open.
         Task actions with required approval register a Wait webhook as `callbackUrl` and re-read status after every
         resume or timeout until all tasks have left waiting. When status carries tasks, task dueAt bounds the timeout;
         otherwise ordinary declared due durations apply. Calendar-based due rules
         without a resolved dueAt use an hourly backstop.
-        Obligation waits require an explicit `obligations` array on Server status. Missing fields fail; an empty
-        array is absent. `until` selects fulfilled/due readiness. Waits wake at the nearest future dueAt, capped at 1 h.
         `emailSend` needs exactly one role-typed action column or `to` typed by an E-R address attribute and wired to
         a bare route-row column. Row addresses are grouped per recipient; missing addresses name the key and fail.
         Role addresses must exist in `TTR_MAIL_RECIPIENTS`; there is no literal fallback. Status must include the
         per-key `actions` selection array for every run; missing is an error. Both deployment and status must
-        explicitly permit wet delivery. Process manifests fingerprint every step; any step can make the export stale.
-        Schedule hints: `HH:MM Zone`, `Mon|Tue|Wed|Thu|Fri|Sat|Sun HH:MM Zone`, `1st HH:MM Zone`, or `*/N`
-        (1–60 minutes). Unsupported hints refuse export.
+        explicitly permit wet delivery. Re-export after model or bundle fingerprint changes.
+        Grammar 0.22 removed recipe process, delivery-policy and schedule constructs. Compose these externally.
         Route rows feed engine-side mail; outcomes are recorded on the Server. HTTP failures, including stale
         fingerprint refusals, stop the workflow before downstream nodes. Re-export after any stale refusal.
 
