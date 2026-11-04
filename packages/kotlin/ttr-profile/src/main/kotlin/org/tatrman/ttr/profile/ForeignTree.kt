@@ -42,7 +42,7 @@ class JsonPointer(pointer: String) {
             it.replace("~1", "/").replace("~0", "~")
         }
     }
-    fun resolve(record: ForeignNode): ForeignNode? {
+    fun resolve(record: ForeignNode, includeNull: Boolean = false): ForeignNode? {
         if (parts == listOf("\$key")) return record.mappingKey?.let {
             record.copy(value = JsonPrimitive(it), keySelection = true)
         }
@@ -57,6 +57,6 @@ class JsonPointer(pointer: String) {
             } ?: return null
             current = current.child(part, value)
         }
-        return current.takeUnless { it.value == JsonNull }
+        return current.takeUnless { !includeNull && it.value == JsonNull }
     }
 }

@@ -1,0 +1,11 @@
+[
+  {"code":"ys/profile-invalid","meaning":"Invalid profile syntax, schema, operands or safety policy","where":"ProfileReader, DeclarationReader, ProfileResolver"},
+  {"code":"ys/profile-grammar-mismatch","meaning":"A profile or declaration excludes the running grammar","where":"ProfileResolver"},
+  {"code":"ys/profile-not-found","meaning":"A local profile cannot be resolved within the root","where":"ProfileResolver"},
+  {"code":"ys/profile-cycle","meaning":"The profile inheritance chain contains a cycle","where":"ProfileResolver"},
+  {"code":"ys/unknown-kind","meaning":"A record discriminator has no kind mapping","where":"RecordPlan"},
+  {"code":"ys/record-id-missing","meaning":"A record has no string ID at kinds.id or the default /$key","where":"RecordPlan (at the authored record)"},
+  {"code":"ys/unknown-key","meaning":"An authored foreign key was neither consumed nor ignored","where":"ConsumptionLedger"},
+  {"code":"ys/profile-conflict","meaning":"Two operations or records own the same canonical target","where":"RecordPlan, ConflictLedger, CanonicalBuilder"},
+  {"code":"ys/value-unmapped","meaning":"A selected value has no mapping and no default","where":"PackageOp"}
+]
