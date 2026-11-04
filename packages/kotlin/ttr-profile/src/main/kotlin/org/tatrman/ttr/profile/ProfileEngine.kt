@@ -3,13 +3,6 @@ package org.tatrman.ttr.profile
 
 import kotlinx.serialization.json.JsonObject
 
-/** In-memory input; file names are paths relative to the model root. */
-class ForeignTree private constructor(val source: String, val file: String) {
-    companion object {
-        fun read(source: String, file: String = "<yaml>"): ForeignTree = ForeignTree(source, file)
-    }
-}
-
 data class EmittedDocument(val value: JsonObject, val locations: Map<String, ProfileSpan>)
 data class Ignored(val location: ProfileSpan, val reason: String?)
 data class ApplyReport(val codes: Map<String, String>)
