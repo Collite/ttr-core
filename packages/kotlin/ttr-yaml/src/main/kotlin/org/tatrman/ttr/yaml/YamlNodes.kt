@@ -12,18 +12,24 @@ import org.snakeyaml.engine.v2.api.lowlevel.Compose
 import org.snakeyaml.engine.v2.api.lowlevel.Parse
 import org.snakeyaml.engine.v2.events.CollectionStartEvent
 import org.snakeyaml.engine.v2.events.CollectionEndEvent
+import org.snakeyaml.engine.v2.events.Event
+import org.snakeyaml.engine.v2.events.NodeEvent
+import org.snakeyaml.engine.v2.events.ScalarEvent
 import org.snakeyaml.engine.v2.exceptions.MarkedYamlEngineException
 import org.snakeyaml.engine.v2.exceptions.YamlEngineException
 import org.snakeyaml.engine.v2.exceptions.ReaderException
 import org.snakeyaml.engine.v2.nodes.*
 import org.snakeyaml.engine.v2.schema.CoreSchema
 
-class CanonicalYamlException(
-    val file: String,
-    val line: Int,
-    val column: Int,
-    val detail: String,
-) : IllegalArgumentException("$file:$line:$column: $detail")
+class CanonicalYamlException
+    @JvmOverloads
+    constructor(
+        val file: String,
+        val line: Int,
+        val column: Int,
+        val detail: String,
+        val keyPath: String = "",
+    ) : IllegalArgumentException("$file:$line:$column: $detail")
 
 internal class YamlNodes(
     private val file: String,
@@ -131,12 +137,35 @@ internal class YamlNodes(
     private fun fail(
         node: Node?,
         message: String,
+        path: String =
+            keys.entries.firstOrNull { it.value === node }?.key
+                ?: locations.entries.firstOrNull { it.value === node }?.key ?: "",
     ): Nothing {
         val mark = node?.startMark?.orElse(null)
-        throw CanonicalYamlException(file, (mark?.line ?: 0) + 1, (mark?.column ?: 0) + 1, message)
+        throw CanonicalYamlException(file, (mark?.line ?: 0) + 1, (mark?.column ?: 0) + 1, message, path)
     }
 
-    fun read(source: String): JsonObject {
+    private fun failAt(
+        event: Event,
+        message: String,
+        path: String,
+    ): Nothing {
+        val mark = event.startMark.orElse(null)
+        throw CanonicalYamlException(file, (mark?.line ?: 0) + 1, (mark?.column ?: 0) + 1, message, path)
+    }
+
+    fun read(
+        source: String,
+        canonical: Boolean = true,
+    ): JsonObject {
+        if (source.codePointCount(0, source.length) > MAX_YAML_CODE_POINTS) {
+            throw CanonicalYamlException(
+                file,
+                1,
+                1,
+                "The incoming YAML document exceeds the limit: $MAX_YAML_CODE_POINTS code points.",
+            )
+        }
         inputText = source
         val settings =
             LoadSettings
@@ -151,24 +180,34 @@ internal class YamlNodes(
                     version
                 }.setAllowDuplicateKeys(false)
                 .setMaxAliasesForCollections(0)
-                .setCodePointLimit(3_000_000)
+                .setCodePointLimit(MAX_YAML_CODE_POINTS)
                 .build()
+        val eventPaths = YamlEventPaths()
         val node =
             try {
                 // Streaming events are safe even when composition/conversion would exhaust the stack.
                 var depth = 0
                 for (event in Parse(settings).parseString(source)) {
+                    val keyEvent = eventPaths.isMappingKey
+                    val parentPath = eventPaths.failurePath
+                    val path = eventPaths.accept(event)
+                    if (!canonical && keyEvent && event is CollectionStartEvent) {
+                        failAt(event, "Mapping keys must be strings", parentPath)
+                    }
+                    if (keyEvent &&
+                        event is ScalarEvent &&
+                        (event.value == "<<" || event.tag.orElse("") == Tag.MERGE.value)
+                    ) {
+                        failAt(event, "Mapping keys must be strings; merge keys are not supported", path)
+                    }
+                    if (!canonical && event is NodeEvent && event.anchor.isPresent) {
+                        failAt(event, "Anchors and aliases are not supported", path)
+                    }
                     when (event) {
                         is CollectionStartEvent -> {
                             depth++
                             if (depth > CanonicalYaml.MAX_NESTING_DEPTH) {
-                                val mark = event.startMark.orElse(null)
-                                throw CanonicalYamlException(
-                                    file,
-                                    (mark?.line ?: 0) + 1,
-                                    (mark?.column ?: 0) + 1,
-                                    "nesting too deep (limit ${CanonicalYaml.MAX_NESTING_DEPTH})",
-                                )
+                                failAt(event, "nesting too deep (limit ${CanonicalYaml.MAX_NESTING_DEPTH})", path)
                             }
                         }
                         is CollectionEndEvent -> depth--
@@ -184,6 +223,7 @@ internal class YamlNodes(
                     (mark?.line ?: 0) + 1,
                     (mark?.column ?: 0) + 1,
                     e.problem ?: "Invalid YAML",
+                    eventPaths.failurePath,
                 )
             } catch (e: ReaderException) {
                 val offset =
@@ -197,18 +237,20 @@ internal class YamlNodes(
                     prefix.count { it == '\n' } + 1,
                     prefix.length - prefix.lastIndexOf('\n'),
                     e.message ?: "Invalid YAML character",
+                    eventPaths.failurePath,
                 )
             } catch (e: YamlEngineException) {
                 throw CanonicalYamlException(file, 1, 1, e.message ?: "Invalid YAML")
             }
         val value = convert(node, "") as? JsonObject ?: fail(node, "Expected a canonical document mapping")
-        validate(value)
+        if (canonical) validate(value)
         return value
     }
 
     fun validate(
         value: JsonObject,
-        report: (String, String) -> Nothing = { path, message -> fail(node(path), message) },
+        selectedSchema: com.networknt.schema.JsonSchema = schema,
+        report: (String, String) -> Nothing = { path, message -> fail(node(path), message, path) },
     ) {
         fun jsonNode(
             v: JsonElement,
@@ -244,7 +286,7 @@ internal class YamlNodes(
         val normalized = jsonNode(value, "")
         val errors =
             try {
-                schema.validate(normalized)
+                selectedSchema.validate(normalized)
             } catch (e: RuntimeException) {
                 report(if (value["defs"] is JsonArray) "/defs/0" else "", e.message ?: "Invalid canonical value")
             }
@@ -275,9 +317,24 @@ internal class YamlNodes(
         }
     }
 
-    fun validateTags(embeddedPaths: Set<String>) {
+    fun validateTags(
+        embeddedPaths: Set<String>,
+        scope: String = "",
+    ) {
         val allowed = embeddedPaths.mapNotNull(::node).toSet()
-        plNodes.forEach { if (it !in allowed) fail(it, "Unsupported YAML tag !pl here") }
+        val scoped =
+            if (scope.isEmpty()) {
+                null
+            } else {
+                locations
+                    .filterKeys {
+                        it == scope || it.startsWith("$scope/")
+                    }.values
+                    .toSet()
+            }
+        plNodes.forEach {
+            if ((scoped == null || it in scoped) && it !in allowed) fail(it, "Unsupported YAML tag !pl here")
+        }
     }
 
     private val valueNodes = java.util.IdentityHashMap<JsonElement, Node>()
@@ -286,6 +343,8 @@ internal class YamlNodes(
         value: JsonElement,
         message: String,
     ): Nothing = fail(valueNodes[value], message)
+
+    fun paths(): Set<String> = locations.keys.toSet()
 
     private fun convert(
         node: Node,
@@ -312,13 +371,21 @@ internal class YamlNodes(
                 if (node.tag != Tag.MAP) fail(node, "Unsupported YAML tag ${node.tag}")
                 val result = linkedMapOf<String, JsonElement>()
                 node.value.forEach { tuple ->
-                    val key = tuple.keyNode as? ScalarNode ?: fail(tuple.keyNode, "Mapping keys must be strings")
+                    val key = tuple.keyNode as? ScalarNode ?: fail(tuple.keyNode, "Mapping keys must be strings", path)
                     if (key.tag != Tag.STR ||
                         key.value == "<<"
                     ) {
-                        fail(key, "Mapping keys must be strings; merge keys are not supported")
+                        fail(
+                            key,
+                            "Mapping keys must be strings; merge keys are not supported",
+                            "$path/${pointerKey(key.value)}",
+                        )
                     }
-                    if (key.value in result) fail(key, "Duplicate mapping key ${key.value}")
+                    if (key.value in
+                        result
+                    ) {
+                        fail(key, "Duplicate mapping key ${key.value}", "$path/${pointerKey(key.value)}")
+                    }
                     val childPath = "$path/${pointerKey(key.value)}"
                     keys[childPath] = key
                     result[key.value] = convert(tuple.valueNode, childPath)
@@ -477,4 +544,48 @@ internal object YamlText {
             else -> out.append(pad).append(scalar(v)).append('\n')
         }
     }
+}
+
+internal const val MAX_YAML_CODE_POINTS = 3_000_000
+
+/** Bounded, strict UTF-8 input for profiles; I/O failures remain the caller's responsibility. */
+fun readProfileYaml(path: java.nio.file.Path): String {
+    val limit = 4 * MAX_YAML_CODE_POINTS
+    val bytes =
+        java.nio.file.Files
+            .newInputStream(path)
+            .use { it.readNBytes(limit + 1) }
+    val file = path.toString()
+    if (bytes.size > limit) throw CanonicalYamlException(file, 1, 1, "Profile exceeds $limit bytes")
+    val input = java.nio.ByteBuffer.wrap(bytes)
+    val output = java.nio.CharBuffer.allocate(bytes.size)
+    val decoder =
+        Charsets.UTF_8
+            .newDecoder()
+            .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+            .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+    val result = decoder.decode(input, output, true)
+    output.flip()
+    val source = output.toString()
+    if (result.isError) {
+        var line = 1
+        var column = 1
+        var afterCr = false
+        source.codePoints().forEach { codePoint ->
+            when (codePoint) {
+                13, 0x85, 0x2028, 0x2029 -> {
+                    line++
+                    column = 1
+                }
+                10 -> {
+                    if (!afterCr) line++
+                    column = 1
+                }
+                else -> column++
+            }
+            afterCr = codePoint == 13
+        }
+        throw CanonicalYamlException(file, line, column, "Malformed UTF-8 in profile")
+    }
+    return source
 }

@@ -17,6 +17,7 @@ dependencyResolutionManagement {
 include(":packages:kotlin:ttr-parser")
 include(":packages:kotlin:ttr-writer")
 include(":packages:kotlin:ttr-yaml")
+include(":packages:kotlin:ttr-profile")
 include(":packages:kotlin:ttr-semantics")
 
 // The C-5-i plan-validator plugin SPI (contracts §9, PL-P4.S2) — an open Apache-2.0 interface the platform
