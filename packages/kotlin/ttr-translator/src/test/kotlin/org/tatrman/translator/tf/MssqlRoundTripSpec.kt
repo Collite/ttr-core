@@ -52,6 +52,22 @@ class MssqlRoundTripSpec :
         val probeTranslator = Translator(FixtureModel.tfHandle())
         val legacyTranslator = Translator(InMemoryModelHandle.fromJson(resource("tf/legacy-model.json")))
 
+        // TC S1.1 — VZ-42's real table shape plus identifier/literal escapes and the ER lane.
+        val bracketCases = TfCases.probes(mapper.readTree(resource("tf/bracket-cases.json")))
+        val bracketTranslator = Translator(InMemoryModelHandle.fromJson(resource("tf/bracket-model.json")))
+        val bracketErTranslator = Translator(FixtureModel.handleWithEntitiesAndFunctions())
+
+        fun bracketRoundTrip(case: ProbeCase): Outcome =
+            if (case.group == "TC-ER") {
+                roundTrip(bracketErTranslator, case.sql, case.params, sourceSchema = SchemaCode.ER, strictLane = true)
+            } else {
+                roundTrip(bracketTranslator, case.sql, case.params)
+            }
+
+        for (case in bracketCases) {
+            registerStatus(case.id, case.status, { bracketRoundTrip(case) }) { case.expect.check(it) }
+        }
+
         for (case in probeCases) {
             registerStatus(case.id, case.status, { roundTrip(probeTranslator, case.sql, case.params) }) {
                 case.expect.check(it)
@@ -83,6 +99,7 @@ class MssqlRoundTripSpec :
                 ) = out.set<JsonNode>(id, o.toJson(mapper))
                 probeCases.forEach { record(it.id, roundTrip(probeTranslator, it.sql, it.params)) }
                 legacyCases.forEach { record(it.id, roundTrip(legacyTranslator, it.sql, it.params)) }
+                bracketCases.forEach { record(it.id, bracketRoundTrip(it)) }
                 mapper.enable(SerializationFeature.INDENT_OUTPUT).writeValue(File(path), out)
             }
         }
@@ -275,6 +292,8 @@ internal fun roundTrip(
     translator: Translator,
     sql: String,
     params: List<TfParam>,
+    sourceSchema: SchemaCode = SchemaCode.SCHEMA_CODE_UNSPECIFIED,
+    strictLane: Boolean = false,
 ): Outcome {
     val parsed =
         try {
@@ -283,8 +302,9 @@ internal fun roundTrip(
                 Language.SQL,
                 SchemaCode.DB,
                 null,
-                SchemaCode.SCHEMA_CODE_UNSPECIFIED,
+                sourceSchema,
                 params.map { SqlParam(it.name, it.type, null) },
+                strictLane = strictLane,
             )
         } catch (t: Throwable) {
             return Outcome.ParseFailed("threw", oneLine("${t::class.simpleName}: ${t.message}"))

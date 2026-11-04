@@ -1,0 +1,42 @@
+[
+  {
+    "id": "tc_vz42_bracket_alias_top_hint",
+    "group": "TC-DB",
+    "sql": "SELECT TOP 5 a AS [potenciál tržeb] FROM [dbo].[XXPRODEJE] WITH (NOLOCK)",
+    "params": [],
+    "expect": {
+      "sql": "SELECT TOP (5) [a] AS [potenciál tržeb] FROM [dbo].[XXPRODEJE] WITH (NOLOCK)"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_bracket_like_pattern_literal",
+    "group": "TC-DB",
+    "sql": "SELECT [a] FROM [db].[dbo].[XXPRODEJE] WHERE [a]]b] LIKE '[0-9]%'",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [a] FROM [dbo].[XXPRODEJE] WHERE [a]]b] LIKE '[0-9]%'"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_escaped_bracket_column",
+    "group": "TC-DB",
+    "sql": "SELECT [a]]b] FROM [db].[dbo].[XXPRODEJE]",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [a]]b] FROM [dbo].[XXPRODEJE]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_bracket_attribute_strict_er_lane",
+    "group": "TC-ER",
+    "sql": "SELECT [name] AS [potenciál tržeb] FROM [er].[entity].[customer]",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [name] AS [potenciál tržeb] FROM [dbo].[customers]"
+    },
+    "status": "green"
+  }
+]

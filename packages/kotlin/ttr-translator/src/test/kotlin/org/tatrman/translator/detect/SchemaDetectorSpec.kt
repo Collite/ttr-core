@@ -115,7 +115,8 @@ class SchemaDetectorSpec :
         }
 
         "non-SQL remains NOT_APPLICABLE even when its text resembles SQL with rails" {
-            val result = SchemaDetector.detect(railQueries.last(), Language.TRANSFORMATION_DSL, SchemaCode.ER, makeHandle())
+            val result =
+                SchemaDetector.detect(railQueries.last(), Language.TRANSFORMATION_DSL, SchemaCode.ER, makeHandle())
             result.decision shouldBe SchemaDecision.NOT_APPLICABLE
             result.effectiveSchema shouldBe SchemaCode.ER
             result.referencedTables shouldBe emptyList()

@@ -4,7 +4,10 @@ package org.tatrman.translator.codec.sql
 /** Shared literal, quoted-identifier and comment boundaries for the pre-parse text passes. */
 internal object SqlTextScanner {
     /** End of the protected span starting at [start], or [start] when this is ordinary SQL. */
-    fun protectedEnd(sql: String, start: Int): Int {
+    fun protectedEnd(
+        sql: String,
+        start: Int,
+    ): Int {
         val ch = sql[start]
         if (ch == '\'' || ch == '"') {
             var i = start + 1
