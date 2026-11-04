@@ -1,0 +1,14 @@
+ttr: "0.22"
+package: "demo"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "Customer"
+    properties:
+      description: "Zákazník"
+      attributes:
+        -
+          id: "kod"
+          properties:
+            type: "string"

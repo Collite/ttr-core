@@ -89,7 +89,12 @@ object ProfileReader {
             value.getValue("operations").jsonArray.forEachIndexed { index, element ->
                 val op = element.jsonObject
                 val scope = op["in"]?.jsonPrimitive?.content
-                val target = op["to"]?.jsonObject?.get("kind")?.jsonPrimitive?.content
+                val target =
+                    op["to"]
+                        ?.jsonObject
+                        ?.get("kind")
+                        ?.jsonPrimitive
+                        ?.content
                 if (target != null && scope != target) {
                     throw ProfileException(
                         "ys/profile-invalid",

@@ -31,7 +31,7 @@ mavenPublishing {
     coordinates("org.tatrman", "ttr-profile", version.toString())
     pom {
         name.set("TTR Profiles")
-        description.set("Located profile loading and canonical identity for the TTR modelling DSL")
+        description.set("Located profile loading, structural execution and canonical identity for the TTR modelling DSL")
         inceptionYear.set("2026")
         url.set("https://github.com/Collite/ttr-core")
         licenses {

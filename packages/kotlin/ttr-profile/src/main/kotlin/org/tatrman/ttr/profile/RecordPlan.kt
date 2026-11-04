@@ -4,6 +4,7 @@ package org.tatrman.ttr.profile
 import kotlinx.serialization.json.*
 
 internal fun JsonObject.string(name: String): String = getValue(name).jsonPrimitive.content
+
 internal fun JsonObject.optionalString(name: String): String? = this[name]?.jsonPrimitive?.contentOrNull
 
 internal class Record(
@@ -17,6 +18,7 @@ internal class Record(
 internal class ConsumptionLedger {
     private val consumed = mutableSetOf<String>()
     private val opened = mutableSetOf<String>()
+
     fun open(node: ForeignNode) {
         var path = node.path
         while (true) {
@@ -25,20 +27,27 @@ internal class ConsumptionLedger {
             path = path.substringBeforeLast('/', "")
         }
     }
+
     fun consume(node: ForeignNode) {
         open(node)
         if (!node.keySelection) consumed += node.path
     }
+
     fun check(root: ForeignNode) {
         fun visit(node: ForeignNode) {
             if (node.path in consumed) return
             when (node.value) {
-                is JsonObject -> node.entries().forEach { child ->
-                    if (child.path !in consumed && child.path !in opened) {
-                        throw ProfileException("ys/unknown-key", child.span(key = true), "Unconsumed key ${child.mappingKey}")
+                is JsonObject ->
+                    node.entries().forEach { child ->
+                        if (child.path !in consumed && child.path !in opened) {
+                            throw ProfileException(
+                                "ys/unknown-key",
+                                child.span(key = true),
+                                "Unconsumed key ${child.mappingKey}",
+                            )
+                        }
+                        visit(child)
                     }
-                    visit(child)
-                }
                 is JsonArray -> node.entries().forEach(::visit)
                 else -> Unit
             }
@@ -51,36 +60,57 @@ internal class ConsumptionLedger {
 internal class ConflictLedger {
     private val writes = mutableMapOf<Record, MutableList<List<String>>>()
     private val targets = mutableMapOf<Record, Pair<Record, List<String>>>()
-    fun register(record: Record, root: Record, path: List<String>) {
+
+    fun register(
+        record: Record,
+        root: Record,
+        path: List<String>,
+    ) {
         targets[record] = root to path
     }
-    fun claim(record: Record, path: List<String>, source: ForeignNode) {
+
+    fun claim(
+        record: Record,
+        path: List<String>,
+        source: ForeignNode,
+    ) {
         val (root, prefix) = targets[record] ?: (record to emptyList())
         val target = prefix + path
         val previous = writes.getOrPut(root) { mutableListOf() }
         if (previous.any { target.take(it.size) == it || it.take(target.size) == target }) {
-            throw ProfileException("ys/profile-conflict", source.span(key = true), "Two operations write ${record.kind}.${record.id}/${path.joinToString("/")}")
+            throw ProfileException(
+                "ys/profile-conflict",
+                source.span(key = true),
+                "Two operations write ${record.kind}.${record.id}/${path.joinToString("/")}",
+            )
         }
         previous += target
     }
 }
 
-internal class PlannedOp(val located: LocatedOp) {
+internal class PlannedOp(
+    val located: LocatedOp,
+) {
     val value = located.value
     val name = value.string("op")
     val scope = value.optionalString("in")
     val at = JsonPointer(value.optionalString("at") ?: "")
     private val files = value["files"]?.jsonArray?.map { it.jsonPrimitive.content }?.let(::FileSelector)
+
     fun matches(tree: ForeignTree) = files?.matches(tree.file) != false
 }
 
 /** Record discovery is a separate pass, so child selectors never depend on writing-operation order. */
-internal class RecordPlan(val tree: ForeignTree, private val operations: List<PlannedOp>) {
+internal class RecordPlan(
+    val tree: ForeignTree,
+    private val operations: List<PlannedOp>,
+) {
     val consumption = ConsumptionLedger()
     val conflicts = ConflictLedger()
     private val found = linkedMapOf<String, Record>()
     val records: List<Record> get() {
         val order = mutableMapOf<String, Int>()
+
         fun walk(node: ForeignNode) {
             order[node.path] = order.size
             node.entries().forEach(::walk)
@@ -88,6 +118,7 @@ internal class RecordPlan(val tree: ForeignTree, private val operations: List<Pl
         walk(tree.root)
         return found.values.sortedBy { order.getValue(it.source.path) }
     }
+
     init {
         val evaluated = mutableSetOf<Pair<Int, String>>()
         var changed: Boolean
@@ -102,25 +133,56 @@ internal class RecordPlan(val tree: ForeignTree, private val operations: List<Pl
                     val selection = op.at.resolve(context, includeNull = true) ?: return@forEach
                     consumption.open(selection)
                     if (selection.value == JsonNull) return@forEach
+                    if (op.value.string("at").isNotEmpty() &&
+                        selection.value !is JsonObject &&
+                        selection.value !is JsonArray
+                    ) {
+                        throw ProfileException(
+                            "ys/profile-invalid",
+                            selection.span(key = true),
+                            "kinds.at must select a sequence or mapping",
+                        )
+                    }
                     val sources = if (op.value.string("at").isEmpty()) listOf(selection) else selection.entries()
                     for (source in sources) {
                         val mapping = op.value.getValue("mapping").jsonObject
-                        val kindNode = op.value.optionalString("kind")?.let { JsonPointer(it).resolve(source) }
-                        val foreignKind = kindNode?.value?.let { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }
-                            ?: if ("kind" !in op.value && mapping.size == 1) mapping.keys.single() else null
-                        val kind = mapping[foreignKind]?.jsonPrimitive?.content ?: throw ProfileException(
-                            "ys/unknown-kind", (kindNode ?: source).span(key = true), "Unmapped record kind $foreignKind",
-                        )
+                        val kindNode =
+                            op.value
+                                .optionalString(
+                                    "kind",
+                                )?.let { JsonPointer(it).resolve(source, includeNull = true) }
+                        val foreignKind =
+                            kindNode?.value?.let { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }
+                                ?: if ("kind" !in op.value && mapping.size == 1) mapping.keys.single() else null
+                        val kind =
+                            mapping[foreignKind]?.jsonPrimitive?.content ?: throw ProfileException(
+                                "ys/unknown-kind",
+                                (kindNode ?: source).span(key = true),
+                                "Unmapped record kind $foreignKind",
+                            )
                         val idNode = JsonPointer(op.value.optionalString("id") ?: "/\$key").resolve(source)
-                        val id = (idNode?.value as? JsonPrimitive)?.takeIf { it.isString }?.content
-                            ?: throw ProfileException("ys/record-id-missing", source.span(), "Record needs a string id")
-                        if (source.path in found) throw ProfileException(
-                            "ys/profile-conflict", source.span(key = true), "Two kinds operations select the same record",
-                        )
+                        val id =
+                            (idNode?.value as? JsonPrimitive)?.takeIf { it.isString }?.content
+                                ?: throw ProfileException(
+                                    "ys/record-id-missing",
+                                    source.span(),
+                                    "Record needs a string id",
+                                )
+                        if (source.path in found) {
+                            throw ProfileException(
+                                "ys/profile-conflict",
+                                source.span(key = true),
+                                "Two kinds operations select the same record",
+                            )
+                        }
                         // A kind selecting itself would create an infinite nested record graph.
-                        if (parent?.source?.path == source.path) throw ProfileException(
-                            "ys/profile-conflict", source.span(key = true), "A record cannot nest inside itself",
-                        )
+                        if (parent?.source?.path == source.path) {
+                            throw ProfileException(
+                                "ys/profile-conflict",
+                                source.span(key = true),
+                                "A record cannot nest inside itself",
+                            )
+                        }
                         consumption.open(source)
                         kindNode?.let(consumption::consume)
                         idNode?.let(consumption::consume)
