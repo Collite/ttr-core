@@ -1,0 +1,6 @@
+entity:
+  - nazev: Customer
+    popis: Zákazník
+    sloupce:
+      kod: {typ: string}
+    poznamka: only the other consumer
