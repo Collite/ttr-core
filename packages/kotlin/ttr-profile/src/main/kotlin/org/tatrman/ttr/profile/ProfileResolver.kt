@@ -9,7 +9,8 @@ import org.tatrman.ttr.yaml.readProfileYaml
 /**
  * All lookups are explicit and local. Catalog paths are root-relative; extends paths are file-relative.
  * Declaring files are absolute, or relative to the resolver's root; the label also bases relative references.
- * A chain that reaches 33 is refused as too deep, cyclic or not.
+ * A chain of more than 32 distinct profiles is refused as too deep, even if it would later cycle;
+ * a cycle within 32 profiles is refused as a cycle.
  */
 class ProfileResolver(
     root: Path,
@@ -52,7 +53,13 @@ class ProfileResolver(
             at: ProfileSpan,
             depth: Int,
         ) {
-            val bundled = ref == "canonical" || ref == "canonical/1"
+            val bundled =
+                ref == "canonical" ||
+                    (
+                        versionedReference.matches(ref) &&
+                            ref.substringBeforeLast('/') == "canonical" &&
+                            ref.substringAfterLast('/').toBigInteger() == java.math.BigInteger.ONE
+                    )
             val path = if (bundled) null else confined(ref, from, at)
             if (path != null && !visiting.add(path)) {
                 throw ProfileException("ys/profile-cycle", at, "Profile cycle through $ref")
@@ -118,7 +125,7 @@ class ProfileResolver(
         key: String,
         profile: ProfileDefinition,
     ) {
-        val versioned = Regex("^.+/[0-9]+$").matches(key)
+        val versioned = versionedReference.matches(key)
         val matches =
             if (versioned) {
                 key.substringBeforeLast('/') == profile.name &&
@@ -136,6 +143,7 @@ class ProfileResolver(
     }
 
     companion object {
+        private val versionedReference = Regex("^.+/[0-9]+$")
         private val canonicalProfile: ProfileDefinition by lazy {
             ProfileReader.read(
                 requireNotNull(ProfileResolver::class.java.getResourceAsStream("/profiles/canonical.yaml")) {

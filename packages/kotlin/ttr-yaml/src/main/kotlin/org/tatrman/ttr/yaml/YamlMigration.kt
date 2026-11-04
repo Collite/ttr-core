@@ -15,7 +15,6 @@ import org.snakeyaml.engine.v2.exceptions.YamlEngineException
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.ByteBuffer
-import java.nio.charset.CodingErrorAction
 import kotlin.system.exitProcess
 
 /** Syntax migrations only. A version pair must be registered here; no best-effort dialect detection. */
@@ -123,10 +122,7 @@ object YamlMigrationCli {
             val bytes = input.readNBytes(MAX_REQUEST_BYTES + 1)
             require(bytes.size <= MAX_REQUEST_BYTES) { "Migration request exceeds 64 MiB" }
             val source =
-                Charsets.UTF_8
-                    .newDecoder()
-                    .onMalformedInput(CodingErrorAction.REPORT)
-                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                strictUtf8Decoder()
                     .decode(ByteBuffer.wrap(bytes))
                     .toString()
             val mapper = ObjectMapper().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)

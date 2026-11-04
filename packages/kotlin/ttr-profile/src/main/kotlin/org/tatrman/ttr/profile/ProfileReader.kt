@@ -107,7 +107,7 @@ object ProfileReader {
                     LocatedOp(
                         op.jsonObject,
                         data.span(path),
-                        operationLocations[index]?.toMap() ?: emptyMap(),
+                        operationLocations[index] ?: emptyMap(),
                     )
                 },
                 locations,
