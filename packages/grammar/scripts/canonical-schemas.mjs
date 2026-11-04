@@ -822,20 +822,28 @@ export function createSchemas(metadata) {
   );
   const files = array({ type: 'string', minLength: 1 }, 1);
   const selectors = { at: pointer, files };
+  const canonicalKind = { enum: [...new Set(targetKinds.map((k) => k.kind))] };
+  const recordSelectors = { ...selectors, in: canonicalKind };
   const operation = (op, props, required) =>
     object({ op: { const: op }, ...props }, ['op', ...required]);
   const operations = [
-    operation(
-      'kinds',
-      {
-        ...selectors,
-        mapping: {
-          type: 'object',
-          additionalProperties: { enum: [...new Set(targetKinds.map((k) => k.kind))] },
+    {
+      ...operation(
+        'kinds',
+        {
+          ...recordSelectors,
+          kind: pointer,
+          id: pointer,
+          mapping: {
+            type: 'object',
+            additionalProperties: canonicalKind,
+          },
         },
-      },
-      ['at', 'mapping']
-    ),
+        ['at', 'mapping']
+      ),
+      if: { properties: { mapping: { minProperties: 2 } } },
+      then: { required: ['kind'] },
+    },
     operation(
       'package',
       {
@@ -845,17 +853,18 @@ export function createSchemas(metadata) {
       },
       ['mapping']
     ),
-    operation('rename', { ...selectors, to: ref('propertyTarget') }, ['at', 'to']),
-    operation('shape', { ...selectors, to: { type: 'object' }, template: ref('profileTemplate') }, [
+    operation('rename', { ...recordSelectors, to: ref('propertyTarget') }, ['in', 'at', 'to']),
+    operation('shape', { ...recordSelectors, to: { type: 'object' }, template: ref('profileTemplate') }, [
       'at',
       'to',
       'template',
+      'in',
     ]),
     ...['nest', 'unnest'].map((op) =>
-      operation(op, { ...selectors, to: ref('propertyTarget') }, ['at', 'to'])
+      operation(op, { ...recordSelectors, to: ref('propertyTarget') }, ['in', 'at', 'to'])
     ),
     {
-      ...operation('ignore', { ...selectors, reason: string }, []),
+      ...operation('ignore', { ...recordSelectors, reason: string }, []),
       anyOf: [{ required: ['at'] }, { required: ['files'] }],
     },
     operation(
@@ -865,8 +874,8 @@ export function createSchemas(metadata) {
     ),
     operation(
       'link',
-      { ...selectors, to: ref('propertyTarget'), by: { enum: ['sourceName', 'iri', 'path'] } },
-      ['at', 'to', 'by']
+      { ...recordSelectors, to: ref('propertyTarget'), by: { enum: ['sourceName', 'iri', 'path'] } },
+      ['in', 'at', 'to', 'by']
     ),
   ];
   // Group endpoint selectors by their value type. Repeating a full nested
@@ -899,8 +908,8 @@ export function createSchemas(metadata) {
   operations.push({
     ...operation(
       'values',
-      { ...selectors, to: ref('propertyTarget'), mapping: { type: 'object' }, default: data },
-      ['at', 'to', 'mapping']
+      { ...recordSelectors, to: ref('propertyTarget'), mapping: { type: 'object' }, default: data },
+      ['in', 'at', 'to', 'mapping']
     ),
     anyOf: [...typeGroups.values()].map(({ value, targets }) => ({
       properties: {
@@ -934,6 +943,9 @@ export function createSchemas(metadata) {
                 op: { enum: operations.map((o) => o.properties.op.const) },
                 at: pointer,
                 files,
+                in: canonicalKind,
+                kind: pointer,
+                id: pointer,
                 to: ref('canonicalTarget'),
                 mapping: { type: 'object' },
                 default: data,

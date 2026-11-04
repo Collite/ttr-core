@@ -6,6 +6,8 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+- The 0.22 profile schema gains record scope `in` and `kinds.kind`/`kinds.id` (D-MW-64). Writing operations now require `in`; previously valid writing operations without it are refused. No grammar change.
+
 ### Added — Profile loading and canonical identity (MW P3 S3.1, ttr-core#384)
 
 - `ttr-profile` loads schema-validated, located profile definitions and declarations, checks grammar ranges,
