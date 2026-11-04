@@ -65,3 +65,45 @@ statement as stage `model_joins`. Design, contracts and the acceptance corpus:
 
 Published as `org.tatrman:ttr-translator`, lockstep with `ttr-plan-proto` under the
 `kotlin-translator/v*` tag. See `docs/ttr-translator/` for the full arc.
+
+## Row-write plans (`translator/v0.14.0`)
+
+`PlanNode.row_writes` (oneof field 18) is an ordered batch of INSERT/UPDATE/DELETE row writes,
+separate from MD `StoreNode`. The wire vocabulary is `RowWrites`, `RowWrite`, `RowWriteOp` and
+`ColumnValue` (`name` + `value: Expression`); existing `QualifiedName` and `Expression` are reused.
+The authoritative wire and answer contract is [AU Server contracts.md, “The door’s write wire”
+(D-163)](https://github.com/Collite/project/blob/master/kantheon/features/automation-agents/implementation/ttr-server/contracts.md).
+
+`MapToPhysical.apply` maps an ER target through `ModelHandle.entityMapping` (`ToTable` only).
+Values, `read_before`, and predicate columns must be declared attributes of the ER entity; physical
+column names alone refuse with `row_writes_attribute_unknown`. Declared attributes use `attributeColumnRenames[attr] ?: attr`, then
+must exist in `columns(table)`; missing entities/columns produce named diagnostics. Query-backed
+or filtered bindings refuse. The REL_NODE front half preserves writes without a Calcite read
+round trip. Read walkers see no scans or output columns, including fingerprint callers.
+
+`RowWriteUnparser.unparse(row, POSTGRESQL, bindings, keyColumns)` returns one SQL statement and
+its parameters in placeholder order. Literals and named parameters are bound, identifiers quoted;
+the executor runs statements in order on one transaction and attaches `seq` to the answers.
+`Translator.unparseFromRelNode` takes one `RowWrite` per call; a larger batch refuses with
+`row_writes_one_row`. The parse half can lower a whole batch before the executor splits it.
+Postgres resolves tables through the connection’s
+`search_path`, as on the read path.
+
+For `read_before`, a materialized key-only SELECT locks the row before the modifying CTE evaluates
+its guard. A CAS miss still returns the locked prior; an absent key returns null. `prior` contains
+only `read_before` columns, aliased to `prior_keys` (field 7): the names originally sent, so an ER
+writer reads attribute names such as `prior.state`. Empty `prior_keys` means use `read_before` as keys
+(for direct DB-coded calls). UPDATE/DELETE require the table's physical primary key from the
+model, with a top-level `eq(column, literal | parameter)` conjunct for every key column. Tables
+without a PK and missing key equalities refuse with `row_writes_key`, with or without a prior
+read. Direct `RowWriteUnparser` callers must supply `keyColumns`; no key is inferred. Each statement returns exactly one row
+`(rows_affected bigint, prior text)`. Other dialects refuse with `row_writes_unsupported_dialect`.
+
+The predicate operators are `and`, `or`, `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `in`,
+`is_null`, and `is_not_null`. Values accept only literals and parameters; predicates accept
+column refs, literals, parameters and these functions. CAST, `not`, and aliases such as `neq`,
+`gte`, `lte`, or `not_in` refuse during lowering as well as unparse.
+
+The executed PG specs opt in with `TTRP_CONFORM_PG=1` and `TTR_CONN_ERP_PG` (the same URI convention
+as `ttrp-conform`); a configured, unreachable PG fails the suite. `RowWriteUnparserSpec` creates
+and drops its own schema. JVM consumers rebuild against the new proto/translator artifacts.

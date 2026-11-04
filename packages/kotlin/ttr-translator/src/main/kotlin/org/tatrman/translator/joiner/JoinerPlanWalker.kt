@@ -140,6 +140,7 @@ object JoinerPlanWalker {
                     plan.toBuilder().setStore(plan.store.toBuilder().setInput(newInput)).build()
                 }
             }
+            PlanNode.NodeCase.ROW_WRITES -> plan // Ordered DML has no read subtree or result set.
             else -> plan
         }
 

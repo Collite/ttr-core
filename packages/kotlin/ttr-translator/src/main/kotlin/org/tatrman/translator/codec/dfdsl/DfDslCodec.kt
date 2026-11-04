@@ -474,6 +474,11 @@ object DfDslCodec {
             // plan. If it does, fall through to the catch-all.
             PlanNode.NodeCase.NODE_NOT_SET ->
                 throw DfDslUnparseException("empty_plan", "Cannot unparse an empty PlanNode")
+            PlanNode.NodeCase.ROW_WRITES ->
+                throw DfDslUnparseException(
+                    "operation_not_supported_in_target_language",
+                    "DataFrame DSL cannot express row writes",
+                )
             else ->
                 throw DfDslUnparseException(
                     "operation_not_supported_in_target_language",

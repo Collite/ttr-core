@@ -233,6 +233,7 @@ class Translator(
             // A Store wrapping an ER SELECT must still trip the pre-physical guard (else the write
             // would slip past MAP_TO_PHYSICAL and blow up at DML unparse).
             PlanNode.NodeCase.STORE -> containsErScan(plan.store.input)
+            PlanNode.NodeCase.ROW_WRITES -> plan.rowWrites.rowsList.any { it.target.schemaCode == SchemaCode.ER }
             else -> false
         }
 
@@ -839,8 +840,38 @@ class Translator(
         targetDialect: SqlDialectProto,
         optimize: Boolean,
         parameters: List<org.tatrman.plan.v1.ParameterBinding> = emptyList(),
-    ): UnparseResult =
-        try {
+    ): UnparseResult {
+        return try {
+            if (plan.nodeCase == PlanNode.NodeCase.ROW_WRITES) {
+                if (plan.rowWrites.rowsCount == 0) {
+                    return UnparseResult.Failure("row_writes_empty", "RowWrites must contain at least one RowWrite")
+                }
+                if (plan.rowWrites.rowsCount > 1) {
+                    return UnparseResult.Failure(
+                        "row_writes_one_row",
+                        "unparse one RowWrite per call; the executor owns the order, seq and the transaction",
+                    )
+                }
+                org.tatrman.translator.dialects.Dialects
+                    .requireRowWrites(targetDialect)
+                val statements =
+                    plan.rowWrites.rowsList.map { row ->
+                        val keys =
+                            model
+                                .tables(
+                                    row.target.schemaCode,
+                                    row.target.namespace,
+                                )[row.target]
+                                ?.primaryKey
+                                .orEmpty()
+                        org.tatrman.translator.codec.sql.RowWriteUnparser
+                            .unparse(row, targetDialect, parameters, keys)
+                    }
+                return UnparseResult.Success(
+                    output = statements.single().sql,
+                    parameters = statements.flatMap { it.parameters },
+                )
+            }
             val framework = TranslatorFramework(model)
             // A StoreNode is a write root: decode/optimize/unparse only its `input` (the RHS read plan)
             // through the normal read path, then assemble the DML around that SELECT (StoreDmlUnparser).
@@ -865,11 +896,14 @@ class Translator(
                     bindings = parameters,
                 )
             UnparseResult.Success(output = unparsed.sql, parameters = positional)
+        } catch (ex: org.tatrman.translator.codec.sql.RowWriteUnparseException) {
+            UnparseResult.Failure(ex.code, ex.message.orEmpty())
         } catch (ex: Exception) {
             sqlUnparseFailure(targetDialect, optimize, ex)
         } catch (ex: AssertionError) {
             sqlUnparseFailure(targetDialect, optimize, ex) // an engine assertion — see the class KDoc
         }
+    }
 
     private fun sqlUnparseFailure(
         targetDialect: SqlDialectProto,
@@ -956,6 +990,17 @@ class Translator(
                     message = ex.message ?: "could not decode REL_NODE source",
                 )
             }
+        // Ordered DML has no relational result set: preserve its wire form through both halves.
+        if (plan.nodeCase == PlanNode.NodeCase.ROW_WRITES) {
+            return if (targetSchema == SchemaCode.DB || targetSchema == SchemaCode.SCHEMA_CODE_UNSPECIFIED) {
+                when (val mapped = MapToPhysical.apply(plan, model)) {
+                    is MapToPhysicalResult.Success -> ParseResult.Success(plan = mapped.plan)
+                    is MapToPhysicalResult.Failure -> ParseResult.Failure(mapped.code, mapped.message)
+                }
+            } else {
+                ParseResult.Success(plan = plan)
+            }
+        }
         val framework = TranslatorFramework(model)
         val rel =
             try {

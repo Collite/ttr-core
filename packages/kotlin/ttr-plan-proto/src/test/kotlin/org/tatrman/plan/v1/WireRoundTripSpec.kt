@@ -59,6 +59,70 @@ class WireRoundTripSpec :
             PlanNode.parseFrom(root.toByteArray()) shouldBe root
         }
 
+        test("RowWrites INSERT, guarded UPDATE and DELETE round-trip with stable field numbers") {
+            val key = Expression.newBuilder().setParameter(ParameterRef.newBuilder().setName("k")).build()
+
+            fun column(name: String) =
+                Expression.newBuilder().setColumnRef(ColumnRef.newBuilder().setName(name)).build()
+
+            fun call(
+                op: String,
+                vararg args: Expression,
+            ) = Expression
+                .newBuilder()
+                .setFunction(
+                    FunctionCall.newBuilder().setOperation(op).addAllOperands(args.toList()),
+                ).build()
+            val placed = Expression.newBuilder().setLiteral(Literal.newBuilder().setStringValue("placed")).build()
+            val target =
+                QualifiedName
+                    .newBuilder()
+                    .setSchemaCode(
+                        SchemaCode.ER,
+                    ).setNamespace("entity")
+                    .setName("order")
+                    .build()
+            val root =
+                PlanNode
+                    .newBuilder()
+                    .setRowWrites(
+                        RowWrites
+                            .newBuilder()
+                            .addRows(
+                                RowWrite
+                                    .newBuilder()
+                                    .setTarget(target)
+                                    .setOp(RowWriteOp.INSERT)
+                                    .setIfAbsent(true)
+                                    .addValues(ColumnValue.newBuilder().setName("order_number").setValue(key)),
+                            ).addRows(
+                                RowWrite
+                                    .newBuilder()
+                                    .setTarget(target)
+                                    .setOp(RowWriteOp.UPDATE)
+                                    .addValues(ColumnValue.newBuilder().setName("state").setValue(placed))
+                                    .setWhere(
+                                        call(
+                                            "and",
+                                            call("eq", column("order_number"), key),
+                                            call("in", column("state"), placed),
+                                        ),
+                                    ).addReadBefore("so_state")
+                                    .addPriorKeys("state"),
+                            ).addRows(
+                                RowWrite
+                                    .newBuilder()
+                                    .setTarget(target)
+                                    .setOp(RowWriteOp.DELETE)
+                                    .setWhere(call("eq", column("order_number"), key)),
+                            ),
+                    ).build()
+            PlanNode.parseFrom(root.toByteArray()) shouldBe root
+            PlanNode.getDescriptor().findFieldByName("row_writes").number shouldBe 18
+            RowWrite.getDescriptor().fields.map { it.number } shouldBe (1..7).toList()
+            ColumnValue.getDescriptor().fields.map { it.number } shouldBe listOf(1, 2)
+        }
+
         test("PipelineContext with a parameter round-trips") {
             val ctx =
                 PipelineContext

@@ -55,5 +55,15 @@ object Dialects {
                 throw IllegalArgumentException("Unrecognised proto SqlDialect value")
         }
 
+    /** Row DML uses Postgres data-modifying CTEs and row locking. No read-dialect fallback. */
+    fun requireRowWrites(code: SqlDialectProto) {
+        if (code != SqlDialectProto.POSTGRESQL) {
+            throw org.tatrman.translator.codec.sql.RowWriteUnparseException(
+                "row_writes_unsupported_dialect",
+                "row_writes supports PostgreSQL only; got $code",
+            )
+        }
+    }
+
     private const val MSSQL_MAJOR_VERSION = 11
 }

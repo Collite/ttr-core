@@ -172,6 +172,7 @@ object JoinerLogical {
                 }
             PlanNode.NodeCase.JOIN -> collectEntityScans(plan.join.left) + collectEntityScans(plan.join.right)
             PlanNode.NodeCase.FILTER -> collectEntityScans(plan.filter.input)
+            PlanNode.NodeCase.ROW_WRITES -> emptyList()
             else -> emptyList()
         }
 
@@ -181,6 +182,7 @@ object JoinerLogical {
             PlanNode.NodeCase.SCAN, PlanNode.NodeCase.TABLE_SCAN -> true
             PlanNode.NodeCase.JOIN -> hasScan(plan.join.left) || hasScan(plan.join.right)
             PlanNode.NodeCase.FILTER -> hasScan(plan.filter.input)
+            PlanNode.NodeCase.ROW_WRITES -> false
             else -> false
         }
 

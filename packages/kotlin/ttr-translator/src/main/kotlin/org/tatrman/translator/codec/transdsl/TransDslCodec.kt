@@ -496,10 +496,10 @@ object TransDslCodec {
                     "TransDSL has no slot for ${plan.nodeCase} as a source. Wrap it in a SubqueryNode.",
                 )
             // A StoreNode is a write plan; TransDSL is a read-only query DSL and has no write form.
-            PlanNode.NodeCase.STORE ->
+            PlanNode.NodeCase.STORE, PlanNode.NodeCase.ROW_WRITES ->
                 throw TransDslUnparseException(
                     "operation_not_supported_in_target_language",
-                    "TransDSL cannot express a StoreNode (write plan); only SQL DML unparse is supported.",
+                    "TransDSL cannot express a write plan; only SQL DML unparse is supported.",
                 )
             PlanNode.NodeCase.NODE_NOT_SET ->
                 throw TransDslUnparseException("empty_plan", "Cannot unparse an empty PlanNode")
