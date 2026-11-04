@@ -167,7 +167,7 @@ class RecipeBundleAssembler(
                 .filter { s ->
                     model.routes.any { r -> r.detail.any { s.port == SwitchLowering.detailPort(r.name, it) } }
                 }.flatMap { s -> s.columns.map { it.name } }
-                // the detail entity's own columns win: a context's `run` / `row_no` is not stored twice (review-119 m4)
+                // The writer's own columns win over context columns (review-119 m4, Core#382).
                 .filter { it !in model.keyColumns && it !in DETAIL_OWN }
                 .distinct()
                 .sorted()
@@ -178,6 +178,7 @@ class RecipeBundleAssembler(
                     OutputColumn(SwitchLowering.ROUTE, "text"),
                     OutputColumn(SwitchLowering.CONTEXT, "text"),
                     OutputColumn("row_no", "int"),
+                    OutputColumn("truncated", "bool"),
                 ) +
                 detailExtra.map { OutputColumn(it, "text") }
         val catalog =
@@ -417,7 +418,7 @@ class RecipeBundleAssembler(
 
     private companion object {
         /** The columns `<recipe>_verdict_detail` writes itself (besides the key). */
-        val DETAIL_OWN = setOf("run", SwitchLowering.ROUTE, SwitchLowering.CONTEXT, "row_no")
+        val DETAIL_OWN = setOf("run", SwitchLowering.ROUTE, SwitchLowering.CONTEXT, "row_no", "truncated")
         const val NATIVE = "native"
         const val SQL_TEXT = "sql-text"
         const val ER = "er"

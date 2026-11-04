@@ -14,7 +14,8 @@ import org.tatrman.ttrp.graph.recipe.RecipeModel
  *   document, fingerprints }`;
  * - `catalog/<recipe>_verdict.ttrm` — `model er`: `<recipe>_verdict` (run, as_of, the key, route, verdict_reason,
  *   parameters_fp, run_as, written_at — run, key and route its key), `<recipe>_verdict_detail` (run, the key, route,
- *   context, row_no — the writer numbers the rows, D-77 — and every `detail:` context's columns, as text) and
+ *   context, row_no — the writer numbers the rows, D-77 — truncated: bool, a non-key flag distinguishing the
+ *   detail-limit marker row from data rows, and every `detail:` context's columns, as text) and
  *   `<recipe>_verdict_current` (the verdict's columns: the latest run per key, all its routes — a table the writer
  *   maintains, D-105, not a `def query`).
  *

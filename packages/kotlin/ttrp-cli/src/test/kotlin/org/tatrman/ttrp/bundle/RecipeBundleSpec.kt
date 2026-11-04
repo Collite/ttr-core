@@ -382,12 +382,25 @@ class RecipeBundleSpec :
                 .roles.elseRoute shouldBe null
         }
 
-        "the detail entity's own columns win over a detail context's `run` / `row_no` (review-119 m4)" {
+        "every recipe's detail catalog declares a non-key boolean truncation marker (Core#382)" {
+            for (name in listOf("release_order", "decide_return", "monitor_inbound", "settle")) {
+                val r = build("$name.ttrp")
+                val catalog = Files.readString(r.dir.resolve("catalog/${name}_verdict.ttrm"))
+                val detail = catalog.substringAfter("def entity ${name}_verdict_detail").substringBefore("def entity")
+                withClue(name) {
+                    detail shouldContain "def attribute truncated { type: bool }"
+                    Regex("""def attribute truncated\b""").findAll(catalog).count() shouldBe 1
+                }
+            }
+        }
+
+        "the detail entity's own columns win over a detail context's `run` / `row_no` / `truncated`" {
             val base = Files.readString(fixtures.resolve("base-order.ttrp"))
             val src =
                 base.replace(
                     "SELECT o.order_number, i.invoice_id FROM orders o",
-                    "SELECT o.order_number, i.invoice_id, i.issued AS run, i.amount AS row_no FROM orders o",
+                    "SELECT o.order_number, i.invoice_id, i.issued AS run, i.amount AS row_no, " +
+                        "i.amount AS truncated FROM orders o",
                 )
             (src != base) shouldBe true
             val r = build("detail_probe.ttrp", src)
@@ -398,6 +411,8 @@ class RecipeBundleSpec :
             attrs shouldContain "invoice_id"
             attrs.count { it == "run" } shouldBe 1
             attrs.count { it == "row_no" } shouldBe 1
+            attrs.count { it == "truncated" } shouldBe 1
+            detail shouldContain "def attribute truncated { type: bool }"
         }
 
         "a `dry_run:` text moves `labels` only (review-119 m7, D-125)" {
@@ -727,5 +742,12 @@ class RecipeBundleSpec :
             entities shouldContain "release_order_verdict"
             entities shouldContain "release_order_verdict_detail"
             entities shouldContain "release_order_verdict_current"
+            val detail =
+                result.model.schemas.values
+                    .flatMap { s -> (s as? org.tatrman.ttr.metadata.model.ErSchema)?.entities?.values.orEmpty() }
+                    .single { it.qname.name == "release_order_verdict_detail" }
+            val truncated = detail.attributes.single { it.qname.name == "release_order_verdict_detail.truncated" }
+            truncated.type shouldBe "bool"
+            truncated.isKey shouldBe false
         }
     })
