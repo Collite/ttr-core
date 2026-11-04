@@ -51,38 +51,15 @@ object TableHintExtractor {
     fun extract(sql: String): ExtractedHints {
         val out = StringBuilder(sql.length)
         val byTable = linkedMapOf<String, MutableList<TableHintSpec>>()
-        var inLiteral = false
         var i = 0
         while (i < sql.length) {
-            val ch = sql[i]
-            if (ch == '\'') {
-                if (inLiteral && i + 1 < sql.length && sql[i + 1] == '\'') {
-                    out.append("''")
-                    i += 2
-                    continue
-                }
-                inLiteral = !inLiteral
-                out.append(ch)
-                i++
+            val protectedEnd = SqlTextScanner.protectedEnd(sql, i)
+            if (protectedEnd > i) {
+                out.append(sql, i, protectedEnd)
+                i = protectedEnd
                 continue
             }
-            // Comments are copied through verbatim so a `WITH (` inside one is never matched as a
-            // table hint (nor stripped). `--` runs to end-of-line; `/* … */` to its close.
-            if (!inLiteral && ch == '-' && i + 1 < sql.length && sql[i + 1] == '-') {
-                val nl = sql.indexOf('\n', i)
-                val end = if (nl < 0) sql.length else nl
-                out.append(sql, i, end)
-                i = end
-                continue
-            }
-            if (!inLiteral && ch == '/' && i + 1 < sql.length && sql[i + 1] == '*') {
-                val close = sql.indexOf("*/", i + 2)
-                val end = if (close < 0) sql.length else close + 2
-                out.append(sql, i, end)
-                i = end
-                continue
-            }
-            if (!inLiteral && isHintWithAt(sql, i)) {
+            if (isHintWithAt(sql, i)) {
                 val parenStart = nextNonWs(sql, i + WITH.length)
                 val parenEnd = matchingParen(sql, parenStart)
                 if (parenEnd >= 0) {
@@ -97,7 +74,7 @@ object TableHintExtractor {
                     continue
                 }
             }
-            out.append(ch)
+            out.append(sql[i])
             i++
         }
         return ExtractedHints(cleanedSql = out.toString(), byTable = byTable)
