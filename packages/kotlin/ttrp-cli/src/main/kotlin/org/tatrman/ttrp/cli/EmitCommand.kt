@@ -260,8 +260,32 @@ class EmitCommand : CliktCommand(name = "emit") {
                         dir,
                     )
                 }
-                val loaded = load(program)
-                val graph = loaded.graph
+                val programGraphs = mutableMapOf<String, Loaded>()
+
+                fun cached(program: AutomationProgram): Loaded =
+                    programGraphs.getOrPut(program.qname.dotted()) { load(program) }
+                val choices = WorldChoicesProjector.project(loaded.model, world) { cached(it).graph }
+                val loaded = cached(program)
+                val modelFingerprint =
+                    "sha256:" +
+                        MessageDigest
+                            .getInstance("SHA-256")
+                            .digest(
+                                roots
+                                    .joinToString(
+                                        "\n",
+                                    ) {
+                                        org.tatrman.ttrp.bundle.ModelFingerprint
+                                            .of(it)
+                                    }.toByteArray(Charsets.UTF_8),
+                            ).joinToString("") { "%02x".format(it) }
+                val graph =
+                    loaded.graph.copy(
+                        recipe =
+                            loaded.graph.recipe.copy(
+                                fingerprints = loaded.graph.recipe.fingerprints + ("model" to modelFingerprint),
+                            ),
+                    )
                 val recipeName = graph.recipe.name
                 val bundle = loaded.bundle
                 val plugins = ServiceLoader.load(TtrEmitPlugin::class.java).toList()
@@ -295,7 +319,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                             "world" to bundle.world.fingerprint,
                         )
                 val stale =
-                    "Stale when any text, values, labels, program, deployment, world, toolchain " +
+                    "Stale when any model, text, values, labels, program, deployment, world, toolchain " +
                         "or target version fingerprint differs for any step from the served bundle; re-export the deployment."
 
                 val fixtures = bundle.recipe!!.tests.orEmpty()
@@ -310,6 +334,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                 val exportManifest =
                     buildJsonObject {
                         put("schemaVersion", 1)
+                        put("world", bundle.world.qname)
                         put("deployment", deploymentName)
                         put("program", program.qname.name)
                         put("recipe", recipeName)
@@ -363,6 +388,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                             formatter.encodeToString(JsonObject.serializer(), exportManifest) + "\n",
                             readme,
                             formatter.encodeToString(JsonObject.serializer(), conformance) + "\n",
+                            choices,
                         ),
                     )
                 val folder =
@@ -399,7 +425,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                             .jsonArray
                     }
                 val renderedCalls = workflowCalls ?: bpmnCalls
-                val finalManifest =
+                val callManifest =
                     if (renderedCalls ==
                         null
                     ) {
@@ -407,6 +433,77 @@ class EmitCommand : CliktCommand(name = "emit") {
                     } else {
                         JsonObject(exportManifest + ("calls" to renderedCalls))
                     }
+                val finalManifest =
+                    JsonObject(
+                        callManifest +
+                            mapOf(
+                                "files" to
+                                    JsonObject(
+                                        (result.files + fixtureBytes).toSortedMap().mapValues { (_, bytes) ->
+                                            JsonPrimitive(
+                                                "sha256:" +
+                                                    MessageDigest
+                                                        .getInstance(
+                                                            "SHA-256",
+                                                        ).digest(bytes)
+                                                        .joinToString("") { "%02x".format(it) },
+                                            )
+                                        },
+                                    ),
+                                "authoring" to
+                                    buildJsonObject {
+                                        put("dialect", if (graph.deployment.type == "camunda_8") "c8" else "c7")
+                                        put(
+                                            "choices",
+                                            JsonArray(
+                                                (
+                                                    choices.programs.map {
+                                                        it.name
+                                                    } + choices.queries.map { it.qname }
+                                                ).sorted().map(::JsonPrimitive),
+                                            ),
+                                        )
+                                        put(
+                                            "steps",
+                                            JsonArray(
+                                                (
+                                                    choices.programs.map { p ->
+                                                        Triple(
+                                                            p.name,
+                                                            p.params,
+                                                            emptyList<org.tatrman.ttrp.emit.spi.ColumnMeta>(),
+                                                        )
+                                                    } +
+                                                        choices.queries.map { q ->
+                                                            Triple(
+                                                                q.qname,
+                                                                q.params,
+                                                                q.columns +
+                                                                    org.tatrman.ttrp.emit.spi
+                                                                        .ColumnMeta("row_count", "integer"),
+                                                            )
+                                                        }
+                                                ).map { (name, params, columns) ->
+                                                    buildJsonObject {
+                                                        put("name", name)
+                                                        put("params", JsonArray(params.map { JsonPrimitive(it.name) }))
+                                                        put(
+                                                            "columns",
+                                                            JsonObject(
+                                                                columns.associate {
+                                                                    it.name to
+                                                                        JsonPrimitive(it.type)
+                                                                },
+                                                            ),
+                                                        )
+                                                        if (columns.isNotEmpty()) put("dmn", "dmn/${name}_decision.dmn")
+                                                    }
+                                                },
+                                            ),
+                                        )
+                                    },
+                            ),
+                    )
                 ExportFolderWriter.write(
                     folder,
                     formatter.encodeToString(JsonObject.serializer(), finalManifest) + "\n",

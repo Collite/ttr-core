@@ -6,6 +6,15 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — AU exporter templates and DMN (S1.5.1, in progress)
+
+- Camunda authoring exports gain deterministic element templates and typed empty DMN 1.3 tables from
+  the host's world program/query projection. The export inventory and offline structure checker cover these files.
+- **JVM SPI v2 clients must rebuild:** revision 2 adds `RecipeEmitRequest.world` and deletes the pre-cut
+  process, delivery and schedule fields. Revision-1 plugins are refused with a rebuild notice. SPI v1 remains
+  unchanged. This is a library/API change within grammar 0.22; no grammar minor or dependency pin changes.
+
+
 ### Added — CG-2 engine attributes (D-144/D-145/D-158/D-161)
 
 - Validate `def action.by` against declared roles and require it for approval-required actions; validate `due`

@@ -9,116 +9,18 @@ internal class N8nRenderer(
     private val request: RecipeEmitRequest,
 ) {
     private val root = request.graph
-    private val flow = Workflow(root.process?.name ?: root.program.name)
+    private val flow = Workflow(root.program.name)
     private var timezone = "UTC"
     private val dollar = '$'
 
     fun render(): String {
         require(root.deployment.type == "n8n_l1") { "n8n exporter requires n8n_l1" }
-        val process = root.process
-        val graphs =
-            process?.steps?.map { requireNotNull(it.graph) { "process step ${it.name} has no graph" } } ?: listOf(root)
-        require(graphs.isNotEmpty()) { "process has no steps" }
-        trigger(graphs.first())
-        var previous = "trigger"
-        val opens = mutableListOf<String>()
-        process?.steps?.forEach { step ->
-            require(
-                step.graph!!.process == null &&
-                    step.graph!!.program.name == step.program &&
-                    step.graph!!.deployment == root.deployment &&
-                    step.graph!!.program.port == (step.port ?: step.graph!!.program.port),
-            ) { "invalid step graph ${step.name}" }
-        }
-        graphs.forEachIndexed { index, graph ->
-            val prefix =
-                process
-                    ?.steps
-                    ?.get(index)
-                    ?.name
-                    ?.let { "$it " } ?: ""
-            val step = process?.steps?.get(index)
-            var skip: String? = null
-            if (step != null && index > 0 && step.obligations.isNotEmpty()) {
-                val previousId = "[${opens.joinToString(
-                    ",",
-                ) { literal(it) }}].reverse().map(n => $dollar(n)).find(n => n.isExecuted).first().json.body.runId"
-                val status = http(graph, prefix + "previous status", "status", "GET", previousId)
-                flow.link(previous, status)
-                val kinds = arr(step.obligations.map(::str)).toString()
-                val obligations =
-                    flow.code(
-                        prefix + "previous obligations",
-                        "if (!Array.isArray(${dollar}json.body.obligations)) throw new Error('run status has no obligations field (ttr-server §1.2 addition); this process export needs it'); return ${dollar}input.all();",
-                    )
-                flow.link(status, obligations)
-                val relevant = "${dollar}json.body.obligations.filter(o => $kinds.includes(o.kind))"
-                val exists = flow.condition(prefix + "obligation present", "$relevant.length > 0")
-                flow.link(obligations, exists)
-                val wait =
-                    flow.node(
-                        prefix + "obligation wait",
-                        "wait",
-                        json(
-                            "resume" to str("webhook"),
-                            "httpMethod" to str("POST"),
-                            "limitWaitTime" to JsonPrimitive(true),
-                            "limitType" to str("afterTimeInterval"),
-                            "resumeAmount" to
-                                str(
-                                    expression(
-                                        "Math.max(1, Math.min(3600, ...$relevant.filter(o => o.dueAt && Date.parse(o.dueAt) > Date.now()).map(o => Math.ceil((Date.parse(o.dueAt) - Date.now()) / 1000))))",
-                                    ),
-                                ),
-                            "resumeUnit" to str("seconds"),
-                            "options" to json("webhookSuffix" to str(prefix.trim())),
-                        ),
-                    )
-                val ready =
-                    flow.condition(
-                        prefix + "obligation ready",
-                        "$relevant.every(o => " +
-                            listOfNotNull(
-                                "(o.state === 'fulfilled')".takeIf { "fulfilled" in step.until },
-                                "(o.state === 'due' || (o.dueAt && Date.parse(o.dueAt) <= Date.now()))".takeIf {
-                                    "due" in
-                                        step.until
-                                },
-                            ).joinToString(" || ").ifEmpty { "false" } + ")",
-                    )
-                flow.link(exists, ready)
-                flow.link(ready, wait, 1)
-                flow.link(wait, status)
-                previous = ready
-                skip = if ("absent" in step.until) exists else null
-                if (skip == null) flow.link(exists, wait, 1)
-            } else if (step?.time != null) {
-                val duration =
-                    Regex("([0-9.]+)\\s+(seconds|minutes|hours|days)").matchEntire(requireNotNull(step.time))
-                        ?: error("unsupported process wait duration ${step.time}")
-                val wait =
-                    flow.node(
-                        prefix + "time wait",
-                        "wait",
-                        json(
-                            "resume" to str("timeInterval"),
-                            "amount" to JsonPrimitive(duration.groupValues[1].toDouble()),
-                            "unit" to str(duration.groupValues[2]),
-                        ),
-                    )
-                flow.link(previous, wait)
-                previous = wait
-            }
-            val (entry, exit) = recipe(graph, prefix, index == 0)
-            flow.link(previous, entry)
-            // An absent obligation skips the associated recipe and joins the next process step.
-            val join = flow.code(prefix + "step complete", "return [{json:{}}];")
-            flow.link(exit, join)
-            skip?.let { flow.link(it, join, 1) }
-            previous = join
-            opens += prefix + "open"
-            opens += prefix + "reopen"
-        }
+        val graphs = listOf(root)
+        trigger(root)
+        val (entry, exit) = recipe(root, "", true)
+        flow.link("trigger", entry)
+        val join = flow.code("step complete", "return [{json:{}}];")
+        flow.link(exit, join)
         val meta =
             json(
                 "schemaVersion" to JsonPrimitive(1),
@@ -150,44 +52,16 @@ internal class N8nRenderer(
     }
 
     private fun trigger(graph: RecipeGraph) {
-        if (graph.program.mode == "batch") {
-            val schedule = requireNotNull(graph.program.schedule) { "batch n8n export needs a schedule hint" }
-            val parsed = ScheduleHint.parse(schedule)
-            timezone = parsed.timezone
-            val cron = parsed.cron
-            flow.node(
-                "trigger",
-                "scheduleTrigger",
-                json(
-                    "rule" to
-                        json(
-                            "interval" to
-                                arr(
-                                    listOf(
-                                        parsed.minutes?.let {
-                                            json(
-                                                "field" to str("minutes"),
-                                                "minutesInterval" to JsonPrimitive(it),
-                                            )
-                                        }
-                                            ?: json("field" to str("cronExpression"), "expression" to str(cron)),
-                                    ),
-                                ),
-                        ),
-                ),
-            )
-        } else {
-            flow.node(
-                "trigger",
-                "webhook",
-                json(
-                    "httpMethod" to str("POST"),
-                    "path" to str(root.deployment.name),
-                    "responseMode" to str("onReceived"),
-                    "options" to json(),
-                ),
-            )
-        }
+        flow.node(
+            "trigger",
+            "webhook",
+            json(
+                "httpMethod" to str("POST"),
+                "path" to str(root.deployment.name),
+                "responseMode" to str("onReceived"),
+                "options" to json(),
+            ),
+        )
     }
 
     private fun recipe(
@@ -226,16 +100,7 @@ internal class N8nRenderer(
                 (fp["program"]?.let { "b.programFingerprint=${literal(it)}; " } ?: "") +
                 (fp["deployment"]?.let { "b.deploymentFingerprint=${literal(it)}; " } ?: "") +
                 (
-                    if (!initial) {
-                        val anchor =
-                            runId(
-                                root.process!!
-                                    .steps
-                                    .first()
-                                    .name + " ",
-                            )
-                        "b.idempotencyKey=$anchor + ${literal(":" + prefix.trim())}; "
-                    } else if (graph.program.mode == "batch") {
+                    if (graph.program.mode == "batch") {
                         "b.idempotencyKey=${dollar}execution.id; "
                     } else {
                         ""
@@ -461,7 +326,7 @@ internal class N8nRenderer(
         flow.link(loop, switch, 1)
         val routes = graph.routes.filterNot { it.isNone }
         flow.link(switch, loop, routes.size)
-        val digest = graph.program.deliver?.contains("digest") == true
+        val digest = false // D-142: delivery cadence belongs to the orchestrator.
         routes.forEachIndexed { index, route ->
             val read =
                 http(

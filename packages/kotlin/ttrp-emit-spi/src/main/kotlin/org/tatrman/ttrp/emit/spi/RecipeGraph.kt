@@ -10,7 +10,6 @@ data class RecipeGraph(
     val routes: List<RouteMeta>,
     val wirings: List<WiringMeta>,
     val actions: Map<String, ActionMeta>,
-    val process: ProcessMeta?,
     val runApi: RunApiMeta,
     /** Verified bundle waves: each island occurs once, in execution order. No executable payload crosses the SPI. */
     val islandWaves: List<List<String>> = emptyList(),
@@ -37,8 +36,6 @@ data class ProgramMeta2(
     val port: String?,
     val mode: String?,
     val asOf: String?,
-    val deliver: String?,
-    val schedule: String?,
     val overrides: Map<String, String>,
     val budget: Map<String, String>,
 )
@@ -97,23 +94,6 @@ data class ActionMeta(
     val by: String? = null,
 )
 
-data class ProcessMeta(
-    val name: String,
-    val instance: String?,
-    val steps: List<StepMeta>,
-)
-
-data class StepMeta(
-    val name: String,
-    val program: String?,
-    val port: String?,
-    val obligations: List<String>,
-    val time: String?,
-    val until: List<String>,
-    /** Resolved step projection; required on process export, with process == null and the parent deployment. */
-    val graph: RecipeGraph? = null,
-)
-
 data class RunApiMeta(
     val basePath: String,
     val calls: Map<String, String>,
@@ -124,4 +104,29 @@ data class RecipeEmitRequest(
     val manifestJson: String,
     val readme: String,
     val conformanceJson: String,
+    val world: WorldChoices = WorldChoices(),
+)
+
+/** Snapshot choices only: no compiler nodes, SQL or ambient model access in plugins. */
+data class WorldChoices(
+    val programs: List<ProgramChoice> = emptyList(),
+    val queries: List<QueryMeta> = emptyList(),
+)
+
+data class ProgramChoice(
+    val name: String,
+    val recipe: String,
+    val port: String?,
+    val params: List<ParameterMeta>,
+)
+
+data class QueryMeta(
+    val qname: String,
+    val params: List<ParameterMeta>,
+    val columns: List<ColumnMeta>,
+)
+
+data class ColumnMeta(
+    val name: String,
+    val type: String,
 )

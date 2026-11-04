@@ -10,7 +10,6 @@ class Camunda8EmitPlugin : TtrEmitPlugin {
     override val spiRevision = TtrEmitPlugin.SPI_REVISION
     override val targetId = "camunda_8"
     override val supportsRecipes = true
-    override val supportsProcesses = true
 
     override fun executorTypeManifest(): String =
         requireNotNull(

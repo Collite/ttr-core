@@ -205,7 +205,7 @@ object EmitPluginLoader {
                     0
                 }
             require(revision == TtrEmitPlugin.SPI_REVISION) {
-                "emit plugin '$targetId' was built against SPI v2 revision $revision; host requires revision ${TtrEmitPlugin.SPI_REVISION}; rebuild the plugin (D-140 JVM signatures changed)"
+                "emit plugin '$targetId' was built against SPI v2 revision $revision; host requires revision ${TtrEmitPlugin.SPI_REVISION}; rebuild the plugin (D-140/D-165 JVM signatures changed)"
             }
         }
         return plugin

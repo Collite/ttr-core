@@ -8,7 +8,6 @@ class N8NL1EmitPlugin : TtrEmitPlugin {
     override val spiRevision = TtrEmitPlugin.SPI_REVISION
     override val targetId = "n8n_l1"
     override val supportsRecipes = true
-    override val supportsProcesses = true
 
     override fun executorTypeManifest(): String =
         requireNotNull(javaClass.getResourceAsStream("/manifests/n8n_l1.ttrm")).bufferedReader().use {
