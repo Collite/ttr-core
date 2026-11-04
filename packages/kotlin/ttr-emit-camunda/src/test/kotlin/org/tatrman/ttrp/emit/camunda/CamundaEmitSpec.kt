@@ -38,8 +38,6 @@ internal fun releaseGraph(
             if (batch) "none" else "key",
             if (batch) "batch" else "on_event",
             if (batch) "now" else "event",
-            "immediate",
-            if (batch) "06:00 Europe/Prague" else null,
             emptyMap(),
             emptyMap(),
         ),
@@ -90,11 +88,12 @@ internal fun releaseGraph(
                     "2 working_days",
                     emptyMap(),
                     null,
+                    by = "role.process_owner",
+                    candidateGroup = "hartland-process-owners",
                 ),
             "notify" to
                 ActionMeta(mapOf("who" to "role"), mapOf("camunda" to "send task"), null, true, null, emptyMap(), null),
         ),
-        null,
         RunApiMeta(
             "/automation",
             mapOf(
@@ -109,25 +108,6 @@ internal fun releaseGraph(
             ),
         ),
     )
-
-internal fun processGraph(
-    target: String,
-    until: List<String> = listOf("fulfilled", "due", "absent"),
-): RecipeGraph {
-    val first = releaseGraph(target).copy(routes = emptyList(), wirings = emptyList(), actions = emptyMap())
-    val second = first.copy(recipe = first.recipe.copy(name = "second"), program = first.program.copy(name = "second"))
-    return first.copy(
-        process =
-            ProcessMeta(
-                "process",
-                "order_number",
-                listOf(
-                    StepMeta("first", first.program.name, "key", emptyList(), null, emptyList(), first),
-                    StepMeta("second", second.program.name, "key", listOf("inbound"), null, until, second),
-                ),
-            ),
-    )
-}
 
 class CamundaEmitSpec :
     StringSpec({
@@ -186,7 +166,7 @@ class CamundaEmitSpec :
                     if (batch) {
                         xml shouldContain "Run batch"
                         xml shouldContain "bounded restart"
-                        xml shouldContain "timeCycle"
+                        xml.contains("timeCycle") shouldBe false
                     } else {
                         xml shouldContain "id=\"release_on_placement\""
                         xml shouldContain "key"
@@ -246,41 +226,6 @@ class CamundaEmitSpec :
                 }
             }
         }
-        "process waits and later-step caller keys use the first run including recovery" {
-            for (target in listOf("camunda_7", "camunda_8")) {
-                val a = releaseGraph(target).copy(routes = emptyList(), wirings = emptyList(), actions = emptyMap())
-                val b = a.copy(recipe = a.recipe.copy(name = "monitor"), program = a.program.copy(name = "monitor"))
-                val graph =
-                    a.copy(
-                        process =
-                            ProcessMeta(
-                                "return_flow",
-                                "order_number",
-                                listOf(
-                                    StepMeta("decide", a.program.name, "key", emptyList(), null, emptyList(), a),
-                                    StepMeta(
-                                        "monitor",
-                                        b.program.name,
-                                        "key",
-                                        listOf("inbound"),
-                                        null,
-                                        listOf("fulfilled", "due", "absent"),
-                                        b,
-                                    ),
-                                ),
-                            ),
-                    )
-                val xml = emit(graph)
-                validateBpmn(xml)
-                xml shouldContain "obligation.inbound.fulfilled"
-                xml shouldContain "timerEventDefinition"
-                xml shouldContain "obligation absent"
-                xml shouldContain "ttrAnchor"
-                xml shouldContain ":monitor"
-                xml shouldContain "idempotencyKey"
-                xml shouldContain "obligations"
-            }
-        }
         "schema validation checks supported extension shapes and named run-API paths are preserved" {
             for (target in listOf("camunda_7", "camunda_8")) {
                 val graph = releaseGraph(target)
@@ -296,16 +241,13 @@ class CamundaEmitSpec :
                 shouldThrow<org.xml.sax.SAXParseException> { validateBpmn(damaged) }
             }
         }
-        "unsupported modes granularities and schedule hints refuse before writing an artifact" {
+        "unsupported modes and granularities refuse before writing an artifact" {
             val graph = releaseGraph()
             shouldThrow<IllegalArgumentException> { emit(graph.copy(program = graph.program.copy(mode = "windowed"))) }
             shouldThrow<IllegalArgumentException> {
                 emit(
                     graph.copy(deployment = graph.deployment.copy(granularity = "islands")),
                 )
-            }
-            shouldThrow<IllegalStateException> {
-                emit(releaseGraph(batch = true).let { it.copy(program = it.program.copy(schedule = "Monday morning")) })
             }
             for (dialect in Dialect.entries) {
                 CamundaSchedule.parse("Mon 09:00 Europe/Prague", dialect).zone shouldBe "Europe/Prague"

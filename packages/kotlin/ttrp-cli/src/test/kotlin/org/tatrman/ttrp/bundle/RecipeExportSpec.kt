@@ -259,6 +259,16 @@ class RecipeExportSpec :
             )
             return project
         }
+        "the CLI rejects nonpositive template versions before loading a project" {
+            for (version in listOf("0", "-1", "not-a-number")) {
+                val result =
+                    TtrpCommand().subcommands(EmitCommand()).test(
+                        listOf("emit", "--deployment", "release_bpmn", "--template-version", version),
+                    )
+                (result.statusCode != 0) shouldBe true
+                result.output shouldContain "template-version"
+            }
+        }
         "Camunda CLI exports the real H-1 in both dialects and structural replay needs no Server" {
             for (target in listOf("camunda_7", "camunda_8")) {
                 val project = exportProject()
@@ -284,6 +294,30 @@ class RecipeExportSpec :
                         modelsRoot = bundleModels,
                         outDir = temporaryDirectory("camunda-h1-bundle"),
                     )
+                // World choices need each deployed program's own recipe metadata.
+                Files.createDirectories(project.resolve("recipes"))
+                Files.list(source.parent).use { paths ->
+                    paths.filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".ttrp") }.forEach {
+                        Files.copy(it, project.resolve("recipes").resolve(it.fileName))
+                    }
+                }
+                Files.delete(project.resolve("models/hartland/writable.ttrm"))
+                // Preserve source text, relocating declared package hartland into its loader directory.
+                val queriesRoot = locate("packages/kotlin/ttrp-cli/src/test/resources/fixtures/hartland-queries")
+                Files.walk(queriesRoot).use { paths ->
+                    paths
+                        .filter {
+                            Files.isRegularFile(it) && it.fileName.toString().endsWith(".ttrm")
+                        }.forEach { path ->
+                            val name = queriesRoot.relativize(path).toString().replace('/', '_')
+                            Files.copy(path, project.resolve("models/hartland/$name"))
+                        }
+                }
+                // Supply the stock vocabulary that normally accompanies the metadata service's source roots.
+                Files.copy(
+                    locate("packages/kotlin/ttr-semantics/src/main/resources/builtin/cnc-stock-roles.ttr"),
+                    project.resolve("models/stock.ttrm"),
+                )
                 val out = temporaryDirectory("camunda-real-h1")
                 val result =
                     TtrpCommand()
@@ -294,6 +328,8 @@ class RecipeExportSpec :
                                 "emit",
                                 "--deployment",
                                 "release_bpmn",
+                                "--template-version",
+                                "7",
                                 "--project",
                                 project.toString(),
                                 "--bundle",
@@ -315,6 +351,35 @@ class RecipeExportSpec :
                         .parseToJsonElement(
                             Files.readString(folder.resolve("manifest.json")),
                         ).jsonObject
+                val authoring = manifest.getValue("authoring").jsonObject
+                authoring.getValue("steps").jsonArray.size shouldBe 32
+                val omission =
+                    authoring
+                        .getValue("omitted")
+                        .jsonArray
+                        .single()
+                        .jsonObject
+                omission.getValue("qname").jsonPrimitive.content shouldBe "query.query.customer_channel_overlap"
+                omission.getValue("reason").jsonPrimitive.content shouldContain
+                    "TTRP-EXPORT-QUERY: query.query.customer_channel_overlap:"
+                val readme = Files.readString(folder.resolve("README.md"))
+                readme shouldContain omission.getValue("reason").jsonPrimitive.content
+                readme shouldContain "START_INSTANCE"
+                xml shouldContain "hartland-process-owners"
+                org.tatrman.ttrp.conform.replay.CamundaStructureDriver
+                    .compareArtifacts(folder) shouldBe emptyList()
+                val queryDmn = folder.resolve("dmn/query.query.channel_revenue_monthly_decision.dmn")
+                Files.readString(queryDmn) shouldContain "typeRef=\"number\""
+                Files.readString(folder.resolve("templates/$suffix/release_on_placement.json")) shouldContain
+                    "tolerance"
+                kotlinx.serialization.json.Json
+                    .parseToJsonElement(
+                        Files.readString(
+                            folder.resolve("templates/$suffix/release_on_placement.json"),
+                        ),
+                    ).jsonObject
+                    .getValue("version")
+                    .jsonPrimitive.content shouldBe "7"
                 manifest.getValue("calls") shouldBe contract.getValue("calls")
                 contract
                     .getValue("calls")
@@ -410,7 +475,7 @@ class RecipeExportSpec :
             Files.readString(folder.resolve("README.md")) shouldContain "tatrman-automation"
             Files.readString(folder.resolve("README.md")) shouldContain "Stale when"
         }
-        "D-142: a batch n8n export refuses — the program has no `schedule:` hint any more" {
+        "D-142: batch n8n export uses an external webhook without an embedded schedule" {
             val bundle = build("release_order")
             val graph =
                 org.tatrman.ttrp.emit.recipe.RecipeGraphProjector.project(
@@ -420,16 +485,14 @@ class RecipeExportSpec :
                     deployment.copy(target = "n8n"),
                     actions,
                 )
-            graph.program.schedule shouldBe null
-            graph.program.deliver shouldBe null
-            val e =
-                io.kotest.assertions.throwables.shouldThrow<IllegalArgumentException> {
-                    EmitPluginLoader.builtin("n8n_l1").emitRecipe(
-                        org.tatrman.ttrp.emit.spi
-                            .RecipeEmitRequest(graph, "{}", "stale rule", "{}"),
-                    )
-                }
-            e.message shouldContain "schedule hint"
+            val result =
+                EmitPluginLoader.builtin("n8n_l1").emitRecipe(
+                    org.tatrman.ttrp.emit.spi
+                        .RecipeEmitRequest(graph, "{}", "stale rule", "{}"),
+                )
+            val workflow = result.files.getValue("workflow.json").decodeToString()
+            workflow shouldContain "n8n-nodes-base.webhook"
+            workflow.contains("n8n-nodes-base.scheduleTrigger") shouldBe false
         }
         "H-2 export addresses customer mail per row (decide_return on n8n)" {
             val project = exportProject()

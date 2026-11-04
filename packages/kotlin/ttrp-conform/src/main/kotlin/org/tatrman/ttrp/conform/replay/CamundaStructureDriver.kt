@@ -85,10 +85,150 @@ class CamundaStructureDriver(
                             }
                     } ?: error("$recipe.$mode: expected one matching Camunda export")
                 }.distinctBy { it.third }
-        return selected.flatMap { (manifest, doc, _) -> compare(doc, manifest, fixture) }
+        return selected.flatMap { (manifest, doc, path) ->
+            compare(doc, manifest, fixture) +
+                compareArtifacts(path.parent)
+        }
     }
 
     companion object {
+        /** Checks the supplementary export against its declared associations, bindings and inventory. */
+        fun compareArtifacts(folder: Path): List<ReplayDiff> =
+            buildList {
+                val manifest = Json.parseToJsonElement(Files.readString(folder.resolve("manifest.json"))).jsonObject
+                val authoring = manifest["authoring"]?.jsonObject ?: return@buildList
+
+                fun problem(message: String) {
+                    add(ReplayDiff("authoring", listOf(message), emptyList()))
+                }
+
+                fun path(relative: String): Path {
+                    val p = folder.resolve(relative).normalize()
+                    require(
+                        p.startsWith(folder.normalize()) &&
+                            relative.split('/').none { it in setOf("", ".", "..") } &&
+                            !relative.contains('\\'),
+                    ) { "unsafe artifact path $relative" }
+                    require(Files.isRegularFile(p) && p.toRealPath().startsWith(folder.toRealPath())) {
+                        "missing or unsafe artifact $relative"
+                    }
+                    return p
+                }
+                manifest["files"]?.jsonObject?.forEach { (relative, expected) ->
+                    try {
+                        val actual =
+                            "sha256:" +
+                                java.security.MessageDigest
+                                    .getInstance(
+                                        "SHA-256",
+                                    ).digest(Files.readAllBytes(path(relative)))
+                                    .joinToString("") {
+                                        "%02x".format(it)
+                                    }
+                        if (actual != expected.jsonPrimitive.content) problem("inventory hash differs: $relative")
+                    } catch (e: IllegalArgumentException) {
+                        problem(e.message ?: relative)
+                    }
+                }
+                val dialect = authoring.getValue("dialect").jsonPrimitive.content
+                require(dialect in setOf("c7", "c8")) { "invalid authoring dialect" }
+                authoring.getValue("steps").jsonArray.forEach { entry ->
+                    val step = entry.jsonObject
+                    val name = step.getValue("name").jsonPrimitive.content
+                    val relative = "templates/$dialect/$name.json"
+                    try {
+                        val template = Json.parseToJsonElement(Files.readString(path(relative))).jsonObject
+                        val properties = template.getValue("properties").jsonArray.map { it.jsonObject }
+                        val source = properties.single { it["type"] == JsonPrimitive("Dropdown") }
+                        val choices = source.getValue("choices").jsonArray.map { it.jsonObject.getValue("value") }
+                        if (choices !=
+                            authoring.getValue("choices").jsonArray.toList()
+                        ) {
+                            problem("world choices differ: $relative")
+                        }
+                        val active =
+                            properties.filter { property ->
+                                property["condition"]
+                                    ?.jsonObject
+                                    ?.get("equals")
+                                    ?.jsonPrimitive
+                                    ?.content
+                                    ?.let { it == name }
+                                    ?: true
+                            }
+                        val input = if (dialect == "c7") "camunda:inputParameter" else "zeebe:input"
+                        val output = if (dialect == "c7") "camunda:outputParameter" else "zeebe:output"
+                        val params = step.getValue("params").jsonArray.map { it.jsonPrimitive.content } + "ttr_source"
+                        params.forEach { param ->
+                            if (active.count { p ->
+                                    p.getValue("binding").jsonObject.let {
+                                        it["type"] ==
+                                            JsonPrimitive(input) &&
+                                            it["name"] == JsonPrimitive(param)
+                                    }
+                                } !=
+                                1
+                            ) {
+                                problem("input binding $param differs: $relative")
+                            }
+                        }
+                        val columns = step.getValue("columns").jsonObject
+                        columns.keys.forEach { column ->
+                            val expectedSource = if (dialect == "c7") "\${$column}" else "=$column"
+                            if (active.count { p ->
+                                    p.getValue("binding").jsonObject.let {
+                                        it["type"] ==
+                                            JsonPrimitive(output) &&
+                                            it["source"] == JsonPrimitive(expectedSource)
+                                    }
+                                } !=
+                                1
+                            ) {
+                                problem("output binding $column differs: $relative")
+                            }
+                        }
+                        step["dmn"]?.jsonPrimitive?.content?.let { dmnPath ->
+                            val doc = parse(Files.readString(path(dmnPath)))
+                            val ns = "https://www.omg.org/spec/DMN/20191111/MODEL/"
+                            val decisions = elements(doc.documentElement, ns, "decision")
+                            if (decisions.singleOrNull()?.getAttribute("id") !=
+                                "${name}_decision"
+                            ) {
+                                problem("DMN decision association differs: $dmnPath")
+                            }
+                            val table = elements(doc.documentElement, ns, "decisionTable").single()
+                            if (table.getAttribute("hitPolicy") != "FIRST" ||
+                                elements(table, ns, "rule").isNotEmpty()
+                            ) {
+                                problem("DMN skeleton is not empty FIRST: $dmnPath")
+                            }
+                            val inputs = elements(table, ns, "inputExpression")
+                            val names = inputs.map { elements(it, ns, "text").single().textContent }
+                            if (names != columns.keys.toList()) problem("DMN typed inputs differ: $dmnPath")
+                            inputs.forEach { expression ->
+                                val column = elements(expression, ns, "text").single().textContent
+                                val type = columns[column]?.jsonPrimitive?.content
+                                val expectedType =
+                                    when (type?.lowercase()) {
+                                        "integer", "decimal", "int", "float", "number" -> "number"
+                                        "bool", "boolean" -> "boolean"
+                                        "text", "string" -> "string"
+                                        "datetime" -> "dateTime"
+                                        else -> type
+                                    }
+                                if (expression.getAttribute("typeRef") !=
+                                    expectedType
+                                ) {
+                                    problem("DMN input type differs: $dmnPath/$column")
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        problem("$relative: ${e.message}")
+                    }
+                }
+            }
+
         private const val BPMN = "http://www.omg.org/spec/BPMN/20100524/MODEL"
         private const val TTR = "https://tatrman.org/schema/automation-export/1"
         private const val CAMUNDA = "http://camunda.org/schema/1.0/bpmn"

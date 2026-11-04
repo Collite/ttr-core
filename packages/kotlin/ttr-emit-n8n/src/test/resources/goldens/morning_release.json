@@ -4,21 +4,17 @@
         {
             "id": "c7d08e09-a44d-3b45-be7e-eecebf0a8daf",
             "name": "trigger",
-            "type": "n8n-nodes-base.scheduleTrigger",
-            "typeVersion": 1.2,
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.0,
             "position": [
                 0,
                 0
             ],
             "parameters": {
-                "rule": {
-                    "interval": [
-                        {
-                            "field": "cronExpression",
-                            "expression": "0 0 6 * * *"
-                        }
-                    ]
-                }
+                "httpMethod": "POST",
+                "path": "release_n8n",
+                "responseMode": "onReceived",
+                "options": {}
             }
         },
         {
@@ -1143,8 +1139,8 @@
             }
         },
         {
-            "id": "8f456247-f415-359b-9df8-c3f586261e65",
-            "name": "routes complete",
+            "id": "2f1c9796-2ce7-3d0f-9c2d-28f80a4b341c",
+            "name": "action hold notify groups",
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
@@ -1152,78 +1148,58 @@
                 0
             ],
             "parameters": {
-                "jsCode": "return [{json:{}}];",
+                "jsCode": "const rows=($(\"route hold collect\").isExecuted ? $(\"route hold collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))); const groups=new Map(); for(const row of rows) {const to=(() => {const role=\"role.sales\"; const to=JSON.parse($env.TTR_MAIL_RECIPIENTS || '{}')[role]; if(typeof to !== 'string' || !to.trim()) throw new Error('no address for role ' + role); return to;})(); if(!groups.has(to)) groups.set(to,[]); groups.get(to).push(row);} return [{json:{groups:groups.size ? [...groups].map(([to,rows])=>({to,rows})) : [{to:null,rows:[]}]}}];",
                 "mode": "runOnceForAllItems"
             }
         },
         {
-            "id": "88444e15-5db9-375e-9d89-f71177d194e2",
-            "name": "digests",
-            "type": "n8n-nodes-base.httpRequest",
-            "typeVersion": 4.2,
+            "id": "21a4ccf6-6b3e-3b67-89c8-eb33a77dbef8",
+            "name": "action hold notify split",
+            "type": "n8n-nodes-base.splitOut",
+            "typeVersion": 1.0,
             "position": [
                 9240,
                 0
             ],
             "parameters": {
-                "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/digests\" }}",
-                "method": "GET",
-                "authentication": "genericCredentialType",
-                "genericAuthType": "httpBearerAuth",
+                "fieldToSplitOut": "groups",
                 "options": {
-                    "response": {
-                        "response": {
-                            "responseFormat": "json",
-                            "fullResponse": true
-                        }
-                    }
+                    "destinationFieldName": "mail"
                 }
-            },
-            "credentials": {
-                "httpBearerAuth": {
-                    "name": "tatrman-automation"
-                }
-            },
-            "retryOnFail": true,
-            "maxTries": 3
+            }
         },
         {
-            "id": "1864b4a7-e32c-3b60-be39-084b1e253b4d",
-            "name": "digest groups",
-            "type": "n8n-nodes-base.code",
-            "typeVersion": 2.0,
+            "id": "b0c2e8ef-b0e7-30b2-afce-0b032a3c12aa",
+            "name": "action hold notify",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2.1,
             "position": [
                 9460,
                 0
             ],
             "parameters": {
-                "jsCode": "const rows=[...($(\"route hold collect\").isExecuted ? $(\"route hold collect\").first().json.rows : []).filter(r => ($(\"action status\").first().json.body.actions).some(a => a.action === \"notify\" && JSON.stringify(r[\"order_number\"]) === JSON.stringify((a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? a.key[\"order_number\"] : a.key)))).map(row => ({...row,who:\"role.sales\",to:(() => {const role=\"role.sales\"; const to=JSON.parse($env.TTR_MAIL_RECIPIENTS || '{}')[role]; if(typeof to !== 'string' || !to.trim()) throw new Error('no address for role ' + role); return to;})()}))]; const groups = $input.first().json.body.groups.map(g => ({...g,rowsRef:g.rows,rows:rows.filter(r => Object.entries(g.by).every(([k,v]) => r[k] === v))})); if(groups.some(g=>!g.rows.length)) throw new Error('digest group has no resolved rows'); const addressed=groups.flatMap(g=>[...new Set(g.rows.map(r=>r.to))].map(to=>({...g,to,rows:g.rows.filter(r=>r.to===to)}))); return [{json:{groups:addressed.length ? addressed : [{empty:true,rows:[]}]}}];",
-                "mode": "runOnceForAllItems"
-            }
-        },
-        {
-            "id": "e3cd3c21-71c9-32cf-95af-401eff2dee13",
-            "name": "digest split",
-            "type": "n8n-nodes-base.splitOut",
-            "typeVersion": 1.0,
-            "position": [
-                9680,
-                0
-            ],
-            "parameters": {
-                "fieldToSplitOut": "groups",
+                "fromEmail": "={{ $env.TTR_MAIL_FROM }}",
+                "toEmail": "={{ $(\"action hold notify split\").item.json.mail.to }}",
+                "subject": "Tatrman morning_release",
+                "emailFormat": "text",
+                "text": "={{ JSON.stringify($(\"action hold notify split\").item.json.mail.rows, null, 2) }}",
                 "options": {
-                    "destinationFieldName": "group"
+                    "appendAttribution": false
+                }
+            },
+            "credentials": {
+                "smtp": {
+                    "name": "tatrman-mail"
                 }
             }
         },
         {
-            "id": "d2278dfa-f7e8-3c47-b8bb-f1a2989f016d",
-            "name": "digest deliver",
+            "id": "f94a5231-f664-3b98-873d-39783228118f",
+            "name": "action hold notify deliver",
             "type": "n8n-nodes-base.if",
             "typeVersion": 2.2,
             "position": [
-                9900,
+                9680,
                 0
             ],
             "parameters": {
@@ -1236,7 +1212,7 @@
                     },
                     "conditions": [
                         {
-                            "leftValue": "={{ false === false && $(\"action status\").first().json.body.dryRun === false && $json.group.rows.length > 0 }}",
+                            "leftValue": "={{ false === false && $(\"action status\").first().json.body.dryRun === false && $json.mail.rows.length > 0 }}",
                             "rightValue": true,
                             "operator": {
                                 "type": "boolean",
@@ -1250,37 +1226,12 @@
             }
         },
         {
-            "id": "044409f3-0766-38e1-9333-b794ebfb0b64",
-            "name": "digest mail",
-            "type": "n8n-nodes-base.emailSend",
-            "typeVersion": 2.1,
-            "position": [
-                10120,
-                0
-            ],
-            "parameters": {
-                "fromEmail": "={{ $env.TTR_MAIL_FROM }}",
-                "toEmail": "={{ $(\"digest split\").item.json.group.to }}",
-                "subject": "Tatrman morning_release",
-                "emailFormat": "text",
-                "text": "={{ JSON.stringify($(\"digest split\").item.json.group.rows, null, 2) }}",
-                "options": {
-                    "appendAttribution": false
-                }
-            },
-            "credentials": {
-                "smtp": {
-                    "name": "tatrman-mail"
-                }
-            }
-        },
-        {
-            "id": "1c3de945-772c-3a4a-a8eb-ce53171bde9f",
-            "name": "digest outcome",
+            "id": "56abad0e-86a0-34e9-8317-c8efdb29bdbb",
+            "name": "action hold notify outcome",
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                10340,
+                9900,
                 0
             ],
             "parameters": {
@@ -1290,7 +1241,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {outcomes:$(\"digest split\").item.json.group.rows.map(r => ({key:r[\"order_number\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                "jsonBody": "={{ {outcomes:$(\"action hold notify split\").item.json.mail.rows.map(r => ({key:r[\"order_number\"],status:'delivered',at:new Date().toISOString()}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1309,12 +1260,26 @@
             "maxTries": 3
         },
         {
-            "id": "acb02c34-d54e-371e-912d-baaa21f30187",
-            "name": "digest complete",
+            "id": "5037b707-1890-3474-9f5a-f17e0275b3b0",
+            "name": "action hold notify complete",
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                10560,
+                10120,
+                0
+            ],
+            "parameters": {
+                "jsCode": "return [{json:{}}];",
+                "mode": "runOnceForAllItems"
+            }
+        },
+        {
+            "id": "8f456247-f415-359b-9df8-c3f586261e65",
+            "name": "routes complete",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2.0,
+            "position": [
+                10340,
                 0
             ],
             "parameters": {
@@ -1328,7 +1293,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                10780,
+                10560,
                 0
             ],
             "parameters": {
@@ -1342,7 +1307,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                11000,
+                10780,
                 0
             ],
             "parameters": {
@@ -1376,7 +1341,7 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2.0,
             "position": [
-                11220,
+                11000,
                 0
             ],
             "parameters": {
@@ -1885,6 +1850,79 @@
             "main": [
                 [
                     {
+                        "node": "action hold notify groups",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "action hold notify groups": {
+            "main": [
+                [
+                    {
+                        "node": "action hold notify split",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "action hold notify split": {
+            "main": [
+                [
+                    {
+                        "node": "action hold notify deliver",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "action hold notify deliver": {
+            "main": [
+                [
+                    {
+                        "node": "action hold notify",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "action hold notify complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "action hold notify": {
+            "main": [
+                [
+                    {
+                        "node": "action hold notify outcome",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "action hold notify outcome": {
+            "main": [
+                [
+                    {
+                        "node": "action hold notify complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "action hold notify complete": {
+            "main": [
+                [
+                    {
                         "node": "routes loop",
                         "type": "main",
                         "index": 0
@@ -1893,90 +1931,6 @@
             ]
         },
         "routes complete": {
-            "main": [
-                [
-                    {
-                        "node": "digests",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "digests": {
-            "main": [
-                [
-                    {
-                        "node": "digest groups",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "digest groups": {
-            "main": [
-                [
-                    {
-                        "node": "digest split",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "digest split": {
-            "main": [
-                [
-                    {
-                        "node": "digest deliver",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "digest deliver": {
-            "main": [
-                [
-                    {
-                        "node": "digest mail",
-                        "type": "main",
-                        "index": 0
-                    }
-                ],
-                [
-                    {
-                        "node": "digest complete",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "digest mail": {
-            "main": [
-                [
-                    {
-                        "node": "digest outcome",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "digest outcome": {
-            "main": [
-                [
-                    {
-                        "node": "digest complete",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "digest complete": {
             "main": [
                 [
                     {
@@ -2034,7 +1988,7 @@
     },
     "settings": {
         "executionOrder": "v1",
-        "timezone": "Europe/Prague"
+        "timezone": "UTC"
     },
     "active": false,
     "pinData": {},
@@ -2585,35 +2539,7 @@
                     "route": "hold"
                 },
                 {
-                    "node": "digests",
-                    "name": "digests",
-                    "method": "GET",
-                    "path": "/automation/runs/{id}/digests",
-                    "recipe": "release_order",
-                    "program": "morning_release",
-                    "mode": "batch",
-                    "port": "none",
-                    "key": [
-                        "order.order_number"
-                    ],
-                    "parameters": {
-                        "url": "={{ $env.TTR_AUTOMATION_URL.replace(/\\/$/, '') + \"/automation/runs/\" + encodeURIComponent(($(\"reopen\").isExecuted ? $(\"reopen\") : $(\"open\")).first().json.body.runId) + \"/digests\" }}",
-                        "method": "GET",
-                        "authentication": "genericCredentialType",
-                        "genericAuthType": "httpBearerAuth",
-                        "options": {
-                            "response": {
-                                "response": {
-                                    "responseFormat": "json",
-                                    "fullResponse": true
-                                }
-                            }
-                        }
-                    },
-                    "arguments": {}
-                },
-                {
-                    "node": "digest outcome",
+                    "node": "action hold notify outcome",
                     "name": "outcome",
                     "method": "POST",
                     "path": "/automation/runs/{id}/actions/notify/outcome",
@@ -2631,7 +2557,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {outcomes:$(\"digest split\").item.json.group.rows.map(r => ({key:r[\"order_number\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                        "jsonBody": "={{ {outcomes:$(\"action hold notify split\").item.json.mail.rows.map(r => ({key:r[\"order_number\"],status:'delivered',at:new Date().toISOString()}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -2680,10 +2606,10 @@
             ],
             "mail": [
                 {
-                    "node": "digest mail",
+                    "node": "action hold notify",
                     "action": "notify",
-                    "rows": "={{ $(\"digest split\").item.json.group.rows }}",
-                    "recipient": "={{ $(\"digest split\").item.json.group.to }}",
+                    "rows": "={{ $(\"action hold notify split\").item.json.mail.rows }}",
+                    "recipient": "={{ $(\"action hold notify split\").item.json.mail.to }}",
                     "key": [
                         "order_number"
                     ],
