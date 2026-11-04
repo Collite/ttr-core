@@ -4,6 +4,7 @@ package org.tatrman.ttrp.bundle
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.networknt.schema.JsonSchemaFactory
 import com.networknt.schema.SpecVersion
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -16,10 +17,13 @@ import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldMatch
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.string.shouldStartWith
+import org.tatrman.ttr.metadata.model.ErSchema
 import org.tatrman.ttr.metadata.model.ModelDescriptor
 import org.tatrman.ttr.metadata.reconcile.ModelReconciler
 import org.tatrman.ttr.metadata.source.FileBasedSource
 import org.tatrman.ttr.metadata.source.LocalFsStorage
+import org.tatrman.ttrp.diagnostics.Severity
+import org.tatrman.ttrp.diagnostics.TtrpDiagnosticId
 import org.tatrman.ttrp.emit.recipe.RecipeFingerprints
 import org.tatrman.ttrp.graph.TtrpPipeline
 import org.tatrman.ttrp.project.TtrpManifest
@@ -56,13 +60,14 @@ class RecipeBundleSpec :
         fun build(
             name: String,
             text: String = source(name),
+            modelsRoot: Path = fixtures.resolve("model"),
         ): BundleAssembler.BundleResult =
             BundleAssembler("1.0.0").build(
                 source = text,
                 fileName = name,
                 recipeDir = recipes,
                 pipelineManifest = manifest,
-                modelsRoot = fixtures.resolve("model"),
+                modelsRoot = modelsRoot,
                 outDir = Files.createTempDirectory("ttrp-recipe"),
             )
 
@@ -394,13 +399,12 @@ class RecipeBundleSpec :
             }
         }
 
-        "the detail entity's own columns win over a detail context's `run` / `row_no` / `truncated`" {
+        "the detail entity's own columns win over a detail context's `run` / `row_no`" {
             val base = Files.readString(fixtures.resolve("base-order.ttrp"))
             val src =
                 base.replace(
                     "SELECT o.order_number, i.invoice_id FROM orders o",
-                    "SELECT o.order_number, i.invoice_id, i.issued AS run, i.amount AS row_no, " +
-                        "i.amount AS truncated FROM orders o",
+                    "SELECT o.order_number, i.invoice_id, i.issued AS run, i.amount AS row_no FROM orders o",
                 )
             (src != base) shouldBe true
             val r = build("detail_probe.ttrp", src)
@@ -413,6 +417,47 @@ class RecipeBundleSpec :
             attrs.count { it == "row_no" } shouldBe 1
             attrs.count { it == "truncated" } shouldBe 1
             detail shouldContain "def attribute truncated { type: bool }"
+        }
+
+        "a truncated detail context column is refused at build time (R227-B)" {
+            val base = Files.readString(fixtures.resolve("base-order.ttrp"))
+            val src =
+                base.replace(
+                    "SELECT o.order_number, i.invoice_id FROM orders o",
+                    "SELECT o.order_number, i.invoice_id, i.amount AS truncated FROM orders o",
+                )
+            (src != base) shouldBe true
+            val error = shouldThrow<BundleAssembler.BundleRefused> { build("detail_probe.ttrp", src) }
+            val diagnostic = error.diagnostics.single { it.id == TtrpDiagnosticId.REC_000 }
+            diagnostic.severity shouldBe Severity.ERROR
+            diagnostic.location.file shouldBe "detail_probe.ttrp"
+            error.message!! shouldContain "truncated"
+            error.message!! shouldContain "hold_ar"
+            error.message!! shouldContain "overdue"
+        }
+
+        "recipe keys cannot use the verdict writer's column names (R227-B)" {
+            for (key in listOf("run", "route", "context", "row_no", "truncated")) {
+                withClue(key) {
+                    val modelRoot = Files.createTempDirectory("ttrp-owned-key")
+                    val original = fixtures.resolve("model")
+                    Files.walk(original).use { paths ->
+                        paths.filter { Files.isRegularFile(it) }.forEach { path ->
+                            val target = modelRoot.resolve(original.relativize(path))
+                            Files.createDirectories(target.parent)
+                            Files.writeString(target, Files.readString(path).replace("order_number", key))
+                        }
+                    }
+                    val src = Files.readString(fixtures.resolve("base-order.ttrp")).replace("order_number", key)
+                    val error =
+                        shouldThrow<BundleAssembler.BundleRefused> { build("owned_key.ttrp", src, modelRoot) }
+                    val diagnostic = error.diagnostics.single { it.id == TtrpDiagnosticId.REC_000 }
+                    diagnostic.severity shouldBe Severity.ERROR
+                    error.message!! shouldContain "`$key`"
+                    // SwitchLowering already refuses route on the decision row, before catalog assembly.
+                    error.message!! shouldContain if (key == "route") "verdict" else "writer"
+                }
+            }
         }
 
         "a `dry_run:` text moves `labels` only (review-119 m7, D-125)" {
@@ -703,7 +748,7 @@ class RecipeBundleSpec :
                 .shouldBeEmpty()
             val entities =
                 result.model.schemas.values
-                    .flatMap { s -> (s as? org.tatrman.ttr.metadata.model.ErSchema)?.entities?.values.orEmpty() }
+                    .flatMap { s -> (s as? ErSchema)?.entities?.values.orEmpty() }
                     .map { it.qname.name }
             for (r in listOf("release_order", "decide_return", "monitor_inbound", "settle")) {
                 entities shouldContain
@@ -735,19 +780,45 @@ class RecipeBundleSpec :
                         it.file.endsWith("release_order_verdict.ttrm")
                 }.map { it.message }
                 .shouldBeEmpty()
-            val entities =
+            val entityList =
                 result.model.schemas.values
-                    .flatMap { s -> (s as? org.tatrman.ttr.metadata.model.ErSchema)?.entities?.values.orEmpty() }
-                    .map { it.qname.name }
+                    .flatMap { s -> (s as? ErSchema)?.entities?.values.orEmpty() }
+            val entities = entityList.map { it.qname.name }
             entities shouldContain "release_order_verdict"
             entities shouldContain "release_order_verdict_detail"
             entities shouldContain "release_order_verdict_current"
-            val detail =
-                result.model.schemas.values
-                    .flatMap { s -> (s as? org.tatrman.ttr.metadata.model.ErSchema)?.entities?.values.orEmpty() }
-                    .single { it.qname.name == "release_order_verdict_detail" }
+            val detail = entityList.single { it.qname.name == "release_order_verdict_detail" }
             val truncated = detail.attributes.single { it.qname.name == "release_order_verdict_detail.truncated" }
             truncated.type shouldBe "bool"
             truncated.isKey shouldBe false
+            val required = setOf("run", "order_number", "route", "context", "row_no", "truncated")
+            detail.attributes.map { it.qname.name.substringAfterLast('.') }.toSet() shouldBe
+                required +
+                setOf(
+                    "due",
+                    "invoice_id",
+                    "item",
+                    "line_no",
+                    "list_price",
+                    "on_hand",
+                    "open_amount",
+                    "outage",
+                    "quantity",
+                    "short",
+                    "unit_price",
+                )
+            for (attribute in detail.attributes) {
+                val name = attribute.qname.name.substringAfterLast('.')
+                withClue("detail.$name") { attribute.nullable shouldBe (name !in required) }
+            }
+            for (name in listOf("release_order_verdict", "release_order_verdict_current")) {
+                val verdict = entityList.single { it.qname.name == name }
+                verdict.attributes.map { it.qname.name.substringAfterLast('.') } shouldContain "verdict_reason"
+                for (attribute in verdict.attributes) {
+                    withClue(attribute.qname.name) {
+                        attribute.nullable shouldBe (attribute.qname.name.substringAfterLast('.') == "verdict_reason")
+                    }
+                }
+            }
         }
     })

@@ -162,24 +162,50 @@ class RecipeBundleAssembler(
                     OutputColumn("run_as", "text"),
                     OutputColumn("written_at", "timestamp"),
                 )
+
+        fun refuseOwnedColumn(message: String): Nothing =
+            throw BundleAssembler.BundleRefused(
+                listOf(
+                    TtrpDiagnostic(
+                        TtrpDiagnosticId.REC_000,
+                        Severity.ERROR,
+                        message,
+                        SourceLocation.UNKNOWN.copy(file = program),
+                    ),
+                ),
+            )
+        model.keyColumns.firstOrNull { it in DETAIL_OWN }?.let {
+            refuseOwnedColumn("key column `$it` is a name the verdict writer owns")
+        }
+        val detailStatements =
+            statements.filter { s ->
+                model.routes.any { r -> r.detail.any { s.port == SwitchLowering.detailPort(r.name, it) } }
+            }
+        for (route in model.routes) {
+            for (context in route.detail) {
+                if (detailStatements.any { s ->
+                        s.port == SwitchLowering.detailPort(route.name, context) &&
+                            s.columns.any { it.name == "truncated" }
+                    }
+                ) {
+                    refuseOwnedColumn(
+                        "context `$context`'s rows on route `${route.name}` carry a `truncated` column — " +
+                            "the name is the detail marker's (Core#382)",
+                    )
+                }
+            }
+        }
         val detailExtra =
-            statements
-                .filter { s ->
-                    model.routes.any { r -> r.detail.any { s.port == SwitchLowering.detailPort(r.name, it) } }
-                }.flatMap { s -> s.columns.map { it.name } }
-                // The writer's own columns win over context columns (review-119 m4, Core#382).
+            detailStatements
+                .flatMap { s -> s.columns.map { it.name } }
+                // The writer overrides context run/row_no (review-119 m4); truncated is refused above (Core#382).
                 .filter { it !in model.keyColumns && it !in DETAIL_OWN }
                 .distinct()
                 .sorted()
         val detailColumns =
-            listOf(OutputColumn("run", "text")) +
+            DETAIL_OWN_COLUMNS.take(1) +
                 model.keyColumns.zip(keyTypes).map { (k, t) -> OutputColumn(k, t) } +
-                listOf(
-                    OutputColumn(SwitchLowering.ROUTE, "text"),
-                    OutputColumn(SwitchLowering.CONTEXT, "text"),
-                    OutputColumn("row_no", "int"),
-                    OutputColumn("truncated", "bool"),
-                ) +
+                DETAIL_OWN_COLUMNS.drop(1) +
                 detailExtra.map { OutputColumn(it, "text") }
         val catalog =
             RecipeCatalogEmitter.emit(
@@ -190,6 +216,8 @@ class RecipeBundleAssembler(
                 model.document,
                 fingerprints,
                 engine,
+                verdictOptional = setOf(SwitchLowering.VERDICT_REASON),
+                detailOptional = detailExtra.toSet(),
             )
         write(bundleDir, catalog.recipeFile, catalog.recipeText, files)
         write(bundleDir, catalog.verdictFile, catalog.verdictText, files)
@@ -418,7 +446,15 @@ class RecipeBundleAssembler(
 
     private companion object {
         /** The columns `<recipe>_verdict_detail` writes itself (besides the key). */
-        val DETAIL_OWN = setOf("run", SwitchLowering.ROUTE, SwitchLowering.CONTEXT, "row_no", "truncated")
+        val DETAIL_OWN_COLUMNS =
+            listOf(
+                OutputColumn("run", "text"),
+                OutputColumn(SwitchLowering.ROUTE, "text"),
+                OutputColumn(SwitchLowering.CONTEXT, "text"),
+                OutputColumn("row_no", "int"),
+                OutputColumn("truncated", "bool"),
+            )
+        val DETAIL_OWN = DETAIL_OWN_COLUMNS.map { it.name }.toSet()
         const val NATIVE = "native"
         const val SQL_TEXT = "sql-text"
         const val ER = "er"

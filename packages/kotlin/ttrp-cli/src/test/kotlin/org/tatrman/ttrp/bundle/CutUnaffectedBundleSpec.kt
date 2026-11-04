@@ -14,7 +14,8 @@ import java.security.MessageDigest
  * declare no `startable_by`/`egress_url`. A `due:` written before CG-2 now adds `recipe.actions.<a>.due` and the
  * catalog's `actions:` line. Only these additions are stripped from release_order and decide_return; every other
  * byte is pinned to the pre-cut toolchain (grammar 0.21, master 0c1e3d74 with the cut fixtures), except for
- * Core#382's boolean detail marker and its catalog/manifest hashes, added to the reviewed baseline.
+ * Core#382's boolean detail marker, optional context/reason columns and their catalog/manifest hashes, added to
+ * the reviewed baseline.
  * Re-recording writes all four recipes' stripped digests, preserving the complete golden.
  */
 class CutUnaffectedBundleSpec :
