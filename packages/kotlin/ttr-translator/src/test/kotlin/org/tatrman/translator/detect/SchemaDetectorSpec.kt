@@ -97,6 +97,30 @@ class SchemaDetectorSpec :
                 entities = entities,
             )
 
+        val railQueries =
+            listOf(
+                "SELECT id FROM item_category",
+                "SELECT TOP 5 id FROM item_category",
+                "SELECT id FROM item_category WITH (NOLOCK)",
+                "SELECT id AS [x y] FROM [dbo].[item_category]",
+                "SELECT TOP 5 [id] AS [x y] FROM [dbo].[item_category] WITH (NOLOCK);",
+            )
+        for ((index, sql) in railQueries.withIndex()) {
+            "pre-parse rails retain the confirmed DB decision and table names $index" {
+                val result = SchemaDetector.detect(sql, Language.SQL, SchemaCode.DB, makeHandle())
+                result.decision shouldBe SchemaDecision.CONFIRMED
+                result.effectiveSchema shouldBe SchemaCode.DB
+                result.referencedTables shouldBe listOf("item_category")
+            }
+        }
+
+        "non-SQL remains NOT_APPLICABLE even when its text resembles SQL with rails" {
+            val result = SchemaDetector.detect(railQueries.last(), Language.TRANSFORMATION_DSL, SchemaCode.ER, makeHandle())
+            result.decision shouldBe SchemaDecision.NOT_APPLICABLE
+            result.effectiveSchema shouldBe SchemaCode.ER
+            result.referencedTables shouldBe emptyList()
+        }
+
         "AUTODETECTED DB when stated=UNSPECIFIED and SQL uses DB table" {
             val sql = "SELECT i_category_id, i_category_code FROM ITEM_CATEGORY WHERE name LIKE 'E%'"
             val result = SchemaDetector.detect(sql, Language.SQL, SchemaCode.SCHEMA_CODE_UNSPECIFIED, makeHandle())
