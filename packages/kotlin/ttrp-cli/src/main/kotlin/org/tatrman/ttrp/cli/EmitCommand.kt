@@ -40,6 +40,8 @@ import org.tatrman.ttrp.graph.capability.RecipeManifestSource
 import org.tatrman.ttrp.graph.capability.RegistryRecipe
 import org.tatrman.ttrp.graph.capability.ExecutorManifestGate
 import org.tatrman.ttrp.project.TtrpManifestReader
+import com.github.ajalt.clikt.parameters.options.validate
+import com.github.ajalt.clikt.parameters.types.int
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -53,6 +55,12 @@ class EmitCommand : CliktCommand(name = "emit") {
     private val granularity by option("--granularity")
     private val out by option("--out").default(".")
     private val json by option("--json").flag()
+    private val templateVersion by option(
+        "--template-version",
+        help = "positive Modeler template version; raise after fingerprint changes",
+    ).int()
+        .default(1)
+        .validate { require(it > 0) { "template version must be a positive integer" } }
 
     override fun run() {
         try {
@@ -114,6 +122,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                         warnings = emptyList(),
                     )
                 val packageOf = LayoutResolver.packagesFromFiles(loaded.files)
+                val index = ModelIndex(registrySnapshot, packageOf)
                 val resolved =
                     org.tatrman.ttr.metadata.world
                         .WorldResolver(registrySnapshot, packageOf)
@@ -248,8 +257,25 @@ class EmitCommand : CliktCommand(name = "emit") {
                             deployment,
                             wiredActions.values.toList(),
                         )
+                    val governed =
+                        if (plugin.targetId in setOf("camunda_7", "camunda_8")) {
+                            projected.copy(
+                                actions =
+                                    projected.actions.mapValues { (name, action) ->
+                                        action.copy(
+                                            candidateGroup =
+                                                ApprovalGroupsProjector.group(
+                                                    wiredActions.getValue(name),
+                                                    index,
+                                                ),
+                                        )
+                                    },
+                            )
+                        } else {
+                            projected
+                        }
                     return Loaded(
-                        projected.copy(
+                        governed.copy(
                             recipe =
                                 projected.recipe.copy(
                                     fingerprints =
@@ -266,7 +292,6 @@ class EmitCommand : CliktCommand(name = "emit") {
                     )
                 }
                 val selected = load(program)
-                val index = ModelIndex(registrySnapshot, packageOf)
                 val choices =
                     if (plugin.targetId in setOf("camunda_7", "camunda_8")) {
                         WorldChoicesProjector.project(loaded.model, world) { choice ->
@@ -447,6 +472,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                             readme,
                             formatter.encodeToString(JsonObject.serializer(), conformance) + "\n",
                             choices,
+                            templateVersion,
                         ),
                     )
                 val folder =
@@ -511,6 +537,17 @@ class EmitCommand : CliktCommand(name = "emit") {
                                 "authoring" to
                                     buildJsonObject {
                                         put("dialect", if (graph.deployment.type == "camunda_8") "c8" else "c7")
+                                        put(
+                                            "omitted",
+                                            JsonArray(
+                                                choices.omitted.map { omitted ->
+                                                    buildJsonObject {
+                                                        put("qname", omitted.qname)
+                                                        put("reason", omitted.reason)
+                                                    }
+                                                },
+                                            ),
+                                        )
                                         put(
                                             "choices",
                                             JsonArray(

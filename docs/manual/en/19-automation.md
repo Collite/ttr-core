@@ -253,16 +253,24 @@ approval integration belong to Platform; this export does not bundle or certify 
 opening are the Camunda acceptance artefacts; no live Camunda deployment is part of this exporter.
 
 The export also contains `templates/c7/<step>.json` or `templates/c8/<step>.json`, plus
-`dmn/<query>_decision.dmn` for each metadata `def query`. Copy the matching templates into your Modeler project's
+`dmn/<query>_decision.dmn` for each projectable metadata `def query`. Queries that cannot be compiled, encoded or
+typed are omitted and named in the README and `manifest.authoring.omitted`; deployed-program failures still refuse. Copy the matching templates into your Modeler project's
 `.camunda/element-templates` directory and restart Modeler. The choice dropdown lists this world's deployed programs
 and model queries. Inputs bind by parameter name; query outputs expose their typed row columns and `row_count`.
 Configure the governed HTTP task and its variables derivation in Modeler before running it.
 
 Each DMN 1.3 skeleton has typed inputs, hit policy FIRST and no rules. Author the business rules and outcome in
 Modeler; inline SQL and Golem questions have no generated skeleton. Templates carry identity
-`tatrman.<world>.<step>` and a fingerprint-derived version. After model/bundle changes, regenerate into a new export
-folder and reinstall the templates. Preserve authored rules separately: regeneration creates empty skeletons.
-The README lists artifact paths; the manifest records hashes and step/DMN associations.
+`tatrman.<world>.<step>`, `metadata.fingerprint` and an explicit positive integer `version`. Pass
+`--template-version <n>` (default 1) and raise it whenever the regenerated fingerprint differs; Modeler prefers the
+highest version for an id. After model/bundle changes, regenerate into a new export folder and reinstall the templates. Preserve authored rules separately: regeneration creates empty skeletons.
+Approval tasks use the approving action's `by: role.<r>` Keycloak group as C7 `candidateGroups` or C8 assignment
+candidates. Roles without a unique group refuse with `TTRP-EXPORT-ROLE`. The README names `startable_by` roles for
+START_INSTANCE authorization; operators configure that authorization in the engine. C7 processes and DMN decisions
+carry a 30-day history TTL. Templates bind IO only; implementation bindings are configured in Modeler.
+
+The README lists artifact paths, omitted queries, and authoring cautions for C7 DMN types, parameter defaults,
+batch external starts and unverified other-program sources. The manifest records hashes and step/DMN associations.
 
 Offline structure conformance needs the export directory and a pinned fixture, with no Server or token:
 

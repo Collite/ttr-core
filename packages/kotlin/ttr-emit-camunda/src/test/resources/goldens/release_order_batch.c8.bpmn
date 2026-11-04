@@ -848,6 +848,7 @@
                 <zeebe:input source="=ttrRow.order_number" target="ttrKey" />
               </zeebe:ioMapping>
               <zeebe:userTask />
+              <zeebe:assignmentDefinition candidateGroups="=[&quot;hartland-process-owners&quot;]" />
             </bpmn:extensionElements>
             <bpmn:incoming>n_529a8c807d3feb30d66f</bpmn:incoming>
             <bpmn:outgoing>n_2b48e0356566be4a663c</bpmn:outgoing>

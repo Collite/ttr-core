@@ -30,7 +30,10 @@ internal class AuthoringArtifacts(
                         .toString() + world.toString()
                 ).toByteArray(Charsets.UTF_8),
             ).joinToString("") { "%02x".format(it) }
-    private val version = fingerprint.take(13).toLong(16)
+    private val version =
+        request.templateVersion.also {
+            require(it > 0) { "TTRP-EXPORT-VERSION: template version must be a positive integer" }
+        }
 
     private fun identifier(value: String): String {
         require(
@@ -218,12 +221,17 @@ internal class AuthoringArtifacts(
                 "definitions",
                 mapOf(
                     "xmlns" to "https://www.omg.org/spec/DMN/20191111/MODEL/",
+                    "xmlns:camunda" to "http://camunda.org/schema/1.0/dmn",
                     "id" to "${id}_definitions",
                     "name" to name,
                     "namespace" to "https://tatrman.org/dmn/$worldName",
                 ),
                 listOf(
-                    Xml("decision", mapOf("id" to id, "name" to id), listOf(table)),
+                    Xml(
+                        "decision",
+                        mapOf("id" to id, "name" to id, "camunda:historyTimeToLive" to "30"),
+                        listOf(table),
+                    ),
                 ),
             )
         return ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + definitions.write() + "\n").toByteArray(Charsets.UTF_8)

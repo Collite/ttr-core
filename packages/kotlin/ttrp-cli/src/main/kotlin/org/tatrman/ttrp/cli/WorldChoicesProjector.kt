@@ -48,37 +48,44 @@ internal object WorldChoicesProjector {
                 )
             }
         val handles = mutableMapOf<SchemaCode, SnapshotQueryHandle>()
+        val omitted = mutableListOf<OmittedQuery>()
         val queries =
-            model.queries.values.sortedBy { it.qname.dotted() }.map { query ->
-                val handle =
-                    handles.getOrPut(
-                        query.qname.schemaCode,
-                    ) { SnapshotQueryHandle(model, query.qname.schemaCode) }
-                val rel = PlanNodeDecoder.decode(handle.plan(query), TranslatorFramework(handle))
-                val columns =
-                    rel.rowType.fieldList.map {
-                        ColumnMeta(
-                            it.name,
-                            ExportTypes.family(it.type.sqlTypeName.name),
-                        )
+            model.queries.values.sortedBy { it.qname.dotted() }.mapNotNull { query ->
+                try {
+                    val handle =
+                        handles.getOrPut(
+                            query.qname.schemaCode,
+                        ) { SnapshotQueryHandle(model, query.qname.schemaCode) }
+                    val rel = PlanNodeDecoder.decode(handle.plan(query), TranslatorFramework(handle))
+                    val columns =
+                        rel.rowType.fieldList.map {
+                            ColumnMeta(
+                                it.name,
+                                ExportTypes.family(it.type.sqlTypeName.name),
+                            )
+                        }
+                    require(
+                        columns.isNotEmpty() &&
+                            columns.map { it.name }.distinct().size == columns.size &&
+                            columns.none { it.name == "row_count" },
+                    ) {
+                        "TTRP-EXPORT-COLUMNS: ${query.qname.dotted()} needs unique named columns, excluding reserved row_count"
                     }
-                require(
-                    columns.isNotEmpty() &&
-                        columns.map { it.name }.distinct().size == columns.size &&
-                        columns.none { it.name == "row_count" },
-                ) {
-                    "TTRP-EXPORT-COLUMNS: ${query.qname.dotted()} needs unique named columns, excluding reserved row_count"
+                    QueryMeta(
+                        query.qname.dotted(),
+                        query.parameters.map {
+                            ExportTypes.family(it.type)
+                            ParameterMeta(it.name, it.type, it.defaultValue)
+                        },
+                        columns,
+                    )
+                } catch (e: Exception) {
+                    val reason = "TTRP-EXPORT-QUERY: ${query.qname.dotted()}: ${e.message ?: e.javaClass.simpleName}"
+                    omitted += OmittedQuery(query.qname.dotted(), reason)
+                    null
                 }
-                QueryMeta(
-                    query.qname.dotted(),
-                    query.parameters.map {
-                        ExportTypes.family(it.type)
-                        ParameterMeta(it.name, it.type, it.defaultValue)
-                    },
-                    columns,
-                )
             }
-        return WorldChoices(programs, queries)
+        return WorldChoices(programs, queries, omitted)
     }
 }
 
@@ -179,7 +186,7 @@ private class SnapshotQueryHandle(
             return when (result) {
                 is ParseResult.Success -> result.plan.also { plans[query.qname] = it }
                 is ParseResult.Failure -> throw IllegalArgumentException(
-                    "TTRP-EXPORT-QUERY: ${query.qname.dotted()}: ${result.code}: ${result.message}",
+                    "${result.code}: ${result.message}",
                 )
             }
         } finally {

@@ -601,6 +601,18 @@ internal class CamundaRenderer(
                         task.extensions +=
                             d.mapping(mapOf("ttrAction" to quote(wiring.action), "ttrKey" to rowKey(graph)))
                         if (d == Dialect.C8) task.extensions += Xml("zeebe:userTask")
+                        action.by?.let { role ->
+                            val group =
+                                requireNotNull(action.candidateGroup?.takeIf { it.isNotBlank() }) {
+                                    "TTRP-EXPORT-ROLE: action ${wiring.action}: $role has no Keycloak group"
+                                }
+                            if (d == Dialect.C7) {
+                                task.attrs["camunda:candidateGroups"] = group
+                            } else {
+                                task.extensions +=
+                                    Xml("zeebe:assignmentDefinition", mapOf("candidateGroups" to "=[${quote(group)}]"))
+                            }
+                        }
                         rowScope.link(
                             gate,
                             task,
@@ -845,6 +857,9 @@ internal class CamundaRenderer(
         io.camunda:http-json:1; supply TTR_AUTOMATION_URL and connector secret TTR_CONN_AUTOMATION.
         Credentials are referenced by name and never embedded. Start this one-program BPMN externally;
         configure scheduling and composition in the engine modeller.
+        ${root.deployment.startableBy?.let {
+            "startable_by: ${it.joinToString()}. Grant START_INSTANCE authorization to these roles in the engine; this file does not provision permissions."
+        } ?: "No startable_by restriction is declared; configure START_INSTANCE authorization in the engine."}
 
         Start with ttrInput={key:..., at:"offset ISO instant"}, keys, or event. Event payload is nested under event;
         at is separate. On C7, ttrInput is a Java Map, including nested maps/lists for events or keys; a REST
@@ -852,7 +867,8 @@ internal class CamundaRenderer(
         expression-tested; no REST start on a live C7 engine is certified here. On-event deduplication requires a
         stable at; absent at is a new run. A batch program uses the engine execution id
         (C8 saves ttrExecutionId, generating one if absent). The Open body and its clock are saved once;
-        retries reuse that body.
+        retries reuse that body. Start each batch once: retrying an external start on C7 or n8n
+        creates another engine instance and caller key; deduplication across those instances is not provided.
 
         201 alone drives evaluation. 200 replay completes the step; 202 polls, closed/waiting completes,
         abandoned/failed allows one re-open. A second non-201 recovery refuses. 409 raises TTR_STALE and reaches

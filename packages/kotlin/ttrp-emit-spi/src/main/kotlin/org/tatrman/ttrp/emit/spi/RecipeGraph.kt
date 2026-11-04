@@ -92,6 +92,8 @@ data class ActionMeta(
     val dryRunText: Map<String, String>,
     val transition: Map<String, String>?,
     val by: String? = null,
+    /** Host-resolved Keycloak group for the approving action. */
+    val candidateGroup: String? = null,
 )
 
 data class RunApiMeta(
@@ -105,12 +107,19 @@ data class RecipeEmitRequest(
     val readme: String,
     val conformanceJson: String,
     val world: WorldChoices = WorldChoices(),
+    val templateVersion: Int = 1,
 )
 
 /** Snapshot choices only: no compiler nodes, SQL or ambient model access in plugins. */
 data class WorldChoices(
     val programs: List<ProgramChoice> = emptyList(),
     val queries: List<QueryMeta> = emptyList(),
+    val omitted: List<OmittedQuery> = emptyList(),
+)
+
+data class OmittedQuery(
+    val qname: String,
+    val reason: String,
 )
 
 data class ProgramChoice(

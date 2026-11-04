@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<definitions id="er.query.order_totals_decision_definitions" name="er.query.order_totals" namespace="https://tatrman.org/dmn/hartland.worlds.demo" xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/">
-  <decision id="er.query.order_totals_decision" name="er.query.order_totals_decision">
+<definitions id="er.query.order_totals_decision_definitions" name="er.query.order_totals" namespace="https://tatrman.org/dmn/hartland.worlds.demo" xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:camunda="http://camunda.org/schema/1.0/dmn">
+  <decision camunda:historyTimeToLive="30" id="er.query.order_totals_decision" name="er.query.order_totals_decision">
     <decisionTable hitPolicy="FIRST" id="er.query.order_totals_decision_table">
       <input id="er.query.order_totals_decision_input_0" label="total">
         <inputExpression id="er.query.order_totals_decision_expression_0" typeRef="number">

@@ -1,0 +1,19 @@
+package hartland
+
+model er
+
+def query report_returns_review_q {
+    sourceText: """sql
+SELECT returns_review.category AS category,
+       COUNT(DISTINCT returns_review.request_id) AS requests,
+       COUNT(DISTINCT CASE WHEN returns_review.received_at IS NOT NULL THEN returns_review.request_id END) AS received,
+       COUNT(DISTINCT CASE WHEN returns_review.status <> 'closed' THEN returns_review.request_id END) AS "open",
+       SUM(returns_review.amount) AS amount
+FROM returns_review
+JOIN date_dim ON returns_review.requested_at = date_dim.cal_date
+WHERE date_dim."year" = EXTRACT(YEAR FROM CURRENT_DATE)
+  AND date_dim."quarter" = EXTRACT(QUARTER FROM CURRENT_DATE)
+GROUP BY returns_review.category
+ORDER BY category
+"""
+}

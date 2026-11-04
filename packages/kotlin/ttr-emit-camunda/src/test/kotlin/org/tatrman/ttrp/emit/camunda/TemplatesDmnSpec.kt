@@ -41,6 +41,78 @@ class TemplatesDmnSpec :
                     world,
                 ),
             )
+        "template versions are explicit, independent of fingerprints, and reject nonpositive values" {
+            val plugin = Camunda7EmitPlugin()
+            val request = RecipeEmitRequest(releaseGraph("camunda_7"), "{}", "", "{}", world, templateVersion = 7)
+
+            fun template(request: RecipeEmitRequest) =
+                Json
+                    .parseToJsonElement(
+                        plugin
+                            .emitRecipe(request)
+                            .files
+                            .getValue("templates/c7/release_on_placement.json")
+                            .decodeToString(),
+                    ).jsonObject
+            val first = template(request)
+            first.getValue("version") shouldBe JsonPrimitive(7)
+            val changed =
+                template(
+                    request.copy(
+                        graph =
+                            request.graph.copy(
+                                recipe =
+                                    request.graph.recipe.copy(
+                                        fingerprints = mapOf("text" to "changed"),
+                                    ),
+                            ),
+                    ),
+                )
+            changed.getValue("version") shouldBe first.getValue("version")
+            (changed.getValue("metadata") != first.getValue("metadata")) shouldBe true
+            io.kotest.assertions.throwables.shouldThrow<IllegalArgumentException> {
+                template(
+                    request.copy(templateVersion = 0),
+                )
+            }
+        }
+        "approval groups are mandatory for named roles and startable_by is an authorization hint" {
+            val graph = releaseGraph("camunda_7")
+            val request =
+                RecipeEmitRequest(
+                    graph.copy(
+                        deployment =
+                            graph.deployment.copy(
+                                startableBy = listOf("role.sales_manager", "role.process_owner"),
+                            ),
+                    ),
+                    "{}",
+                    "",
+                    "{}",
+                )
+            val readme =
+                Camunda7EmitPlugin()
+                    .emitRecipe(request)
+                    .files
+                    .getValue("README.md")
+                    .decodeToString()
+            readme shouldContain "startable_by: role.sales_manager, role.process_owner"
+            readme shouldContain "START_INSTANCE"
+            val unresolved =
+                request.copy(
+                    graph =
+                        graph.copy(
+                            actions =
+                                graph.actions.mapValues { (_, action) ->
+                                    action.copy(candidateGroup = null)
+                                },
+                        ),
+                )
+            io.kotest.assertions.throwables
+                .shouldThrow<IllegalArgumentException> {
+                    Camunda7EmitPlugin().emitRecipe(unresolved)
+                }.message!! shouldContain "TTRP-EXPORT-ROLE: action approve_release: role.process_owner"
+        }
         "the offline structure driver rejects missing artifacts, wrong bindings and unsafe DMN" {
             val files = result("camunda_7").files
             val folder =
@@ -140,6 +212,7 @@ class TemplatesDmnSpec :
                             files.getValue("templates/$dialect/release_on_placement.json").decodeToString(),
                         ).jsonObject
                 template.getValue("id") shouldBe JsonPrimitive("tatrman.hartland.worlds.demo.release_on_placement")
+                template.getValue("version") shouldBe JsonPrimitive(1)
                 val schemaStream =
                     requireNotNull(javaClass.getResourceAsStream("/schema/$dialect-template-schema.json"))
                 val schema =
@@ -183,6 +256,7 @@ class TemplatesDmnSpec :
                 dmn shouldContain "https://www.omg.org/spec/DMN/20191111/MODEL/"
                 dmn shouldContain "id=\"er.query.order_totals_decision\""
                 dmn shouldContain "hitPolicy=\"FIRST\""
+                dmn shouldContain "camunda:historyTimeToLive=\"30\""
                 dmn shouldContain "typeRef=\"number\""
                 dmn shouldContain "typeRef=\"boolean\""
                 dmn shouldContain "row_count"
@@ -219,51 +293,16 @@ class TemplatesDmnSpec :
                 }
                 first.keys shouldBe second.keys
                 first.forEach { (path, bytes) -> bytes.contentEquals(second.getValue(path)) shouldBe true }
-                validateBpmn(first.getValue("release_order.$dialect.bpmn").decodeToString())
+                val bpmn = first.getValue("release_order.$dialect.bpmn").decodeToString()
+                bpmn shouldContain "hartland-process-owners"
+                if (dialect == "c7") {
+                    bpmn shouldContain "camunda:candidateGroups=\"hartland-process-owners\""
+                    bpmn shouldContain "camunda:historyTimeToLive=\"30\""
+                } else {
+                    bpmn shouldContain "zeebe:assignmentDefinition"
+                    bpmn shouldContain "candidateGroups=\"=[&quot;hartland-process-owners&quot;]\""
+                }
+                validateBpmn(bpmn)
             }
         }
     })
-
-private fun authoringGraph(target: String): RecipeGraph =
-    RecipeGraph(
-        RecipeMeta(
-            "release_order",
-            listOf("order.order_number"),
-            "now",
-            emptyList(),
-            mapOf(
-                "text" to "sha256:text",
-                "values" to "sha256:values",
-            ),
-            "per_candidate",
-            listOf("sql"),
-        ),
-        ProgramMeta2("release_on_placement", "key", "on_event", "event", emptyMap(), emptyMap()),
-        DeploymentMeta(
-            "release_bpmn",
-            target,
-            target,
-            "1",
-            "identity.automation_decider",
-            "parts",
-            true,
-            false,
-            emptyMap(),
-        ),
-        Roles("placed_orders", listOf(ContextMeta("shortfall", "per_candidate", "sql")), "verdict", "overlapping"),
-        listOf(RouteMeta("release", null, emptyList(), false, false, false)),
-        listOf(WiringMeta(listOf("verdict.release"), "release", mapOf("order" to "order_number"), null)),
-        mapOf("release" to ActionMeta(emptyMap(), mapOf("camunda" to "door"), null, false, null, emptyMap(), null)),
-        RunApiMeta(
-            "/automation",
-            mapOf(
-                "open" to "/recipes/{recipe}/runs",
-                "evaluate" to "/runs/{id}/evaluate",
-                "part" to "/runs/{id}/parts/{part}",
-                "status" to "/runs/{id}",
-                "route" to "/runs/{id}/routes/{route}",
-                "perform" to "/runs/{id}/actions/{action}/perform",
-                "close" to "/runs/{id}/close",
-            ),
-        ),
-    )

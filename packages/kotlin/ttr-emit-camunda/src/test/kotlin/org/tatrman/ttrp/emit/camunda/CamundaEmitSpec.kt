@@ -88,6 +88,8 @@ internal fun releaseGraph(
                     "2 working_days",
                     emptyMap(),
                     null,
+                    by = "role.process_owner",
+                    candidateGroup = "hartland-process-owners",
                 ),
             "notify" to
                 ActionMeta(mapOf("who" to "role"), mapOf("camunda" to "send task"), null, true, null, emptyMap(), null),

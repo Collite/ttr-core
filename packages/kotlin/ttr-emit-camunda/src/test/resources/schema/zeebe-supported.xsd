@@ -10,6 +10,7 @@
   <xs:element name="header"><xs:complexType><xs:attribute name="key" type="xs:string" use="required"/><xs:attribute name="value" type="xs:string" use="required"/></xs:complexType></xs:element>
   <xs:element name="loopCharacteristics"><xs:complexType><xs:attribute name="inputCollection" type="xs:string" use="required"/><xs:attribute name="inputElement" type="xs:string" use="required"/></xs:complexType></xs:element>
   <xs:element name="script"><xs:complexType><xs:attribute name="expression" type="xs:string" use="required"/><xs:attribute name="resultVariable" type="xs:string" use="required"/></xs:complexType></xs:element>
+  <xs:element name="assignmentDefinition"><xs:complexType><xs:attribute name="candidateGroups" type="xs:string"/></xs:complexType></xs:element>
   <xs:element name="userTask"><xs:complexType/></xs:element>
   <xs:element name="subscription"><xs:complexType><xs:attribute name="correlationKey" type="xs:string" use="required"/></xs:complexType></xs:element>
 </xs:schema>
