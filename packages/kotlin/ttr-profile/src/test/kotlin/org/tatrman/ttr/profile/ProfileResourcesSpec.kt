@@ -19,7 +19,7 @@ class ProfileResourcesSpec :
                 it.readBytes() shouldBe Path.of("../../grammar/schemas/profile.schema.json").readBytes()
             }
         }
-        test("resolved production dependencies go from profile to yaml and parser without metadata") {
+        test("resolved production dependencies include yaml, parser and model semantics without metadata") {
             // Adding structured paths must preserve the public four-argument exception constructor.
             CanonicalYamlException::class.java
                 .getConstructor(
@@ -33,6 +33,7 @@ class ProfileResourcesSpec :
                     ":packages:kotlin:ttr-profile",
                     ":packages:kotlin:ttr-yaml",
                     ":packages:kotlin:ttr-parser",
+                    ":packages:kotlin:ttr-semantics",
                 )
         }
     })

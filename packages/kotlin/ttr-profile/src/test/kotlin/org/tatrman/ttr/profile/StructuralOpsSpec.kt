@@ -60,7 +60,7 @@ class StructuralOpsSpec : FunSpec({
         result.documents.size shouldBe 1
         result.documents.single().value.getValue("package") shouldBe JsonPrimitive("shop")
         result.defs().map { it.getValue("id").jsonPrimitive.content } shouldBe listOf("First", "Second")
-        runOps("oblast: Sales\nentity: {}", "- {op: package, at: /oblast, mapping: {Sales: shop}}")
+        runOps("oblast: Sales\nentity: {}", "- {op: package, at: /oblast, mapping: {Sales: shop}}\n- {op: kinds, at: /entity, mapping: {e: entity}}")
             .documents.size shouldBe 0
         val error = shouldThrow<ProfileException> {
             runOps("entity: {Customer: {}}", entityOps.replace("mapping: {}, default: demo", "mapping: {}"), "pt02_new.yaml")
@@ -75,11 +75,11 @@ class StructuralOpsSpec : FunSpec({
           - {op: rename, in: entity, at: /popis, to: {kind: entity, property: description}}
           - {op: nest, in: entity, at: /role, to: {kind: entity, path: [semantics, role]}}
           - {op: rename, in: entity, at: /popis, to: {kind: entity, path: [semantics, sourceName]}}
-          - {op: unnest, in: entity, at: /obalka/jiny, to: {kind: entity, property: displayLabel}}
+          - {op: unnest, in: entity, at: /obalka/jiny, to: {kind: entity, property: labelPlural}}
         """.trimIndent())
         result.properties()["description"] shouldBe JsonPrimitive("Zákazník")
         result.properties()["semantics"] shouldBe Json.parseToJsonElement("""{"role":"buyer","sourceName":"Zákazník"}""")
-        result.properties()["displayLabel"] shouldBe JsonPrimitive("Další")
+        result.properties()["labelPlural"] shouldBe JsonPrimitive("Další")
         val reversed = recordProfile(entityOps + recordProfileOpsReversed())
         val left = runOps("entity: {Customer: {a: A, b: B}}", entityOps + recordProfileOpsReversed().lines().reversed().joinToString("\n"))
         ProfileEngine.apply(listOf(ForeignTree.read("entity: {Customer: {a: A, b: B}}")), listOf(reversed)).properties() shouldBe left.properties()
@@ -136,5 +136,5 @@ class StructuralOpsSpec : FunSpec({
 
 private fun recordProfileOpsReversed() = """
   - {op: rename, in: entity, at: /a, to: {kind: entity, property: description}}
-  - {op: rename, in: entity, at: /b, to: {kind: entity, property: displayLabel}}
+  - {op: rename, in: entity, at: /b, to: {kind: entity, property: labelPlural}}
 """.trimIndent()

@@ -10,6 +10,7 @@ plugins {
 kotlin { jvmToolchain(21) }
 dependencies {
     api(project(":packages:kotlin:ttr-yaml"))
+    implementation(project(":packages:kotlin:ttr-semantics"))
     testImplementation(libs.bundles.kotest)
 }
 tasks.test {

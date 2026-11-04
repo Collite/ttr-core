@@ -50,12 +50,18 @@ internal class ConsumptionLedger {
 /** A target prefix owns its entire subtree; siblings remain independently writable. */
 internal class ConflictLedger {
     private val writes = mutableMapOf<Record, MutableList<List<String>>>()
+    private val targets = mutableMapOf<Record, Pair<Record, List<String>>>()
+    fun register(record: Record, root: Record, path: List<String>) {
+        targets[record] = root to path
+    }
     fun claim(record: Record, path: List<String>, source: ForeignNode) {
-        val previous = writes.getOrPut(record) { mutableListOf() }
-        if (previous.any { path.take(it.size) == it || it.take(path.size) == path }) {
+        val (root, prefix) = targets[record] ?: (record to emptyList())
+        val target = prefix + path
+        val previous = writes.getOrPut(root) { mutableListOf() }
+        if (previous.any { target.take(it.size) == it || it.take(target.size) == target }) {
             throw ProfileException("ys/profile-conflict", source.span(key = true), "Two operations write ${record.kind}.${record.id}/${path.joinToString("/")}")
         }
-        previous += path
+        previous += target
     }
 }
 
