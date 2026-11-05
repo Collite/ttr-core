@@ -12,6 +12,7 @@ import org.tatrman.ttrp.resolve.ModelIndex
  * compile writes them: `<recipe>_verdict` (and `_verdict_current`, the same columns) and `_verdict_detail`. A
  * recipe reads its own past verdicts — `monitor_inbound`'s `reminded` context counts the `remind` verdicts of
  * earlier runs (AU 17 §4.2). Another recipe's verdicts come from its bundle's catalog, served by Veles.
+ * The assembler's detail schema is the source for these writer-owned columns; context columns are not listed here.
  */
 object RecipeCatalog {
     /** The explicit `recipe:` name, else a stable identifier from the filename without language suffixes. */
@@ -52,7 +53,12 @@ object RecipeCatalog {
                 )
         val detail =
             listOf(Column("run", text)) + keys +
-                listOf(Column("route", text), Column("context", text), Column("row_no", TtrpType.Integer))
+                listOf(
+                    Column("route", text),
+                    Column("context", text),
+                    Column("row_no", TtrpType.Integer),
+                    Column("truncated", TtrpType.Bool),
+                )
         return mapOf(
             "${name}_verdict" to verdict,
             "${name}_verdict_current" to verdict,
