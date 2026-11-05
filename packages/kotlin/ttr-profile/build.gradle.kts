@@ -15,6 +15,8 @@ dependencies {
 }
 tasks.test {
     useJUnitPlatform()
+    // The generated-document budget regression constructs 70,000 located records.
+    maxHeapSize = "2g"
     inputs.dir("../../../tests/conformance/fixtures")
     inputs.file("../../grammar/schemas/profile.schema.json")
     inputs.file("build.gradle.kts")

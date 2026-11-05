@@ -5,7 +5,8 @@ import kotlinx.serialization.json.*
 import org.tatrman.ttr.semantics.modelForKind
 import org.tatrman.ttr.yaml.CanonicalYaml
 import org.tatrman.ttr.yaml.CanonicalYamlException
-import org.tatrman.ttr.yaml.YamlData
+import java.util.Optional
+import java.util.concurrent.ConcurrentHashMap
 
 /** Grammar metadata supplies body membership; the existing semantics layer supplies model membership. */
 internal object ProfileVocabulary {
@@ -21,6 +22,12 @@ internal object ProfileVocabulary {
             .associate { it.jsonObject.string("kind") to it.jsonObject.string("body") }
     private val bodies = metadata.getValue("bodies").jsonObject
     private val rules = metadata.getValue("rules").jsonObject
+
+    private val conceptKinds = setOf("kind", "subkind", "variant", "event", "phase", "quality", "relation_type")
+    private val ruleSeparator = Regex("[^A-Za-z0-9_]+")
+    private val slots = ConcurrentHashMap<Pair<String, String>, Optional<String>>()
+
+    fun semanticsKind(kind: String): String = if (kind in conceptKinds) "concept" else kind
 
     fun model(kind: String): String {
         val ast =
@@ -58,7 +65,7 @@ internal object ProfileVocabulary {
         return rules[rule]
             ?.jsonPrimitive
             ?.content
-            ?.split(Regex("[^A-Za-z0-9_]+"))
+            ?.split(ruleSeparator)
             ?.any { it != rule && it.firstOrNull()?.isLowerCase() == true && reaches(it, body, seen) } == true
     }
 
@@ -80,23 +87,39 @@ internal object ProfileVocabulary {
     fun nestedSlot(
         parent: Record,
         child: Record,
-    ): String {
-        val bodyName = bodyName(parent)
-        val body = bodies.getValue(bodyName).jsonObject
-        val childBody = bodyName(child)
-        if (body.getValue("members").jsonArray.any { it.jsonObject.string("body") == childBody }) {
-            return if (bodyName == "storageDef") "schemas" else "members"
-        }
-        val properties =
-            body.getValue("properties").jsonArray.map { it.jsonObject }.filter { property ->
-                symbols(property.getValue("value")).any { reaches(it, childBody, mutableSetOf()) }
-            }
-        if (properties.size == 1) return properties.single().string("key")
-        throw ProfileException(
+    ): String =
+        nestedSlotOrNull(parent, child) ?: throw ProfileException(
             "ys/profile-invalid",
             child.source.span(),
             "${child.kind} cannot nest unambiguously under ${parent.kind}",
         )
+
+    fun nestedSlotOrNull(
+        parent: Record,
+        child: Record,
+    ): String? {
+        val bodyName = bodyName(parent)
+        val childBody = bodyName(child)
+        return slots
+            .getOrPut(bodyName to childBody) {
+                Optional.ofNullable(
+                    run {
+                        val body = bodies.getValue(bodyName).jsonObject
+                        if (body.getValue("members").jsonArray.any { it.jsonObject.string("body") == childBody }) {
+                            if (bodyName == "storageDef") "schemas" else "members"
+                        } else {
+                            body
+                                .getValue("properties")
+                                .jsonArray
+                                .map { it.jsonObject }
+                                .filter { property ->
+                                    symbols(property.getValue("value")).any { reaches(it, childBody, mutableSetOf()) }
+                                }.singleOrNull()
+                                ?.string("key")
+                        }
+                    },
+                )
+            }.orElse(null)
     }
 }
 
@@ -116,7 +139,12 @@ internal class CanonicalBuilder(
                 origins[record] = linkedMapOf()
                 if (record.parent == null) {
                     val identity =
-                        listOf(packages.getValue(plan), ProfileVocabulary.model(record.kind), record.kind, record.id)
+                        listOf(
+                            packages.getValue(plan),
+                            ProfileVocabulary.model(record.kind),
+                            ProfileVocabulary.semanticsKind(record.kind),
+                            record.id,
+                        )
                     if (!identities.add(
                             identity,
                         )
@@ -169,9 +197,13 @@ internal class CanonicalBuilder(
         value: JsonElement,
         source: ForeignNode,
     ) {
-        val nested = children[record]?.get(path.first())
-        if (nested != null && path.size > 1) {
-            nested.forEach { write(plan, it, path.drop(1), value, source) }
+        if (path.size > 1 &&
+            plan.nestedKinds(record).any { kind ->
+                ProfileVocabulary.nestedSlotOrNull(record, Record(record.source, kind, record.id, record)) ==
+                    path.first()
+            }
+        ) {
+            children[record]?.get(path.first())?.forEach { write(plan, it, path.drop(1), value, source) }
             return
         }
         plan.conflicts.claim(record, path, source)
@@ -262,7 +294,32 @@ internal class CanonicalBuilder(
                         ),
                     )
                 }
-            val json = raw.toString()
+            // JSON string escaping is narrower than YAML's printable set.
+            val json =
+                buildString {
+                    raw.toString().codePoints().forEach { cp ->
+                        if (cp == 9 ||
+                            cp == 10 ||
+                            cp == 13 ||
+                            cp in 0x20..0x7e ||
+                            cp == 0x85 ||
+                            cp in 0xa0..0xd7ff ||
+                            cp in 0xe000..0xfffd ||
+                            cp >= 0x10000
+                        ) {
+                            appendCodePoint(cp)
+                        } else {
+                            append("\\u" + cp.toString(16).padStart(4, '0'))
+                        }
+                    }
+                }
+            if (json.codePointCount(0, json.length) > 3_000_000) {
+                throw ProfileException(
+                    "ys/profile-invalid",
+                    records.first().source.span(),
+                    "Canonical document ${group.first}/${group.second} exceeds 3000000 code points",
+                )
+            }
             val file =
                 records
                     .first()
@@ -271,14 +328,8 @@ internal class CanonicalBuilder(
                 try {
                     CanonicalYaml.read(json, file)
                 } catch (error: CanonicalYamlException) {
-                    // The bridge diagnoses generated JSON; map that offset back to the closest authored record.
-                    val data = YamlData.read(json, file)
-                    val path =
-                        data.paths
-                            .filter { candidate ->
-                                val span = data.source(candidate)
-                                error.column - 1 in span.offsetStart until span.offsetEnd
-                            }.maxByOrNull { it.length } ?: ""
+                    // Canonical paths map to the closest authored record without parsing the failed bridge again.
+                    val path = error.keyPath
                     val origin =
                         recordLocations.entries
                             .filter { path == it.key || path.startsWith(it.key + "/") }

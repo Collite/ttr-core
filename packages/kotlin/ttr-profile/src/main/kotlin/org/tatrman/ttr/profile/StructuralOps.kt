@@ -34,7 +34,13 @@ internal class PackageOp(
             ?: throw ProfileException(
                 "ys/value-unmapped",
                 ProfileSpan(plan.tree.file, 1, 1, 1, 1, ""),
-                "Unmapped package key $key",
+                if (key ==
+                    null
+                ) {
+                    "Unmapped package key: no string at ${op.value.string("at")}"
+                } else {
+                    "Unmapped package key $key"
+                },
             )
     }
 }
@@ -76,6 +82,16 @@ internal class IgnoreOp(
             }
         contexts.forEach { context ->
             op.at.resolve(context, includeNull = true)?.let { source ->
+                plan.records
+                    .firstOrNull { record ->
+                        record.source.path == source.path || record.source.path.startsWith("${source.path}/")
+                    }?.let { record ->
+                        throw ProfileException(
+                            "ys/profile-conflict",
+                            source.span(key = true),
+                            "ignore covers record ${record.kind}.${record.id}",
+                        )
+                    }
                 plan.consumption.consume(source)
                 ignored += Ignored(source.span(key = true), op.value.optionalString("reason"))
             }
@@ -112,7 +128,12 @@ internal object StructuralExecutor {
                     matches.forEach { ignored += Ignored(input.root.span(), it.value.optionalString("reason")) }
                     null
                 } else {
-                    RecordPlan(input, ops)
+                    RecordPlan(input, ops).also { plan ->
+                        val root = input.root.value as? JsonObject
+                        if (root?.keys?.firstOrNull() == "ttr" && root["ttr"] is JsonObject) {
+                            plan.consumption.consume(input.root.child("ttr", root.getValue("ttr")))
+                        }
+                    }
                 }
             }
         val packages =
@@ -133,7 +154,7 @@ internal object StructuralExecutor {
                 } else {
                     throw ProfileException(
                         "ys/value-unmapped",
-                        plan.tree.root.span(),
+                        ProfileSpan(plan.tree.file, 1, 1, 1, 1, ""),
                         "No package operation for ${plan.tree.file}",
                     )
                 }

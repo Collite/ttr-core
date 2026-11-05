@@ -49,7 +49,8 @@ internal class ConsumptionLedger {
                         visit(child)
                     }
                 is JsonArray -> node.entries().forEach(::visit)
-                else -> Unit
+                JsonNull -> Unit
+                else -> throw ProfileException("ys/unknown-key", node.span(), "Unconsumed value ${node.path}")
             }
         }
         visit(root)
@@ -108,7 +109,7 @@ internal class RecordPlan(
     val consumption = ConsumptionLedger()
     val conflicts = ConflictLedger()
     private val found = linkedMapOf<String, Record>()
-    val records: List<Record> get() {
+    val records: List<Record> by lazy {
         val order = mutableMapOf<String, Int>()
 
         fun walk(node: ForeignNode) {
@@ -116,8 +117,19 @@ internal class RecordPlan(
             node.entries().forEach(::walk)
         }
         walk(tree.root)
-        return found.values.sortedBy { order.getValue(it.source.path) }
+        found.values.sortedBy { order.getValue(it.source.path) }
     }
+
+    fun nestedKinds(parent: Record): List<String> =
+        operations
+            .filter {
+                it.name == "kinds" && it.scope == parent.kind && it.matches(tree)
+            }.flatMap {
+                it.value
+                    .getValue("mapping")
+                    .jsonObject.values
+                    .map { kind -> kind.jsonPrimitive.content }
+            }.distinct()
 
     init {
         val evaluated = mutableSetOf<Pair<Int, String>>()
@@ -158,7 +170,13 @@ internal class RecordPlan(
                             mapping[foreignKind]?.jsonPrimitive?.content ?: throw ProfileException(
                                 "ys/unknown-kind",
                                 (kindNode ?: source).span(key = true),
-                                "Unmapped record kind $foreignKind",
+                                if (foreignKind ==
+                                    null
+                                ) {
+                                    "Unmapped record kind: no string at ${op.value.optionalString("kind") ?: ""}"
+                                } else {
+                                    "Unmapped record kind $foreignKind"
+                                },
                             )
                         val idNode = JsonPointer(op.value.optionalString("id") ?: "/\$key").resolve(source)
                         val id =
@@ -168,19 +186,19 @@ internal class RecordPlan(
                                     source.span(),
                                     "Record needs a string id",
                                 )
-                        if (source.path in found) {
-                            throw ProfileException(
-                                "ys/profile-conflict",
-                                source.span(key = true),
-                                "Two kinds operations select the same record",
-                            )
-                        }
                         // A kind selecting itself would create an infinite nested record graph.
                         if (parent?.source?.path == source.path) {
                             throw ProfileException(
                                 "ys/profile-conflict",
                                 source.span(key = true),
                                 "A record cannot nest inside itself",
+                            )
+                        }
+                        if (source.path in found) {
+                            throw ProfileException(
+                                "ys/profile-conflict",
+                                source.span(key = true),
+                                "Two kinds operations select the same record",
                             )
                         }
                         consumption.open(source)

@@ -242,6 +242,41 @@ class StructuralOpsSpec :
                 )
             }.code shouldBe "ys/profile-conflict"
         }
+
+        test("unconsumed scalar values in sequences and scalar records are located instead of dropped") {
+            val rename = "- {op: rename, in: entity, at: /tags/0, to: {kind: entity, property: description}}"
+            val nested =
+                "- {op: kinds, in: entity, at: /sloupce, mapping: {a: attribute}}\n" +
+                    "- {op: rename, in: attribute, at: /typ, to: {kind: attribute, property: type}}"
+            listOf(
+                Triple("entity:\n  A: {tags: [x, y]}\n", entityOps + rename, Triple(2, 17, "/entity/A/tags/1")),
+                Triple("meta: [a, b, c]\n", "- {op: ignore, at: /meta/0}", Triple(1, 11, "/meta/1")),
+                Triple("entity:\n  Invoice: Faktura\n", entityOps, Triple(2, 12, "/entity/Invoice")),
+                Triple(
+                    "entity:\n  A:\n    sloupce: {kod: {typ: string}, _poznamka: text}\n",
+                    entityOps + nested,
+                    Triple(3, 46, "/entity/A/sloupce/_poznamka"),
+                ),
+            ).forEach { (source, ops, expected) ->
+                val error = shouldThrow<ProfileException> { runOps(source, ops) }
+                error.code shouldBe "ys/unknown-key"
+                Triple(error.location.line, error.location.column, error.location.path) shouldBe expected
+                error.detail shouldBe "Unconsumed value ${expected.third}"
+            }
+            runOps("entity: {Invoice: ~}", entityOps).defs().single().string("id") shouldBe "Invoice"
+            runOps(
+                "entity: {Invoice: {tags: []}}",
+                entityOps +
+                    "- {op: kinds, in: entity, at: /tags, mapping: {a: attribute}}",
+            ).properties()
+                .isEmpty() shouldBe true
+            runOps(
+                "entity: {Invoice: Faktura}",
+                entityOps +
+                    "- {op: rename, in: entity, at: '', to: {kind: entity, property: description}}",
+            ).properties()
+                .string("description") shouldBe "Faktura"
+        }
     })
 
 private fun recordProfileOpsReversed() =

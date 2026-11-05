@@ -235,4 +235,38 @@ class ProfileReview220Spec :
             DeclarationReader.readTree(tree) shouldBe DeclarationReader.readTree(tree)
             ProfileReader.read(profile220()) shouldBe ProfileReader.read(profile220())
         }
+
+        test("malformed UTF-8 preserves earlier Reader errors and final CR positions") {
+            root220 { root ->
+                val file = root.resolve("profile.yaml")
+                val resolver = ProfileResolver(root, mapOf("demo-cs/1" to Path.of("profile.yaml")))
+                listOf(
+                    Triple("profile: x\u0001", 1, 11),
+                    Triple("a: 1\nb: \u007f", 2, 4),
+                    Triple("x: \ufffe", 1, 4),
+                    Triple("a: b\n\u0085c: \u0001", 2, 5),
+                ).forEach { (source, line, column) ->
+                    file.writeText(source)
+                    val clean = shouldThrow<ProfileException> { resolver.resolve("demo-cs/1", Path.of("ttr.yaml")) }
+                    file.writeBytes(source.toByteArray() + byteArrayOf(0xff.toByte()))
+                    val bad = shouldThrow<ProfileException> { resolver.resolve("demo-cs/1", Path.of("ttr.yaml")) }
+                    bad.message shouldBe clean.message
+                    bad.code shouldBe "ys/profile-invalid"
+                    bad.detail shouldBe "special characters are not allowed"
+                    bad.location.line shouldBe line
+                    bad.location.column shouldBe column
+                }
+                listOf("a\r" to 1, "a\rb" to 2, "a\r\n" to 1).forEach { (source, column) ->
+                    file.writeBytes(source.toByteArray() + byteArrayOf(0xff.toByte()))
+                    val error = shouldThrow<ProfileException> { resolver.resolve("demo-cs/1", Path.of("ttr.yaml")) }
+                    error.location.line shouldBe 2
+                    error.location.column shouldBe column
+                    error.detail shouldBe "Malformed UTF-8 in profile"
+                }
+                val astralPrefix = "# " + "x".repeat(1022) + "😀"
+                file.writeBytes(astralPrefix.toByteArray() + byteArrayOf(0xff.toByte()))
+                shouldThrow<ProfileException> { resolver.resolve("demo-cs/1", Path.of("ttr.yaml")) }.detail shouldBe
+                    "Malformed UTF-8 in profile"
+            }
+        }
     })

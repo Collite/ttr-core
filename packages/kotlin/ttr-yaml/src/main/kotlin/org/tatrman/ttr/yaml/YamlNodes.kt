@@ -183,6 +183,7 @@ internal class YamlNodes(
                 }.setAllowDuplicateKeys(false)
                 .setMaxAliasesForCollections(0)
                 .setCodePointLimit(MAX_YAML_CODE_POINTS)
+                .setBufferSize(source.length + 1)
                 .build()
         val eventPaths = YamlEventPaths()
         val node =
@@ -192,7 +193,7 @@ internal class YamlNodes(
                 var documents = 0
                 for (event in Parse(settings).parseString(source)) {
                     if (event is DocumentStartEvent && ++documents > 1) {
-                        failAt(event, "but found another document", "")
+                        break // Compose preserves earlier document-one errors and refuses the second document itself.
                     }
                     val keyEvent = eventPaths.isMappingKey
                     val parentPath = eventPaths.failurePath
@@ -232,19 +233,7 @@ internal class YamlNodes(
                     eventPaths.failurePath,
                 )
             } catch (e: ReaderException) {
-                val offset =
-                    source.offsetByCodePoints(
-                        0,
-                        e.position.coerceAtMost(source.codePointCount(0, source.length)),
-                    )
-                val prefix = source.take(offset)
-                throw CanonicalYamlException(
-                    file,
-                    prefix.count { it == '\n' } + 1,
-                    prefix.length - prefix.lastIndexOf('\n'),
-                    e.message ?: "Invalid YAML character",
-                    eventPaths.failurePath,
-                )
+                throw readerFailure(source, file, e, eventPaths.failurePath)
             } catch (e: YamlEngineException) {
                 throw CanonicalYamlException(file, 1, 1, e.message ?: "Invalid YAML")
             }
@@ -553,6 +542,23 @@ internal object YamlText {
     }
 }
 
+private fun readerFailure(
+    source: String,
+    file: String,
+    error: ReaderException,
+    path: String = "",
+): CanonicalYamlException {
+    val offset = source.offsetByCodePoints(0, error.position.coerceAtMost(source.codePointCount(0, source.length)))
+    val prefix = source.take(offset)
+    return CanonicalYamlException(
+        file,
+        prefix.count { it == '\n' } + 1,
+        prefix.length - prefix.lastIndexOf('\n'),
+        error.message ?: "Invalid YAML character",
+        path,
+    )
+}
+
 internal const val MAX_YAML_CODE_POINTS = 3_000_000
 
 internal fun strictUtf8Decoder(): java.nio.charset.CharsetDecoder =
@@ -577,10 +583,14 @@ fun readProfileYaml(path: java.nio.file.Path): String {
     output.flip()
     val source = output.toString()
     if (result.isError) {
-        val reader = StreamReader(LoadSettings.builder().build(), source)
-        reader.forward(source.codePointCount(0, source.length))
-        val mark = reader.mark.orElseThrow()
-        throw CanonicalYamlException(file, mark.line + 1, mark.column + 1, "Malformed UTF-8 in profile")
+        try {
+            val reader = StreamReader(LoadSettings.builder().setBufferSize(source.length + 1).build(), "$source ")
+            reader.forward(source.codePointCount(0, source.length))
+            val mark = reader.mark.orElseThrow()
+            throw CanonicalYamlException(file, mark.line + 1, mark.column + 1, "Malformed UTF-8 in profile")
+        } catch (error: ReaderException) {
+            throw readerFailure(source, file, error)
+        }
     }
     return source
 }

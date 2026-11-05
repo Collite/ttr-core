@@ -48,11 +48,16 @@ internal fun escapePointer(key: String) = key.replace("~", "~0").replace("/", "~
 class JsonPointer(
     pointer: String,
 ) {
+    companion object {
+        private val invalidEscape = Regex("~(?![01])")
+        private val arrayIndex = Regex("[1-9][0-9]*")
+    }
+
     private val parts: List<String>
 
     init {
         require(pointer.isEmpty() || pointer.startsWith('/')) { "Expected a JSON Pointer" }
-        require(!Regex("~(?![01])").containsMatchIn(pointer)) { "Invalid JSON Pointer escape" }
+        require(!invalidEscape.containsMatchIn(pointer)) { "Invalid JSON Pointer escape" }
         parts =
             if (pointer.isEmpty()) {
                 emptyList()
@@ -78,7 +83,7 @@ class JsonPointer(
                 when (val parent = current.value) {
                     is JsonObject -> parent[part]
                     is JsonArray ->
-                        if (part == "0" || part.matches(Regex("[1-9][0-9]*"))) {
+                        if (part == "0" || part.matches(arrayIndex)) {
                             part.toIntOrNull()?.let(parent::getOrNull)
                         } else {
                             null

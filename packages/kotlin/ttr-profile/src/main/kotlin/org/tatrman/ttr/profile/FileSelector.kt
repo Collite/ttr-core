@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.profile
 
-/** MF F-8: gitignore subset, rooted paths, no re-inclusion. Also tests every ancestor directory. */
+/**
+ * MF F-8: gitignore subset, rooted paths, no re-inclusion. Also tests every ancestor directory.
+ * Wildcard/escape rules: https://git-scm.com/docs/gitignore#_pattern_format
+ */
 class FileSelector(
     patterns: List<String>,
 ) {
@@ -12,7 +15,14 @@ class FileSelector(
 
     private val rules =
         patterns.mapNotNull { raw ->
-            val pattern = raw.trimEnd()
+            var end = raw.length
+            while (end > 0 && raw[end - 1] == ' ') {
+                var slash = end - 2
+                while (slash >= 0 && raw[slash] == '\\') slash--
+                if ((end - 2 - slash) % 2 == 1) break
+                end--
+            }
+            val pattern = raw.take(end)
             require(!pattern.startsWith('!')) { "'!' (re-include) is not supported" }
             if (pattern.isBlank() || pattern.startsWith('#')) return@mapNotNull null
             val directory = pattern.endsWith('/')
@@ -36,9 +46,13 @@ class FileSelector(
                 while (i < pattern.length) {
                     when (val c = pattern[i++]) {
                         '*' ->
-                            if (i < pattern.length && pattern[i] == '*') {
+                            if ((i == 1 || pattern[i - 2] == '/') &&
+                                i < pattern.length &&
+                                pattern[i] == '*' &&
+                                (i + 1 == pattern.length || pattern[i + 1] == '/')
+                            ) {
                                 i++
-                                if (i < pattern.length && pattern[i] == '/') {
+                                if (i < pattern.length) {
                                     i++
                                     append("(?:.*/)?")
                                 } else {
@@ -47,6 +61,10 @@ class FileSelector(
                             } else {
                                 append("[^/]*")
                             }
+                        '\\' -> {
+                            require(i < pattern.length) { "Trailing glob escape" }
+                            append(Regex.escape(pattern[i++].toString()))
+                        }
                         '?' -> append("[^/]")
                         '[' -> {
                             val end = pattern.indexOf(']', i)

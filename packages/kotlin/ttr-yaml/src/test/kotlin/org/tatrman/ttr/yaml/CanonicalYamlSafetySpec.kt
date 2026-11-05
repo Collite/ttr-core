@@ -145,4 +145,31 @@ class CanonicalYamlSafetySpec :
                 scalars.getValue("2") shouldBe "/x/next"
             }
         }
+
+        test("astral characters at fixed-size reader boundaries survive YAML and migration marker reads") {
+            listOf(1024, 2049).forEach { boundary ->
+                val scalar = "x".repeat(boundary - 3) + "😀"
+                YamlData.read("a: $scalar").value["a"].toString() shouldBe "\"$scalar\""
+                val prefix = "# " + "x".repeat(boundary - 2) + "😀\n"
+                val source = prefix + "ttr: '0.22'\nmodel: er\ndefs: []\n"
+                CanonicalYaml.read(source).ast.errors shouldBe emptyList()
+                // A differing marker must be found before the canonical reader, so this exercises the marker's Reader.
+                val old = source.replace("0.22", "0.21")
+                val request =
+                    kotlinx.serialization.json.buildJsonObject {
+                        put("operation", kotlinx.serialization.json.JsonPrimitive("migrate"))
+                        put("from", kotlinx.serialization.json.JsonPrimitive("0.21"))
+                        put("to", kotlinx.serialization.json.JsonPrimitive("0.22"))
+                        put("source", kotlinx.serialization.json.JsonPrimitive(old))
+                    }
+                YamlMigration.migrate(request)["source"].toString().contains("0.22") shouldBe true
+            }
+        }
+        test("document-one composition errors precede the second document guard") {
+            val error =
+                shouldThrow<CanonicalYamlException> {
+                    CanonicalYaml.read("ttr: '0.22'\nmodel: cn\ndefs: *missing\n---\nx: 1\n", "earliest.yaml")
+                }
+            error.message shouldBe "earliest.yaml:3:7: found undefined alias missing"
+        }
     })

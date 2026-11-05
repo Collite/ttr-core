@@ -6,9 +6,20 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — Structural profile execution (MW P3 S3.2, ttr-core#388)
+
 - `ttr-profile` now executes original-tree record selectors, `kinds`, `package`, `rename`, `nest`/`unnest`, `ignore` and `codes`; inherited profiles emit located canonical documents grouped by package and model. Missing record IDs, unconsumed keys and conflicting targets are refused.
 
+### Changed — Breaking profile schema change (`@tatrman/grammar`, grammar 0.22)
+
 - The 0.22 profile schema gains record scope `in` and `kinds.kind`/`kinds.id` (D-MW-64). Writing operations now require `in`; previously valid writing operations without it are refused. No grammar change.
+
+### Fixed — Structural profile and YAML safety (ttr-core#388, review-225)
+
+- Refuse unconsumed scalar values, ignores covering records and duplicate concept identities; consume declaration
+  headers and apply nested-slot writes only to existing children. Align file-selector escapes and double stars with Git.
+- Preserve earliest YAML errors and malformed UTF-8 positions, avoid surrogate-boundary reader crashes, escape the
+  generated JSON bridge and report its size/validation failures at authored records.
 
 ### Added — Profile loading and canonical identity (MW P3 S3.1, ttr-core#384)
 

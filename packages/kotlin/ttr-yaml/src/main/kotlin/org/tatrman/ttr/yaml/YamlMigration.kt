@@ -14,8 +14,32 @@ import org.snakeyaml.engine.v2.events.SequenceStartEvent
 import org.snakeyaml.engine.v2.exceptions.YamlEngineException
 import java.io.InputStream
 import java.io.OutputStream
+import java.io.Reader
 import java.nio.ByteBuffer
 import kotlin.system.exitProcess
+
+/** Keep a high surrogate with its low surrogate across SnakeYAML's fixed-size reads. */
+private class SurrogateReader(
+    private val source: String,
+) : Reader() {
+    private var offset = 0
+
+    override fun read(
+        buffer: CharArray,
+        start: Int,
+        length: Int,
+    ): Int {
+        if (length == 0) return 0
+        if (offset == source.length) return -1
+        var count = minOf(length, source.length - offset)
+        if (count > 1 && offset + count < source.length && source[offset + count - 1].isHighSurrogate()) count--
+        source.toCharArray(buffer, start, offset, offset + count)
+        offset += count
+        return count
+    }
+
+    override fun close() = Unit
+}
 
 /** Syntax migrations only. A version pair must be registered here; no best-effort dialect detection. */
 object YamlMigration {
@@ -63,7 +87,7 @@ object YamlMigration {
         var key = true
         var value = false
         try {
-            for (event in Parse(LoadSettings.builder().build()).parseString(source)) {
+            for (event in Parse(LoadSettings.builder().build()).parseReader(SurrogateReader(source))) {
                 val start = event is MappingStartEvent || event is SequenceStartEvent
                 val node = start || event is ScalarEvent || event is AliasEvent
                 if (depth == 0 && node && event !is MappingStartEvent) return null

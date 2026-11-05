@@ -70,4 +70,39 @@ class ForeignTreeSpec :
             shouldThrow<IllegalArgumentException> { FileSelector(listOf("!x")) }
             shouldThrow<IllegalArgumentException> { FileSelector(listOf("[x")) }
         }
+
+        test("astral characters at SnakeYAML chunk boundaries remain valid dialect input") {
+            listOf(1024, 2049).forEach { boundary ->
+                val value = "x".repeat(boundary - 3) + "😀"
+                ForeignTree
+                    .read("a: $value")
+                    .root.value
+                    .toString()
+                    .contains("😀") shouldBe true
+            }
+        }
+        test("gitignore whole-segment double stars and escaped literals agree with git's oracle") {
+            listOf(
+                Triple("a**b.yaml", "a/b.yaml", false),
+                Triple("a**b.yaml", "a/c/b.yaml", false),
+                Triple("a**b.yaml", "x/a/b.yaml", false),
+                Triple("a**b.yaml", "x/a/c/b.yaml", false),
+                Triple("a**b.yaml", "axxb.yaml", true),
+                Triple("a/**b.yaml", "a/c/b.yaml", false),
+                Triple("a/**b.yaml", "a/x/y/b.yaml", false),
+                Triple("a/**b.yaml", "a/xxb.yaml", true),
+                Triple("\\#x.yaml", "#x.yaml", true),
+                Triple("\\!x.yaml", "!x.yaml", true),
+                Triple("\\*.yaml", "*.yaml", true),
+                Triple("\\*.yaml", "a.yaml", false),
+                Triple("x\\ .yaml", "x .yaml", true),
+                Triple("a\\ ", "a ", true),
+                Triple("a\\  ", "a ", true),
+                Triple("a/**/b.yaml", "a/b.yaml", true),
+                Triple("a/**", "a/c/b.yaml", true),
+                Triple("**", "a/c/b.yaml", true),
+            ).forEach { (pattern, path, expected) ->
+                FileSelector(listOf(pattern)).matches(path) shouldBe expected
+            }
+        }
     })
