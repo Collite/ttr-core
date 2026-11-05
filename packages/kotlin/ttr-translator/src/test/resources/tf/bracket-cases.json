@@ -2,12 +2,32 @@
   {
     "id": "tc_vz42_bracket_alias_top_hint",
     "group": "TC-DB",
-    "sql": "SELECT TOP 5 a AS [potenciál tržeb] FROM [dbo].[XXPRODEJE] WITH (NOLOCK)",
+    "sql": "SELECT TOP 5 a AS [potenciál tržeb] FROM [db].[dbo].[XXPRODEJE] WITH (NOLOCK)",
     "params": [],
     "expect": {
       "sql": "SELECT TOP (5) [a] AS [potenciál tržeb] FROM [dbo].[XXPRODEJE] WITH (NOLOCK)"
     },
     "status": "green"
+  },
+  {
+    "id": "tc_vz42_one_part",
+    "group": "TC-DB",
+    "sql": "SELECT TOP 5 a AS [potenciál tržeb] FROM [XXPRODEJE] WITH (NOLOCK)",
+    "params": [],
+    "expect": {
+      "sql": "SELECT TOP (5) [a] AS [potenciál tržeb] FROM [dbo].[XXPRODEJE] WITH (NOLOCK)"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_vz42_two_part",
+    "group": "TC-DB",
+    "sql": "SELECT TOP 5 a AS [potenciál tržeb] FROM [dbo].[XXPRODEJE] WITH (NOLOCK)",
+    "params": [],
+    "expect": {
+      "sql": "SELECT TOP (5) [a] AS [potenciál tržeb] FROM [dbo].[XXPRODEJE] WITH (NOLOCK)"
+    },
+    "status": "red:TC-S1.2"
   },
   {
     "id": "tc_bracket_like_pattern_literal",

@@ -28,7 +28,7 @@ import java.io.File
  *
  * `tf/cases.json` — one entry per probe, with the expected MSSQL text or the expected failure:
  * * `"status": "green"` — asserted.
- * * `"status": "red:TF-P<n>.S<m>"` — a known gap. The case itself is registered disabled, plus a
+ * * `"status": "red:TF-P<n>.S<m>"` or `"red:TC-S<n>.<m>"` — a known gap. The case itself is registered disabled, plus a
  *   guard `"<id> is still red (expected to be fixed by <stage>)"` that FAILS as soon as the case
  *   passes — so a fix that lands early is noticed and the status is flipped in the same commit.
  * * `"status": "out-of-scope"` — a failure by design (C13), asserted like `green`.
@@ -209,7 +209,7 @@ data class TfParam(
 )
 
 internal object TfCases {
-    private val STATUS = Regex("""green|out-of-scope|red:TF-P\d\.S\d""")
+    private val STATUS = Regex("""green|out-of-scope|red:TF-P\d\.S\d|red:TC-S\d\.\d""")
 
     fun probes(root: JsonNode): List<ProbeCase> =
         root
