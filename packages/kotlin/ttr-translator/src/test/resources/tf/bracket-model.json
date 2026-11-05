@@ -1,5 +1,17 @@
 {
   "tables": {
-    "XXPRODEJE": {"a": "INT", "a]b": "TEXT"}
+    "XXPRODEJE": {
+      "a": "INT",
+      "a]b": "TEXT"
+    },
+    "order details": {
+      "a": "INT"
+    },
+    "q\"t": {
+      "a": "INT"
+    },
+    "a.b": {
+      "a": "INT"
+    }
   }
 }

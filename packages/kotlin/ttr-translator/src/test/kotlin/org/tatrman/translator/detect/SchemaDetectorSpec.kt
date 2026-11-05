@@ -260,4 +260,28 @@ class SchemaDetectorSpec :
             val result = SchemaDetector.detect(sql, Language.SQL, SchemaCode.SCHEMA_CODE_UNSPECIFIED, makeHandle())
             result.decision shouldBe SchemaDecision.NOT_APPLICABLE
         }
+
+        for (sql in listOf(
+            "SELECT x.id FROM (SELECT TOP 5 id FROM item_category) x",
+            "SELECT x.id FROM (SELECT id FROM item_category ORDER BY id) x",
+        )) {
+            "derived ordered query retains table detection: $sql" {
+                val result = SchemaDetector.detect(sql, Language.SQL, SchemaCode.DB, makeHandle())
+                result.decision shouldBe SchemaDecision.CONFIRMED
+                result.referencedTables shouldBe listOf("item_category")
+            }
+        }
+
+        "derived TOP query reports unknown tables instead of confirming the outer table alone" {
+            val result =
+                SchemaDetector.detect(
+                    "SELECT x.id FROM (SELECT TOP 5 id FROM nope) x JOIN item_category y ON x.id = y.id",
+                    Language.SQL,
+                    SchemaCode.DB,
+                    makeHandle(),
+                )
+            result.decision shouldBe SchemaDecision.UNKNOWN
+            result.unknownTables shouldBe listOf("nope")
+            result.referencedTables shouldBe listOf("item_category", "nope")
+        }
     })

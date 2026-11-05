@@ -22,8 +22,8 @@ internal object SqlTextScanner {
             }
             return sql.length
         }
-        if (sql.startsWith("--", start)) {
-            val newline = sql.indexOf('\n', start + 2)
+        if (sql.startsWith("--", start) || sql.startsWith("//", start)) {
+            val newline = sql.indexOfAny(charArrayOf('\n', '\r'), start + 2)
             return if (newline < 0) sql.length else newline
         }
         if (sql.startsWith("/*", start)) {

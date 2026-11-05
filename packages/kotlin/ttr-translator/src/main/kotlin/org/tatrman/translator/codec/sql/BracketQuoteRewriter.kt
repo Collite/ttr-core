@@ -28,7 +28,9 @@ object BracketQuoteRewriter {
                     }
                 }
                 if (closed) {
+                    if (out.lastOrNull() == '"') out.append(' ')
                     out.append('"').append(name.toString().replace("\"", "\"\"")).append('"')
+                    if (i < sql.length && sql[i] == '"') out.append(' ')
                 } else {
                     // Preserve the malformed suffix; the parser owns its diagnostic.
                     out.append(sql, start, sql.length)

@@ -3,6 +3,7 @@ package org.tatrman.concept.metadata
 
 import org.tatrman.plan.v1.QualifiedName
 import org.tatrman.plan.v1.SchemaCode
+import org.tatrman.translator.codec.sql.PreParseRails
 import org.tatrman.translator.codec.sql.SqlValidator
 import org.tatrman.translator.codec.sql.ValidateResult
 import org.tatrman.translator.framework.*
@@ -121,7 +122,10 @@ class CalciteQueryLineage : QueryLineage {
         val framework = TranslatorFramework(model, SchemaCode.ER, "entity")
         framework.newPlanner().use { planner ->
             val result =
-                SqlValidator.validateAndConvert(planner, sql.trim().removeSuffix(";")) as? ValidateResult.Success
+                SqlValidator.validateAndConvert(
+                    planner,
+                    PreParseRails.prepare(sql).cleanedSql,
+                ) as? ValidateResult.Success
                     ?: return null
             val rel = result.rel
             val output = linkedMapOf<String, Set<Pair<String, String>>?>()

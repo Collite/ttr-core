@@ -13,9 +13,9 @@ package org.tatrman.translator.codec.sql
  * table name, and re-emitted by the MSSQL unparse
  * ([org.tatrman.translator.dialects.MssqlSqlDialectWithFloatCast.unparseTableScanHints]).
  *
- * The scan is literal-aware: a single left-to-right pass tracking whether it sits inside a
- * single-quoted string literal (doubled `''` stays inside), so `WHERE note = 'use WITH (NOLOCK)'`
- * is never matched.
+ * One left-to-right scan shares literal, quoted-identifier and comment boundaries with the other
+ * pre-parse rails. Quoted names are decoded as whole tokens, comments do not interrupt a table
+ * reference, and `WHERE note = 'use WITH (NOLOCK)'` is never matched.
  *
  * A `WITH` token counts as a table hint **only** when the next non-whitespace character is `(`.
  * The CTE form `WITH cte AS (…)` has an identifier between `WITH` and `(`, so it is never matched —
@@ -51,10 +51,45 @@ object TableHintExtractor {
     fun extract(sql: String): ExtractedHints {
         val out = StringBuilder(sql.length)
         val byTable = linkedMapOf<String, MutableList<TableHintSpec>>()
+        val references = mutableListOf<ReferenceToken>()
+        var continuesReference = false
+
+        fun reference(
+            text: String,
+            quoted: Boolean,
+        ) {
+            if (!quoted && text.lowercase() in CLAUSE_BOUNDARIES) {
+                references.clear()
+                continuesReference = false
+                return
+            }
+            val decoded =
+                if (quoted) {
+                    text.substring(1, text.length - 1).replace("\"\"", "\"")
+                } else {
+                    text.split('.').joinToString(".") { it.trim('`', '[', ']') }
+                }
+            val previous = references.lastOrNull()
+            if (previous != null && (continuesReference || (!quoted && text.startsWith('.')))) {
+                references[references.lastIndex] = ReferenceToken(previous.name + decoded, isAs = false)
+            } else {
+                references += ReferenceToken(decoded, isAs = !quoted && text.equals("AS", ignoreCase = true))
+            }
+            continuesReference = !quoted && text.endsWith('.')
+        }
+
         var i = 0
         while (i < sql.length) {
             val protectedEnd = SqlTextScanner.protectedEnd(sql, i)
             if (protectedEnd > i) {
+                when (sql[i]) {
+                    '"' -> reference(sql.substring(i, protectedEnd), quoted = true)
+                    '\'' -> {
+                        references.clear()
+                        continuesReference = false
+                    }
+                    // Comments are invisible to the table-reference token run.
+                }
                 out.append(sql, i, protectedEnd)
                 i = protectedEnd
                 continue
@@ -63,7 +98,12 @@ object TableHintExtractor {
                 val parenStart = nextNonWs(sql, i + WITH.length)
                 val parenEnd = matchingParen(sql, parenStart)
                 if (parenEnd >= 0) {
-                    val tableKey = tableKeyBefore(sql, i)
+                    val tableKey =
+                        references
+                            .firstOrNull { !it.isAs }
+                            ?.name
+                            ?.substringAfterLast('.')
+                            ?.lowercase()
                     val specs = parseHintBody(sql.substring(parenStart + 1, parenEnd))
                     if (tableKey != null && specs.isNotEmpty()) {
                         byTable.getOrPut(tableKey) { mutableListOf() }.addAll(specs)
@@ -74,11 +114,26 @@ object TableHintExtractor {
                     continue
                 }
             }
-            out.append(sql[i])
-            i++
+            if (isRefChar(sql[i])) {
+                val start = i++
+                while (i < sql.length && isRefChar(sql[i])) i++
+                reference(sql.substring(start, i), quoted = false)
+                out.append(sql, start, i)
+            } else {
+                if (!sql[i].isWhitespace()) {
+                    references.clear()
+                    continuesReference = false
+                }
+                out.append(sql[i++])
+            }
         }
         return ExtractedHints(cleanedSql = out.toString(), byTable = byTable)
     }
+
+    private data class ReferenceToken(
+        val name: String,
+        val isAs: Boolean,
+    )
 
     private const val WITH = "WITH"
 
@@ -111,7 +166,7 @@ object TableHintExtractor {
 
     /**
      * Index of the `)` matching the `(` at [open], honouring nested parens (e.g. `INDEX(0)`) and
-     * string literals inside the hint body. Returns -1 if unbalanced.
+     * protected spans inside the hint body. Returns -1 if unbalanced.
      */
     private fun matchingParen(
         sql: String,
@@ -119,15 +174,16 @@ object TableHintExtractor {
     ): Int {
         if (open >= sql.length || sql[open] != '(') return -1
         var depth = 0
-        var inLit = false
         var j = open
         while (j < sql.length) {
-            val c = sql[j]
-            when {
-                c == '\'' && inLit && j + 1 < sql.length && sql[j + 1] == '\'' -> j++
-                c == '\'' -> inLit = !inLit
-                !inLit && c == '(' -> depth++
-                !inLit && c == ')' -> {
+            val end = SqlTextScanner.protectedEnd(sql, j)
+            if (end > j) {
+                j = end
+                continue
+            }
+            when (sql[j]) {
+                '(' -> depth++
+                ')' -> {
                     depth--
                     if (depth == 0) return j
                 }
@@ -135,41 +191,6 @@ object TableHintExtractor {
             j++
         }
         return -1
-    }
-
-    /**
-     * The table key for a hint whose `WITH` starts at [withStart]: walk backwards over the
-     * whitespace-separated identifier run immediately preceding `WITH` (`table [AS] [alias]`),
-     * stopping at a clause keyword or a `,` / `(` delimiter, and return the *leftmost* identifier
-     * (the table) reduced to its last dotted segment, unquoted and lowercased. Null when no
-     * identifier precedes.
-     *
-     * Quoted identifiers (`"mu"`, `` `mu` ``, `[mu]`) are captured as part of the run and the
-     * surrounding quote chars stripped from the final key, so `FROM "dbo"."mu" WITH (NOLOCK)`
-     * keys on `mu` — matching the unquoted name the encoded scan carries.
-     */
-    private fun tableKeyBefore(
-        sql: String,
-        withStart: Int,
-    ): String? {
-        var j = withStart - 1
-        val idents = mutableListOf<String>()
-        while (j >= 0) {
-            while (j >= 0 && sql[j].isWhitespace()) j--
-            if (j < 0) break
-            val c = sql[j]
-            if (c == ',' || c == '(' || c == ')') break
-            if (!isRefChar(c)) break
-            val end = j + 1
-            while (j >= 0 && isRefChar(sql[j])) j--
-            val token = sql.substring(j + 1, end)
-            if (token.lowercase() in CLAUSE_BOUNDARIES) break
-            idents.add(token)
-            // continue scanning further-left tokens (alias / AS / table)
-        }
-        // `idents` is right-to-left; the table is the leftmost non-`AS` identifier.
-        val table = idents.lastOrNull { !it.equals("AS", ignoreCase = true) } ?: return null
-        return table.substringAfterLast('.').trim('"', '`', '[', ']').lowercase()
     }
 
     /** Parse the comma-separated hint list (the text between the outer parens). */
@@ -185,9 +206,9 @@ object TableHintExtractor {
                         splitTopLevel(item.substring(paren + 1, item.length - 1))
                             .map { it.trim() }
                             .filter { it.isNotEmpty() }
-                    TableHintSpec(name = name, options = options)
+                    TableHintSpec(name = bracketHintIdentifiers(name), options = options.map(::bracketHintIdentifiers))
                 } else {
-                    TableHintSpec(name = item)
+                    TableHintSpec(name = bracketHintIdentifiers(item))
                 }
             }
 
@@ -196,7 +217,15 @@ object TableHintExtractor {
         val parts = mutableListOf<String>()
         val cur = StringBuilder()
         var depth = 0
-        for (c in s) {
+        var i = 0
+        while (i < s.length) {
+            val end = SqlTextScanner.protectedEnd(s, i)
+            if (end > i) {
+                cur.append(s, i, end)
+                i = end
+                continue
+            }
+            val c = s[i++]
             when {
                 c == '(' -> {
                     depth++
@@ -217,10 +246,31 @@ object TableHintExtractor {
         return parts
     }
 
+    /** Hint text is emitted raw by MSSQL; restore its identifier quotes after splitting options. */
+    private fun bracketHintIdentifiers(text: String): String {
+        val out = StringBuilder(text.length)
+        var i = 0
+        while (i < text.length) {
+            val end = SqlTextScanner.protectedEnd(text, i)
+            if (end > i) {
+                if (text[i] == '"') {
+                    val name = text.substring(i + 1, end - 1).replace("\"\"", "\"")
+                    out.append('[').append(name.replace("]", "]]")).append(']')
+                } else {
+                    out.append(text, i, end)
+                }
+                i = end
+            } else {
+                out.append(text[i++])
+            }
+        }
+        return out.toString()
+    }
+
     private fun isIdentChar(c: Char): Boolean = c.isLetterOrDigit() || c == '_' || c == '.'
 
-    /** [isIdentChar] plus the identifier-quote chars, so a quoted table name scans as one run. */
-    private fun isRefChar(c: Char): Boolean = isIdentChar(c) || c == '"' || c == '`' || c == '[' || c == ']'
+    /** Bare reference characters; double-quoted names are tokens from the shared scanner. */
+    private fun isRefChar(c: Char): Boolean = isIdentChar(c) || c == '`' || c == '[' || c == ']'
 }
 
 /** Result of [TableHintExtractor.extract]. */

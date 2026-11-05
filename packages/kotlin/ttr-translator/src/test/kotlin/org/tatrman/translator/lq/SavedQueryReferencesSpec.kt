@@ -77,4 +77,14 @@ class SavedQueryReferencesSpec :
                         .build(),
                 )
         }
+
+        for (sql in listOf(
+            "SELECT [a] FROM obj.query.revenue",
+            "SELECT a FROM [obj].[query].[revenue]",
+            "SELECT TOP 5 [a] FROM [obj].[query].[revenue] WITH (NOLOCK) WHERE a = {name};;",
+        )) {
+            "bracket SQL retains saved-query dependencies: $sql" {
+                refs(sql) shouldBe listOf("query.revenue")
+            }
+        }
     })

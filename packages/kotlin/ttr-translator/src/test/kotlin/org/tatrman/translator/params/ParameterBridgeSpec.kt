@@ -215,4 +215,11 @@ class ParameterBridgeSpec :
                 )
             r.sql shouldBe "SELECT id FROM customers WHERE blob = CAST(? AS VARCHAR)"
         }
+
+        "slash comments and carriage-return line endings share the SQL scanner rules" {
+            val sql = "// it's {ignored}\rSELECT {id} -- {ignored}\rWHERE id = {id}"
+            val result = ParameterBridge.prepareSqlForCalcite(sql, listOf(SqlParam("id", "int", 1)))
+            result.sql shouldBe "// it's {ignored}\rSELECT ? -- {ignored}\rWHERE id = ?"
+            result.parameterOrder shouldBe listOf("id", "id")
+        }
     })

@@ -55,4 +55,16 @@ class BracketQuoteRewriterSpec :
             val once = BracketQuoteRewriter.rewrite(source)
             BracketQuoteRewriter.rewrite(once) shouldBe once
         }
+
+        for (source in listOf("[a][b]", "[a]\"b\"", "\"a\"[b]")) {
+            "separates adjacent identifiers on both sides: $source" {
+                val once = BracketQuoteRewriter.rewrite(source)
+                once shouldBe "\"a\" \"b\""
+                BracketQuoteRewriter.rewrite(once) shouldBe once
+            }
+        }
+
+        "a bracket after a bare column is a T-SQL alias rather than array indexing" {
+            BracketQuoteRewriter.rewrite("a[1]") shouldBe "a\"1\""
+        }
     })

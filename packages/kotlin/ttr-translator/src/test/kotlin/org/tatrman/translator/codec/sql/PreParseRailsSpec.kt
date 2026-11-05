@@ -41,6 +41,10 @@ class PreParseRailsSpec :
                 "SELECT TOP 5 [x] FROM [dbo].[t] WITH (NOLOCK);",
                 "SELECT TOP 5 [x] FROM [dbo].[t] WITH (NOLOCK) WHERE [x] > 0;",
                 "SELECT [TOP], [a]]b], [a\"b] FROM [t]",
+                "SELECT [a][b] FROM [t]",
+                "SELECT 1;;",
+                "SELECT 1 ; ;",
+                "SELECT a FROM t; WITH (NOLOCK)",
             )
         for ((index, source) in sources.withIndex()) {
             "preparation is idempotent and hints are consumed only once $index" {
@@ -49,5 +53,47 @@ class PreParseRailsSpec :
                 second.cleanedSql shouldBe first.cleanedSql
                 second.hintsByTable shouldBe emptyMap()
             }
+        }
+
+        val hintKeys =
+            listOf(
+                "[order details]" to "order details",
+                "[order details] d WITH (NOLOCK) JOIN [order] o ON d.a = o.a" to "order details",
+                "[XX-PRODEJE]" to "xx-prodeje",
+                "[q\"t]" to "q\"t",
+                "[x]]]" to "x]",
+                "[a.b]" to "b",
+                "[a b] AS [c d]" to "a b",
+                "t AS [a from b]" to "t",
+                "[t] /* c */" to "t",
+                "t -- c\n" to "t",
+                "[dbo] . [t]" to "t",
+                "[from] AS [AS]" to "from",
+            )
+        for ((index, pair) in hintKeys.withIndex()) {
+            "hint keys retain decoded table names across aliases and comments $index" {
+                val (reference, key) = pair
+                val sql =
+                    if (reference.contains(
+                            "WITH",
+                        )
+                    ) {
+                        "SELECT a FROM $reference"
+                    } else {
+                        "SELECT a FROM $reference WITH (NOLOCK)"
+                    }
+                PreParseRails.prepare(sql).hintsByTable shouldBe mapOf(key to listOf(TableHintSpec("NOLOCK")))
+            }
+        }
+
+        "quoted hint arguments preserve punctuation and literals after splitting" {
+            PreParseRails.prepare("SELECT a FROM t WITH (INDEX([I,X], [I)X], 'a,b', 'q\"t'))").hintsByTable shouldBe
+                mapOf("t" to listOf(TableHintSpec("INDEX", listOf("[I,X]", "[I)X]", "'a,b'", "'q\"t'"))))
+        }
+
+        "a hint without a table token is removed without attaching it elsewhere" {
+            val result = PreParseRails.prepare("SELECT 'literal' WITH (NOLOCK)")
+            result.cleanedSql shouldBe "SELECT 'literal'"
+            result.hintsByTable shouldBe emptyMap()
         }
     })
