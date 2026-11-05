@@ -29,59 +29,9 @@ class N8nReviewRegressionSpec :
                         .decodeToString(),
                 ).jsonObject
 
-        fun process(
-            until: List<String> = listOf("fulfilled", "due", "absent"),
-            batch: Boolean = false,
-        ): RecipeGraph {
-            val a =
-                bare().let {
-                    if (batch) {
-                        it.copy(
-                            program = it.program.copy(mode = "batch", port = "none", schedule = "06:00 Europe/Prague"),
-                        )
-                    } else {
-                        it
-                    }
-                }
-            val b = a.copy(recipe = a.recipe.copy(name = "second"), program = a.program.copy(name = "second"))
-            return a.copy(
-                process =
-                    ProcessMeta(
-                        "flow",
-                        "order_number",
-                        listOf(
-                            StepMeta("first", a.program.name, a.program.port, emptyList(), null, emptyList(), a),
-                            StepMeta(
-                                "second",
-                                b.program.name,
-                                b.program.port,
-                                if (batch) emptyList() else listOf("inbound"),
-                                null,
-                                until,
-                                b,
-                            ),
-                        ),
-                    ),
-            )
-        }
-
-        fun mailGraph(
-            address: Boolean = true,
-            digest: Boolean = false,
-        ): RecipeGraph {
+        fun mailGraph(address: Boolean = true): RecipeGraph {
             val b = bare()
             return b.copy(
-                program =
-                    if (digest) {
-                        b.program.copy(
-                            mode = "batch",
-                            port = "none",
-                            schedule = "06:00 Europe/Prague",
-                            deliver = "digest",
-                        )
-                    } else {
-                        b.program
-                    },
                 routes = listOf(RouteMeta("mail", null, emptyList(), false, false, false)),
                 wirings =
                     listOf(
@@ -115,19 +65,6 @@ class N8nReviewRegressionSpec :
                             ),
                     ),
             )
-        }
-        "R1 missing obligations fails; an explicit empty array skips only the absent branch" {
-            WorkflowFixture().use { f ->
-                val result = f.run(workflow(process()))
-                result["error"]!!.jsonPrimitive.content shouldContain "run status has no obligations field"
-                f.calls.count { it.path.endsWith("/second/runs") } shouldBe 0
-            }
-            WorkflowFixture().use { f ->
-                f.obligations = JsonArray(emptyList())
-                val result = f.run(workflow(process()))
-                result["error"] shouldBe null
-                f.calls.count { it.path.endsWith("/second/runs") } shouldBe 0
-            }
         }
         "R2 customer mail is grouped by row address; empty addresses name the key; invalid wiring refuses export" {
             WorkflowFixture().use { f ->
@@ -234,166 +171,23 @@ class N8nReviewRegressionSpec :
                 f.calls.count { it.path.endsWith("/runs") } shouldBe 2
             }
         }
-        "R4a later Open clocks survive a lost response with only one claim" {
+        "R4bc externally triggered batch omits at and uses its execution caller key" {
             WorkflowFixture().use { f ->
-                f.obligations =
-                    JsonArray(
-                        listOf(
-                            buildJsonObject {
-                                put("kind", "inbound")
-                                put("state", "fulfilled")
-                            },
-                        ),
-                    )
-                var attempt = 0
-                val claims = mutableSetOf<JsonObject>()
-                f.override = { c ->
-                    when {
-                        c.path.endsWith("/second/runs") -> {
-                            val fresh = claims.add(c.body!!)
-                            if (++attempt == 1) {
-                                Thread.sleep(10)
-                                Reply(0, "")
-                            } else {
-                                Reply(if (fresh)201 else 202, """{"runId":"step","status":"open"}""")
-                            }
-                        }
-                        c.path == "/automation/runs/step" -> Reply(200, """{"status":"closed"}""")
-                        else -> null
-                    }
-                }
-                val result = f.run(workflow(process()))
-                result["error"] shouldBe null
-                val bodies = f.calls.filter { it.path.endsWith("/second/runs") }.map { it.body }
-                bodies.size shouldBe 2
-                bodies.distinct().size shouldBe 1
-                claims.size shouldBe 1
-                bodies
-                    .first()!!
-                    .getValue("port")
-                    .jsonObject
-                    .containsKey("at") shouldBe true
-            }
-        }
-        "R4bc none steps omit at and batch step keys differ" {
-            WorkflowFixture().use { f ->
-                f.run(workflow(process(batch = true)))["error"] shouldBe null
+                val g = bare().let { it.copy(program = it.program.copy(mode = "batch", port = "none")) }
+                f.run(workflow(g))["error"] shouldBe null
                 val opens = f.calls.filter { it.path.endsWith("/runs") }.map { it.body!! }
                 opens.map { it.getValue("port").jsonObject.keys }.toSet() shouldBe setOf(setOf("none"))
-                opens.map { it.getValue("idempotencyKey") }.distinct().size shouldBe 2
-                opens.map { it.getValue("idempotencyKey").jsonPrimitive.content } shouldBe listOf("review", "r1:second")
+                opens
+                    .single()
+                    .getValue("idempotencyKey")
+                    .jsonPrimitive.content shouldBe "review"
             }
-            workflow(process())
+            workflow(bare())
                 .getValue("nodes")
                 .jsonArray
                 .filter {
-                    it.jsonObject["type"] ==
-                        JsonPrimitive("n8n-nodes-base.httpRequest")
+                    it.jsonObject["type"] == JsonPrimitive("n8n-nodes-base.httpRequest")
                 }.forEach { it.toString().contains("new Date()") shouldBe false }
-        }
-        "N1 redelivered processes claim each step once across executions and keep distinct instances separate" {
-            WorkflowFixture().use { f ->
-                f.obligations = Json.parseToJsonElement("""[{"kind":"inbound","state":"fulfilled"}]""").jsonArray
-                val claims = mutableMapOf<String, String>()
-                f.override = { c ->
-                    if (c.path.endsWith("/runs")) {
-                        val body = c.body!!
-                        val key = body["idempotencyKey"]?.jsonPrimitive?.content ?: body.toString()
-                        val replayed = key in claims
-                        val id = claims.getOrPut(key) { "instance-run-${claims.size + 1}" }
-                        Reply(if (replayed) 200 else 201, """{"runId":"$id","status":"closed","replayed":$replayed}""")
-                    } else {
-                        null
-                    }
-                }
-                val graph = process()
-                val meta = graph.process!!
-                val last = meta.steps.last()
-                val third =
-                    last.graph!!.let {
-                        it.copy(recipe = it.recipe.copy(name = "third"), program = it.program.copy(name = "third"))
-                    }
-                val rendered =
-                    workflow(
-                        graph.copy(
-                            process =
-                                meta.copy(
-                                    steps =
-                                        meta.steps + last.copy(name = "third", program = "third", graph = third),
-                                ),
-                        ),
-                    )
-                f.run(rendered, executionId = "original")["error"] shouldBe null
-                val firstCalls = f.calls.size
-                Thread.sleep(10) // A redelivery's later-step clock differs from the original execution's.
-                f.run(rendered, executionId = "redelivery")["error"] shouldBe null
-                claims.size shouldBe 3
-                val duplicateCalls = f.calls.drop(firstCalls)
-                duplicateCalls.count { it.path.endsWith("/runs") } shouldBe 3
-                duplicateCalls.any {
-                    it.path.endsWith(
-                        "/evaluate",
-                    ) ||
-                        "/parts/" in it.path ||
-                        it.path.endsWith("/close")
-                } shouldBe
-                    false
-                val laterOpens = f.calls.filter { it.path.endsWith("/second/runs") || it.path.endsWith("/third/runs") }
-                laterOpens
-                    .map {
-                        it.body!!
-                            .getValue("idempotencyKey")
-                            .jsonPrimitive.content
-                    }.toSet() shouldBe
-                    setOf("instance-run-1:second", "instance-run-1:third")
-                f.run(
-                    rendered,
-                    buildJsonObject {
-                        put("key", 2)
-                        put("at", "2026-10-31T12:00:00Z")
-                    },
-                    executionId = "distinct",
-                )["error"] shouldBe
-                    null
-                claims.size shouldBe 6
-            }
-        }
-        "N1 later steps anchor on the first handle or its recovered run id" {
-            for (state in listOf("closed", "abandoned")) {
-                WorkflowFixture().use { f ->
-                    f.obligations = Json.parseToJsonElement("""[{"kind":"inbound","state":"fulfilled"}]""").jsonArray
-                    var firstOpens = 0
-                    f.override = { c ->
-                        when {
-                            c.path.endsWith("/release_order/runs") -> {
-                                if (++firstOpens == 1) {
-                                    Reply(202, """{"runId":"original-handle","status":"running"}""")
-                                } else {
-                                    Reply(201, """{"runId":"recovered","status":"open"}""")
-                                }
-                            }
-                            c.path == "/automation/runs/original-handle" ->
-                                Reply(
-                                    200,
-                                    """{"status":"$state","obligations":[{"kind":"inbound","state":"fulfilled"}]}""",
-                                )
-                            else -> null
-                        }
-                    }
-                    f.run(workflow(process()))["error"] shouldBe null
-                    firstOpens shouldBe if (state == "abandoned") 2 else 1
-                    val key =
-                        f.calls
-                            .single {
-                                it.path.endsWith(
-                                    "/second/runs",
-                                )
-                            }.body!!
-                            .getValue("idempotencyKey")
-                            .jsonPrimitive.content
-                    key shouldBe if (state == "abandoned") "recovered:second" else "original-handle:second"
-                }
-            }
         }
         "R5 the event body excludes the port clock and identical timed redeliveries claim once" {
             WorkflowFixture().use { f ->
@@ -419,38 +213,12 @@ class N8nReviewRegressionSpec :
                 port["at"] shouldBe input["at"]
             }
         }
-        "R6 actual Hartland daily, weekly, monthly and interval hints have explicit cron and timezone; others refuse" {
-            mapOf(
-                "06:00 Europe/Prague" to "0 0 6 * * *",
-                "Mon 05:30 Europe/Prague" to "0 30 5 * * 1",
-                "1st 08:00 Europe/Prague" to "0 0 8 1 * *",
-                "*/60" to "0 0 * * * *",
-            ).forEach { (hint, cron) ->
-                val w =
-                    workflow(bare().copy(program = bare().program.copy(mode = "batch", port = "none", schedule = hint)))
-                w
-                    .getValue("nodes")
-                    .jsonArray
-                    .first()
-                    .toString() shouldContain cron
-                w.getValue("settings").jsonObject["timezone"] shouldBe
-                    JsonPrimitive(if (hint == "*/60") "UTC" else "Europe/Prague")
-            }
-            workflow(
-                bare().copy(program = bare().program.copy(mode = "batch", port = "none", schedule = "*/7")),
-            ).getValue("nodes").jsonArray.first().jsonObject.getValue("parameters").toString() shouldContain
-                "minutesInterval"
-            shouldThrow<IllegalStateException> {
-                workflow(bare().copy(program = bare().program.copy(mode = "batch", schedule = "every tuesday")))
-            }.message!! shouldContain
-                "every tuesday"
-        }
         "R7 a renamed task approval waits again after the first of two callbacks and closes after both" {
             WorkflowFixture().use { f ->
                 val g =
                     n8nGraph().let { b ->
                         b.copy(
-                            program = b.program.copy(mode = "batch", port = "none", schedule = "06:00 Europe/Prague"),
+                            program = b.program.copy(mode = "batch", port = "none"),
                             routes = b.routes.filter { it.name == "release_confirmed" },
                             wirings =
                                 listOf(
@@ -527,39 +295,6 @@ class N8nReviewRegressionSpec :
                 wait["resumeAmount"] shouldBe JsonPrimitive(172800)
             }
         }
-        "R8 until fulfilled never advances on an expired dueAt; until due advances and waits use a one-hour backstop" {
-            for (until in listOf("fulfilled", "due")) {
-                WorkflowFixture().use { f ->
-                    f.obligations =
-                        JsonArray(
-                            listOf(
-                                buildJsonObject {
-                                    put("kind", "inbound")
-                                    put("state", "open")
-                                    put("dueAt", "2000-01-01T00:00:00Z")
-                                },
-                            ),
-                        )
-                    val result = f.run(workflow(process(listOf(until))), maxWaits = 2)
-                    if (until == "fulfilled") {
-                        result["error"] shouldBe JsonPrimitive("test wait boundary")
-                        f.calls.none { it.path.endsWith("/second/runs") } shouldBe true
-                        result
-                            .getValue(
-                                "waits",
-                            ).jsonArray
-                            .first()
-                            .jsonObject
-                            .getValue("parameters")
-                            .jsonObject["resumeAmount"] shouldBe
-                            JsonPrimitive(3600)
-                    } else {
-                        result["error"] shouldBe null
-                        f.calls.any { it.path.endsWith("/second/runs") } shouldBe true
-                    }
-                }
-            }
-        }
         "R11 and R12 missing dryRun never sends mail, deployment dryRun also guards it, and missing actions refuses" {
             for (dry in listOf<JsonElement?>(null, JsonPrimitive(false))) {
                 WorkflowFixture().use { f ->
@@ -622,7 +357,6 @@ class N8nReviewRegressionSpec :
                         g.program.copy(
                             mode = "batch",
                             port = "none",
-                            schedule = "*/60",
                             budget =
                                 mapOf(
                                     "batch" to "2 hours",
@@ -643,35 +377,12 @@ class N8nReviewRegressionSpec :
                 f.calls.count { it.path.endsWith("/close") } shouldBe 1
             }
         }
-        "R15 missing role address refuses and digest delivery uses the same row addressing" {
+        "R15 missing role address refuses" {
             WorkflowFixture().use { f ->
                 f.routes = mapOf("mail" to listOf(row(1)))
                 f.actions = JsonArray(listOf(actionPreview(1, "notify")))
                 f.run(workflow(mailGraph(address = false)))["error"]!!.jsonPrimitive.content shouldContain
                     "no address for role role.sales"
-            }
-            WorkflowFixture().use { f ->
-                f.routes = mapOf("mail" to listOf(row(1, "a@example.test"), row(2, "b@example.test")))
-                f.actions = JsonArray(listOf(actionPreview(1, "notify"), actionPreview(2, "notify")))
-                f.override =
-                    { c ->
-                        if (c.path.endsWith(
-                                "/digests",
-                            )
-                        ) {
-                            Reply(200, """{"groups":[{"by":{},"rows":"ref","period":"day"}]}""")
-                        } else {
-                            null
-                        }
-                    }
-                val result = f.run(workflow(mailGraph(digest = true)))
-                result["error"] shouldBe null
-                result
-                    .getValue("mails")
-                    .jsonArray
-                    .map { it.jsonObject["recipient"] }
-                    .toSet() shouldBe
-                    setOf(JsonPrimitive("a@example.test"), JsonPrimitive("b@example.test"))
             }
         }
         "R17 context and route names cannot collide with control names; manifest pins match node factory" {
@@ -705,21 +416,8 @@ class N8nReviewRegressionSpec :
                     program = first.program.copy(name = "follow_up"),
                     recipe = first.recipe.copy(name = "follow_up"),
                 )
-            val process =
-                first.copy(
-                    process =
-                        ProcessMeta(
-                            "mail_flow",
-                            null,
-                            listOf(
-                                StepMeta("first", first.program.name, "key", emptyList(), null, emptyList(), first),
-                                StepMeta("second", second.program.name, "key", emptyList(), null, emptyList(), second),
-                            ),
-                        ),
-                )
-            workflow(process)
-                .getValue("nodes")
-                .jsonArray
+            listOf(first, second)
+                .flatMap { workflow(it).getValue("nodes").jsonArray }
                 .filter {
                     it.jsonObject["type"] ==
                         JsonPrimitive("n8n-nodes-base.emailSend")

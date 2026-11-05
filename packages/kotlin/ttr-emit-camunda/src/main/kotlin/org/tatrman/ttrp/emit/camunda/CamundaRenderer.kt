@@ -10,7 +10,7 @@ internal class CamundaRenderer(
     private val d: Dialect,
 ) {
     private val root = request.graph
-    private val model = BpmnModel(root.process?.name ?: root.program.name, d)
+    private val model = BpmnModel(root.program.name, d)
     private var scheduleZone: String? = null
 
     private fun expr(
@@ -188,9 +188,7 @@ internal class CamundaRenderer(
     ): BpmnModel.Node {
         require(graph.deployment.granularity in setOf("recipe", "parts")) { "unsupported Camunda granularity" }
         require(graph.program.mode in setOf("on_event", "batch")) { "unsupported Camunda mode" }
-        require(graph.program.deliver?.contains("digest") != true) {
-            "camunda exports do not render digest delivery; use n8n_l1 or deliver: immediate"
-        }
+
         val scope = BpmnModel.Scope(stableId("${model.processId}/step/$name"))
         val sub =
             model.root.node(
@@ -603,6 +601,18 @@ internal class CamundaRenderer(
                         task.extensions +=
                             d.mapping(mapOf("ttrAction" to quote(wiring.action), "ttrKey" to rowKey(graph)))
                         if (d == Dialect.C8) task.extensions += Xml("zeebe:userTask")
+                        action.by?.let { role ->
+                            val group =
+                                requireNotNull(action.candidateGroup?.takeIf { it.isNotBlank() }) {
+                                    "TTRP-EXPORT-ROLE: action ${wiring.action}: $role has no Keycloak group"
+                                }
+                            if (d == Dialect.C7) {
+                                task.attrs["camunda:candidateGroups"] = group
+                            } else {
+                                task.extensions +=
+                                    Xml("zeebe:assignmentDefinition", mapOf("candidateGroups" to "=[${quote(group)}]"))
+                            }
+                        }
                         rowScope.link(
                             gate,
                             task,
@@ -759,205 +769,6 @@ internal class CamundaRenderer(
         return expr("ttrStatus.jsonPath(${d.concat(*queryParts.toTypedArray())}).elementList().size() > 0", feel)
     }
 
-    private fun waitBefore(
-        graph: RecipeGraph,
-        step: StepMeta,
-        previous: BpmnModel.Node,
-        next: BpmnModel.Node,
-        join: BpmnModel.Node,
-        failure: BpmnModel.Node,
-        outdated: BpmnModel.Node,
-    ) {
-        val scope = model.root
-        if (step.obligations.isEmpty()) {
-            val duration = step.time?.let { duration(it) }
-            if (duration == null) {
-                scope.link(previous, next)
-            } else {
-                val pause = timer(scope, "${step.name} time wait", duration)
-                scope.link(previous, pause)
-                scope.link(pause, next)
-            }
-            return
-        }
-        val status =
-            http(
-                scope,
-                graph,
-                "${step.name} previous obligations",
-                "status",
-                "ttrObligations",
-                run = "ttrPreviousRunId",
-            )
-        val failedStatus =
-            boundary(
-                scope,
-                status,
-                "${step.name} invalid obligation evidence",
-                Xml(
-                    "bpmn:errorEventDefinition",
-                    mapOf(
-                        "errorRef" to "run_refused",
-                    ),
-                ),
-            )
-        val staleStatus =
-            boundary(
-                scope,
-                status,
-                "${step.name} stale obligation status",
-                Xml(
-                    "bpmn:errorEventDefinition",
-                    mapOf(
-                        "errorRef" to "stale_export",
-                    ),
-                ),
-            )
-        scope.link(failedStatus, failure)
-        scope.link(staleStatus, outdated)
-        if (d == Dialect.C7) {
-            val script =
-                """
-                def body = execution.getVariable('ttrObligations')
-                if (!body.hasProp('obligations') || !body.prop('obligations').isArray()) {
-                    throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_REFUSED', 'run status has no obligations array')
-                }
-                def kinds = [${step.obligations.joinToString(",") { quote(it) }}]
-                def relevant = body.prop('obligations').elements().findAll { kinds.contains(it.prop('kind').stringValue()) }
-                def now = java.time.Instant.now()
-                def ready = relevant.every { o ->
-                    def state = o.prop('state').stringValue()
-                    (${"fulfilled" in step.until} && state == 'fulfilled') ||
-                    (${"due" in step.until} && (state == 'due' || (o.hasProp('dueAt') && !o.prop('dueAt').isNull() && !java.time.OffsetDateTime.parse(o.prop('dueAt').stringValue()).toInstant().isAfter(now))))
-                }
-                def future = relevant.findAll { it.hasProp('dueAt') && !it.prop('dueAt').isNull() }.collect {
-                    java.time.Duration.between(now, java.time.OffsetDateTime.parse(it.prop('dueAt').stringValue()).toInstant()).seconds
-                }.findAll { it > 0 }
-                execution.setVariable('ttrObligationReady', ready)
-                execution.setVariable('ttrObligationDelay', 'PT' + Math.max(1L, Math.min(3600L, future ? future.min() : 3600L)) + 'S')
-                """.trimIndent()
-            status.extensions +=
-                Xml(
-                    "camunda:executionListener",
-                    mapOf("event" to "end"),
-                    listOf(
-                        Xml(
-                            "camunda:script",
-                            mapOf(
-                                "scriptFormat" to "groovy",
-                            ),
-                            text = script,
-                        ),
-                    ),
-                )
-        }
-        scope.link(previous, status)
-        val present = scope.node("exclusiveGateway", "${step.name} obligation absent")
-        scope.link(status, present)
-        val kinds = step.obligations.joinToString(",") { quote(it) }
-        val relevant =
-            expr(
-                "ttrObligations.jsonPath(${quote("$.obligations[?(@.kind in [$kinds])]")}).elementList()",
-                "ttrObligations.obligations[list contains([$kinds],kind)]",
-            )
-        val hasArray =
-            expr(
-                "ttrObligations.hasProp('obligations') && ttrObligations.prop('obligations').isArray()",
-                "ttrObligations.obligations instance of list",
-            )
-        val checked = scope.node("exclusiveGateway", "${step.name} obligations ready")
-        scope.link(present, checked, "obligations array", hasArray)
-        scope.default(present, failure)
-        val any = expr("$relevant.size() > 0", "count($relevant) > 0")
-        if ("absent" in
-            step.until
-        ) {
-            scope.link(checked, join, "absent", expr("$relevant.isEmpty()", "count($relevant) = 0"))
-        }
-        val readyC8 = mutableListOf<String>()
-        if ("fulfilled" in step.until) readyC8 += "o.state = \"fulfilled\""
-        if ("due" in step.until) readyC8 += "o.state = \"due\" or (o.dueAt != null and date and time(o.dueAt) <= now())"
-        val readiness =
-            expr(
-                "ttrObligationReady",
-                "every o in $relevant satisfies (${readyC8.joinToString(" or ").ifEmpty { "false" }})",
-            )
-        scope.link(checked, next, "ready", d.and(any, readiness))
-        val waiting = BpmnModel.Scope(stableId("${scope.id}/${step.name}/wait"))
-        val sub = scope.node("subProcess", "${step.name} obligation wait", child = waiting)
-        scope.default(checked, sub)
-        val ws = waiting.node("startEvent", "wait start")
-        val wg = waiting.node("eventBasedGateway", "obligation messages")
-        val we = waiting.node("endEvent", "obligation changed")
-        waiting.link(ws, wg)
-        step.obligations.forEach { kind ->
-            step.until.filter { it in setOf("fulfilled", "due") }.forEach { state ->
-                val message = "obligation.$kind.$state"
-                val id = stableId("message/$message")
-                model.messages[id] =
-                    Xml(
-                        "bpmn:message",
-                        mapOf("id" to id, "name" to message),
-                        if (d ==
-                            Dialect.C8
-                        ) {
-                            listOf(
-                                Xml(
-                                    "bpmn:extensionElements",
-                                    children =
-                                        listOf(
-                                            Xml(
-                                                "zeebe:subscription",
-                                                mapOf(
-                                                    "correlationKey" to "=ttrPreviousRunId",
-                                                ),
-                                            ),
-                                        ),
-                                ),
-                            )
-                        } else {
-                            emptyList()
-                        },
-                    )
-                val catch = waiting.node("intermediateCatchEvent", message)
-                catch.tail += Xml("bpmn:messageEventDefinition", mapOf("messageRef" to id))
-                waiting.link(wg, catch)
-                waiting.link(catch, we)
-            }
-        }
-        val delay =
-            d.condition(
-                expr(
-                    "ttrObligationDelay",
-                    "{future:(for o in $relevant[dueAt != null] return date and time(o.dueAt))[item > now()], nearest:min(append(future,now()+duration(\"PT1H\"))), delay:max([duration(\"PT1S\"),nearest-now()])}.delay",
-                ),
-            )
-        val backstop = timer(waiting, "obligation nearest due or hourly backstop", delay)
-        waiting.link(wg, backstop)
-        waiting.link(backstop, we)
-        scope.link(sub, status)
-        if ("due" in step.until) {
-            val due =
-                boundary(
-                    scope,
-                    sub,
-                    "${step.name} due recheck",
-                    Xml("bpmn:timerEventDefinition", children = listOf(Xml("bpmn:timeDuration", text = delay))),
-                )
-            scope.link(due, status)
-        }
-    }
-
-    private fun duration(raw: String): String {
-        val m =
-            Regex("([0-9.]+)\\s+(seconds|minutes|hours|days)").matchEntire(raw)
-                ?: error("unsupported process wait $raw")
-        val seconds =
-            m.groupValues[1].toDouble() *
-                mapOf("seconds" to 1, "minutes" to 60, "hours" to 3600, "days" to 86400).getValue(m.groupValues[2])
-        return "PT${kotlin.math.ceil(seconds).toLong()}S"
-    }
-
     fun render(): String {
         require(
             root.deployment.type ==
@@ -969,54 +780,9 @@ internal class CamundaRenderer(
                     "camunda_8"
                 },
         ) { "Camunda target/dialect mismatch" }
-        val steps =
-            root.process?.steps
-                ?: listOf(
-                    StepMeta(
-                        root.program.name,
-                        root.program.name,
-                        root.program.port,
-                        emptyList(),
-                        null,
-                        emptyList(),
-                        root,
-                    ),
-                )
-        require(steps.isNotEmpty()) { "empty process" }
         val scope = model.root
-        var last =
-            scope.node(
-                "startEvent",
-                if (steps
-                        .first()
-                        .graph!!
-                        .program.mode ==
-                    "batch"
-                ) {
-                    "scheduled start"
-                } else {
-                    "start with ttrInput key"
-                },
-            )
-        if (steps
-                .first()
-                .graph!!
-                .program.mode == "batch"
-        ) {
-            val schedule =
-                CamundaSchedule.parse(
-                    requireNotNull(
-                        steps
-                            .first()
-                            .graph!!
-                            .program.schedule,
-                    ),
-                    d,
-                )
-            scheduleZone = schedule.zone
-            last.tail +=
-                Xml("bpmn:timerEventDefinition", children = listOf(Xml("bpmn:timeCycle", text = schedule.cycle)))
-        }
+        val start = scope.node("startEvent", "start with ttrInput key")
+        if (d == Dialect.C7) start.attrs["camunda:asyncAfter"] = "true"
         val terminate =
             scope.node("endEvent", "stopped for repair").also {
                 it.tail +=
@@ -1024,64 +790,51 @@ internal class CamundaRenderer(
             }
         val outdated = scope.node("userTask", "export outdated")
         val refused = scope.node("userTask", "run refused; inspect evidence")
-        if (d ==
-            Dialect.C8
-        ) {
+        if (d == Dialect.C8) {
             outdated.extensions += Xml("zeebe:userTask")
             refused.extensions += Xml("zeebe:userTask")
         }
         scope.link(outdated, terminate)
         scope.link(refused, terminate)
-        steps.forEachIndexed { index, step ->
-            val graph = requireNotNull(step.graph) { "missing graph for ${step.name}" }
-            require(graph.process == null || root.process == null) { "recursive process" }
-            require(
-                graph.deployment == root.deployment &&
-                    graph.program.name == step.program &&
-                    (step.port ?: graph.program.port) == graph.program.port,
-            ) { "invalid process step ${step.name}" }
-            val sub = step(graph, step.name, index == 0)
-            val done = scope.node("exclusiveGateway", "${step.name} step complete")
-            if (index == 0) scope.link(last, sub) else waitBefore(graph, step, last, sub, done, refused, outdated)
-            scope.link(sub, done)
-            val stale =
-                boundary(
-                    scope,
-                    sub,
-                    "${step.name} stale export",
-                    Xml(
-                        "bpmn:errorEventDefinition",
-                        mapOf(
-                            "errorRef" to "stale_export",
-                        ),
+        val sub = step(root, root.program.name, true)
+        scope.link(start, sub)
+        val done = scope.node("exclusiveGateway", "${root.program.name} step complete")
+        scope.link(sub, done)
+        val stale =
+            boundary(
+                scope,
+                sub,
+                "${root.program.name} stale export",
+                Xml(
+                    "bpmn:errorEventDefinition",
+                    mapOf(
+                        "errorRef" to "stale_export",
                     ),
-                )
-            val fail =
-                boundary(
-                    scope,
-                    sub,
-                    "${step.name} run refused",
-                    Xml(
-                        "bpmn:errorEventDefinition",
-                        mapOf(
-                            "errorRef" to "run_refused",
-                        ),
+                ),
+            )
+        val fail =
+            boundary(
+                scope,
+                sub,
+                "${root.program.name} run refused",
+                Xml(
+                    "bpmn:errorEventDefinition",
+                    mapOf(
+                        "errorRef" to "run_refused",
                     ),
-                )
-            scope.link(stale, outdated)
-            scope.link(fail, refused)
-            last = done
-        }
-        scope.link(last, scope.node("endEvent", "complete"))
+                ),
+            )
+        scope.link(stale, outdated)
+        scope.link(fail, refused)
+        scope.link(done, scope.node("endEvent", "complete"))
         val contract =
             buildJsonObject {
                 put("schemaVersion", 1)
                 put("target", root.deployment.type)
                 put("deployment", root.deployment.name)
-                put("recipes", JsonArray(steps.map { JsonPrimitive(it.graph!!.recipe.name) }))
+                put("recipes", JsonArray(listOf(JsonPrimitive(root.recipe.name))))
                 put("calls", JsonArray(model.calls))
                 put("routes", JsonArray(model.routes))
-                scheduleZone?.let { put("scheduleTimezone", it) }
             }
         return model.render(contract)
     }
@@ -1099,22 +852,23 @@ internal class CamundaRenderer(
         [FEEL timezone conversion](https://unsupported.docs.camunda.io/8.5/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-conversion/)
         are available there (timezone conversion is already documented in 8.5).
 
-        C7 requires Camunda Connect's HTTP connector, Spin JSON and Groovy for Retry-After normalization and process
-        obligation readiness. Configure TTR_CONN_AUTOMATION
+        C7 requires Camunda Connect's HTTP connector, Spin JSON and Groovy for Retry-After normalization. Configure TTR_CONN_AUTOMATION
         with url (origin, no trailing slash) and token. C8 uses the standard REST outbound connector
         io.camunda:http-json:1; supply TTR_AUTOMATION_URL and connector secret TTR_CONN_AUTOMATION.
-        Credentials are referenced by name and never embedded. C7 cron timers use the engine JVM timezone:
-        ${scheduleZone ?: "UTC (no batch timer)"}. C8 calendar timers use zoned ISO repeating intervals.
+        Credentials are referenced by name and never embedded. Start this one-program BPMN externally;
+        configure scheduling and composition in the engine modeller.
+        ${root.deployment.startableBy?.let {
+            "startable_by: ${it.joinToString()}. Grant START_INSTANCE authorization to these roles in the engine; this file does not provision permissions."
+        } ?: "No startable_by restriction is declared; configure START_INSTANCE authorization in the engine."}
 
         Start with ttrInput={key:..., at:"offset ISO instant"}, keys, or event. Event payload is nested under event;
         at is separate. On C7, ttrInput is a Java Map, including nested maps/lists for events or keys; a REST
         Object variable must deserialize to a Map, rather than a Spin Json variable. This input contract is
         expression-tested; no REST start on a live C7 engine is certified here. On-event deduplication requires a
-        stable at; absent at is a new run. First batch steps use
-        the engine execution id (C8 saves ttrExecutionId, generating one if absent). Every later step uses
-        ttrAnchor + ':<step>', anchored on the first run id, including its recovered re-open id. A duplicate may
-        claim a later step before the original; the original follows its 202 handle without repeating effects.
-        Clocks and Open bodies are saved after process waits, once per step; retries reuse the saved body.
+        stable at; absent at is a new run. A batch program uses the engine execution id
+        (C8 saves ttrExecutionId, generating one if absent). The Open body and its clock are saved once;
+        retries reuse that body. Start each batch once: retrying an external start on C7 or n8n
+        creates another engine instance and caller key; deduplication across those instances is not provided.
 
         201 alone drives evaluation. 200 replay completes the step; 202 polls, closed/waiting completes,
         abandoned/failed allows one re-open. A second non-201 recovery refuses. 409 raises TTR_STALE and reaches
@@ -1136,8 +890,8 @@ internal class CamundaRenderer(
         enforced by the Server. Read every route page using offset and the Server's default page size; do not
         override its displayRows limit. Empty/short pages before rowCount or inconsistent counts refuse before
         any row action. Missing obligations/actions refuse, never count as empty evidence.
-        Digest delivery is not rendered: every digest program or process step refuses export. Use n8n_l1 or
-        deliver: immediate; Camunda digest rendering is a planned follow-up.
+        Compose obligation watching and digest policies in the engine; recipe process/delivery/schedule
+        constructs were removed in grammar 0.22.
 
         Send tasks are customer template nodes using TTR_CONN_MAIL (C7 external task / C8 job type). Their worker
         belongs to Platform and is not bundled. Resolve TTR_MAIL_RECIPIENTS for role recipients; per-row addresses
@@ -1146,8 +900,9 @@ internal class CamundaRenderer(
         explicitly be wet, with the action selected for this key. Required approval is a Camunda user task carrying
         ttrAction/ttrKey; connect its completion to the exchange's task/approval integration before deployment.
 
-        Stale when any step's recipe text/values/labels, program, deployment, world, toolchain or target version
-        differs from the served bundle: re-export. The manifest covers all steps. The structure driver checks
-        route branches, tasks, connections and named calls only; it does not execute connectors or compare verdicts.
+        Stale when model, recipe text/values/labels, program, deployment, world, toolchain or target version
+        differs from the served bundle: re-export. The manifest inventories all emitted artifacts. The structure
+        driver checks routes, tasks, named calls, template bindings and DMN associations offline; it does not
+        execute connectors or compare verdicts.
         """.trimIndent() + "\n"
 }

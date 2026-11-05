@@ -835,7 +835,7 @@
   },
   "files": {
     "catalog/release_order.ttrm": "sha256:092e6ff5914d9ce49624f0e9fdb6503522f5f01435b99c402d87bcca550a3fcd",
-    "catalog/release_order_verdict.ttrm": "sha256:1172675861546a966ea9a1daca8c805386898e3dec5bd81790dd6739123f8909",
+    "catalog/release_order_verdict.ttrm": "sha256:ba556b898d5ae21beb7cb439c796168657d1a1f153f7214c2615f860b38ff99e",
     "islands/overdue.rows.sql": "sha256:3730c48e4975b3a5052a7e1a246a7c02f3c783c51505461e037842f503e6755a",
     "islands/placed_orders.orders.sql": "sha256:87fc1d71dba0be2a03e674da6d79188432e2ec439625472e0c33201c7e640ce0",
     "islands/price_differences.rows.sql": "sha256:8242affb2c600e197f69b99c2a3b565bf8ee11040e0a337a5d404ce549bb19ad",

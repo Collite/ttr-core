@@ -91,9 +91,6 @@ object RecipeGraphProjector {
                 program.port,
                 program.mode,
                 program.asOf,
-                // D-142 took `deliver:` and `schedule:` (the engine sends and schedules); SPI v2 keeps the fields, null.
-                null,
-                null,
                 program.overrides.associate { it.first to AutomationFingerprints.render(it.second) }.toSortedMap(),
                 buildMap {
                     program.budgetSync?.let { put("sync", "${it.amount} ${it.unit}") }
@@ -140,7 +137,6 @@ object RecipeGraphProjector {
                 },
             recipe.wiring.map { WiringMeta(it.routes, it.action, it.columns.toSortedMap(), it.whenCondition) },
             wired,
-            null, // D-142 took `def process`: a process is a BPMN process now, not an export input
             RunApiMeta(
                 "/automation",
                 sortedMapOf(

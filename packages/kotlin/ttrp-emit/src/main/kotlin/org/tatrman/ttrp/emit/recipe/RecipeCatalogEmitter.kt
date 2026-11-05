@@ -14,9 +14,14 @@ import org.tatrman.ttrp.graph.recipe.RecipeModel
  *   document, fingerprints }`;
  * - `catalog/<recipe>_verdict.ttrm` — `model er`: `<recipe>_verdict` (run, as_of, the key, route, verdict_reason,
  *   parameters_fp, run_as, written_at — run, key and route its key), `<recipe>_verdict_detail` (run, the key, route,
- *   context, row_no — the writer numbers the rows, D-77 — and every `detail:` context's columns, as text) and
+ *   context, row_no — the writer numbers the rows, D-77 — truncated: bool, a non-key flag distinguishing the
+ *   detail-limit marker row from data rows, and every `detail:` context's columns, as text) and
  *   `<recipe>_verdict_current` (the verdict's columns: the latest run per key, all its routes — a table the writer
  *   maintains, D-105, not a `def query`).
+ *
+ * Context columns are optional: marker rows omit them, and rows from another context may not carry them.
+ * `verdict_reason` is optional on both verdict entities for routes without `because:`. Writer-owned columns stay
+ * required, and key columns are never optional.
  *
  * The entities carry no er2db binding — like the automation stdlib, the deploying world's automation storage holds
  * them (§5.3's `automation_pg` binding is the world's, not the bundle's).
@@ -37,6 +42,8 @@ object RecipeCatalogEmitter {
         document: String?,
         fingerprints: RecipeFingerprints,
         engine: RecipeEngineMetadata = RecipeEngineMetadata(),
+        verdictOptional: Set<String> = emptySet(),
+        detailOptional: Set<String> = emptySet(),
     ): Catalog {
         val name = model.name
         val pkg = (model.programPackage ?: "automation") + ".generated"
@@ -104,6 +111,7 @@ object RecipeCatalogEmitter {
                     verdictColumns,
                     keyOf =
                         keys.map { it.first } + listOf("run", "route"),
+                    optional = verdictOptional,
                 )
                 append('\n')
                 entity(
@@ -112,6 +120,7 @@ object RecipeCatalogEmitter {
                     "The rows of the `detail:` contexts the routes of `$name` attach, per run, key and route (D-77).",
                     detailColumns,
                     keyOf = emptyList(),
+                    optional = detailOptional,
                 )
                 append('\n')
                 entity(
@@ -121,6 +130,7 @@ object RecipeCatalogEmitter {
                     verdictColumns,
                     keyOf =
                         keys.map { it.first } + listOf("route"),
+                    optional = verdictOptional,
                 )
             }
         return Catalog("catalog/$name.ttrm", recipe, "catalog/${name}_verdict.ttrm", verdict)
@@ -132,6 +142,7 @@ object RecipeCatalogEmitter {
         description: String,
         columns: List<OutputColumn>,
         keyOf: List<String>,
+        optional: Set<String>,
     ) {
         sb.append("def entity $name {\n")
         sb.append("    description: ${str(description)}\n")
@@ -140,7 +151,8 @@ object RecipeCatalogEmitter {
         sb.append(
             columns.joinToString(",\n") { c ->
                 val key = if (c.name in keyOf) ", isKey: true" else ""
-                "        def attribute ${c.name} { type: ${c.type}$key }"
+                val nullable = if (c.name in optional && c.name !in keyOf) ", optional: true" else ""
+                "        def attribute ${c.name} { type: ${c.type}$nullable$key }"
             },
         )
         sb.append("\n    ]\n}\n")

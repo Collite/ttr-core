@@ -70,7 +70,7 @@ class N8nEmitSpec :
                 .jsonPrimitive.content shouldContain "callbackUrl"
             nodes(graph).count { it["name"] == JsonPrimitive("action release_confirmed ask wait") } shouldBe 1
         }
-        "batch schedule and digest groups use a Split Out and engine-side delivery outcomes" {
+        "externally triggered batch uses a Split Out and per-row delivery outcomes" {
             val g =
                 n8nGraph().copy(
                     program =
@@ -78,17 +78,15 @@ class N8nEmitSpec :
                             name = "morning_release",
                             port = "none",
                             mode = "batch",
-                            schedule = "06:00 Europe/Prague",
-                            deliver = "{digest: {by: who, per: day}}",
                         ),
                 )
             golden("morning_release", g)
             val ns = nodes(g)
-            ns.first()["type"] shouldBe JsonPrimitive("n8n-nodes-base.scheduleTrigger")
+            ns.first()["type"] shouldBe JsonPrimitive("n8n-nodes-base.webhook")
             ns.single { it["name"] == JsonPrimitive("open input") }.toString() shouldContain "idempotencyKey"
             ns.any { it["type"] == JsonPrimitive("n8n-nodes-base.splitOut") } shouldBe true
             ns.count { it["type"] == JsonPrimitive("n8n-nodes-base.emailSend") } shouldBe 1
-            ns.any { it["name"] == JsonPrimitive("digest outcome") } shouldBe true
+            ns.any { it["name"] == JsonPrimitive("action hold notify outcome") } shouldBe true
         }
         "recipe and island granularities follow runApi metadata and never embed SQL" {
             val graph = n8nGraph()
@@ -142,7 +140,6 @@ class N8nEmitSpec :
                             name = "winback_monthly",
                             port = "none",
                             mode = "batch",
-                            schedule = "1st 08:00 Europe/Prague",
                         ),
                     roles =
                         base.roles.copy(
@@ -251,60 +248,6 @@ class N8nEmitSpec :
                 }
             }
         }
-        "process rendering retains three distinct recipes and skips absent obligations" {
-            val first =
-                n8nGraph().copy(
-                    program = n8nGraph().program.copy(name = "decide"),
-                    recipe = n8nGraph().recipe.copy(name = "decide_return"),
-                )
-            val second =
-                first.copy(
-                    program = first.program.copy(name = "inbound"),
-                    recipe = first.recipe.copy(name = "monitor_inbound"),
-                )
-            val third =
-                first.copy(
-                    program = first.program.copy(name = "settle"),
-                    recipe = first.recipe.copy(name = "settle"),
-                )
-            val process =
-                first.copy(
-                    process =
-                        ProcessMeta(
-                            "return_line_flow",
-                            "line_id",
-                            listOf(
-                                StepMeta("decide", "decide", "key", emptyList(), null, emptyList(), first),
-                                StepMeta(
-                                    "inbound",
-                                    "inbound",
-                                    "key",
-                                    listOf("inbound"),
-                                    null,
-                                    listOf("fulfilled", "due", "absent"),
-                                    second,
-                                ),
-                                StepMeta(
-                                    "settle",
-                                    "settle",
-                                    "key",
-                                    listOf("credit_note", "payment"),
-                                    null,
-                                    listOf("fulfilled", "due", "absent"),
-                                    third,
-                                ),
-                            ),
-                        ),
-                )
-            golden("returns_n8n", process)
-            val ns = nodes(process)
-            ns.filter { it["name"]!!.jsonPrimitive.content.endsWith(" open") }.size shouldBe 3
-            ns.filter { it["name"]!!.jsonPrimitive.content.endsWith("obligation present") }.size shouldBe 2
-            ns.filter { it["name"]!!.jsonPrimitive.content.endsWith("obligation wait") }.size shouldBe 2
-            ns.filter { it["name"]!!.jsonPrimitive.content.endsWith("obligation wait") }.forEach {
-                it.getValue("parameters").jsonObject["limitWaitTime"] shouldBe JsonPrimitive(true)
-            }
-        }
     })
 
 internal fun n8nGraph(): RecipeGraph =
@@ -322,7 +265,7 @@ internal fun n8nGraph(): RecipeGraph =
             "per_candidate",
             listOf("sql"),
         ),
-        ProgramMeta2("release_on_placement", "key", "on_event", "event", "immediate", null, emptyMap(), emptyMap()),
+        ProgramMeta2("release_on_placement", "key", "on_event", "event", emptyMap(), emptyMap()),
         DeploymentMeta("release_n8n", "n8n", "n8n_l1", "1", "identity.automation", "parts", false, false, emptyMap()),
         Roles("placed_orders", listOf(ContextMeta("stock", "per_candidate", "sql")), "verdict", "overlapping"),
         listOf(
@@ -350,7 +293,6 @@ internal fun n8nGraph(): RecipeGraph =
                 ).copy(sinks = mapOf("n8n" to "door", "native" to "task"), approval = "required", due = "2 days"),
             "notify" to action("n8n-nodes-base.emailSend", true),
         ),
-        null,
         RunApiMeta(
             "/automation",
             mapOf(

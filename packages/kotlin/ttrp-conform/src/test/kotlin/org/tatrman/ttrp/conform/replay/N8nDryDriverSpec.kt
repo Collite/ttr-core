@@ -136,7 +136,7 @@ class N8nDryDriverSpec :
                         .mapNotNull { it["idempotencyKey"] }
                         .distinct()
                         .size shouldBe 2
-                    server.requests.any { it.endsWith("/digests") } shouldBe true
+                    server.requests.any { it.endsWith("/digests") } shouldBe false
                     server.requests.any { it.endsWith("/outcome") } shouldBe false
                 }
             } finally {

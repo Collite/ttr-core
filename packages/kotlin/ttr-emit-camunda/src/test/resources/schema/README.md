@@ -15,3 +15,8 @@ not represented as official Camunda schemas or a substitute for engine validatio
 extension validation in the standard schema cannot silently skip these supported shapes.
 
 The Modeler opening is a separate, pending manual acceptance. No DFP draft is used as a schema or fixture.
+
+P1.5 authoring schemas (vendored for offline checks):
+- `c7-template-schema.json`: @camunda/element-templates-json-schema 0.12.1, https://unpkg.com/@camunda/element-templates-json-schema@0.12.1/resources/schema.json
+- `c8-template-schema.json`: @camunda/zeebe-element-templates-json-schema 0.31.0, https://unpkg.com/@camunda/zeebe-element-templates-json-schema@0.31.0/resources/schema.json
+- `dmn/`: OMG DMN 1.3 `DMN13.xsd`, `DMNDI13.xsd` (https://www.omg.org/spec/DMN/20191111/), DC/DI dependencies (https://www.omg.org/spec/DMN/20180521/).

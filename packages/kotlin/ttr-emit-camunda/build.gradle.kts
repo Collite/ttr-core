@@ -27,6 +27,7 @@ dependencies {
     testImplementation("org.apache.groovy:groovy:5.0.3")
     testImplementation("org.camunda.spin:camunda-spin-dataformat-json-jackson:7.24.0")
     testImplementation(libs.bundles.kotest)
+    testImplementation(libs.json.schema.validator)
 }
 
 mavenPublishing {

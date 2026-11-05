@@ -40,6 +40,8 @@ import org.tatrman.ttrp.graph.capability.RecipeManifestSource
 import org.tatrman.ttrp.graph.capability.RegistryRecipe
 import org.tatrman.ttrp.graph.capability.ExecutorManifestGate
 import org.tatrman.ttrp.project.TtrpManifestReader
+import com.github.ajalt.clikt.parameters.options.validate
+import com.github.ajalt.clikt.parameters.types.int
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -53,6 +55,12 @@ class EmitCommand : CliktCommand(name = "emit") {
     private val granularity by option("--granularity")
     private val out by option("--out").default(".")
     private val json by option("--json").flag()
+    private val templateVersion by option(
+        "--template-version",
+        help = "positive Modeler template version; raise after fingerprint changes",
+    ).int()
+        .default(1)
+        .validate { require(it > 0) { "template version must be a positive integer" } }
 
     override fun run() {
         try {
@@ -96,7 +104,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                     org.tatrman.ttrp.graph.capability.RegistryGrid
                         .executorType(world, deployment),
                 )
-            val temp = if (bundlePath == null) Files.createTempDirectory("ttrp-export-build") else null
+            val temp = Files.createTempDirectory("ttrp-export-build")
             try {
                 data class Loaded(
                     val graph: org.tatrman.ttrp.emit.spi.RecipeGraph,
@@ -114,6 +122,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                         warnings = emptyList(),
                     )
                 val packageOf = LayoutResolver.packagesFromFiles(loaded.files)
+                val index = ModelIndex(registrySnapshot, packageOf)
                 val resolved =
                     org.tatrman.ttr.metadata.world
                         .WorldResolver(registrySnapshot, packageOf)
@@ -122,33 +131,38 @@ class EmitCommand : CliktCommand(name = "emit") {
                     resolved is org.tatrman.ttr.metadata.world.WorldResolution.Ok,
                 ) { "cannot resolve export world: $resolved" }
 
+                val selectedRecipe = program.recipe
+
                 fun load(program: AutomationProgram): Loaded {
                     val recipeName = requireNotNull(program.recipe)
                     val dir =
-                        bundlePath?.let { base -> Path.of(base).toAbsolutePath().normalize() } ?: run {
-                            val sources =
-                                Files.walk(root).use { paths ->
-                                    paths
-                                        .filter {
-                                            Files.isRegularFile(it) &&
-                                                it.fileName.toString() == "$recipeName.ttrp"
-                                        }.toList()
-                                }
-                            val source =
-                                requireNotNull(
-                                    sources.singleOrNull(),
-                                ) { "expected one $recipeName.ttrp; use --bundle for an existing bundle" }
-                            BundleAssembler(
-                                ToolchainVersion.current,
-                            ).build(
-                                source = Files.readString(source),
-                                fileName = source.toString(),
-                                recipeDir = source.parent,
-                                pipelineManifest = config.manifest,
-                                modelsRoot = config.manifest.modelsRoot(),
-                                outDir = temp!!,
-                            ).dir
+                        bundlePath?.takeIf { recipeName == selectedRecipe }?.let { base ->
+                            Path.of(base).toAbsolutePath().normalize()
                         }
+                            ?: run {
+                                val sources =
+                                    Files.walk(root).use { paths ->
+                                        paths
+                                            .filter {
+                                                Files.isRegularFile(it) &&
+                                                    it.fileName.toString() == "$recipeName.ttrp"
+                                            }.toList()
+                                    }
+                                val source =
+                                    requireNotNull(
+                                        sources.singleOrNull(),
+                                    ) { "expected one $recipeName.ttrp; use --bundle for an existing bundle" }
+                                BundleAssembler(
+                                    ToolchainVersion.current,
+                                ).build(
+                                    source = Files.readString(source),
+                                    fileName = source.toString(),
+                                    recipeDir = source.parent,
+                                    pipelineManifest = config.manifest,
+                                    modelsRoot = config.manifest.modelsRoot(),
+                                    outDir = temp.resolve(recipeName),
+                                ).dir
+                            }
                     val bundle = RunManifest.fromJson(Files.readString(dir.resolve("manifest.json")))
                     require(
                         bundle.world.fingerprint ==
@@ -243,8 +257,25 @@ class EmitCommand : CliktCommand(name = "emit") {
                             deployment,
                             wiredActions.values.toList(),
                         )
+                    val governed =
+                        if (plugin.targetId in setOf("camunda_7", "camunda_8")) {
+                            projected.copy(
+                                actions =
+                                    projected.actions.mapValues { (name, action) ->
+                                        action.copy(
+                                            candidateGroup =
+                                                ApprovalGroupsProjector.group(
+                                                    wiredActions.getValue(name),
+                                                    index,
+                                                ),
+                                        )
+                                    },
+                            )
+                        } else {
+                            projected
+                        }
                     return Loaded(
-                        projected.copy(
+                        governed.copy(
                             recipe =
                                 projected.recipe.copy(
                                     fingerprints =
@@ -260,8 +291,84 @@ class EmitCommand : CliktCommand(name = "emit") {
                         dir,
                     )
                 }
-                val loaded = load(program)
-                val graph = loaded.graph
+                val selected = load(program)
+                val choices =
+                    if (plugin.targetId in setOf("camunda_7", "camunda_8")) {
+                        WorldChoicesProjector.project(loaded.model, world) { choice ->
+                            if (choice.recipe == program.recipe) {
+                                selected.graph.recipe.parameters
+                            } else {
+                                val recipe =
+                                    requireNotNull(choice.recipe) { "program ${choice.qname.name} has no recipe" }
+                                val source =
+                                    Files
+                                        .walk(root)
+                                        .use { paths ->
+                                            paths
+                                                .filter {
+                                                    Files.isRegularFile(
+                                                        it,
+                                                    ) &&
+                                                        it.fileName.toString() == "$recipe.ttrp"
+                                                }.toList()
+                                        }.singleOrNull() ?: error("expected one $recipe.ttrp for world program choices")
+                                val parsed =
+                                    org.tatrman.ttrp.parser.TtrpParser
+                                        .parseFile(source)
+                                require(parsed.diagnostics.none { it.severity.name == "ERROR" }) {
+                                    "cannot read $recipe parameters: ${parsed.diagnostics.joinToString { it.render() }}"
+                                }
+                                val decl =
+                                    parsed.document.statements
+                                        .filterIsInstance<org.tatrman.ttrp.ast.RecipeDecl>()
+                                        .singleOrNull()
+                                        ?: error("expected one recipe in $source")
+                                val scope =
+                                    index
+                                        .automationInScope(ModelIndex.importsOf(parsed.document))
+                                        .filterIsInstance<org.tatrman.ttr.metadata.model.AutomationParameter>()
+                                decl.parameters.map { ref ->
+                                    val param =
+                                        scope.singleOrNull { it.qname.name == ref.text }
+                                            ?: error("unknown or ambiguous parameter ${ref.text} in $recipe")
+                                    org.tatrman.ttrp.emit.spi.ParameterMeta(
+                                        ref.text,
+                                        requireNotNull(param.type) { "parameter ${ref.text} has no type" },
+                                        param.value?.let { value ->
+                                            when (value) {
+                                                is org.tatrman.ttr.parser.model.AutoValue.Str -> value.raw
+                                                else -> AutomationFingerprints.render(value)
+                                            }
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        org.tatrman.ttrp.emit.spi
+                            .WorldChoices()
+                    }
+                val loaded = selected
+                val modelFingerprint =
+                    "sha256:" +
+                        MessageDigest
+                            .getInstance("SHA-256")
+                            .digest(
+                                roots
+                                    .joinToString(
+                                        "\n",
+                                    ) {
+                                        org.tatrman.ttrp.bundle.ModelFingerprint
+                                            .of(it)
+                                    }.toByteArray(Charsets.UTF_8),
+                            ).joinToString("") { "%02x".format(it) }
+                val graph =
+                    loaded.graph.copy(
+                        recipe =
+                            loaded.graph.recipe.copy(
+                                fingerprints = loaded.graph.recipe.fingerprints + ("model" to modelFingerprint),
+                            ),
+                    )
                 val recipeName = graph.recipe.name
                 val bundle = loaded.bundle
                 val plugins = ServiceLoader.load(TtrEmitPlugin::class.java).toList()
@@ -295,7 +402,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                             "world" to bundle.world.fingerprint,
                         )
                 val stale =
-                    "Stale when any text, values, labels, program, deployment, world, toolchain " +
+                    "Stale when any model, text, values, labels, program, deployment, world, toolchain " +
                         "or target version fingerprint differs for any step from the served bundle; re-export the deployment."
 
                 val fixtures = bundle.recipe!!.tests.orEmpty()
@@ -310,6 +417,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                 val exportManifest =
                     buildJsonObject {
                         put("schemaVersion", 1)
+                        put("world", bundle.world.qname)
                         put("deployment", deploymentName)
                         put("program", program.qname.name)
                         put("recipe", recipeName)
@@ -363,6 +471,8 @@ class EmitCommand : CliktCommand(name = "emit") {
                             formatter.encodeToString(JsonObject.serializer(), exportManifest) + "\n",
                             readme,
                             formatter.encodeToString(JsonObject.serializer(), conformance) + "\n",
+                            choices,
+                            templateVersion,
                         ),
                     )
                 val folder =
@@ -399,7 +509,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                             .jsonArray
                     }
                 val renderedCalls = workflowCalls ?: bpmnCalls
-                val finalManifest =
+                val callManifest =
                     if (renderedCalls ==
                         null
                     ) {
@@ -407,6 +517,88 @@ class EmitCommand : CliktCommand(name = "emit") {
                     } else {
                         JsonObject(exportManifest + ("calls" to renderedCalls))
                     }
+                val finalManifest =
+                    JsonObject(
+                        callManifest +
+                            mapOf(
+                                "files" to
+                                    JsonObject(
+                                        (result.files + fixtureBytes).toSortedMap().mapValues { (_, bytes) ->
+                                            JsonPrimitive(
+                                                "sha256:" +
+                                                    MessageDigest
+                                                        .getInstance(
+                                                            "SHA-256",
+                                                        ).digest(bytes)
+                                                        .joinToString("") { "%02x".format(it) },
+                                            )
+                                        },
+                                    ),
+                                "authoring" to
+                                    buildJsonObject {
+                                        put("dialect", if (graph.deployment.type == "camunda_8") "c8" else "c7")
+                                        put(
+                                            "omitted",
+                                            JsonArray(
+                                                choices.omitted.map { omitted ->
+                                                    buildJsonObject {
+                                                        put("qname", omitted.qname)
+                                                        put("reason", omitted.reason)
+                                                    }
+                                                },
+                                            ),
+                                        )
+                                        put(
+                                            "choices",
+                                            JsonArray(
+                                                (
+                                                    choices.programs.map {
+                                                        it.name
+                                                    } + choices.queries.map { it.qname }
+                                                ).sorted().map(::JsonPrimitive),
+                                            ),
+                                        )
+                                        put(
+                                            "steps",
+                                            JsonArray(
+                                                (
+                                                    choices.programs.map { p ->
+                                                        Triple(
+                                                            p.name,
+                                                            p.params,
+                                                            emptyList<org.tatrman.ttrp.emit.spi.ColumnMeta>(),
+                                                        )
+                                                    } +
+                                                        choices.queries.map { q ->
+                                                            Triple(
+                                                                q.qname,
+                                                                q.params,
+                                                                q.columns +
+                                                                    org.tatrman.ttrp.emit.spi
+                                                                        .ColumnMeta("row_count", "integer"),
+                                                            )
+                                                        }
+                                                ).map { (name, params, columns) ->
+                                                    buildJsonObject {
+                                                        put("name", name)
+                                                        put("params", JsonArray(params.map { JsonPrimitive(it.name) }))
+                                                        put(
+                                                            "columns",
+                                                            JsonObject(
+                                                                columns.associate {
+                                                                    it.name to
+                                                                        JsonPrimitive(it.type)
+                                                                },
+                                                            ),
+                                                        )
+                                                        if (columns.isNotEmpty()) put("dmn", "dmn/${name}_decision.dmn")
+                                                    }
+                                                },
+                                            ),
+                                        )
+                                    },
+                            ).filterKeys { it != "authoring" || plugin.targetId in setOf("camunda_7", "camunda_8") },
+                    )
                 ExportFolderWriter.write(
                     folder,
                     formatter.encodeToString(JsonObject.serializer(), finalManifest) + "\n",
@@ -426,7 +618,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                     echo(stale)
                 }
             } finally {
-                temp?.toFile()?.deleteRecursively()
+                temp.toFile().deleteRecursively()
             }
         } catch (e: Exception) {
             echo("ttrp emit: ${e.message}", err = true)
