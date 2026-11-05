@@ -1,0 +1,8 @@
+package demo
+model binding
+
+def er2db_entity E {
+    entity: er.entity.E
+    target: { table: db.dbo.T }
+    whereFilter: { sql: "STAV = 1" }
+}

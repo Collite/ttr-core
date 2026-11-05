@@ -12,6 +12,8 @@ dependencies {
     api(project(":packages:kotlin:ttr-yaml"))
     implementation(project(":packages:kotlin:ttr-semantics"))
     testImplementation(libs.bundles.kotest)
+    testImplementation(testFixtures(project(":packages:kotlin:ttr-semantics")))
+    testImplementation(testFixtures(project(":packages:kotlin:ttr-parser")))
 }
 tasks.test {
     useJUnitPlatform()
