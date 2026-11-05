@@ -1,0 +1,2 @@
+tabulka:
+  Warehouse: {popis: Sklad, sloupce: {code: {typ: string}}}

@@ -302,3 +302,23 @@ test('every top-level and nested definition body has an explicit schema handler'
     JSON.parse(files['canonical-metadata.json']).handledValueRules.includes('embeddedBlock')
   );
 });
+
+test('D-MW-64 record operands follow canonical kinds and operation scope', () => {
+  const profile = JSON.parse(files['profile.schema.json']);
+  const envelope = profile.oneOf[1].properties.operations.items;
+  const ops = Object.fromEntries(envelope.allOf.map((b) => [b.if.properties.op.const, b.then]));
+  assert.deepEqual(envelope.properties.in, ops.kinds.properties.mapping.additionalProperties);
+  for (const name of ['rename', 'values', 'shape', 'nest', 'unnest', 'link']) {
+    assert.ok(ops[name].required.includes('in'), name);
+    assert.deepEqual(ops[name].properties.in, envelope.properties.in);
+  }
+  for (const name of ['kinds', 'ignore']) {
+    assert.ok(!ops[name].required.includes('in'), name);
+    assert.deepEqual(ops[name].properties.in, envelope.properties.in);
+  }
+  for (const name of ['package', 'codes']) assert.ok(!ops[name].properties.in, name);
+  assert.deepEqual(ops.kinds.properties.kind, envelope.properties.at);
+  assert.deepEqual(ops.kinds.properties.id, envelope.properties.at);
+  assert.deepEqual(ops.kinds.if, { properties: { mapping: { minProperties: 2 } } });
+  assert.deepEqual(ops.kinds.then, { required: ['kind'] });
+});

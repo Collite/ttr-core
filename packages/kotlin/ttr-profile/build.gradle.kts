@@ -10,10 +10,13 @@ plugins {
 kotlin { jvmToolchain(21) }
 dependencies {
     api(project(":packages:kotlin:ttr-yaml"))
+    implementation(project(":packages:kotlin:ttr-semantics"))
     testImplementation(libs.bundles.kotest)
 }
 tasks.test {
     useJUnitPlatform()
+    // The generated-document budget regression constructs 70,000 located records.
+    maxHeapSize = "2g"
     inputs.dir("../../../tests/conformance/fixtures")
     inputs.file("../../grammar/schemas/profile.schema.json")
     inputs.file("build.gradle.kts")
@@ -30,7 +33,9 @@ mavenPublishing {
     coordinates("org.tatrman", "ttr-profile", version.toString())
     pom {
         name.set("TTR Profiles")
-        description.set("Located profile loading and canonical identity for the TTR modelling DSL")
+        description.set(
+            "Located profile loading, structural execution and canonical identity for the TTR modelling DSL",
+        )
         inceptionYear.set("2026")
         url.set("https://github.com/Collite/ttr-core")
         licenses {

@@ -86,6 +86,34 @@ object ProfileReader {
             val data = YamlData.read(source, file)
             data.validate("profile.schema.json", 1)
             val value = data.value
+            value.getValue("operations").jsonArray.forEachIndexed { index, element ->
+                val op = element.jsonObject
+                val scope = op["in"]?.jsonPrimitive?.content
+                val target =
+                    op["to"]
+                        ?.jsonObject
+                        ?.get("kind")
+                        ?.jsonPrimitive
+                        ?.content
+                if (target != null && scope != target) {
+                    throw ProfileException(
+                        "ys/profile-invalid",
+                        data.span("/operations/$index/to/kind", key = true),
+                        "to.kind must equal in ($scope)",
+                    )
+                }
+                op["files"]?.jsonArray?.forEachIndexed { fileIndex, pattern ->
+                    try {
+                        FileSelector(listOf(pattern.jsonPrimitive.content))
+                    } catch (e: IllegalArgumentException) {
+                        throw ProfileException(
+                            "ys/profile-invalid",
+                            data.span("/operations/$index/files/$fileIndex"),
+                            e.message ?: "Invalid file selector",
+                        )
+                    }
+                }
+            }
             val identity = value.getValue("profile").jsonPrimitive.content
             val locations = data.paths.associateWith { data.span(it) }
             val operationLocations = mutableMapOf<Int, MutableMap<String, ProfileSpan>>()
@@ -107,7 +135,7 @@ object ProfileReader {
                     LocatedOp(
                         op.jsonObject,
                         data.span(path),
-                        operationLocations[index]?.toMap() ?: emptyMap(),
+                        operationLocations[index] ?: emptyMap(),
                     )
                 },
                 locations,

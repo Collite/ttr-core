@@ -63,6 +63,17 @@ class ProfileReview220Spec :
             error.location.path shouldBe "/overlay/x"
         }
 
+        test("header tag scope ends at pointer segment boundaries") {
+            val header = "ttr: {profile: demo-cs/1, grammar: '>=0.18'}\n"
+            listOf("ttrx", "\"ttr/x\"").forEach { key ->
+                DeclarationReader.readFile(header + "$key: !pl a\n")!!.profile shouldBe "demo-cs/1"
+            }
+            shouldThrow<ProfileException> { DeclarationReader.readFile("ttr: !pl x\n", "header.yaml") }.also {
+                it.location.path shouldBe "/ttr"
+                it.detail shouldBe "Unsupported YAML tag !pl here"
+            }
+        }
+
         test("profile disk reads refuse malformed UTF-8 and enforce byte then code-point budgets") {
             root220 { root ->
                 val file = root.resolve("profile.yaml")
@@ -74,11 +85,25 @@ class ProfileReview220Spec :
                 error.location.line shouldBe 4
                 error.location.column shouldBe 23
                 error.location.path shouldBe ""
-                listOf("\n", "\r\n", "\r", "\u0085", "\u2028", "\u2029").forEach { newline ->
+                listOf("\n", "\r\n", "\r").forEach { newline ->
                     file.writeBytes("😀${newline}é😀".toByteArray() + byteArrayOf(0xff.toByte()))
                     shouldThrow<ProfileException> { resolver.resolve("demo-cs/1", Path.of("ttr.yaml")) }.also {
                         it.location.line shouldBe 2
                         it.location.column shouldBe 3
+                    }
+                }
+                listOf("\u0085", "\u2028", "\u2029").forEach { separator ->
+                    file.writeBytes("ab${separator}cd".toByteArray() + byteArrayOf(0xff.toByte()))
+                    shouldThrow<ProfileException> { resolver.resolve("demo-cs/1", Path.of("ttr.yaml")) }.also {
+                        it.location.line shouldBe 1
+                        it.location.column shouldBe 6
+                    }
+                }
+                listOf("" to 1, "\uFEFF" to 1, "\uFEFFa" to 2).forEach { (prefix, column) ->
+                    file.writeBytes(prefix.toByteArray() + byteArrayOf(0xff.toByte()))
+                    shouldThrow<ProfileException> { resolver.resolve("demo-cs/1", Path.of("ttr.yaml")) }.also {
+                        it.location.line shouldBe 1
+                        it.location.column shouldBe column
                     }
                 }
                 file.writeBytes(ByteArray(12_000_001) { 'a'.code.toByte() })
@@ -153,12 +178,42 @@ class ProfileReview220Spec :
             }
         }
 
+        test("canonical numeric major one always uses the bundle before catalog lookup") {
+            root220 { root ->
+                // A catalog override must never be read, even when it declares canonical/1.
+                root.resolve("override.yaml").writeText(profile220("canonical/1", "writable: true\n"))
+                val resolver =
+                    ProfileResolver(
+                        root,
+                        mapOf(
+                            "canonical/01" to Path.of("override.yaml"),
+                            "canonical/001" to Path.of("missing.yaml"),
+                        ),
+                    )
+                val bundled = resolver.resolve("canonical", Path.of("ttr.yaml"))
+                listOf("canonical/1", "canonical/01", "canonical/001").forEach { ref ->
+                    resolver.resolve(ref, Path.of("ttr.yaml")) shouldBe bundled
+                    ProfileResolver(root, emptyMap()).resolve(ref, Path.of("ttr.yaml")) shouldBe bundled
+                }
+                root.resolve("child.yaml").writeText(profile220(extra = "extends: canonical/01\n"))
+                resolver.resolve("./child.yaml", Path.of("ttr.yaml")).first() shouldBe bundled.single()
+                shouldThrow<ProfileException> { resolver.resolve("canonical/2", Path.of("ttr.yaml")) }
+                    .detail shouldBe "No catalog entry for canonical/2"
+                root.resolve("other.yaml").writeText(profile220("canonical/2"))
+                ProfileResolver(root, mapOf("canonical/2" to Path.of("other.yaml")))
+                    .resolve("canonical/2", Path.of("ttr.yaml"))
+                    .single()
+                    .major
+                    .toString() shouldBe "2"
+            }
+        }
+
         test("operation location buckets partition all operation paths without changing keys") {
             val source =
                 profile220().replace(
                     "operations: []",
                     "operations:\n" +
-                        (0..2).joinToString("\n") { "  - op: ignore\n    at: /x$it\n    reason: fixture" },
+                        (0..11).joinToString("\n") { "  - op: ignore\n    at: /x$it\n    reason: fixture" },
                 )
             val profile = ProfileReader.read(source)
             val expected = profile.locations.filterKeys { it.startsWith("/operations/") }
@@ -179,5 +234,39 @@ class ProfileReview220Spec :
             val tree = "profile: demo-cs/1\ngrammar: '>=0.18 <1.0'\n"
             DeclarationReader.readTree(tree) shouldBe DeclarationReader.readTree(tree)
             ProfileReader.read(profile220()) shouldBe ProfileReader.read(profile220())
+        }
+
+        test("malformed UTF-8 preserves earlier Reader errors and final CR positions") {
+            root220 { root ->
+                val file = root.resolve("profile.yaml")
+                val resolver = ProfileResolver(root, mapOf("demo-cs/1" to Path.of("profile.yaml")))
+                listOf(
+                    Triple("profile: x\u0001", 1, 11),
+                    Triple("a: 1\nb: \u007f", 2, 4),
+                    Triple("x: \ufffe", 1, 4),
+                    Triple("a: b\n\u0085c: \u0001", 2, 5),
+                ).forEach { (source, line, column) ->
+                    file.writeText(source)
+                    val clean = shouldThrow<ProfileException> { resolver.resolve("demo-cs/1", Path.of("ttr.yaml")) }
+                    file.writeBytes(source.toByteArray() + byteArrayOf(0xff.toByte()))
+                    val bad = shouldThrow<ProfileException> { resolver.resolve("demo-cs/1", Path.of("ttr.yaml")) }
+                    bad.message shouldBe clean.message
+                    bad.code shouldBe "ys/profile-invalid"
+                    bad.detail shouldBe "special characters are not allowed"
+                    bad.location.line shouldBe line
+                    bad.location.column shouldBe column
+                }
+                listOf("a\r" to 1, "a\rb" to 2, "a\r\n" to 1).forEach { (source, column) ->
+                    file.writeBytes(source.toByteArray() + byteArrayOf(0xff.toByte()))
+                    val error = shouldThrow<ProfileException> { resolver.resolve("demo-cs/1", Path.of("ttr.yaml")) }
+                    error.location.line shouldBe 2
+                    error.location.column shouldBe column
+                    error.detail shouldBe "Malformed UTF-8 in profile"
+                }
+                val astralPrefix = "# " + "x".repeat(1022) + "😀"
+                file.writeBytes(astralPrefix.toByteArray() + byteArrayOf(0xff.toByte()))
+                shouldThrow<ProfileException> { resolver.resolve("demo-cs/1", Path.of("ttr.yaml")) }.detail shouldBe
+                    "Malformed UTF-8 in profile"
+            }
         }
     })

@@ -1,0 +1,4 @@
+unknown-kind.yaml: {code: ys/unknown-kind, line: 2, column: 6}
+unknown-key.yaml: {code: ys/unknown-key, line: 3, column: 5}
+missing-id.yaml: {code: ys/record-id-missing, line: 2, column: 5}
+conflict.yaml: {code: ys/profile-conflict, line: 2, column: 26}

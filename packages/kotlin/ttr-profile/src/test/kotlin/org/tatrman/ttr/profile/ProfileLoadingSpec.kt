@@ -83,7 +83,7 @@ class ProfileLoadingSpec :
                 ProfileReader.read(
                     definition().replace(
                         "operations: []",
-                        "operations: [{op: rename, at: /x, to: {kind: entity, property: typo}}]",
+                        "operations: [{op: rename, in: entity, at: /x, to: {kind: entity, property: typo}}]",
                     ),
                 )
             }.code shouldBe "ys/profile-invalid"

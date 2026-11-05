@@ -38,6 +38,61 @@ class CanonicalYamlSafetySpec :
             error.keyPath shouldBe "/defs/0/properties/<<"
         }
 
+        test("merge-looking values keep the base canonical output") {
+            val entity = header + "  - kind: entity\n    id: Product\n    properties:\n"
+            val expected = CanonicalYaml.write(CanonicalYaml.read(entity + "      description: \"<<\"\n"))
+            listOf(
+                "      description: \"<<\"\n",
+                "      description: '<<'\n",
+                "      description: !!str <<\n",
+                "      description: |-\n        <<\n",
+                "      description: >-\n        <<\n",
+                "      ? description\n      : \"<<\"\n",
+            ).forEach { body ->
+                CanonicalYaml.write(CanonicalYaml.read(entity + body)) shouldBe expected
+            }
+            val tagged = CanonicalYaml.write(CanonicalYaml.read(entity + "      tags: [\"<<\", '>>']\n"))
+            CanonicalYaml.write(CanonicalYaml.read(entity + "      tags:\n        - \"<<\"\n        - '>>'\n")) shouldBe
+                tagged
+            val flow = header + "  - {kind: entity, id: Product, properties: {? description : \"<<\"}}\n"
+            CanonicalYaml.write(CanonicalYaml.read(flow)) shouldBe expected
+            val both =
+                CanonicalYaml.write(
+                    CanonicalYaml.read(
+                        entity + "      description: \"<<\"\n      tags: [\"<<\"]\n",
+                    ),
+                )
+            CanonicalYaml.write(
+                CanonicalYaml.read(
+                    header + "  - {kind: entity, id: Product, properties: {description: \"<<\", tags: [\"<<\"]}}\n",
+                ),
+            ) shouldBe both
+        }
+
+        test(
+            "plain merge-looking values retain the tag diagnostic and merge keys use the approved earlier diagnostic",
+        ) {
+            val entity = header + "  - kind: entity\n    id: Product\n    properties:\n"
+            shouldThrow<CanonicalYamlException> { CanonicalYaml.read(entity + "      description: <<\n", "value.yaml") }
+                .message shouldBe "value.yaml:7:20: Unsupported YAML tag tag:yaml.org,2002:merge"
+            shouldThrow<CanonicalYamlException> { CanonicalYaml.read(entity + "      <<: x\n", "key.yaml") }
+                .message shouldBe "key.yaml:7:7: $mergeMessage"
+        }
+
+        test("a second document fails at its start before its later merge key in both reader modes") {
+            val valid = "ttr: '0.22'\nmodel: cn\ndefs: []\n"
+            listOf<(String) -> Any>(
+                { CanonicalYaml.read(it, "documents.yaml") },
+                { YamlData.read(it, "documents.yaml") },
+            ).forEach { read ->
+                shouldThrow<CanonicalYamlException> { read(valid + "---\n<<: {a: 1}\n") }.message shouldBe
+                    "documents.yaml:4:1: but found another document"
+                shouldThrow<CanonicalYamlException> { read(valid + "...\n<<: {a: 1}\n") }.message shouldBe
+                    "documents.yaml:5:1: expected '<document start>', but found '<block mapping start>'"
+                read("---\n$valid...\n")
+            }
+        }
+
         test("whole input budget includes trailing comments at the exact code-point boundary") {
             val valid = header + "  - kind: kind\n    id: Order\n    properties: {}\n"
             val prefix = valid + "# 😀"
@@ -89,5 +144,32 @@ class CanonicalYamlSafetySpec :
                 scalars.getValue("next") shouldBe "/x/next"
                 scalars.getValue("2") shouldBe "/x/next"
             }
+        }
+
+        test("astral characters at fixed-size reader boundaries survive YAML and migration marker reads") {
+            listOf(1024, 2049).forEach { boundary ->
+                val scalar = "x".repeat(boundary - 3) + "😀"
+                YamlData.read("a: $scalar").value["a"].toString() shouldBe "\"$scalar\""
+                val prefix = "# " + "x".repeat(boundary - 2) + "😀\n"
+                val source = prefix + "ttr: '0.22'\nmodel: er\ndefs: []\n"
+                CanonicalYaml.read(source).ast.errors shouldBe emptyList()
+                // A differing marker must be found before the canonical reader, so this exercises the marker's Reader.
+                val old = source.replace("0.22", "0.21")
+                val request =
+                    kotlinx.serialization.json.buildJsonObject {
+                        put("operation", kotlinx.serialization.json.JsonPrimitive("migrate"))
+                        put("from", kotlinx.serialization.json.JsonPrimitive("0.21"))
+                        put("to", kotlinx.serialization.json.JsonPrimitive("0.22"))
+                        put("source", kotlinx.serialization.json.JsonPrimitive(old))
+                    }
+                YamlMigration.migrate(request)["source"].toString().contains("0.22") shouldBe true
+            }
+        }
+        test("document-one composition errors precede the second document guard") {
+            val error =
+                shouldThrow<CanonicalYamlException> {
+                    CanonicalYaml.read("ttr: '0.22'\nmodel: cn\ndefs: *missing\n---\nx: 1\n", "earliest.yaml")
+                }
+            error.message shouldBe "earliest.yaml:3:7: found undefined alias missing"
         }
     })

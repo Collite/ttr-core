@@ -6,6 +6,40 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — Structural profile execution (MW P3 S3.2, ttr-core#388)
+
+- `ttr-profile` now executes original-tree record selectors, `kinds`, `package`, `rename`, `nest`/`unnest`, `ignore` and `codes`; inherited profiles emit located canonical documents grouped by package and model. Missing record IDs, unconsumed keys and conflicting targets are refused.
+
+### Changed — Breaking profile schema change (`@tatrman/grammar`, grammar 0.22)
+
+- The 0.22 profile schema gains record scope `in` and `kinds.kind`/`kinds.id` (D-MW-64). Writing operations now require `in`; previously valid writing operations without it are refused. No grammar change.
+
+### Fixed — Structural profile and YAML safety (ttr-core#388, review-225)
+
+- Refuse unconsumed scalar values, ignores covering records and duplicate concept identities; consume declaration
+  headers and apply nested-slot writes only to existing children. Align file-selector escapes and double stars with Git.
+- Preserve earliest YAML errors and malformed UTF-8 positions, avoid surrogate-boundary reader crashes, escape the
+  generated JSON bridge and report its size/validation failures at authored records.
+
+### Added — Profile loading and canonical identity (MW P3 S3.1, ttr-core#384)
+
+- `ttr-profile` loads schema-validated, located profile definitions and declarations, checks grammar ranges,
+  resolves root-confined catalog/path inheritance, and provides the bundled `canonical/1` identity profile.
+- `ttr-yaml` exposes `YamlData` (profile-mode reading with `tagScope`), `readProfileYaml` (bounded, strict UTF-8
+  input) and `CanonicalYamlException.keyPath` for authored diagnostic pointers.
+
+### Fixed — Canonical YAML input safety (ttr-core#384, review-220)
+
+- `ttr-yaml` refuses block, flow and `!!merge` merge keys before composition can flatten them, at the authored
+  key: `Mapping keys must be strings; merge keys are not supported`. Under ✅R220-E this also replaces later
+  `Expected mapping node or an anchor referencing mapping` errors for malformed merge operands, and later
+  `Unsupported YAML tag tag:yaml.org,2002:merge` or nesting errors when the merge key is earlier.
+  Merge-looking string values remain accepted.
+- Trailing comments count toward the 3,000,000-code-point budget, preserving the existing limit message.
+- The profile follow-ups align malformed UTF-8 positions with SnakeYAML marks, reject a second document at its
+  start, and reserve all numeric-major-one canonical references (including `canonical/01`) for the bundle.
+- No release is cut here; the internal grammar-family cut remains MW P3 S3.7.
+
 ### Added — AU exporter templates and DMN (S1.5.1)
 
 - Camunda authoring exports gain deterministic element templates and typed empty DMN 1.3 tables from
