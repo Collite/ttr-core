@@ -3,6 +3,9 @@ package org.tatrman.translator.codec.sql
 
 /** Shared literal, quoted-identifier and comment boundaries for the pre-parse text passes. */
 internal object SqlTextScanner {
+    /** The name inside a `"…"` span from [protectedEnd]; the parser reports unterminated spans, including a lone `"`. */
+    fun quotedName(span: String): String = span.drop(1).dropLast(1).replace("\"\"", "\"")
+
     /** End of the protected span starting at [start], or [start] when this is ordinary SQL. */
     fun protectedEnd(
         sql: String,

@@ -87,4 +87,8 @@ class SavedQueryReferencesSpec :
                 refs(sql) shouldBe listOf("query.revenue")
             }
         }
+
+        "an unterminated quote has no saved-query dependencies and does not throw" {
+            refs("SELECT \"a, \"b\" FROM \"t\"").shouldBeEmpty()
+        }
     })

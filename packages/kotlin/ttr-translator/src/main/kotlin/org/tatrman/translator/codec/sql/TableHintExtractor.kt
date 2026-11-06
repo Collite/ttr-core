@@ -65,7 +65,7 @@ object TableHintExtractor {
             }
             val decoded =
                 if (quoted) {
-                    text.substring(1, text.length - 1).replace("\"\"", "\"")
+                    SqlTextScanner.quotedName(text)
                 } else {
                     text.split('.').joinToString(".") { it.trim('`', '[', ']') }
                 }
@@ -199,7 +199,7 @@ object TableHintExtractor {
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .map { item ->
-                val paren = item.indexOf('(')
+                val paren = firstParen(item)
                 if (paren >= 0 && item.endsWith(")")) {
                     val name = item.substring(0, paren).trim()
                     val options =
@@ -211,6 +211,21 @@ object TableHintExtractor {
                     TableHintSpec(name = bracketHintIdentifiers(item))
                 }
             }
+
+    /** First option-list opener outside a protected span. */
+    private fun firstParen(item: String): Int {
+        var i = 0
+        while (i < item.length) {
+            val end = SqlTextScanner.protectedEnd(item, i)
+            if (end > i) {
+                i = end
+            } else {
+                if (item[i] == '(') return i
+                i++
+            }
+        }
+        return -1
+    }
 
     /** Split on commas at paren-depth 0 (so `INDEX(0, 1)` stays one item). */
     private fun splitTopLevel(s: String): List<String> {
@@ -254,7 +269,7 @@ object TableHintExtractor {
             val end = SqlTextScanner.protectedEnd(text, i)
             if (end > i) {
                 if (text[i] == '"') {
-                    val name = text.substring(i + 1, end - 1).replace("\"\"", "\"")
+                    val name = SqlTextScanner.quotedName(text.substring(i, end))
                     out.append('[').append(name.replace("]", "]]")).append(']')
                 } else {
                     out.append(text, i, end)

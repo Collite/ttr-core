@@ -57,6 +57,9 @@ class PreParseRailsSpec :
 
         val hintKeys =
             listOf(
+                "a, b" to "b",
+                "(SELECT a FROM t) AS x" to "x",
+                "[AS]" to "as",
                 "[order details]" to "order details",
                 "[order details] d WITH (NOLOCK) JOIN [order] o ON d.a = o.a" to "order details",
                 "[XX-PRODEJE]" to "xx-prodeje",
@@ -95,5 +98,42 @@ class PreParseRailsSpec :
             val result = PreParseRails.prepare("SELECT 'literal' WITH (NOLOCK)")
             result.cleanedSql shouldBe "SELECT 'literal'"
             result.hintsByTable shouldBe emptyMap()
+        }
+
+        val unterminatedQuotes =
+            listOf(
+                "\"" to "\"",
+                "SELECT \"" to "SELECT \"",
+                "SELECT a FROM t \"" to "SELECT a FROM t \"",
+                "SELECT \"a, \"b\" FROM \"t\"" to "SELECT \"a, \"b\" FROM \"t\"",
+                "SELECT [a]\"" to "SELECT \"a\" \"",
+            )
+        for ((index, pair) in unterminatedQuotes.withIndex()) {
+            "unterminated quotes are left for the parser with or without a terminator $index" {
+                val (source, cleaned) = pair
+                for (suffix in listOf("", ";")) {
+                    val result = PreParseRails.prepare(source + suffix)
+                    result.cleanedSql shouldBe cleaned
+                    result.hintsByTable shouldBe emptyMap()
+                }
+            }
+        }
+
+        "parentheses inside quoted hint names do not start the options" {
+            for (name in listOf("a(b", "(x")) {
+                PreParseRails.prepare("SELECT a FROM t WITH ([$name](c))").hintsByTable shouldBe
+                    mapOf("t" to listOf(TableHintSpec("[$name]", listOf("c"))))
+            }
+        }
+
+        "a literal ends the table reference run before a hint" {
+            val result = PreParseRails.prepare("SELECT a FROM t 'x' WITH (NOLOCK)")
+            result.cleanedSql shouldBe "SELECT a FROM t 'x'"
+            result.hintsByTable shouldBe emptyMap()
+        }
+
+        "double quotes inside hint identifiers are decoded before restoring brackets" {
+            PreParseRails.prepare("SELECT a FROM t WITH (INDEX([a\"b]))").hintsByTable shouldBe
+                mapOf("t" to listOf(TableHintSpec("INDEX", listOf("[a\"b]"))))
         }
     })

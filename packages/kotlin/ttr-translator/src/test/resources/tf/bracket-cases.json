@@ -228,5 +228,15 @@
       "sql": "SELECT [a] FROM [dbo].[XXPRODEJE]"
     },
     "status": "green"
+  },
+  {
+    "id": "tc_r229_unterminated_quote",
+    "group": "TC-DB",
+    "sql": "SELECT \"a, \"b\" FROM \"t\"",
+    "params": [],
+    "expect": {
+      "parseCode": "parse_failed"
+    },
+    "status": "green"
   }
 ]

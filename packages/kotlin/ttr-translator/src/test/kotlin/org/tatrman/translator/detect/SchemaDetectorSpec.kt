@@ -284,4 +284,15 @@ class SchemaDetectorSpec :
             result.unknownTables shouldBe listOf("nope")
             result.referencedTables shouldBe listOf("item_category", "nope")
         }
+
+        "an unterminated quote is NOT_APPLICABLE and does not throw" {
+            val result =
+                SchemaDetector.detect(
+                    "SELECT \"a, \"b\" FROM \"t\"",
+                    Language.SQL,
+                    SchemaCode.DB,
+                    makeHandle(),
+                )
+            result.decision shouldBe SchemaDecision.NOT_APPLICABLE
+        }
     })
