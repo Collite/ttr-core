@@ -13,8 +13,7 @@ import org.tatrman.plan.v1.QualifiedName
 import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.translator.codec.sql.SqlParser
 import org.tatrman.translator.codec.sql.ParseResult as SqlParseResult
-import org.tatrman.translator.codec.sql.TableHintExtractor
-import org.tatrman.translator.codec.sql.TopClauseExtractor
+import org.tatrman.translator.codec.sql.PreParseRails
 
 /**
  * LQ (contract L-24) — the saved queries a SQL body reads as `obj.<namespace>.<name>`, wherever a FROM clause sits:
@@ -26,15 +25,14 @@ import org.tatrman.translator.codec.sql.TopClauseExtractor
  * matches them that way), in first-occurrence order. Pure: no model.
  */
 object SavedQueryReferenceExtractor {
-    /** [source] as a worker holds it: a trailing `;`, `TOP n`, table hints and `{name}` placeholders are accepted. */
+    /** [source] as a worker holds it: a trailing `;`, `TOP n`, table hints, `[…]` names and `{name}` placeholders are accepted. */
     fun fromSource(source: String): List<QualifiedName> {
         // A Calcite entry point like the parse: promote Calcite's literal charset to UTF-8 before any Calcite class
         // loads. A metadata worker calls this before its first parse; without it Calcite froze ISO-8859-1 for the
         // process and every later body with a literal outside Latin-1 failed. Idempotent; see CalciteCharset.
         org.tatrman.translator.framework.CalciteCharset
             .ensureUtf8()
-        val terminated = source.trimEnd().removeSuffix(";").trimEnd()
-        val cleaned = TableHintExtractor.extract(TopClauseExtractor.rewrite(terminated)).cleanedSql
+        val cleaned = PreParseRails.prepare(source).cleanedSql
         val placeholdersFree = PLACEHOLDER.replace(cleaned, "?")
         val parsed = SqlParser.parseQuery(placeholdersFree)
         return if (parsed is SqlParseResult.Success) fromQuery(parsed.sqlNode) else emptyList()

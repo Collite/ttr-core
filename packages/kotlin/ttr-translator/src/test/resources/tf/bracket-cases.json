@@ -1,0 +1,242 @@
+[
+  {
+    "id": "tc_vz42_bracket_alias_top_hint",
+    "group": "TC-DB",
+    "sql": "SELECT TOP 5 a AS [potenciál tržeb] FROM [db].[dbo].[XXPRODEJE] WITH (NOLOCK)",
+    "params": [],
+    "expect": {
+      "sql": "SELECT TOP (5) [a] AS [potenciál tržeb] FROM [dbo].[XXPRODEJE] WITH (NOLOCK)"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_vz42_one_part",
+    "group": "TC-DB",
+    "sql": "SELECT TOP 5 a AS [potenciál tržeb] FROM [XXPRODEJE] WITH (NOLOCK)",
+    "params": [],
+    "expect": {
+      "sql": "SELECT TOP (5) [a] AS [potenciál tržeb] FROM [dbo].[XXPRODEJE] WITH (NOLOCK)"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_vz42_two_part",
+    "group": "TC-DB",
+    "sql": "SELECT TOP 5 a AS [potenciál tržeb] FROM [dbo].[XXPRODEJE] WITH (NOLOCK)",
+    "params": [],
+    "expect": {
+      "sql": "SELECT TOP (5) [a] AS [potenciál tržeb] FROM [dbo].[XXPRODEJE] WITH (NOLOCK)"
+    },
+    "status": "red:TC-S1.2"
+  },
+  {
+    "id": "tc_bracket_like_pattern_literal",
+    "group": "TC-DB",
+    "sql": "SELECT [a] FROM [db].[dbo].[XXPRODEJE] WHERE [a]]b] LIKE '[0-9]%'",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [a] FROM [dbo].[XXPRODEJE] WHERE [a]]b] LIKE '[0-9]%'"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_escaped_bracket_column",
+    "group": "TC-DB",
+    "sql": "SELECT [a]]b] FROM [db].[dbo].[XXPRODEJE]",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [a]]b] FROM [dbo].[XXPRODEJE]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_bracket_attribute_strict_er_lane",
+    "group": "TC-ER",
+    "sql": "SELECT [name] AS [potenciál tržeb] FROM [er].[entity].[customer]",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [name] AS [potenciál tržeb] FROM [dbo].[customers]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_r229_hint_spaced_table",
+    "group": "TC-DB",
+    "sql": "SELECT a FROM [order details] WITH (NOLOCK)",
+    "params": [],
+    "expect": {
+      "sql": "SELECT * FROM [dbo].[order details] WITH (NOLOCK)"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_r229_hint_quoted_table",
+    "group": "TC-DB",
+    "sql": "SELECT a FROM [q\"t] WITH (NOLOCK)",
+    "params": [],
+    "expect": {
+      "sql": "SELECT * FROM [dbo].[q\"t] WITH (NOLOCK)"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_r229_hint_dotted_table",
+    "group": "TC-DB",
+    "sql": "SELECT a FROM [a.b] WITH (NOLOCK)",
+    "params": [],
+    "expect": {
+      "sql": "SELECT * FROM [dbo].[a.b] WITH (NOLOCK)"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_r229_hint_argument_0",
+    "group": "TC-DB",
+    "sql": "SELECT a FROM XXPRODEJE WITH (INDEX([IX_a]))",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [a] FROM [dbo].[XXPRODEJE] WITH (INDEX([IX_A]))"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_r229_hint_argument_1",
+    "group": "TC-DB",
+    "sql": "SELECT a FROM XXPRODEJE WITH (INDEX([IX_a]), NOLOCK)",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [a] FROM [dbo].[XXPRODEJE] WITH (INDEX([IX_A]), NOLOCK)"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_r229_hint_argument_2",
+    "group": "TC-DB",
+    "sql": "SELECT a FROM XXPRODEJE WITH (INDEX = [IX_a])",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [a] FROM [dbo].[XXPRODEJE] WITH (INDEX = [IX_A])"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_r229_hint_argument_3",
+    "group": "TC-DB",
+    "sql": "SELECT a FROM XXPRODEJE WITH (FORCESEEK([IX_a] ([a])))",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [a] FROM [dbo].[XXPRODEJE] WITH (FORCESEEK([IX_A] ([A])))"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_r229_hint_argument_4",
+    "group": "TC-DB",
+    "sql": "SELECT a FROM XXPRODEJE WITH (INDEX([a]]b]))",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [a] FROM [dbo].[XXPRODEJE] WITH (INDEX([A]]B]))"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_r229_hint_argument_5",
+    "group": "TC-DB",
+    "sql": "SELECT a FROM XXPRODEJE WITH (INDEX(\"IX_a\"))",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [a] FROM [dbo].[XXPRODEJE] WITH (INDEX([IX_A]))"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_r229_hint_argument_6",
+    "group": "TC-DB",
+    "sql": "SELECT a FROM XXPRODEJE WITH (INDEX([I)X]))",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [a] FROM [dbo].[XXPRODEJE] WITH (INDEX([I)X]))"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_r229_hint_argument_7",
+    "group": "TC-DB",
+    "sql": "SELECT a FROM XXPRODEJE WITH (INDEX([I,X]))",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [a] FROM [dbo].[XXPRODEJE] WITH (INDEX([I,X]))"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_r229_adjacent_names_0",
+    "group": "TC-DB",
+    "sql": "SELECT [a][b] FROM XXPRODEJE",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [a] AS [b] FROM [dbo].[XXPRODEJE]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_r229_adjacent_names_1",
+    "group": "TC-DB",
+    "sql": "SELECT [a]\"b\" FROM XXPRODEJE",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [a] AS [b] FROM [dbo].[XXPRODEJE]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_r229_adjacent_names_2",
+    "group": "TC-DB",
+    "sql": "SELECT \"a\"[b] FROM XXPRODEJE",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [a] AS [b] FROM [dbo].[XXPRODEJE]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_r229_cr_comment",
+    "group": "TC-DB",
+    "sql": "-- c\rSELECT [a] FROM XXPRODEJE",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [a] FROM [dbo].[XXPRODEJE]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_r229_slash_comment",
+    "group": "TC-DB",
+    "sql": "// it's\nSELECT [a] FROM XXPRODEJE",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [a] FROM [dbo].[XXPRODEJE]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_r229_repeated_terminators",
+    "group": "TC-DB",
+    "sql": "SELECT a FROM XXPRODEJE;;",
+    "params": [],
+    "expect": {
+      "sql": "SELECT [a] FROM [dbo].[XXPRODEJE]"
+    },
+    "status": "green"
+  },
+  {
+    "id": "tc_r229_unterminated_quote",
+    "group": "TC-DB",
+    "sql": "SELECT \"a, \"b\" FROM \"t\"",
+    "params": [],
+    "expect": {
+      "parseCode": "parse_failed"
+    },
+    "status": "green"
+  }
+]

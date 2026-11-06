@@ -78,6 +78,8 @@ object TableIdentifierExtractor {
 
         private fun collectFrom(node: SqlNode?) {
             when (node) {
+                is SqlOrderBy -> collect(node)
+
                 is SqlIdentifier -> add(node)
 
                 is SqlJoin -> {

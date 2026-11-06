@@ -13,9 +13,8 @@ import org.tatrman.translator.codec.sql.RelToSqlUnparser
 import org.tatrman.translator.codec.sql.ModelJoinRewriter
 import org.tatrman.translator.codec.sql.SqlValidator
 import org.tatrman.translator.codec.sql.StoreDmlUnparser
-import org.tatrman.translator.codec.sql.TableHintExtractor
+import org.tatrman.translator.codec.sql.PreParseRails
 import org.tatrman.translator.codec.sql.TableHintSpec
-import org.tatrman.translator.codec.sql.TopClauseExtractor
 import org.tatrman.translator.codec.sql.ValidateResult
 import org.tatrman.translator.functions.TsqlPlusLowering
 import org.tatrman.translator.codec.transdsl.TransDslCodec
@@ -342,22 +341,9 @@ class Translator(
                 )
             }
         }
-        // Calcite parses a single statement and rejects a trailing terminator (`Encountered ";"`).
-        // Authored pattern queries and hand-written SQL routinely end with one, so strip a single
-        // trailing `;` (plus surrounding whitespace) up front — before the rails below and schema
-        // detection / validation each re-parse the SQL. Only the final non-whitespace `;` is removed,
-        // so a `;` inside a string literal is left intact.
-        val terminated = source.trimEnd().removeSuffix(";").trimEnd()
-        // NX-A.S4 — MSSQL pre-parse rails, BEFORE anything parses the SQL (schema detection AND
-        // validation must both see a form the stock parser accepts):
-        //  1. TOP: `SELECT [DISTINCT] TOP n …` → `… FETCH FIRST n ROWS ONLY`. The row-limit then
-        //     flows through the existing Sort/LimitOffset path and the MSSQL dialect renders it back.
-        //  2. Table hints: pull `WITH (NOLOCK)` out (a post-alias position the grammar can't read).
-        //     `hintsByTable` rides through to PlanNodeEncoder, which stamps the hints onto the
-        //     matching scan; the MSSQL unparse re-emits them. CTEs / string literals are not matched.
-        val extractedHints = TableHintExtractor.extract(TopClauseExtractor.rewrite(terminated))
-        val preSource = extractedHints.cleanedSql
-        val hintsByTable = extractedHints.byTable
+        val textSource = PreParseRails.prepare(source)
+        val preSource = textSource.cleanedSql
+        val hintsByTable = textSource.hintsByTable
         // Parameter rail: when typed bindings are supplied, rewrite `{name}` → Calcite positional
         // `?` BEFORE anything parses the SQL (schema detection AND validation must see `?`, never
         // the raw `{name}` token — the latter is what produced the opaque "Incorrect syntax near

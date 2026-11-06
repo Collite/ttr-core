@@ -2,6 +2,7 @@
 package org.tatrman.translator.params
 
 import org.apache.calcite.sql.type.SqlTypeName
+import org.tatrman.translator.codec.sql.SqlTextScanner
 
 /**
  * Bridge between named-parameter SQL and Calcite's positional `?` form.
@@ -196,29 +197,7 @@ object ParameterBridge {
     private fun opaqueEnd(
         sql: String,
         start: Int,
-    ): Int {
-        fun quoted(quote: Char): Int {
-            var j = start + 1
-            while (j < sql.length) {
-                if (sql[j] == quote) {
-                    if (j + 1 < sql.length && sql[j + 1] == quote) {
-                        j += 2
-                        continue
-                    }
-                    return j + 1
-                }
-                j++
-            }
-            return sql.length
-        }
-        return when {
-            sql[start] == '\'' -> quoted('\'')
-            sql[start] == '"' -> quoted('"')
-            sql.startsWith("--", start) -> sql.indexOf('\n', start).let { if (it < 0) sql.length else it }
-            sql.startsWith("/*", start) -> sql.indexOf("*/", start + 2).let { if (it < 0) sql.length else it + 2 }
-            else -> start
-        }
-    }
+    ): Int = SqlTextScanner.protectedEnd(sql, start)
 
     private fun isIdentifierChar(c: Char): Boolean = c.isLetterOrDigit() || c == '_'
 
