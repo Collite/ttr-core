@@ -6,6 +6,8 @@ import com.github.ajalt.clikt.testing.test
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldMatch
+import kotlinx.serialization.json.Json
 import org.tatrman.ttr.metadata.source.FileBasedSource
 import org.tatrman.ttr.metadata.source.LocalFsStorage
 import org.tatrman.ttrp.cli.EmitCommand
@@ -95,7 +97,7 @@ class RecipeExportSpec :
             }
             Files.readString(path) shouldBe text + "\n"
         }
-        "SPI v2 projects every H-1 deployment field and native passes the H-6 determinism kit" {
+        "SPI v2 projects every H-1 deployment field and process_engine passes the H-6 determinism kit" {
             val bundle = build("release_order")
             val d = world.deployment("release_n8n")!!
             val graph =
@@ -130,21 +132,33 @@ class RecipeExportSpec :
             // D-142 took the connectors: an authored `connectors:` (refused by the checkers) never reaches the SPI
             connected.deployment.connectors shouldBe emptyMap()
             golden("release_n8n_recipe_graph", graph.toString().replace(", ", ",\n"))
-            val native = world.deployment("release_morning")!!
-            val nativeGraph =
+            val engine = world.deployment("release_morning")!!
+            val engineGraph =
                 org.tatrman.ttrp.emit.recipe.RecipeGraphProjector.project(
                     bundle.manifest,
                     world,
                     program,
-                    native,
+                    engine,
                     actions,
                 )
+            engineGraph.deployment.egressUrl shouldBe "http://process-engine-egress.process-engine.svc/automation"
             org.tatrman.ttrp.conform.EmitDeterminismKit
                 .checkRecipes(
-                    EmitPluginLoader.builtin("native"),
+                    EmitPluginLoader.builtin("process_engine"),
                     listOf(
                         org.tatrman.ttrp.emit.spi
-                            .RecipeEmitRequest(nativeGraph, "{}", "readme", "{}"),
+                            .RecipeEmitRequest(
+                                // The host resolves approval groups for the Camunda targets (⚑R223-C).
+                                engineGraph.copy(
+                                    actions =
+                                        engineGraph.actions.mapValues {
+                                            it.value.copy(candidateGroup = "hartland-process-owners")
+                                        },
+                                ),
+                                "{}",
+                                "readme",
+                                "{}",
+                            ),
                     ),
                 ).deterministic shouldBe
                 true
@@ -651,7 +665,7 @@ class RecipeExportSpec :
                 }.message!! shouldContain
                 "emailSend action emit needs exactly one addressing column"
         }
-        "native CLI export is deterministic and contains no launcher or run calls" {
+        "process_engine CLI export is deterministic and inventories the rendered BPMN's calls" {
             val project = temporaryDirectory("recipe-export-project")
             for (folder in listOf("automation", "worlds")) {
                 val target = project.resolve("models/hartland/$folder")
@@ -677,7 +691,13 @@ class RecipeExportSpec :
             )
             Files.writeString(project.resolve("modeler.toml"), "[ttrp]\nworld = \"hartland.worlds.demo\"\n")
             val recipe = locate("packages/kotlin/ttrp-frontend/src/test/resources/recipes/release_order.ttrp")
-            Files.copy(recipe, project.resolve("release_order.ttrp"))
+            // The engine export's templates offer every world program: their recipes' parameters come from source.
+            Files.createDirectories(project.resolve("recipes"))
+            Files.list(recipe.parent).use { paths ->
+                paths.filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".ttrp") }.forEach {
+                    Files.copy(it, project.resolve("recipes").resolve(it.fileName))
+                }
+            }
             val bundle =
                 BundleAssembler("test").build(
                     source = Files.readString(recipe),
@@ -691,8 +711,8 @@ class RecipeExportSpec :
                     modelsRoot = root,
                     outDir = temporaryDirectory("recipe-export-bundle"),
                 )
-            val first = temporaryDirectory("native-export-a")
-            val second = temporaryDirectory("native-export-b")
+            val first = temporaryDirectory("engine-export-a")
+            val second = temporaryDirectory("engine-export-b")
 
             fun emit(out: Path) =
                 TtrpCommand()
@@ -716,20 +736,27 @@ class RecipeExportSpec :
             io.kotest.assertions.withClue(a.output) { a.statusCode shouldBe 0 }
             val b = emit(second)
             io.kotest.assertions.withClue(b.output) { b.statusCode shouldBe 0 }
-            val folder = "release_morning.native.export"
-            val files =
-                Files.list(first.resolve(folder)).use {
-                    it
-                        .map { p ->
-                            p.fileName.toString()
-                        }.sorted()
+            val folder = "release_morning.process_engine.export"
+
+            fun tree(root: Path) =
+                Files.walk(root.resolve(folder)).use { paths ->
+                    paths
+                        .filter { Files.isRegularFile(it) }
+                        .map { root.resolve(folder).relativize(it).toString() to Files.readString(it) }
                         .toList()
+                        .toMap()
                 }
-            files shouldBe listOf("README.md", "conformance.json", "manifest.json")
-            files.forEach { name ->
-                Files.readString(first.resolve(folder).resolve(name)) shouldBe
-                    Files.readString(second.resolve(folder).resolve(name))
-            }
-            Files.readString(first.resolve(folder).resolve("manifest.json")) shouldContain "\"calls\": []"
+            val files = tree(first)
+            files.keys.filter { '/' !in it }.sorted() shouldBe
+                listOf("README.md", "conformance.json", "manifest.json", "release_order.c7.bpmn")
+            files.keys.filter { it.startsWith("templates/c7/") }.isEmpty() shouldBe false
+            files shouldBe tree(second)
+            val manifest = Json.parseToJsonElement(files.getValue("manifest.json")).jsonObject
+            manifest.getValue("calls").jsonArray.isEmpty() shouldBe false
+            manifest
+                .getValue("fingerprints")
+                .jsonObject
+                .getValue("bundle")
+                .jsonPrimitive.content shouldMatch Regex("[0-9a-f]{64}")
         }
     })

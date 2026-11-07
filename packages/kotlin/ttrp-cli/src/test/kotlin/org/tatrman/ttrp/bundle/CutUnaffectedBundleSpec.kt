@@ -16,6 +16,9 @@ import java.security.MessageDigest
  * byte is pinned to the pre-cut toolchain (grammar 0.21, master 0c1e3d74 with the cut fixtures), except for
  * Core#382's boolean detail marker, optional context/reason columns and their catalog/manifest hashes, added to
  * the reviewed baseline.
+ * S1.5.2 (D-145) re-recorded the baseline once more for the fixture world alone: its `engine { extends: process_engine,
+ * egress_url }` replaced `server { extends: native }` and the `*_native_*` deployments were renamed, which moves the
+ * world fingerprint (every manifest) and the catalogs' world lines; islands, parts and READMEs are unchanged.
  * Re-recording writes all four recipes' stripped digests, preserving the complete golden.
  */
 class CutUnaffectedBundleSpec :
