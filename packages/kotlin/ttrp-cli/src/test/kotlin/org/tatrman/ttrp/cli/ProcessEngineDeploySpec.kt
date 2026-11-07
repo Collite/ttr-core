@@ -44,64 +44,113 @@ class ProcessEngineDeploySpec :
             error("could not locate $rel")
         }
         val fixture = locate("packages/kotlin/ttrp-frontend/src/test/resources/recipes/hartland-engine")
+        val queriesRoot = locate("packages/kotlin/ttrp-cli/src/test/resources/fixtures/hartland-queries")
+        val stockRoles = locate("packages/kotlin/ttr-semantics/src/main/resources/builtin/cnc-stock-roles.ttr")
         val worldFile = "models/hartland/worlds/demo.ttrm"
+        val automationFile = "models/hartland/automation/automation.ttrm"
 
-        /** The CG-2 engine fixture plus one `def query`, so the bundle carries a DMN skeleton beside the BPMN. */
-        fun project(engineUrl: String = "http://127.0.0.1:9/engine-rest"): Path {
-            val dir = Files.createTempDirectory("pe-deploy-project")
-            Files.walk(fixture).use { paths ->
-                paths.forEach { p ->
-                    val target = dir.resolve(fixture.relativize(p).toString())
-                    if (Files.isDirectory(p)) Files.createDirectories(target) else Files.copy(p, target)
-                }
+        /** An export project and, unless refused before building, the recipe bundle `--bundle` passes. */
+        class Project(
+            val dir: Path,
+            val bundle: Path?,
+        )
+
+        fun copyTree(
+            from: Path,
+            to: Path,
+        ) = Files.walk(from).use { paths ->
+            paths.forEach { p ->
+                val target = to.resolve(from.relativize(p).toString())
+                if (Files.isDirectory(p)) Files.createDirectories(target) else Files.copy(p, target)
             }
-            val world = dir.resolve(worldFile)
-            val text = Files.readString(world)
-            check("http://process-engine.<ns>.svc/engine-rest" in text)
-            Files.writeString(world, text.replace("http://process-engine.<ns>.svc/engine-rest", engineUrl))
-            Files.createDirectories(dir.resolve("models/hartland/queries"))
-            Files.writeString(
-                dir.resolve("models/hartland/queries/q_engine.ttrm"),
-                """
-                package hartland
-
-                model query
-
-                def query placed_orders {
-                    language: SQL
-                    sourceText: ${"\"\"\""}SELECT so_order_number, so_state FROM sales_order WHERE so_state = 'placed'${"\"\"\""}
-                }
-                """.trimIndent() + "\n",
-            )
-            return dir
         }
 
         fun edit(
-            dir: Path,
+            path: Path,
             before: String,
             after: String,
         ) {
-            val path = dir.resolve(worldFile)
             val source = Files.readString(path)
             check(before in source) { "fixture lacks: $before" }
             Files.writeString(path, source.replace(before, after))
         }
 
+        /**
+         * The CG-2 engine fixture (post-cut world: `engine { extends: process_engine, url, egress_url }`, H-1
+         * `release_event` startable by `role.sales_manager`). Its recipe bundle builds against the fixture's own models;
+         * the export project carries the same automation and world over hartland's complete model (the S1.5.1
+         * `hartland-queries` fixture, 24 projectable `def query` → 24 DMN skeletons) plus the stock vocabulary, as
+         * RecipeExportSpec's Camunda case does. [worldEdits]/[automationEdits] apply to both copies.
+         */
+        fun project(
+            engineUrl: String = "http://127.0.0.1:9/engine-rest",
+            worldEdits: List<Pair<String, String>> = emptyList(),
+            automationEdits: List<Pair<String, String>> = emptyList(),
+            bundle: Boolean = true,
+        ): Project {
+            val models = Files.createTempDirectory("pe-bundle-models")
+            copyTree(fixture, models)
+            val edits = listOf("http://process-engine.<ns>.svc/engine-rest" to engineUrl) + worldEdits
+            edits.forEach { (a, b) -> edit(models.resolve(worldFile), a, b) }
+            automationEdits.forEach { (a, b) -> edit(models.resolve(automationFile), a, b) }
+            val dir = Files.createTempDirectory("pe-deploy-project")
+            for (folder in listOf("automation", "worlds")) {
+                copyTree(models.resolve("models/hartland/$folder"), dir.resolve("models/hartland/$folder"))
+            }
+            Files.walk(queriesRoot).use { paths ->
+                paths.filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".ttrm") }.forEach { path ->
+                    val name = queriesRoot.relativize(path).toString().replace('/', '_')
+                    Files.copy(path, dir.resolve("models/hartland/$name"))
+                }
+            }
+            // hartland's customer is the TPC-DS dimension keyed `sk` (ttr-demo automation.ttrm); the CG-2 fixture's
+            // ER spells it `customer_sk`. The respelling is the export project's only departure from the bundle's copy.
+            edit(dir.resolve(automationFile), "type: customer.customer_sk", "type: customer.sk")
+            Files.copy(stockRoles, dir.resolve("models/stock.ttrm"))
+            Files.createDirectories(dir.resolve("recipes"))
+            Files.list(fixture).use { paths ->
+                paths.filter { it.fileName.toString().endsWith(".ttrp") }.forEach {
+                    Files.copy(it, dir.resolve("recipes").resolve(it.fileName))
+                }
+            }
+            Files.writeString(dir.resolve("modeler.toml"), "[ttrp]\nworld = \"hartland.worlds.demo\"\n")
+            val built =
+                if (!bundle) {
+                    null
+                } else {
+                    org.tatrman.ttrp.bundle
+                        .BundleAssembler("test")
+                        .build(
+                            source = Files.readString(models.resolve("release_order.ttrp")),
+                            fileName = "release_order.ttrp",
+                            recipeDir = models,
+                            pipelineManifest = org.tatrman.ttrp.project.TtrpManifestReader.resolve(models).manifest,
+                            modelsRoot = models.resolve("models"),
+                            outDir = Files.createTempDirectory("pe-bundle"),
+                        ).dir
+                }
+            return Project(dir, built)
+        }
+
         fun emit(
-            dir: Path,
+            project: Project,
             vararg extra: String,
             env: Map<String, String> = mapOf("TTR_BEARER" to bearer),
             deployment: String = "release_event",
         ): CliktCommandTestResult =
             TtrpCommand()
                 .subcommands(EmitCommand(env))
-                .test(listOf("emit", "--deployment", deployment, "--project", dir.toString()) + extra.toList())
+                .test(
+                    listOf("emit", "--deployment", deployment, "--project", project.dir.toString()) +
+                        (project.bundle?.let { listOf("--bundle", it.toString()) } ?: emptyList()) +
+                        extra.toList(),
+                )
 
         fun sha256(bytes: ByteArray) =
             MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
         /** The bundle fingerprint as `fingerprints.bundle` is written: one file export, read back. */
-        fun exported(dir: Path): Path {
+        fun exported(dir: Project): Path {
             val out = Files.createTempDirectory("pe-export")
             val result = emit(dir, "--out", out.toString())
             withClue(result.output) { result.statusCode shouldBe 0 }
@@ -125,15 +174,15 @@ class ProcessEngineDeploySpec :
             bpmn shouldContain "camunda:historyTimeToLive=\"30\""
             bpmn shouldContain "camunda:candidateStarterGroups=\"hartland-sales-managers\""
             bpmn shouldContain "http://process-engine-egress/automation/recipes/release_order/runs"
+            Files.readString(folder.resolve("templates/c7/release_on_placement.json")) shouldContain
+                "http://process-engine-egress/automation/recipes/"
             bpmn shouldNotContain "Authorization"
             bpmn shouldNotContain "TTR_CONN_AUTOMATION"
             val dmn =
-                Files.list(folder.resolve("dmn")).use { it.toList() }.map { it.fileName.toString() }
-            dmn.size shouldBe 1
+                Files.list(folder.resolve("dmn")).use { it.toList() }.map { it.fileName.toString() }.sorted()
+            dmn.size shouldBe 24
             val template =
-                Files.list(folder.resolve("templates/c7")).use { it.toList() }.single {
-                    it.fileName.toString().contains("placed_orders")
-                }
+                folder.resolve("templates/c7/${dmn.first().removeSuffix("_decision.dmn")}.json")
             val templateText = Files.readString(template)
             templateText shouldContain "camunda:Connector"
             templateText shouldContain "http-connector"
@@ -163,18 +212,17 @@ class ProcessEngineDeploySpec :
         }
 
         "the retired native executor type refuses by name" {
-            val dir = project()
-            edit(
-                dir,
-                "def executor engine {",
-                "def executor server { extends: native }\n    def executor engine {",
-            )
-            edit(
-                dir,
-                "def deployment release_morning ",
-                "def deployment release_server { program: morning_release, target: server, " +
-                    "run_as: identity.automation_decider }\n    def deployment release_morning ",
-            )
+            val dir =
+                project(
+                    worldEdits =
+                        listOf(
+                            "def executor engine {" to "def executor server { extends: native }\n    def executor engine {",
+                            "def deployment release_morning " to
+                                "def deployment release_server { program: morning_release, target: server, " +
+                                "run_as: identity.automation_decider }\n    def deployment release_morning ",
+                        ),
+                    bundle = false,
+                )
             val result = emit(dir, "--out", Files.createTempDirectory("pe-native").toString(), deployment = "release_server")
             result.statusCode shouldBe 2
             result.output shouldContain "native"
@@ -183,30 +231,28 @@ class ProcessEngineDeploySpec :
         }
 
         "startable_by: [] writes no start group and says no role may start it; absent keeps no-restriction" {
-            val empty = project()
-            edit(empty, "startable_by: role.sales_manager", "startable_by: []")
+            val empty = project(worldEdits = listOf("startable_by: role.sales_manager" to "startable_by: []"))
             val emptyFolder = exported(empty)
             Files.readString(emptyFolder.resolve("release_order.c7.bpmn")) shouldNotContain "candidateStarterGroups"
             Files.readString(emptyFolder.resolve("README.md")) shouldContain "no role may start"
-            val absent = project()
-            edit(absent, ", startable_by: role.sales_manager", "")
+            val absent = project(worldEdits = listOf(", startable_by: role.sales_manager" to ""))
             val absentFolder = exported(absent)
             Files.readString(absentFolder.resolve("release_order.c7.bpmn")) shouldNotContain "candidateStarterGroups"
             Files.readString(absentFolder.resolve("README.md")) shouldContain "No startable_by restriction"
         }
 
         "a startable_by role without a Keycloak group refuses TTRP-EXPORT-ROLE" {
-            val dir = project()
-            val automation = dir.resolve("models/hartland/automation/automation.ttrm")
-            Files.writeString(
-                automation,
-                Files.readString(automation).replace(
-                    "def role ops            { resolve: keycloak_group \"hartland-ops\" }",
-                    "def role ops            { resolve: keycloak_group \"hartland-ops\" }\n" +
-                        "def role night_shift    { members: [\"maya\"] }",
-                ),
-            )
-            edit(dir, "startable_by: role.sales_manager", "startable_by: [role.sales_manager, role.night_shift]")
+            val dir =
+                project(
+                    worldEdits =
+                        listOf("startable_by: role.sales_manager" to "startable_by: [role.sales_manager, role.night_shift]"),
+                    automationEdits =
+                        listOf(
+                            "def role ops            { resolve: keycloak_group \"hartland-ops\" }" to
+                                "def role ops            { resolve: keycloak_group \"hartland-ops\" }\n" +
+                                "def role night_shift    { members: [\"maya\"] }",
+                        ),
+                )
             val result = emit(dir, "--out", Files.createTempDirectory("pe-role").toString())
             result.statusCode shouldBe 2
             result.output shouldContain "TTRP-EXPORT-ROLE"
@@ -214,8 +260,7 @@ class ProcessEngineDeploySpec :
         }
 
         "an engine export without egress_url refuses by name" {
-            val dir = project()
-            edit(dir, "egress_url: \"http://process-engine-egress/automation\", ", "")
+            val dir = project(worldEdits = listOf("egress_url: \"http://process-engine-egress/automation\", " to ""))
             val result = emit(dir, "--out", Files.createTempDirectory("pe-egress").toString())
             result.statusCode shouldBe 2
             result.output shouldContain "egress_url"
@@ -324,12 +369,14 @@ class ProcessEngineDeploySpec :
                     )
                 val files = form.filter { it.second != null }
                 files.map { it.second } shouldBe files.map { it.first }
-                val dmnName =
-                    Files.list(folder.resolve("dmn")).use { it.toList() }.single().fileName.toString()
-                files.map { it.second }.sorted() shouldBe listOf(dmnName, "release_order.c7.bpmn").sorted()
+                val dmnNames = Files.list(folder.resolve("dmn")).use { it.toList() }.map { it.fileName.toString() }
+                dmnNames.size shouldBe 24
+                files.map { it.second!! } shouldBe (dmnNames + "release_order.c7.bpmn").sortedBy { it }
                 files.single { it.second == "release_order.c7.bpmn" }.third shouldBe
                     Files.readAllBytes(folder.resolve("release_order.c7.bpmn"))
-                files.single { it.second == dmnName }.third shouldBe Files.readAllBytes(folder.resolve("dmn/$dmnName"))
+                dmnNames.forEach { name ->
+                    files.single { it.second == name }.third shouldBe Files.readAllBytes(folder.resolve("dmn/$name"))
+                }
             } finally {
                 engine.stop()
             }
@@ -339,9 +386,11 @@ class ProcessEngineDeploySpec :
             val engine = Engine()
             try {
                 val dir = project(engine.url)
-                val cwdBefore = Files.list(dir).use { it.toList() }.toSet()
-                emit(dir, "--deploy").statusCode shouldBe 0
-                Files.list(dir).use { it.toList() }.toSet() shouldBe cwdBefore
+                val cwdBefore = Files.list(dir.dir).use { it.toList() }.toSet()
+                val deployed = emit(dir, "--deploy")
+                withClue(deployed.output) { deployed.statusCode shouldBe 0 }
+                Files.list(dir.dir).use { it.toList() }.toSet() shouldBe cwdBefore
+                Files.exists(Path.of("release_event.process_engine.export")) shouldBe false
                 val out = Files.createTempDirectory("pe-file-only")
                 val fileOnly = emit(dir, "--out", out.toString(), env = emptyMap())
                 withClue(fileOnly.output) { fileOnly.statusCode shouldBe 0 }
@@ -368,12 +417,17 @@ class ProcessEngineDeploySpec :
         }
 
         "--deploy refuses a non-engine target: customer Camunda exports stay files" {
-            val dir = project()
-            edit(dir, "def executor py    { extends: python_client }",
-                "def executor py    { extends: python_client }\n    def executor c7 { extends: camunda_7 }")
-            edit(dir, "def deployment release_morning ",
-                "def deployment release_c7 { program: release_on_placement, target: c7, " +
-                    "run_as: identity.automation_decider }\n    def deployment release_morning ")
+            val dir =
+                project(
+                    worldEdits =
+                        listOf(
+                            "def executor py     { extends: python_client }" to
+                                "def executor py     { extends: python_client }\n    def executor c7 { extends: camunda_7 }",
+                            "def deployment release_morning " to
+                                "def deployment release_c7 { program: release_on_placement, target: c7, " +
+                                "run_as: identity.automation_decider }\n    def deployment release_morning ",
+                        ),
+                )
             val result = emit(dir, "--deploy", deployment = "release_c7")
             result.statusCode shouldBe 2
             result.output shouldContain "process_engine"
