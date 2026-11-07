@@ -90,7 +90,10 @@ internal class AuthoringArtifacts(
      */
     private val egress: String by lazy {
         val raw =
-            requireNotNull(request.graph.deployment.egressUrl?.takeIf { it.isNotBlank() }) {
+            requireNotNull(
+                request.graph.deployment.egressUrl
+                    ?.takeIf { it.isNotBlank() },
+            ) {
                 "TTRP-EXPORT-EGRESS: deployment ${request.graph.deployment.name}: executor " +
                     "${request.graph.deployment.target} declares no egress_url (D-158)"
             }
@@ -128,20 +131,24 @@ internal class AuthoringArtifacts(
      */
     private fun connectorScope(): JsonObject {
         val programs =
-            world.programs.sortedBy { it.name }.joinToString(", ", "[", "]") { p ->
-                val port =
-                    when (p.port) {
-                        null, "none" -> "none"
-                        "key", "keys" -> p.port
-                        else -> error("TTRP-EXPORT-REF: unsupported template port ${p.port} for ${p.name}")
-                    }
-                "'${identifier(p.name)}': [recipe: '${identifier(p.recipe)}', port: '$port']"
-            }.let { if (it == "[]") "[:]" else it }
+            world.programs
+                .sortedBy { it.name }
+                .joinToString(", ", "[", "]") { p ->
+                    val port =
+                        when (p.port) {
+                            null, "none" -> "none"
+                            "key", "keys" -> p.port
+                            else -> error("TTRP-EXPORT-REF: unsupported template port ${p.port} for ${p.name}")
+                        }
+                    "'${identifier(p.name)}': [recipe: '${identifier(p.recipe)}', port: '$port']"
+                }.let { if (it == "[]") "[:]" else it }
         val queries =
-            world.queries.sortedBy { it.qname }.joinToString(", ", "[", "]") { q ->
-                "'${identifier(q.qname)}': " +
-                    q.params.sortedBy { it.name }.joinToString(", ", "[", "]") { "'${identifier(it.name)}'" }
-            }.let { if (it == "[]") "[:]" else it }
+            world.queries
+                .sortedBy { it.qname }
+                .joinToString(", ", "[", "]") { q ->
+                    "'${identifier(q.qname)}': " +
+                        q.params.sortedBy { it.name }.joinToString(", ", "[", "]") { "'${identifier(it.name)}'" }
+                }.let { if (it == "[]") "[:]" else it }
         val url =
             """
             def source = execution.getVariable('ttr_source')

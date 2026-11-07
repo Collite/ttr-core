@@ -124,7 +124,10 @@ class ProcessEngineDeploySpec :
                             source = Files.readString(models.resolve("release_order.ttrp")),
                             fileName = "release_order.ttrp",
                             recipeDir = models,
-                            pipelineManifest = org.tatrman.ttrp.project.TtrpManifestReader.resolve(models).manifest,
+                            pipelineManifest =
+                                org.tatrman.ttrp.project.TtrpManifestReader
+                                    .resolve(models)
+                                    .manifest,
                             modelsRoot = models.resolve("models"),
                             outDir = Files.createTempDirectory("pe-bundle"),
                         ).dir
@@ -166,10 +169,14 @@ class ProcessEngineDeploySpec :
                 .getValue("bundle")
                 .jsonPrimitive.content
 
-        "process_engine selects the C7 export against the executor's egress, with start groups and a bundle fingerprint" {
+        "process_engine selects the C7 export: the executor's egress, start groups and a bundle fingerprint" {
             val folder = exported(project())
             val manifest = Json.parseToJsonElement(Files.readString(folder.resolve("manifest.json"))).jsonObject
-            manifest.getValue("target").jsonObject.getValue("type").jsonPrimitive.content shouldBe "process_engine"
+            manifest
+                .getValue("target")
+                .jsonObject
+                .getValue("type")
+                .jsonPrimitive.content shouldBe "process_engine"
             val bpmn = Files.readString(folder.resolve("release_order.c7.bpmn"))
             bpmn shouldContain "camunda:historyTimeToLive=\"30\""
             bpmn shouldContain "camunda:candidateStarterGroups=\"hartland-sales-managers\""
@@ -179,7 +186,11 @@ class ProcessEngineDeploySpec :
             bpmn shouldNotContain "Authorization"
             bpmn shouldNotContain "TTR_CONN_AUTOMATION"
             val dmn =
-                Files.list(folder.resolve("dmn")).use { it.toList() }.map { it.fileName.toString() }.sorted()
+                Files
+                    .list(folder.resolve("dmn"))
+                    .use { it.toList() }
+                    .map { it.fileName.toString() }
+                    .sorted()
             dmn.size shouldBe 24
             val template =
                 folder.resolve("templates/c7/${dmn.first().removeSuffix("_decision.dmn")}.json")
@@ -190,9 +201,10 @@ class ProcessEngineDeploySpec :
             templateText shouldNotContain "Authorization"
             // fingerprints.bundle = sha256 over the posted resources in name byte order, each `<name>\n<bytes>`.
             val resources =
-                (listOf("release_order.c7.bpmn" to folder.resolve("release_order.c7.bpmn")) +
-                    dmn.map { it to folder.resolve("dmn/$it") })
-                    .sortedBy { it.first }
+                (
+                    listOf("release_order.c7.bpmn" to folder.resolve("release_order.c7.bpmn")) +
+                        dmn.map { it to folder.resolve("dmn/$it") }
+                ).sortedBy { it.first }
             val expected =
                 sha256(
                     resources
@@ -216,14 +228,16 @@ class ProcessEngineDeploySpec :
                 project(
                     worldEdits =
                         listOf(
-                            "def executor engine {" to "def executor server { extends: native }\n    def executor engine {",
+                            "def executor engine {" to
+                                "def executor server { extends: native }\n    def executor engine {",
                             "def deployment release_morning " to
                                 "def deployment release_server { program: morning_release, target: server, " +
                                 "run_as: identity.automation_decider }\n    def deployment release_morning ",
                         ),
                     bundle = false,
                 )
-            val result = emit(dir, "--out", Files.createTempDirectory("pe-native").toString(), deployment = "release_server")
+            val result =
+                emit(dir, "--out", Files.createTempDirectory("pe-native").toString(), deployment = "release_server")
             result.statusCode shouldBe 2
             result.output shouldContain "native"
             result.output shouldContain "retired"
@@ -245,7 +259,10 @@ class ProcessEngineDeploySpec :
             val dir =
                 project(
                     worldEdits =
-                        listOf("startable_by: role.sales_manager" to "startable_by: [role.sales_manager, role.night_shift]"),
+                        listOf(
+                            "startable_by: role.sales_manager" to
+                                "startable_by: [role.sales_manager, role.night_shift]",
+                        ),
                     automationEdits =
                         listOf(
                             "def role ops            { resolve: keycloak_group \"hartland-ops\" }" to
@@ -310,7 +327,9 @@ class ProcessEngineDeploySpec :
         fun row(
             id: String,
             source: String?,
-        ) = """[{"id":"$id","name":"release_event","source":${source?.let { "\"$it\"" } ?: "null"},"deploymentTime":"2026-11-06T09:00:00.000+0000","tenantId":null}]"""
+        ) = """[{"id":"$id","name":"release_event","source":${source?.let {
+            "\"$it\""
+        } ?: "null"},"deploymentTime":"2026-11-06T09:00:00.000+0000","tenantId":null}]"""
 
         /** Parse a `multipart/form-data` body into (name, filename?, bytes). */
         fun parts(
@@ -407,8 +426,14 @@ class ProcessEngineDeploySpec :
                 result.statusCode shouldBe 2
                 result.output shouldContain "TTR_BEARER"
                 engine.requests.shouldBeEmpty()
-                val named = emit(project(engine.url), "--deploy", "--token-env", "DEPLOYER_BEARER",
-                    env = mapOf("DEPLOYER_BEARER" to "other-bearer"))
+                val named =
+                    emit(
+                        project(engine.url),
+                        "--deploy",
+                        "--token-env",
+                        "DEPLOYER_BEARER",
+                        env = mapOf("DEPLOYER_BEARER" to "other-bearer"),
+                    )
                 withClue(named.output) { named.statusCode shouldBe 0 }
                 engine.authorizations.forEach { it shouldBe "Bearer other-bearer" }
             } finally {

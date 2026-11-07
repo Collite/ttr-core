@@ -25,7 +25,12 @@ class ProcessEngineRenderSpec :
             WorldChoices(
                 programs =
                     listOf(
-                        ProgramChoice("release_on_placement", "release_order", "key", listOf(ParameterMeta("tolerance", "decimal", "0.01"))),
+                        ProgramChoice(
+                            "release_on_placement",
+                            "release_order",
+                            "key",
+                            listOf(ParameterMeta("tolerance", "decimal", "0.01")),
+                        ),
                         ProgramChoice("morning_release", "release_order", null, emptyList()),
                     ),
                 queries =
@@ -134,7 +139,13 @@ class ProcessEngineRenderSpec :
         }
 
         "a missing or unsafe egress_url refuses TTRP-EXPORT-EGRESS" {
-            for (url in listOf(null, "", "ftp://egress/automation", "http://egress/automation?x=1", "http://u:p@egress/a")) {
+            for (url in listOf(
+                null,
+                "",
+                "ftp://egress/automation",
+                "http://egress/automation?x=1",
+                "http://u:p@egress/a",
+            )) {
                 shouldThrow<IllegalArgumentException> { emit(graph(url = url)) }.message shouldContain
                     "TTRP-EXPORT-EGRESS"
             }
@@ -155,8 +166,11 @@ class ProcessEngineRenderSpec :
                 )
             templates.values.forEach { bytes ->
                 schema
-                    .validate(com.fasterxml.jackson.databind.ObjectMapper().readTree(bytes))
-                    .map { it.message } shouldBe emptyList()
+                    .validate(
+                        com.fasterxml.jackson.databind
+                            .ObjectMapper()
+                            .readTree(bytes),
+                    ).map { it.message } shouldBe emptyList()
                 val text = bytes.decodeToString()
                 text shouldNotContain "Authorization"
                 text shouldContain "http-connector"
@@ -167,16 +181,26 @@ class ProcessEngineRenderSpec :
         "the template scripts pick the run-API call from ttr_source and bind parameters by name" {
             val template =
                 Json
-                    .parseToJsonElement(emit().files.getValue("templates/c7/release_on_placement.json").decodeToString())
+                    .parseToJsonElement(
+                        emit().files.getValue("templates/c7/release_on_placement.json").decodeToString(),
+                    ).jsonObject
+            val scope =
+                template
+                    .getValue("scopes")
+                    .jsonArray
+                    .single()
                     .jsonObject
-            val scope = template.getValue("scopes").jsonArray.single().jsonObject
             scope.getValue("type").jsonPrimitive.content shouldBe "camunda:Connector"
             val properties = scope.getValue("properties").jsonArray.map { it.jsonObject }
 
             fun script(name: String) =
                 properties
                     .single {
-                        it.getValue("binding").jsonObject["name"]?.jsonPrimitive?.content == name
+                        it
+                            .getValue("binding")
+                            .jsonObject["name"]
+                            ?.jsonPrimitive
+                            ?.content == name
                     }.getValue("value")
                     .jsonPrimitive.content
 
@@ -186,7 +210,11 @@ class ProcessEngineRenderSpec :
             ): Any? = GroovyShell(Binding(mapOf("execution" to FakeExecution(variables)))).evaluate(script(name))
 
             val program =
-                mapOf("ttr_source" to "release_on_placement", "ttr_deployment" to "release_event", "ttrInput" to mapOf("key" to 4711))
+                mapOf(
+                    "ttr_source" to "release_on_placement",
+                    "ttr_deployment" to "release_event",
+                    "ttrInput" to mapOf("key" to 4711),
+                )
             run("url", program) shouldBe "$egress/recipes/release_order/runs"
             Json.parseToJsonElement(run("payload", program) as String) shouldBe
                 Json.parseToJsonElement("""{"deployment":"release_event","port":{"key":4711},"origin":"engine"}""")
@@ -199,11 +227,18 @@ class ProcessEngineRenderSpec :
                 Json.parseToJsonElement("""{"query":"er.query.order_totals","parameters":{"limit":10}}""")
             shouldThrow<IllegalArgumentException> { run("payload", mapOf("ttr_source" to "nope")) }
             script("headers") shouldContain "application/json"
-            properties.single { it.getValue("binding").jsonObject["name"]?.jsonPrimitive?.content == "connectorId" }
-                .getValue("value") shouldBe JsonPrimitive("http-connector")
+            properties
+                .single {
+                    it
+                        .getValue("binding")
+                        .jsonObject["name"]
+                        ?.jsonPrimitive
+                        ?.content == "connectorId"
+                }.getValue("value") shouldBe JsonPrimitive("http-connector")
         }
 
         "the engine rendering is deterministic" {
-            emit().files.mapValues { it.value.decodeToString() } shouldBe emit().files.mapValues { it.value.decodeToString() }
+            emit().files.mapValues { it.value.decodeToString() } shouldBe
+                emit().files.mapValues { it.value.decodeToString() }
         }
     })

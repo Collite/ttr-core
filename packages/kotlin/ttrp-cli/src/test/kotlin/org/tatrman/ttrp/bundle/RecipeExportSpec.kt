@@ -45,7 +45,15 @@ class RecipeExportSpec :
         val plugins =
             ServiceLoader.load(TtrEmitPlugin::class.java).toList().filter {
                 it.targetId in
-                    setOf("process_engine", "n8n_l1", "camunda_7", "camunda_8", "python_client", "python_offline", "sql_job")
+                    setOf(
+                        "process_engine",
+                        "n8n_l1",
+                        "camunda_7",
+                        "camunda_8",
+                        "python_client",
+                        "python_offline",
+                        "sql_job",
+                    )
             }
         val manifests = RecipeManifestSource(plugins.map { it.executorTypeManifest() })
         val root = locate("packages/kotlin/ttrp-graph/src/test/resources/fixtures/recipes/model")
@@ -188,7 +196,15 @@ class RecipeExportSpec :
         }
         "seven plugin-owned TTR-M manifests load through metadata world objects" {
             manifests.all().map { it.id } shouldBe
-                listOf("camunda_7", "camunda_8", "n8n_l1", "process_engine", "python_client", "python_offline", "sql_job")
+                listOf(
+                    "camunda_7",
+                    "camunda_8",
+                    "n8n_l1",
+                    "process_engine",
+                    "python_client",
+                    "python_offline",
+                    "sql_job",
+                )
             manifests.load("n8n-l1")!!.entries("idempotency") shouldBe
                 mapOf("on_event" to "derived", "batch" to "execution_id")
             manifests.load("n8n_l1")!!.entries("nodeVersions")["httpRequest"] shouldBe "4.2"

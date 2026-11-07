@@ -102,7 +102,7 @@ class WorldBindingSpec :
             bound.diagnostics.map { it.id } shouldContainExactlyInAnyOrder listOf(TtrpDiagnosticId.WLD_005)
         }
 
-        "an executor extending the retired native type is refused TTRP-TGT-006, the engine type binds silently (D-145)" {
+        "an executor extending retired native is refused TTRP-TGT-006; the engine type binds silently (D-145)" {
             fun executor(
                 name: String,
                 base: String,

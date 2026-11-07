@@ -27,8 +27,12 @@ internal class CamundaRenderer(
             }
         val uri = runCatching { java.net.URI(raw) }.getOrNull()
         require(
-            uri != null && uri.scheme in setOf("http", "https") && !uri.host.isNullOrBlank() &&
-                uri.rawQuery == null && uri.rawFragment == null && uri.rawUserInfo == null,
+            uri != null &&
+                uri.scheme in setOf("http", "https") &&
+                !uri.host.isNullOrBlank() &&
+                uri.rawQuery == null &&
+                uri.rawFragment == null &&
+                uri.rawUserInfo == null,
         ) { "TTRP-EXPORT-EGRESS: $where egress_url $raw must be an http(s) URL without query, fragment or credentials" }
         raw.trimEnd('/')
     }
@@ -825,7 +829,10 @@ internal class CamundaRenderer(
                 }
             }
             // ⚑R226-A: the engine's provisioner grants START_INSTANCE from this static attribute only.
-            if (!groups.isNullOrEmpty()) model.processAttributes["camunda:candidateStarterGroups"] = groups.joinToString(",")
+            if (!groups.isNullOrEmpty()) {
+                model.processAttributes["camunda:candidateStarterGroups"] =
+                    groups.joinToString(",")
+            }
         }
         val scope = model.root
         val start = scope.node("startEvent", "start with ttrInput key")
@@ -910,7 +917,10 @@ internal class CamundaRenderer(
         """.trimIndent().replace("\n", "\n        ")
 
     private fun startHint(): String {
-        val roles = root.deployment.startableBy ?: return "No startable_by restriction is declared; configure START_INSTANCE authorization in the engine."
+        val roles =
+            root.deployment.startableBy
+                ?: return "No startable_by restriction is declared; " +
+                    "configure START_INSTANCE authorization in the engine."
         if (roles.isEmpty()) {
             return if (engine) {
                 "startable_by: [] — no role may start this process; it carries no camunda:candidateStarterGroups."
@@ -920,9 +930,17 @@ internal class CamundaRenderer(
         }
         val groups = root.deployment.startableGroups
         val named =
-            roles.mapIndexed { i, role -> groups?.getOrNull(i)?.let { "$role (Keycloak group $it)" } ?: role }.joinToString()
+            roles
+                .mapIndexed {
+                    i,
+                    role,
+                    ->
+                    groups?.getOrNull(i)?.let { "$role (Keycloak group $it)" } ?: role
+                }.joinToString()
         return if (engine) {
-            "startable_by: $named. The process carries camunda:candidateStarterGroups=\"${groups.orEmpty().joinToString(",")}\"; " +
+            "startable_by: $named. The process carries camunda:candidateStarterGroups=\"${groups.orEmpty().joinToString(
+                ",",
+            )}\"; " +
                 "the engine's provisioner grants START_INSTANCE to these groups (D-161)."
         } else {
             "startable_by: $named. Grant START_INSTANCE authorization to these groups in the engine; this file does not provision permissions."

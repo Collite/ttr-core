@@ -160,12 +160,14 @@ internal class EngineClient(
         val form = ByteArrayOutputStream()
 
         fun line(text: String) = form.write((text + "\r\n").toByteArray(Charsets.UTF_8))
-        for ((field, value) in
-            listOf(
-                "deployment-name" to name,
-                "enable-duplicate-filtering" to "true",
-                "deployment-source" to source,
-            )) {
+        for (
+        (field, value) in
+        listOf(
+            "deployment-name" to name,
+            "enable-duplicate-filtering" to "true",
+            "deployment-source" to source,
+        )
+        ) {
             line("--$boundary")
             line("Content-Disposition: form-data; name=\"$field\"")
             line("")

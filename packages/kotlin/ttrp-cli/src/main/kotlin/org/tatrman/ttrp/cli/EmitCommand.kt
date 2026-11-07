@@ -89,8 +89,12 @@ class EmitCommand(
 
     override fun run() {
         if (!deploy) {
-            listOf("--check" to check, "--force" to force, "--token-env" to (tokenEnv != null), "--engine-url" to (engineUrl != null))
-                .firstOrNull { it.second }
+            listOf(
+                "--check" to check,
+                "--force" to force,
+                "--token-env" to (tokenEnv != null),
+                "--engine-url" to (engineUrl != null),
+            ).firstOrNull { it.second }
                 ?.let { throw UsageError("${it.first} needs --deploy") }
         }
         if (deploy && json) throw UsageError("--json cannot be combined with --deploy")
@@ -524,7 +528,14 @@ class EmitCommand(
                         .normalize()
                         .resolve("$deploymentName.${graph.deployment.type}.export")
                 // ✅D-170: an engine export records the fingerprint of exactly the resources `--deploy` posts.
-                val engineResources = if (plugin.targetId == PROCESS_ENGINE) EngineBundle.resources(result.files) else null
+                val engineResources =
+                    if (plugin.targetId ==
+                        PROCESS_ENGINE
+                    ) {
+                        EngineBundle.resources(result.files)
+                    } else {
+                        null
+                    }
                 val bundleFingerprint = engineResources?.let(EngineBundle::fingerprint)
                 val fixtureBytes = linkedMapOf<String, ByteArray>()
                 fixtures.forEach { relative ->
@@ -669,7 +680,12 @@ class EmitCommand(
                     )
                 }
                 if (deploy) {
-                    deployToEngine(world, deployment, requireNotNull(engineResources), requireNotNull(bundleFingerprint))
+                    deployToEngine(
+                        world,
+                        deployment,
+                        requireNotNull(engineResources),
+                        requireNotNull(bundleFingerprint),
+                    )
                 } else if (json) {
                     echo(
                         buildJsonObject {
