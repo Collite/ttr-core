@@ -116,6 +116,8 @@ internal enum class Dialect(
         body: String?,
         result: String,
         retryBudgetSeconds: Long,
+        // The process engine's egress injects the bearer (D-158): its HTTP steps carry none.
+        bearer: Boolean = true,
     ): List<Xml> =
         if (this == C7) {
             listOf(
@@ -137,14 +139,14 @@ internal enum class Dialect(
                                                 Xml(
                                                     "camunda:map",
                                                     children =
-                                                        listOf(
+                                                        listOfNotNull(
                                                             Xml(
                                                                 "camunda:entry",
                                                                 mapOf("key" to "Authorization"),
                                                                 text =
                                                                     "\${'Bearer '.concat(" +
                                                                         "TTR_CONN_AUTOMATION.token)}",
-                                                            ),
+                                                            ).takeIf { bearer },
                                                             Xml(
                                                                 "camunda:entry",
                                                                 mapOf("key" to "Content-Type"),

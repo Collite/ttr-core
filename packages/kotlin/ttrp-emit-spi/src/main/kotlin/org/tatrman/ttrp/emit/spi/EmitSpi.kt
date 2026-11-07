@@ -45,7 +45,8 @@ interface TtrEmitPlugin {
     companion object {
         /** The current SPI major version. */
         const val SPI_VERSION: Int = 2
-        const val SPI_REVISION: Int = 2
+        /** Revision 3 (S1.5.2, ⚑R226-A): `DeploymentMeta.startableGroups` — revision 2 shipped in grammar/v0.22.3. */
+        const val SPI_REVISION: Int = 3
         val SUPPORTED_VERSIONS: Set<Int> = setOf(1, 2)
     }
 }

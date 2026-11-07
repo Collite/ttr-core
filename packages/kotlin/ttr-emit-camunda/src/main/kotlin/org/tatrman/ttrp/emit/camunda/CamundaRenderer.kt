@@ -15,6 +15,24 @@ internal class CamundaRenderer(
         require(!engine || d == Dialect.C7) { "the process engine target renders the C7 dialect" }
     }
 
+    /**
+     * The engine's egress (D-158): the run API's address as the engine's HTTP steps see it. The egress injects the
+     * `process-engine` bearer, so these steps carry none. Engine target only; refused when absent or not a plain URL.
+     */
+    private val egress: String by lazy {
+        val where = "deployment ${root.deployment.name}: executor ${root.deployment.target}"
+        val raw =
+            requireNotNull(root.deployment.egressUrl?.takeIf { it.isNotBlank() }) {
+                "TTRP-EXPORT-EGRESS: $where declares no egress_url (D-158); the engine's HTTP steps call the egress"
+            }
+        val uri = runCatching { java.net.URI(raw) }.getOrNull()
+        require(
+            uri != null && uri.scheme in setOf("http", "https") && !uri.host.isNullOrBlank() &&
+                uri.rawQuery == null && uri.rawFragment == null && uri.rawUserInfo == null,
+        ) { "TTRP-EXPORT-EGRESS: $where egress_url $raw must be an http(s) URL without query, fragment or credentials" }
+        raw.trimEnd('/')
+    }
+
     private val root = request.graph
     private val model = BpmnModel(root.program.name, d)
     private var scheduleZone: String? = null
@@ -82,14 +100,24 @@ internal class CamundaRenderer(
             path = path.replace("{$key}", value)
         }
         val method = if (call in setOf("status", "route", "digests")) "GET" else "POST"
-        val base = expr("TTR_CONN_AUTOMATION.url", "TTR_AUTOMATION_URL")
         val url =
-            if ("{id}" in
-                path
-            ) {
-                d.concat(base, quote(path.substringBefore("{id}")), run, quote(path.substringAfter("{id}")))
+            if (engine) {
+                // The egress stands for the run API's base path: `<egress_url>` + the call's path below it.
+                val below = egress + path.removePrefix(graph.runApi.basePath.trimEnd('/'))
+                if ("{id}" in below) {
+                    d.concat(quote(below.substringBefore("{id}")), run, quote(below.substringAfter("{id}")))
+                } else {
+                    quote(below)
+                }
             } else {
-                d.concat(base, quote(path))
+                val base = expr("TTR_CONN_AUTOMATION.url", "TTR_AUTOMATION_URL")
+                if ("{id}" in
+                    path
+                ) {
+                    d.concat(base, quote(path.substringBefore("{id}")), run, quote(path.substringAfter("{id}")))
+                } else {
+                    d.concat(base, quote(path))
+                }
             }
         val task = scope.node("serviceTask", label)
         task.extensions +=
@@ -105,6 +133,7 @@ internal class CamundaRenderer(
                 if (method == "POST") body ?: obj() else null,
                 result,
                 budget(graph),
+                bearer = !engine,
             )
         if (d == Dialect.C7) {
             task.attrs["camunda:asyncBefore"] = "true"
@@ -784,6 +813,20 @@ internal class CamundaRenderer(
                     else -> "camunda_8"
                 },
         ) { "Camunda target/dialect mismatch" }
+        if (engine) {
+            val roles = root.deployment.startableBy
+            val groups = root.deployment.startableGroups
+            require(
+                (roles == null) == (groups == null) && (roles == null || roles.size == groups!!.size),
+            ) { "TTRP-EXPORT-ROLE: deployment ${root.deployment.name}: startable_by groups are not resolved" }
+            groups?.forEach {
+                require(it.isNotBlank() && it.none { c -> c == ',' || c.isWhitespace() }) {
+                    "TTRP-EXPORT-ROLE: start group `$it` cannot be listed in camunda:candidateStarterGroups"
+                }
+            }
+            // ⚑R226-A: the engine's provisioner grants START_INSTANCE from this static attribute only.
+            if (!groups.isNullOrEmpty()) model.processAttributes["camunda:candidateStarterGroups"] = groups.joinToString(",")
+        }
         val scope = model.root
         val start = scope.node("startEvent", "start with ttrInput key")
         if (d == Dialect.C7) start.attrs["camunda:asyncAfter"] = "true"
@@ -843,12 +886,60 @@ internal class CamundaRenderer(
         return model.render(contract)
     }
 
+    private fun customerConnection(): String =
+        """
+        C7 requires Camunda Connect's HTTP connector, Spin JSON and Groovy for Retry-After normalization. Configure TTR_CONN_AUTOMATION
+        with url (origin, no trailing slash) and token. C8 uses the standard REST outbound connector
+        io.camunda:http-json:1; supply TTR_AUTOMATION_URL and connector secret TTR_CONN_AUTOMATION.
+        Credentials are referenced by name and never embedded. Start this one-program BPMN externally;
+        configure scheduling and composition in the engine modeller.
+        """.trimIndent().replace("\n", "\n        ")
+
+    private fun engineConnection(): String =
+        """
+        Every HTTP step is Camunda Connect's http-connector calling the executor's egress, $egress (D-158).
+        The egress injects the process-engine client's bearer; this BPMN carries no token and no connector secret.
+        The engine needs Spin JSON and Groovy for Retry-After normalization. Start this one-program BPMN through
+        the engine (REST, Tasklist or a message); configure scheduling and composition in the engine modeller.
+        Deploy: `ttrp emit --deployment ${root.deployment.name} --deploy` posts this BPMN and the DMN files as one engine
+        deployment named ${root.deployment.name}, with duplicate filtering and deployment-source ttrp:<bundle fingerprint>.
+        The bearer comes from TTR_BEARER (or --token-env); it is never written to output or export files.
+        `--deploy --check` reads the newest deployment of the name and answers absent, current, stale or foreign;
+        `--deploy` creates for absent or stale, does nothing for current and refuses foreign unless --force.
+        `--engine-url` overrides the executor's url, e.g. for a port-forward.
+        """.trimIndent().replace("\n", "\n        ")
+
+    private fun startHint(): String {
+        val roles = root.deployment.startableBy ?: return "No startable_by restriction is declared; configure START_INSTANCE authorization in the engine."
+        if (roles.isEmpty()) {
+            return if (engine) {
+                "startable_by: [] — no role may start this process; it carries no camunda:candidateStarterGroups."
+            } else {
+                "startable_by: [] — no role may start this process; grant no START_INSTANCE authorization."
+            }
+        }
+        val groups = root.deployment.startableGroups
+        val named =
+            roles.mapIndexed { i, role -> groups?.getOrNull(i)?.let { "$role (Keycloak group $it)" } ?: role }.joinToString()
+        return if (engine) {
+            "startable_by: $named. The process carries camunda:candidateStarterGroups=\"${groups.orEmpty().joinToString(",")}\"; " +
+                "the engine's provisioner grants START_INSTANCE to these groups (D-161)."
+        } else {
+            "startable_by: $named. Grant START_INSTANCE authorization to these groups in the engine; this file does not provision permissions."
+        }
+    }
+
     fun readme(): String =
         """
-        # ${root.deployment.name} — Camunda ${if (d == Dialect.C7) "7" else "8"} BPMN file
+        # ${root.deployment.name} — ${if (engine) "the estate's process engine (Camunda 7 dialect)" else "Camunda ${if (d == Dialect.C7) "7" else "8"} BPMN file"}
 
-        Import `${root.recipe.name}.${d.suffix}.bpmn` in the matching Camunda Modeler. This is an L1 orchestration
-        skeleton; SQL and governed writes stay on the Server. No live Camunda is deployed by this export.
+        ${if (engine) {
+            "`${root.recipe.name}.${d.suffix}.bpmn` and the DMN files deploy to the process engine with `ttrp emit --deployment ${root.deployment.name} --deploy`. This is an L1 orchestration\n" +
+                "        skeleton; SQL and governed writes stay on the Server."
+        } else {
+            "Import `${root.recipe.name}.${d.suffix}.bpmn` in the matching Camunda Modeler. This is an L1 orchestration\n" +
+                "        skeleton; SQL and governed writes stay on the Server. No live Camunda is deployed by this export."
+        }}
         The Modeler opening follows the repair re-review and is Bora's manual acceptance; XSD/structure checks
         do not certify a live engine. The file declares Camunda Platform 7.24.0 or Camunda Cloud 8.6.0 as its
         execution platform. C8 requires at least 8.6: [converging inclusive gateways](https://unsupported.docs.camunda.io/8.6/docs/components/modeler/bpmn/inclusive-gateways/),
@@ -856,14 +947,8 @@ internal class CamundaRenderer(
         [FEEL timezone conversion](https://unsupported.docs.camunda.io/8.5/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-conversion/)
         are available there (timezone conversion is already documented in 8.5).
 
-        C7 requires Camunda Connect's HTTP connector, Spin JSON and Groovy for Retry-After normalization. Configure TTR_CONN_AUTOMATION
-        with url (origin, no trailing slash) and token. C8 uses the standard REST outbound connector
-        io.camunda:http-json:1; supply TTR_AUTOMATION_URL and connector secret TTR_CONN_AUTOMATION.
-        Credentials are referenced by name and never embedded. Start this one-program BPMN externally;
-        configure scheduling and composition in the engine modeller.
-        ${root.deployment.startableBy?.let {
-            "startable_by: ${it.joinToString()}. Grant START_INSTANCE authorization to these roles in the engine; this file does not provision permissions."
-        } ?: "No startable_by restriction is declared; configure START_INSTANCE authorization in the engine."}
+        ${if (engine) engineConnection() else customerConnection()}
+        ${startHint()}
 
         Start with ttrInput={key:..., at:"offset ISO instant"}, keys, or event. Event payload is nested under event;
         at is separate. On C7, ttrInput is a Java Map, including nested maps/lists for events or keys; a REST

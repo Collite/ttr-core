@@ -271,6 +271,10 @@ class EmitCommand : CliktCommand(name = "emit") {
                                                 ),
                                         )
                                     },
+                                deployment =
+                                    projected.deployment.copy(
+                                        startableGroups = ApprovalGroupsProjector.startGroups(deployment, index),
+                                    ),
                             )
                         } else {
                             projected
