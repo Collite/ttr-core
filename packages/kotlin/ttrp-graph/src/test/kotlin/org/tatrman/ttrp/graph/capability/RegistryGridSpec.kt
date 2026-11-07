@@ -13,7 +13,8 @@ import org.tatrman.ttr.metadata.model.WorldExecutor
 /**
  * Grammar 0.22 (D-142): a deployment's target is an executor of its world, resolved through the world's executors —
  * there is no `target: native` pseudo-executor. An executor that happens to be named `native` is resolved like any
- * other (by what it extends); the Server is an executor that extends `native`.
+ * other (by what it extends). D-145 retired the `native` type itself: resolution still names it, and the binder and
+ * `ttrp emit` refuse it (`TTRP-TGT-006`).
  */
 class RegistryGridSpec :
     StringSpec({

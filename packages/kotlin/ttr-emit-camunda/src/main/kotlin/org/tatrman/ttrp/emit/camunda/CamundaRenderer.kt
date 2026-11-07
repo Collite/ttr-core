@@ -8,7 +8,13 @@ import org.tatrman.ttrp.emit.spi.*
 internal class CamundaRenderer(
     private val request: RecipeEmitRequest,
     private val d: Dialect,
+    /** The estate's process engine (D-145): C7, egress-bound HTTP steps (D-158), start groups (⚑R226-A). */
+    private val engine: Boolean = false,
 ) {
+    init {
+        require(!engine || d == Dialect.C7) { "the process engine target renders the C7 dialect" }
+    }
+
     private val root = request.graph
     private val model = BpmnModel(root.program.name, d)
     private var scheduleZone: String? = null
@@ -772,12 +778,10 @@ internal class CamundaRenderer(
     fun render(): String {
         require(
             root.deployment.type ==
-                if (d ==
-                    Dialect.C7
-                ) {
-                    "camunda_7"
-                } else {
-                    "camunda_8"
+                when {
+                    engine -> "process_engine"
+                    d == Dialect.C7 -> "camunda_7"
+                    else -> "camunda_8"
                 },
         ) { "Camunda target/dialect mismatch" }
         val scope = model.root

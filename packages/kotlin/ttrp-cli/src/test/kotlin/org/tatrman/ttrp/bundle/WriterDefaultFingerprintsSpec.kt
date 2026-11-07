@@ -144,7 +144,7 @@ class WriterDefaultFingerprintsSpec :
                     listOf(
                         "emit",
                         "--deployment",
-                        "release_native_morning",
+                        "release_morning",
                         "--project",
                         root.toString(),
                         "--bundle",
@@ -155,7 +155,7 @@ class WriterDefaultFingerprintsSpec :
                     ),
                 )
             withClue(emitted.output) { emitted.statusCode shouldBe 0 }
-            Files.exists(root.resolve("export/release_native_morning.native.export/manifest.json")) shouldBe true
+            Files.exists(root.resolve("export/release_morning.native.export/manifest.json")) shouldBe true
         }
 
         "rereview R1 default approval verifies after moving metadata outside all package directories" {
@@ -215,7 +215,7 @@ class WriterDefaultFingerprintsSpec :
                     listOf(
                         "emit",
                         "--deployment",
-                        "release_native_morning",
+                        "release_morning",
                         "--project",
                         root.toString(),
                         "--bundle",
@@ -228,7 +228,7 @@ class WriterDefaultFingerprintsSpec :
             refused.output shouldContain "release"
             refused.output shouldContain "ambiguous"
             refused.output.contains("recorded scope") shouldBe false
-            Files.exists(out.resolve("release_native_morning.native.export")) shouldBe false
+            Files.exists(out.resolve("release_morning.native.export")) shouldBe false
         }
 
         "rereview n4 an unknown recorded import is named before any export is written" {
@@ -262,7 +262,7 @@ class WriterDefaultFingerprintsSpec :
                     listOf(
                         "emit",
                         "--deployment",
-                        "release_native_morning",
+                        "release_morning",
                         "--project",
                         root.toString(),
                         "--bundle",
@@ -274,7 +274,7 @@ class WriterDefaultFingerprintsSpec :
             refused.statusCode shouldBe 2
             refused.output shouldContain "recorded import `absent.*`"
             refused.output.contains("rebuild") shouldBe false
-            Files.exists(out.resolve("release_native_morning.native.export")) shouldBe false
+            Files.exists(out.resolve("release_morning.native.export")) shouldBe false
         }
 
         "rereview n3 an ambiguous action typed value has the actionable REC007 diagnostic" {
@@ -593,7 +593,7 @@ class WriterDefaultFingerprintsSpec :
                 listOf(
                     "emit",
                     "--deployment",
-                    "release_native_morning",
+                    "release_morning",
                     "--project",
                     root.toString(),
                     "--bundle",
@@ -609,7 +609,7 @@ class WriterDefaultFingerprintsSpec :
             val exported =
                 Json
                     .parseToJsonElement(
-                        Files.readString(good.resolve("release_native_morning.native.export/manifest.json")),
+                        Files.readString(good.resolve("release_morning.native.export/manifest.json")),
                     ).jsonObject
             exported
                 .getValue("fingerprints")
@@ -625,7 +625,7 @@ class WriterDefaultFingerprintsSpec :
             stale.statusCode shouldBe 2
             stale.output shouldContain "action approval dependencies"
             stale.output shouldContain "rebuild the recipe bundle"
-            Files.exists(root.resolve("stale-export/release_native_morning.native.export")) shouldBe false
+            Files.exists(root.resolve("stale-export/release_morning.native.export")) shouldBe false
             Files.writeString(metadata, original)
             val recipe = result.manifest.recipe!!
             val evidence = recipe.approvalDependencies!!
@@ -656,7 +656,7 @@ class WriterDefaultFingerprintsSpec :
                 withClue(refused.output) { refused.statusCode shouldBe 2 }
                 refused.output shouldContain reason
                 refused.output.contains("rebuild") shouldBe false
-                Files.exists(out.resolve("release_native_morning.native.export")) shouldBe false
+                Files.exists(out.resolve("release_morning.native.export")) shouldBe false
             }
             val missingVersion = result.manifest.toJson().replace(Regex("\"version\":\\s*1,\\s*"), "")
             val missingDir = invalidBundle("missing-version-bundle", missingVersion)
@@ -664,7 +664,7 @@ class WriterDefaultFingerprintsSpec :
             val missing = emit(missingOut, missingDir)
             missing.statusCode shouldBe 2
             missing.output shouldContain "version"
-            Files.exists(missingOut.resolve("release_native_morning.native.export")) shouldBe false
+            Files.exists(missingOut.resolve("release_morning.native.export")) shouldBe false
 
             // #294: after reconcile a different package can replace an ER entity with the same name.
             // Scoped verification must name the unresolved ref, not recommend a rebuild of the same model.

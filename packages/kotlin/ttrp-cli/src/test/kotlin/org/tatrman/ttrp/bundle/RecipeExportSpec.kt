@@ -43,7 +43,7 @@ class RecipeExportSpec :
         val plugins =
             ServiceLoader.load(TtrEmitPlugin::class.java).toList().filter {
                 it.targetId in
-                    setOf("native", "n8n_l1", "camunda_7", "camunda_8", "python_client", "python_offline", "sql_job")
+                    setOf("process_engine", "n8n_l1", "camunda_7", "camunda_8", "python_client", "python_offline", "sql_job")
             }
         val manifests = RecipeManifestSource(plugins.map { it.executorTypeManifest() })
         val root = locate("packages/kotlin/ttrp-graph/src/test/resources/fixtures/recipes/model")
@@ -56,7 +56,7 @@ class RecipeExportSpec :
                     it.qname.name
                 }
         val program = programs.getValue("morning_release")
-        val deployment = world.deployment("release_native_morning")!!
+        val deployment = world.deployment("release_morning")!!
 
         fun build(recipeName: String): BundleAssembler.BundleResult {
             val source = locate("packages/kotlin/ttrp-frontend/src/test/resources/recipes/$recipeName.ttrp")
@@ -130,7 +130,7 @@ class RecipeExportSpec :
             // D-142 took the connectors: an authored `connectors:` (refused by the checkers) never reaches the SPI
             connected.deployment.connectors shouldBe emptyMap()
             golden("release_n8n_recipe_graph", graph.toString().replace(", ", ",\n"))
-            val native = world.deployment("release_native_morning")!!
+            val native = world.deployment("release_morning")!!
             val nativeGraph =
                 org.tatrman.ttrp.emit.recipe.RecipeGraphProjector.project(
                     bundle.manifest,
@@ -174,7 +174,7 @@ class RecipeExportSpec :
         }
         "seven plugin-owned TTR-M manifests load through metadata world objects" {
             manifests.all().map { it.id } shouldBe
-                listOf("camunda_7", "camunda_8", "n8n_l1", "native", "python_client", "python_offline", "sql_job")
+                listOf("camunda_7", "camunda_8", "n8n_l1", "process_engine", "python_client", "python_offline", "sql_job")
             manifests.load("n8n-l1")!!.entries("idempotency") shouldBe
                 mapOf("on_event" to "derived", "batch" to "execution_id")
             manifests.load("n8n_l1")!!.entries("nodeVersions")["httpRequest"] shouldBe "4.2"
@@ -702,7 +702,7 @@ class RecipeExportSpec :
                         listOf(
                             "emit",
                             "--deployment",
-                            "release_native_morning",
+                            "release_morning",
                             "--project",
                             project.toString(),
                             "--bundle",
@@ -716,7 +716,7 @@ class RecipeExportSpec :
             io.kotest.assertions.withClue(a.output) { a.statusCode shouldBe 0 }
             val b = emit(second)
             io.kotest.assertions.withClue(b.output) { b.statusCode shouldBe 0 }
-            val folder = "release_native_morning.native.export"
+            val folder = "release_morning.native.export"
             val files =
                 Files.list(first.resolve(folder)).use {
                     it

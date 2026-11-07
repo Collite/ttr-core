@@ -9,6 +9,8 @@ import java.security.MessageDigest
 internal class AuthoringArtifacts(
     private val request: RecipeEmitRequest,
     private val dialect: Dialect,
+    /** The estate's process engine: templates carry their HTTP connector implementation, addressed to the egress. */
+    private val engine: Boolean = false,
 ) {
     private val json = Json { prettyPrint = true }
     private val world = request.world

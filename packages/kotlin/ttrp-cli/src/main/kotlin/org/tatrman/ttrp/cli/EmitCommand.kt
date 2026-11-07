@@ -39,6 +39,7 @@ import org.tatrman.ttrp.emit.spi.RecipeEmitRequest
 import org.tatrman.ttrp.graph.capability.RecipeManifestSource
 import org.tatrman.ttrp.graph.capability.RegistryRecipe
 import org.tatrman.ttrp.graph.capability.ExecutorManifestGate
+import org.tatrman.ttrp.graph.capability.WorldBinder
 import org.tatrman.ttrp.project.TtrpManifestReader
 import com.github.ajalt.clikt.parameters.options.validate
 import com.github.ajalt.clikt.parameters.types.int
@@ -99,11 +100,11 @@ class EmitCommand : CliktCommand(name = "emit") {
                         it.qname.name == deployment.program
                     },
                 ) { "unknown or ambiguous program ${deployment.program}" }
-            val plugin =
-                EmitPluginLoader.builtin(
-                    org.tatrman.ttrp.graph.capability.RegistryGrid
-                        .executorType(world, deployment),
-                )
+            val executorType =
+                org.tatrman.ttrp.graph.capability.RegistryGrid
+                    .executorType(world, deployment)
+            require(executorType !in WorldBinder.RETIRED_EXECUTOR_TYPES) { WorldBinder.retired(deployment.target) }
+            val plugin = EmitPluginLoader.builtin(executorType)
             val temp = Files.createTempDirectory("ttrp-export-build")
             try {
                 data class Loaded(
@@ -258,7 +259,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                             wiredActions.values.toList(),
                         )
                     val governed =
-                        if (plugin.targetId in setOf("camunda_7", "camunda_8")) {
+                        if (plugin.targetId in CAMUNDA_TARGETS) {
                             projected.copy(
                                 actions =
                                     projected.actions.mapValues { (name, action) ->
@@ -293,7 +294,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                 }
                 val selected = load(program)
                 val choices =
-                    if (plugin.targetId in setOf("camunda_7", "camunda_8")) {
+                    if (plugin.targetId in CAMUNDA_TARGETS) {
                         WorldChoicesProjector.project(loaded.model, world) { choice ->
                             if (choice.recipe == program.recipe) {
                                 selected.graph.recipe.parameters
@@ -597,7 +598,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                                             ),
                                         )
                                     },
-                            ).filterKeys { it != "authoring" || plugin.targetId in setOf("camunda_7", "camunda_8") },
+                            ).filterKeys { it != "authoring" || plugin.targetId in CAMUNDA_TARGETS },
                     )
                 ExportFolderWriter.write(
                     folder,
@@ -627,6 +628,9 @@ class EmitCommand : CliktCommand(name = "emit") {
     }
 
     companion object {
+        /** The targets the Camunda renderer serves: customers' C7/C8 files and the estate's engine (D-145). */
+        val CAMUNDA_TARGETS = setOf("camunda_7", "camunda_8", "process_engine")
+
         val RECIPE_TYPES =
             org.tatrman.ttrp.graph.capability.WorldBinder.AUTOMATION_EXECUTOR_TYPES
     }

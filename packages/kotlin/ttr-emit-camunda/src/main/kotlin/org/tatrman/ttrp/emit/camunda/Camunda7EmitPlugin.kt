@@ -25,10 +25,11 @@ class Camunda7EmitPlugin : TtrEmitPlugin {
 internal fun emitCamunda(
     request: RecipeEmitRequest,
     dialect: Dialect,
+    engine: Boolean = false,
 ): EmitResult {
-    val renderer = CamundaRenderer(request, dialect)
+    val renderer = CamundaRenderer(request, dialect, engine)
     val xml = renderer.render()
-    val artifacts = AuthoringArtifacts(request, dialect).files()
+    val artifacts = AuthoringArtifacts(request, dialect, engine).files()
     return EmitResult(
         sortedMapOf(
             "${request.graph.recipe.name}.${dialect.suffix}.bpmn" to xml.toByteArray(Charsets.UTF_8),
