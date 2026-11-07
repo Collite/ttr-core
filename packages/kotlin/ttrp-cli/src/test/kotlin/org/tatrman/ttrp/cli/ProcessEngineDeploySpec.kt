@@ -218,6 +218,19 @@ class ProcessEngineDeploySpec :
             readme shouldNotContain bearer
         }
 
+        "a project without models/ exports from its extra-model-roots, as the checker reads it (hartland's layout)" {
+            val project = project()
+            Files.move(project.dir.resolve("models"), project.dir.resolve("model"))
+            Files.writeString(
+                project.dir.resolve("modeler.toml"),
+                "[ttrp]\nworld = \"hartland.worlds.demo\"\nextra-model-roots = [\"model\"]\n",
+            )
+            val out = Files.createTempDirectory("pe-extra-roots")
+            val result = emit(project, "--out", out.toString())
+            withClue(result.output) { result.statusCode shouldBe 0 }
+            Files.exists(out.resolve("release_event.process_engine.export/release_order.c7.bpmn")) shouldBe true
+        }
+
         "the export is deterministic, so the bundle fingerprint is stable across runs" {
             val dir = project()
             bundleFingerprint(exported(dir)) shouldBe bundleFingerprint(exported(dir))

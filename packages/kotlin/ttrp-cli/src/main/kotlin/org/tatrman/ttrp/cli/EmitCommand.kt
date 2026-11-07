@@ -105,7 +105,12 @@ class EmitCommand(
             require(
                 config.diagnostics.none { it.severity.name == "ERROR" },
             ) { config.diagnostics.joinToString { it.render() } }
-            val roots = listOf(config.manifest.modelsRoot()) + config.manifest.extraModelRootPaths()
+            // As the checker's ModelRepo: a root that does not exist is skipped (hartland keeps no `models/`, only
+            // `extra-model-roots`); at least one must exist.
+            val roots =
+                (listOf(config.manifest.modelsRoot()) + config.manifest.extraModelRootPaths())
+                    .filter { Files.isDirectory(it) }
+            require(roots.isNotEmpty()) { "no model root: neither models/ nor an extra-model-roots entry exists" }
             val snapshots =
                 roots.mapIndexed { i, path ->
                     FileBasedSource("export-$i", 0, LocalFsStorage("export-$i", path.toRealPath())).load()
