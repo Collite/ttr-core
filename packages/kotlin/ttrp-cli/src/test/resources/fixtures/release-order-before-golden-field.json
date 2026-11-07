@@ -5,7 +5,7 @@
   "program": "release_order.ttrp",
   "world": {
     "qname": "hartland.worlds.demo",
-    "fingerprint": "sha256:53c0785903729aa5cd8e7b25cb3cde492adc5c643011d4294d79d348ffc36d6e"
+    "fingerprint": "sha256:eb63628541c85d774037e72b0fc94f1338db431637d5335360bd75088cec5974"
   },
   "islands": [
     {
@@ -831,10 +831,15 @@
           "unit": "working_days"
         }
       }
+    },
+    "executors": {
+      "engine": {
+        "egressUrl": "http://process-engine-egress.process-engine.svc/automation"
+      }
     }
   },
   "files": {
-    "catalog/release_order.ttrm": "sha256:092e6ff5914d9ce49624f0e9fdb6503522f5f01435b99c402d87bcca550a3fcd",
+    "catalog/release_order.ttrm": "sha256:e252ea132b1a101d64bfcadbed909e0e37175da2ecc588a16f62d73d1c76ba36",
     "catalog/release_order_verdict.ttrm": "sha256:ba556b898d5ae21beb7cb439c796168657d1a1f153f7214c2615f860b38ff99e",
     "islands/overdue.rows.sql": "sha256:3730c48e4975b3a5052a7e1a246a7c02f3c783c51505461e037842f503e6755a",
     "islands/placed_orders.orders.sql": "sha256:87fc1d71dba0be2a03e674da6d79188432e2ec439625472e0c33201c7e640ce0",

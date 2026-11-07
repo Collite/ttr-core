@@ -80,12 +80,15 @@ model world
 
 def world demo {
     def identity automation_decider { principal: "svc-hartland-automation", credential: TTR_CONN_AUTOMATION_DECIDER }
-    def executor server { extends: native }
+    def executor engine { extends: process_engine, url: "http://process-engine.process-engine.svc/engine-rest",
+                          egress_url: "http://process-engine-egress.process-engine.svc/automation", connection: engine_bp_dsk }
     def executor n8n    { extends: n8n_l1, url: "https://n8n.hartland.example", connection: n8n_hartland }
 
     def grant { who: role.ops, program: *, as: identity.automation_decider }
 
-    def deployment release_native_morning { program: morning_release, target: server, run_as: identity.automation_decider }
+    def deployment release_morning { program: morning_release, target: engine, run_as: identity.automation_decider }
+    def deployment release_event   { program: release_on_placement, target: engine, run_as: identity.automation_decider,
+                                     startable_by: role.sales_manager }
 }
 ```
 
@@ -94,8 +97,10 @@ def world demo {
 - **Grant** — `who` (a role, an identity or `*`) may run `program` (or `*`) **as** an identity or `author`. Unnamed; a
   grant is its triple.
 - **Deployment** — a program on a target (an executor of the world), with `run_as: caller | author | identity.<n>`.
-- **Executor types** are names: `native`, `n8n_l1`, `camunda_7`, `camunda_8`, `python_client`, `python_offline`,
-  `sql_job` — `extends: n8n_l1`.
+- **Executor types** are names: `process_engine`, `n8n_l1`, `camunda_7`, `camunda_8`, `python_client`,
+  `python_offline`, `sql_job` — `extends: n8n_l1`. `process_engine` is the estate's BPMN engine (D-145): `url:` is its
+  REST base (`…/engine-rest`), `egress_url:` the run API as the engine's HTTP steps reach it (the egress adds the
+  bearer, D-158). The `native` type is retired: an executor that still `extends: native` is refused `TTRP-TGT-006`.
 
 ## States on attributes
 
@@ -130,7 +135,7 @@ models them now:
 | `TTRP-CUT-001` | `def process` (`def step`, `after:`) | a BPMN process: a service task per step calling the run API; a wait is a message catch with a timer boundary event |
 | `TTRP-CUT-002` | a deployment's `process:` | deploy the program; the BPMN process calls it |
 | `TTRP-CUT-003` | a deployment's `trigger:` | a BPMN timer start event |
-| `TTRP-CUT-004` | `target: native` | an executor of the world (`def executor server { extends: native }`) |
+| `TTRP-CUT-004` | `target: native` | an executor of the world — the estate's engine is `def executor engine { extends: process_engine, … }` |
 | `TTRP-CUT-005` | a deployment's `connectors:` | the engine's tasks call the connectors |
 | `TTRP-CUT-006` | a program's `deliver:` and digests | a BPMN send task; the Server renders a digest on request |
 | `TTRP-CUT-007` | a program's `schedule:` | a BPMN timer start event |
@@ -145,17 +150,17 @@ schedule the model no longer carries — it refuses until the exporters take the
 
 ## Exporting a deployment
 
-The native exporter writes a deterministic identity package for a deployment. The Server executes the
-original recipe bundle. Run this from the model project, or pass `--project <root>`:
+`ttrp emit` renders a deployment for its executor's type. Run it from the model project, or pass `--project <root>`:
 
 ```sh
-ttrp emit --deployment release_native_morning --out exports
+ttrp emit --deployment release_morning --out exports
 # Reuse an existing compiler bundle:
-ttrp emit --deployment release_native_morning --bundle automation/release_order/release_order.bundle --out exports
+ttrp emit --deployment release_morning --bundle automation/release_order/release_order.bundle --out exports
 ```
 
-The output directory is `release_native_morning.native.export/`: `manifest.json`, `README.md`,
-`conformance.json`, and the bundle's golden YAML files under `tests/`, when present. `--json` prints the
+The output directory is `release_morning.process_engine.export/`: `manifest.json`, `README.md`,
+`conformance.json`, the rendered files (for the engine: `release_order.c7.bpmn`, `templates/c7/`, `dmn/`), and the
+bundle's golden YAML files under `tests/`, when present. `--json` prints the
 export identity and stale rule as JSON. `--granularity recipe|parts|islands` overrides the deployment's
 export granularity; the default is `parts`. Existing export directories are refused. Files are checked
 against the bundle's hashes and a complete directory is published only after every file is written.
@@ -163,7 +168,40 @@ against the bundle's hashes and a complete directory is published only after eve
 An export becomes stale when its recipe text, parameter values, labels, program, deployment, world,
 toolchain or target version differs from the served bundle. Rebuild and export again after such a change.
 Executor manifests are plugin-owned TTR-M resources. All seven target manifests ship with the toolchain;
-n8n L1 and Camunda render recipes; Python rendering remains in its planned exporter Stage.
+the process engine, n8n L1 and Camunda render recipes; Python rendering remains in its planned exporter Stage.
+
+## Deploying to the process engine
+
+A `process_engine` deployment renders the Camunda 7 dialect for the estate's engine (CIB seven / Operaton, D-145):
+
+- every HTTP step is Camunda Connect's `http-connector` calling the executor's `egress_url` — the egress injects the
+  `process-engine` client's bearer, so the BPMN carries no token and no connector secret (D-158);
+- `startable_by: role.<r>` becomes `camunda:candidateStarterGroups` on the process, from each role's Keycloak group;
+  the engine's provisioner grants START_INSTANCE from that attribute. A role without a unique group refuses
+  `TTRP-EXPORT-ROLE`; `startable_by: []` writes no attribute (no role may start it);
+- the element templates carry their implementation: an `http-connector` to the egress, which opens a run of the
+  World deployment property for a program step, or posts `{query, parameters}` to `/query` for a query step.
+
+`manifest.json` records `fingerprints.bundle`: sha256 over the BPMN and the `dmn/` files, in file-name byte order,
+each as `<name>\n<bytes>`. `--deploy` posts exactly those files as one engine deployment:
+
+```sh
+export TTR_BEARER=…            # a personal bearer of an engine operator (or --token-env <variable>)
+ttrp emit --deployment release_event --deploy --check     # absent | current <id> | stale <old> → <new> <id> | foreign <id>
+ttrp emit --deployment release_event --deploy             # deployed <id> | current <id>
+kubectl -n process-engine port-forward svc/process-engine 18081:80 &
+ttrp emit --deployment release_event --deploy --engine-url http://127.0.0.1:18081/engine-rest
+```
+
+The deployment is named after the world deployment and carries `deployment-source = ttrp:<first 16 hex of the
+bundle fingerprint>`, with the engine's duplicate filtering on. `--deploy --check` reads the newest deployment of the
+name (`GET /deployment?name=…`) and changes nothing: `absent` and `current` exit 0, `stale` and `foreign` exit 2.
+`--deploy` creates for `absent` or `stale` (a new definition version; running instances finish on theirs), posts
+nothing for `current`, and refuses `TTRP-DEPLOY-FOREIGN` for a deployment of the name that `ttrp emit` did not make,
+unless `--force`. Any transport failure or engine refusal is `TTRP-DEPLOY-ENGINE <status|cause>` with exit 2 and never
+claims a deployment. With `--deploy` the export folder is written only when `--out` is given. The bearer is read from
+the environment and appears in no output or file. Customer `camunda_7` / `camunda_8` exports stay files: `--deploy`
+refuses them.
 
 > **Grammar 0.22 (D-142).** The paragraphs below on process exports, step bundles, digests and batch schedule hints
 > describe the exporters as built before the cut. The model no longer carries `def process`, `deliver:` or
@@ -209,8 +247,8 @@ with a program-budget plus two-minute recovery-grace bound.
 
 `--bundle` supplies the selected program's verified recipe bundle. Camunda exports also read other deployed
 programs' `.ttrp` parameter declarations from the project and resolve their types/values through metadata.
-SPI v2 JVM callers must rebuild with this toolchain and declare `spiRevision = 2`; the host refuses an older
-revision before rendering. SPI v1 stays compatible; this API change does not change the grammar's 0.22 minor.
+SPI v2 JVM callers must rebuild with this toolchain and declare `spiRevision = 3` (revision 3 adds
+`DeploymentMeta.startableGroups`); the host refuses an older revision before rendering. SPI v1 stays compatible; this API change does not change the grammar's 0.22 minor.
 The removed process, delivery and schedule SPI fields have no compatibility shims.
 Hartland H-2/winback customer-mail exports refuse until its model supplies the address column. H-2 live
 certification also requires the Server's planned obligations status field.
@@ -265,9 +303,10 @@ Modeler; inline SQL and Golem questions have no generated skeleton. Templates ca
 `--template-version <n>` (default 1) and raise it whenever the regenerated fingerprint differs; Modeler prefers the
 highest version for an id. After model/bundle changes, regenerate into a new export folder and reinstall the templates. Preserve authored rules separately: regeneration creates empty skeletons.
 Approval tasks use the approving action's `by: role.<r>` Keycloak group as C7 `candidateGroups` or C8 assignment
-candidates. Roles without a unique group refuse with `TTRP-EXPORT-ROLE`. The README names `startable_by` roles for
-START_INSTANCE authorization; operators configure that authorization in the engine. C7 processes and DMN decisions
-carry a 30-day history TTL. Templates bind IO only; implementation bindings are configured in Modeler.
+candidates. Roles without a unique group refuse with `TTRP-EXPORT-ROLE`. The README names `startable_by` roles and their
+Keycloak groups for START_INSTANCE authorization; operators configure that authorization in a customer's engine.
+C7 processes and DMN decisions carry a 30-day history TTL. Customer templates bind IO only; implementation bindings
+are configured in Modeler (the `process_engine` export's templates carry them, above).
 
 The README lists artifact paths, omitted queries, and authoring cautions for C7 DMN types, parameter defaults,
 batch external starts and unverified other-program sources. The manifest records hashes and step/DMN associations.

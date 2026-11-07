@@ -67,7 +67,6 @@ dependencies {
     implementation(project(":packages:kotlin:ttr-emit-python"))
     implementation(project(":packages:kotlin:ttr-emit-camunda"))
     implementation(project(":packages:kotlin:ttr-emit-n8n"))
-    implementation(project(":packages:kotlin:ttr-emit-native"))
     implementation(project(":packages:kotlin:ttrp-frontend"))
     implementation(project(":packages:kotlin:ttrp-graph"))
     implementation(project(":packages:kotlin:ttrp-emit"))
