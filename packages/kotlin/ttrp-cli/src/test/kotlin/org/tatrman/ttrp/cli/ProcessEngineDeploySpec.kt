@@ -323,8 +323,9 @@ class ProcessEngineDeploySpec :
          * `DeploymentWithDefinitionsDto`). It holds deployments newest last. A create with duplicate filtering compares
          * the posted resources with the newest deployment of the name that has the same source: if every resource matches,
          * it creates nothing and answers the newest deployment of the name, whatever its source, with no deployed
-         * definitions. Otherwise it creates a deployment and lists its definitions. [readOverride] replaces the GET body,
-         * e.g. a read that predates a racing deployer, or an error body.
+         * definitions. Otherwise it creates a deployment and lists its definitions. [readOverride] replaces every GET body
+         * (an error body); [nextReads] replaces the next GETs once each (a read that predates a racing deployer);
+         * [afterCreate] runs after a create is answered (a racing deployer before the re-read).
          */
         class Engine(
             var readStatus: Int = 200,
@@ -354,6 +355,8 @@ class ProcessEngineDeploySpec :
 
             val held = mutableListOf<Held>()
             var readOverride: String? = null
+            val nextReads = ArrayDeque<String>()
+            var afterCreate: (() -> Unit)? = null
             val requests = mutableListOf<Triple<String, String, ByteArray>>()
             val authorizations = mutableListOf<String?>()
             val contentTypes = mutableListOf<String?>()
@@ -398,11 +401,15 @@ class ProcessEngineDeploySpec :
                     contentTypes += contentType
                     val (status, answer) =
                         if (ex.requestMethod == "GET") {
-                            readStatus to (readOverride ?: "[" + (held.lastOrNull()?.json() ?: "") + "]")
+                            readStatus to
+                                (
+                                    readOverride ?: nextReads.removeFirstOrNull()
+                                        ?: "[" + (held.lastOrNull()?.json() ?: "") + "]"
+                                )
                         } else if (createStatus != 200) {
                             createStatus to """{"type":"ProcessEngineException","message":"refused"}"""
                         } else {
-                            200 to create(contentType, body)
+                            (200 to create(contentType, body)).also { afterCreate?.invoke() }
                         }
                     val bytes = answer.toByteArray()
                     ex.responseHeaders.add("Content-Type", "application/json")
@@ -419,7 +426,7 @@ class ProcessEngineDeploySpec :
             fun stop() = server.stop(0)
         }
 
-        "--deploy posts BPMN and DMN as one multipart deployment with duplicate filtering and the bundle source" {
+        "--deploy posts BPMN and DMN as one multipart deployment, filter off, with the bundle source, then re-reads" {
             val engine = Engine()
             try {
                 val dir = project(engine.url)
@@ -429,7 +436,8 @@ class ProcessEngineDeploySpec :
                 withClue(result.output) { result.statusCode shouldBe 0 }
                 result.output.trim() shouldBe "deployed dep-new-1"
                 result.output shouldNotContain bearer
-                engine.requests.map { it.first } shouldContainExactly listOf("GET", "POST")
+                engine.requests.map { it.first } shouldContainExactly listOf("GET", "POST", "GET")
+                engine.requests.last().second shouldBe engine.requests.first().second
                 val read = engine.requests.first().second
                 read shouldMatch Regex("/engine-rest/deployment\\?.*")
                 val query =
@@ -446,12 +454,12 @@ class ProcessEngineDeploySpec :
                 val create = engine.creates().single()
                 create.second shouldBe "/engine-rest/deployment/create"
                 engine.authorizations.forEach { it shouldBe "Bearer $bearer" }
-                val form = parts(engine.contentTypes.last()!!, create.third)
+                val form = parts(engine.contentTypes[1]!!, create.third)
                 val fields = form.filter { it.second == null }.associate { it.first to String(it.third) }
                 fields shouldBe
                     mapOf(
                         "deployment-name" to "release_event",
-                        "enable-duplicate-filtering" to "true",
+                        "enable-duplicate-filtering" to "false",
                         "deployment-source" to "ttrp:${fp.take(16)}",
                     )
                 val files = form.filter { it.second != null }
@@ -481,7 +489,7 @@ class ProcessEngineDeploySpec :
                 val out = Files.createTempDirectory("pe-file-only")
                 val fileOnly = emit(dir, "--out", out.toString(), env = emptyMap())
                 withClue(fileOnly.output) { fileOnly.statusCode shouldBe 0 }
-                engine.requests.size shouldBe 2
+                engine.requests.size shouldBe 3
             } finally {
                 engine.stop()
             }
@@ -638,7 +646,7 @@ class ProcessEngineDeploySpec :
             result.output shouldNotContain "deployed"
         }
 
-        "A → B → A: the engine's duplicate filter keeps B newest, so re-deploying A refuses and never claims current" {
+        "A → B → A: re-deploying the earlier bundle makes a new version, confirmed newest by the re-read" {
             val engine = Engine()
             try {
                 val a = project(engine.url)
@@ -652,30 +660,48 @@ class ProcessEngineDeploySpec :
                 fpA shouldNotBe fpB
                 emit(a, "--deploy").output.trim() shouldBe "deployed dep-new-1"
                 emit(b, "--deploy").output.trim() shouldBe "deployed dep-new-2"
+                emit(a, "--deploy", "--check").output.trim() shouldBe "stale $fpB → $fpA dep-new-2"
                 val again = emit(project(engine.url), "--deploy")
-                withClue(again.output) { again.statusCode shouldBe 2 }
-                again.output shouldContain "TTRP-DEPLOY-ENGINE dep-new-2 (ttrp:$fpB) stays the newest"
-                again.output.lines().none { it.startsWith("current") || it.startsWith("deployed") } shouldBe true
-                engine.held.map { it.id } shouldContainExactly listOf("dep-new-1", "dep-new-2")
+                withClue(again.output) { again.statusCode shouldBe 0 }
+                again.output.trim() shouldBe "deployed dep-new-3"
+                engine.held.map { it.id to it.source } shouldContainExactly
+                    listOf("dep-new-1" to "ttrp:$fpA", "dep-new-2" to "ttrp:$fpB", "dep-new-3" to "ttrp:$fpA")
                 val check = emit(a, "--deploy", "--check")
-                check.statusCode shouldBe 2
-                check.output.trim() shouldBe "stale $fpB → $fpA dep-new-2"
+                withClue(check.output) { check.statusCode shouldBe 0 }
+                check.output.trim() shouldBe "current dep-new-3"
             } finally {
                 engine.stop()
             }
         }
 
-        "a racing deployer of the same bundle: the read saw none, the create answers its deployment → current" {
+        "a racing deployer of the same bundle before the read: two deployments of the name, the re-read decides" {
             val engine = Engine(createId = "dep-race-winner")
             try {
                 val dir = project(engine.url)
                 emit(dir, "--deploy").output.trim() shouldBe "deployed dep-race-winner"
-                engine.readOverride = "[]"
+                engine.nextReads += "[]"
                 val raced = emit(dir, "--deploy")
                 withClue(raced.output) { raced.statusCode shouldBe 0 }
-                raced.output.trim() shouldBe "current dep-race-winner"
-                engine.creates().size shouldBe 2
-                engine.held.size shouldBe 1
+                raced.output.trim() shouldBe "deployed dep-new-2"
+                engine.held.map { it.id } shouldContainExactly listOf("dep-race-winner", "dep-new-2")
+            } finally {
+                engine.stop()
+            }
+        }
+
+        "a create the re-read does not confirm (another deployer after it) refuses TTRP-DEPLOY-ENGINE, never current" {
+            val engine = Engine(createId = "dep-ours")
+            try {
+                engine.afterCreate = {
+                    engine.seed("dep-racer", "ttrp:0123456789abcdef")
+                    engine.afterCreate = null
+                }
+                val result = emit(project(engine.url), "--deploy")
+                withClue(result.output) { result.statusCode shouldBe 2 }
+                result.output shouldContain "TTRP-DEPLOY-ENGINE the engine did not make the bundle current"
+                result.output shouldContain "dep-racer (ttrp:0123456789abcdef)"
+                result.output.lines().none { it.startsWith("current") || it.startsWith("deployed") } shouldBe true
+                engine.requests.map { it.first } shouldContainExactly listOf("GET", "POST", "GET")
             } finally {
                 engine.stop()
             }

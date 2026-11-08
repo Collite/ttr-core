@@ -12,11 +12,11 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   executor's `egress_url` without a bearer, `camunda:candidateStarterGroups` from `startable_by` roles' Keycloak groups,
   and element templates with an `http-connector` implementation. Refusals `TTRP-EXPORT-EGRESS`, `TTRP-EXPORT-ROLE`.
 - `ttrp emit --deploy [--check] [--force] [--token-env] [--engine-url]` deploys a `process_engine` export's BPMN and DMN
-  to the engine (`POST /deployment/create`, duplicate filtering, `deployment-source = ttrp:<bundle fp>`) and checks
+  to the engine (`POST /deployment/create`, duplicate filtering off, `deployment-source = ttrp:<bundle fp>`) and checks
   the newest deployment of the name: `absent | current | stale | foreign`; `TTRP-DEPLOY-FOREIGN`, `TTRP-DEPLOY-ENGINE`.
-  `manifest.json` gains `fingerprints.bundle` for engine exports. A create's outcome follows the engine's answer: a
-  duplicate-filter answer of another bundle (re-posting an earlier bundle behind a newer one) is refused
-  `TTRP-DEPLOY-ENGINE`, never `current`; a bearer that is not an RFC 6750 token is refused before any request, unprinted.
+  `manifest.json` gains `fingerprints.bundle` for engine exports. After a create the CLI re-reads the newest deployment
+  and prints `deployed` only when it is the created one with this bundle's source, else `TTRP-DEPLOY-ENGINE`; a rollback
+  to an earlier bundle makes a new version. A bearer that is not an RFC 6750 token is refused before any request, unprinted.
 
 ### Changed — Breaking: `native` retired, SPI v2 revision 3 (AU-export S1.5.2)
 

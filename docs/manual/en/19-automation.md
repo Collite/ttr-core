@@ -194,16 +194,18 @@ ttrp emit --deployment release_event --deploy --engine-url http://127.0.0.1:1808
 ```
 
 The deployment is named after the world deployment and carries `deployment-source = ttrp:<first 16 hex of the
-bundle fingerprint>`, with the engine's duplicate filtering on. `--deploy --check` reads the newest deployment of the
+bundle fingerprint>`, with the engine's duplicate filtering off. `--deploy --check` reads the newest deployment of the
 name (`GET /deployment?name=…`) and changes nothing: `absent` and `current` exit 0, `stale` and `foreign` exit 2.
 `--deploy` creates for `absent` or `stale` (a new definition version; running instances finish on theirs), posts
 nothing for `current`, and refuses `TTRP-DEPLOY-FOREIGN` for a deployment of the name that `ttrp emit` did not make,
 unless `--force`. Any transport failure or engine refusal is `TTRP-DEPLOY-ENGINE <status|cause>` with exit 2 and never
-claims a deployment. The outcome comes from the engine's answer, not from the read: a create that the duplicate filter
-matches reports `current` only when the answered deployment carries this bundle's source (a racing deployer of the same
-bundle). The engine compares a bundle only with its own earlier deployment of the same source, so re-posting an earlier
-bundle behind a newer one (A → B → A) creates nothing and is refused `TTRP-DEPLOY-ENGINE <newest id> (<its source>)
-stays the newest …`; `--deploy --check` keeps reporting `stale`. With `--deploy` the export folder is written only when
+claims a deployment. The CLI owns idempotency: the read decides whether to post, and after a create it reads the newest
+deployment of the name again and prints `deployed <id>` only when that is the created deployment with this bundle's
+source; anything else (another deployer in between) is `TTRP-DEPLOY-ENGINE the engine did not make the bundle current …`.
+Re-deploying an earlier bundle behind a newer one (A → B → A, a rollback) makes a new version; two deployers of the same
+bundle at once leave two deployments of the name. (The engine's own duplicate filter compares a bundle only with the
+newest deployment of the same source and then answers the newest deployment of the name, so it would never redeploy an
+earlier bundle; that is why it stays off.) With `--deploy` the export folder is written only when
 `--out` is given. The bearer is read from the environment, must be an RFC 6750 token (a pasted newline or space is
 refused before any request), and appears in no output or file. Customer `camunda_7` / `camunda_8` exports stay files: `--deploy`
 refuses them.

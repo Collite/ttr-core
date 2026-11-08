@@ -762,20 +762,18 @@ class EmitCommand(
         }
         if (outcome is DeployCheck.Current) return
         val created = client.create(deploymentName, source, resources)
-        // Duplicate filtering compares the bundle with the newest deployment of the name that has the same source; when
-        // they match it creates nothing and answers the newest deployment of the name, whatever its source. So the
-        // answer's source, not its id, says whether this bundle is now the newest: a racing deployer of the same bundle
-        // answers it (current); an older deployment of this bundle behind a newer one answers the newer one (refused).
-        when {
-            created.source != source ->
-                throw DeployRefusal(
-                    "TTRP-DEPLOY-ENGINE ${created.id} (${created.source ?: "no source"}) stays the newest deployment " +
-                        "of $deploymentName: the engine holds this bundle ($source) as an older deployment, so its " +
-                        "duplicate filter created nothing; re-posting an earlier bundle cannot make it the newest again",
-                )
-            created.fresh -> echo("deployed ${created.id}")
-            else -> echo("current ${created.id}")
+        // process-engine §1a (⚑AU-X-4): the CLI owns idempotency. The answer must carry this bundle's source, and a
+        // re-read must find that very deployment as the newest of the name; anything else (another source, a racing
+        // deployer after the create) is not a success, and never `current`.
+        val newest = client.newest(deploymentName)
+        if (created.source != source || newest?.id != created.id || newest.source != source) {
+            throw DeployRefusal(
+                "TTRP-DEPLOY-ENGINE the engine did not make the bundle current: the create answered ${created.id} " +
+                    "(${created.source ?: "no source"}), the newest deployment of $deploymentName is " +
+                    (newest?.let { "${it.id} (${it.source ?: "no source"})" } ?: "none") + ", this bundle is $source",
+            )
         }
+        echo("deployed ${created.id}")
     }
 
     companion object {

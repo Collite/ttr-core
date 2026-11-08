@@ -130,17 +130,6 @@ internal class EngineClient(
         val source: String?,
     )
 
-    /**
-     * The create's answer. [fresh] is whether the engine made a new deployment: it lists the definitions it deployed
-     * only then. When duplicate filtering matches, the engine answers the newest deployment of the name instead, which
-     * may carry another bundle's source.
-     */
-    data class Created(
-        val id: String,
-        val source: String?,
-        val fresh: Boolean,
-    )
-
     init {
         if (!isToken(bearer)) throw DeployRefusal(INVALID_BEARER)
     }
@@ -166,12 +155,17 @@ internal class EngineClient(
         return rows.firstOrNull()?.let { deployment(it) }
     }
 
-    /** Post [resources] as one deployment; the engine's answer (an existing deployment when duplicate filtering hit). */
+    /**
+     * Post [resources] as one deployment, duplicate filtering off (⚑AU-X-4): the engine's filter compares only with the
+     * newest deployment of the same source and, when it matches, answers the newest deployment of the name, so an
+     * earlier bundle behind a newer one would never deploy again. The pre-read decides whether to post; the caller
+     * confirms the result with a re-read.
+     */
     fun create(
         name: String,
         source: String,
         resources: List<Pair<String, ByteArray>>,
-    ): Created {
+    ): Deployment {
         val boundary = "ttrp-deploy-" + source.removePrefix("ttrp:")
         val form = ByteArrayOutputStream()
 
@@ -180,7 +174,7 @@ internal class EngineClient(
         (field, value) in
         listOf(
             "deployment-name" to name,
-            "enable-duplicate-filtering" to "true",
+            "enable-duplicate-filtering" to "false",
             "deployment-source" to source,
         )
         ) {
@@ -210,10 +204,9 @@ internal class EngineClient(
                     .header("Content-Type", "multipart/form-data; boundary=$boundary")
                     .POST(HttpRequest.BodyPublishers.ofByteArray(form.toByteArray())),
             )
-        val answer = parse(body) as? JsonObject ?: throw DeployRefusal("TTRP-DEPLOY-ENGINE malformed deployment answer")
-        val deployed = deployment(answer)
-        val fresh = (answer["deployedProcessDefinitions"] as? JsonObject)?.isNotEmpty() == true
-        return Created(deployed.id, deployed.source, fresh)
+        return deployment(
+            parse(body) as? JsonObject ?: throw DeployRefusal("TTRP-DEPLOY-ENGINE malformed deployment answer"),
+        )
     }
 
     private fun uri(text: String): URI =
