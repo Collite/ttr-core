@@ -6,6 +6,16 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Changed — `ttrp emit` and `ttrp check` read the served layout (AU-export S1.5.4, D-173)
+
+- The project model loads through `ttr-metadata`'s `MetadataLoader` with the built-in stock roles, every existing
+  root (`models/` + `[ttrp] extra-model-roots`) a peer source, and the verdict of its `LoadReport` under
+  `[packages].layout` (`off` / `flexible` / `strict`, the rule `ttr-metadata load` applies). A hartland-shaped
+  repository (`model/<kind>/*.ttrm` declaring one package, `layout = "off"`) exports without relocating files.
+  `ttrp emit` refuses a qname that two roots define (`duplicate-qname`); `ttrp check` no longer ranks `models/` above
+  the extra roots.
+- `MetadataLoadCli.readManifest` is public; `ttrp-frontend` depends on `ttr-metadata-cli` for it.
+
 ### Added — The process engine target and `ttrp emit --deploy` (AU-export S1.5.2, D-145, D-170)
 
 - `ttr-emit-camunda` ships `ProcessEngineEmitPlugin` (`process_engine`): the C7 dialect whose HTTP steps call the

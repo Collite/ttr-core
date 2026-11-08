@@ -85,7 +85,12 @@ object MetadataLoadCli {
 
     private const val CHECKOUT_SOURCE = "checkout"
 
-    internal fun readManifest(manifest: Path): Pair<PackageLayout, List<LoadReportIssue>> {
+    /**
+     * `[packages].layout` of a `modeler.toml` and the manifest's own issues: the one reading of the rule, shared with
+     * `ttrp emit` / `ttrp check` (AU-export S1.5.4, D-173). A missing key is `flexible`; an unknown value warns and
+     * falls back to `flexible`; an unreadable file is an error.
+     */
+    fun readManifest(manifest: Path): Pair<PackageLayout, List<LoadReportIssue>> {
         val parsed =
             runCatching { Toml.parse(manifest) }.getOrElse { error ->
                 return PackageLayout.Flexible to

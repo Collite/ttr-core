@@ -165,6 +165,13 @@ export identity and stale rule as JSON. `--granularity recipe|parts|islands` ove
 export granularity; the default is `parts`. Existing export directories are refused. Files are checked
 against the bundle's hashes and a complete directory is published only after every file is written.
 
+The export reads the model as the services do. Every model root in `modeler.toml` that exists is one source:
+`models/` and each `[ttrp] extra-model-roots` entry, for example `["model", "automation"]`. The stock roles
+(`fact`, `dimension` and the rest) and the automation stdlib are loaded with them, so the project does not copy
+them. A file whose declared package differs from its directory follows `[packages].layout`, as `ttr-metadata load`
+does: `off` accepts it, `flexible` (the default) warns and `strict` refuses the export. Any other load error, such as
+one qualified name defined in two roots, refuses the export before anything is written, with the files that cause it.
+
 An export becomes stale when its recipe text, parameter values, labels, program, deployment, world,
 toolchain or target version differs from the served bundle. Rebuild and export again after such a change.
 Executor manifests are plugin-owned TTR-M resources. All seven target manifests ship with the toolchain;

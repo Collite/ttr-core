@@ -19,10 +19,6 @@ import kotlinx.serialization.json.jsonArray
 import org.tatrman.ttr.metadata.model.World
 import org.tatrman.ttr.metadata.model.AutomationProgram
 import org.tatrman.ttr.metadata.model.AutomationAction
-import org.tatrman.ttr.metadata.model.ModelDescriptor
-import org.tatrman.ttr.metadata.reconcile.ModelReconciler
-import org.tatrman.ttr.metadata.source.FileBasedSource
-import org.tatrman.ttr.metadata.source.LocalFsStorage
 import org.tatrman.ttrp.bundle.RunManifest
 import org.tatrman.ttrp.bundle.BundleAssembler
 import org.tatrman.ttrp.bundle.EmitPluginLoader
@@ -41,6 +37,7 @@ import org.tatrman.ttrp.graph.capability.RecipeManifestSource
 import org.tatrman.ttrp.graph.capability.RegistryRecipe
 import org.tatrman.ttrp.graph.capability.ExecutorManifestGate
 import org.tatrman.ttrp.graph.capability.WorldBinder
+import org.tatrman.ttrp.project.ProjectModel
 import org.tatrman.ttrp.project.TtrpManifestReader
 import com.github.ajalt.clikt.parameters.options.validate
 import com.github.ajalt.clikt.parameters.types.int
@@ -105,19 +102,15 @@ class EmitCommand(
             require(
                 config.diagnostics.none { it.severity.name == "ERROR" },
             ) { config.diagnostics.joinToString { it.render() } }
-            // As the checker's ModelRepo: a root that does not exist is skipped (hartland keeps no `models/`, only
-            // `extra-model-roots`); at least one must exist.
-            val roots =
-                (listOf(config.manifest.modelsRoot()) + config.manifest.extraModelRootPaths())
-                    .filter { Files.isDirectory(it) }
+            // S1.5.4 (D-173): the model as the services load it — every declared root that exists (hartland keeps no
+            // `models/`, only `extra-model-roots`), the stock roles, the verdict of the LoadReport under the manifest's
+            // `[packages].layout`. A declared-package/directory mismatch refuses only under `strict`.
+            val project = ProjectModel.load(config.manifest)
+            val roots = project.roots
             require(roots.isNotEmpty()) { "no model root: neither models/ nor an extra-model-roots entry exists" }
-            val snapshots =
-                roots.mapIndexed { i, path ->
-                    FileBasedSource("export-$i", 0, LocalFsStorage("export-$i", path.toRealPath())).load()
-                }
-            val loaded = ModelReconciler(ModelDescriptor("export", "export")).reconcile(snapshots)
-            require(loaded.ok) { loaded.errors.joinToString { it.message } }
-            val objects = loaded.model.objectByQname().values
+            require(project.ok) { "the model does not load:\n" + project.errors(root) }
+            val model = requireNotNull(project.result.model)
+            val objects = model.objectByQname().values
             val worlds =
                 objects.filterIsInstance<World>().filter { w ->
                     config.manifest.world == null ||
@@ -160,14 +153,14 @@ class EmitCommand(
 
                 val registrySnapshot =
                     org.tatrman.ttr.metadata.registry.RegistrySnapshot(
-                        model = loaded.model,
+                        model = model,
                         graph =
                             org.tatrman.ttr.metadata.graph.ModelGraph
-                                .build(loaded.model),
+                                .build(model),
                         swappedAt = java.time.Instant.EPOCH,
                         warnings = emptyList(),
                     )
-                val packageOf = LayoutResolver.packagesFromFiles(loaded.files)
+                val packageOf = LayoutResolver.packagesFromFiles(project.result.files)
                 val index = ModelIndex(registrySnapshot, packageOf)
                 val resolved =
                     org.tatrman.ttr.metadata.world
@@ -344,7 +337,7 @@ class EmitCommand(
                 val selected = load(program)
                 val choices =
                     if (plugin.targetId in CAMUNDA_TARGETS) {
-                        WorldChoicesProjector.project(loaded.model, world) { choice ->
+                        WorldChoicesProjector.project(model, world) { choice ->
                             if (choice.recipe == program.recipe) {
                                 selected.graph.recipe.parameters
                             } else {
