@@ -14,7 +14,9 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - `ttrp emit --deploy [--check] [--force] [--token-env] [--engine-url]` deploys a `process_engine` export's BPMN and DMN
   to the engine (`POST /deployment/create`, duplicate filtering, `deployment-source = ttrp:<bundle fp>`) and checks
   the newest deployment of the name: `absent | current | stale | foreign`; `TTRP-DEPLOY-FOREIGN`, `TTRP-DEPLOY-ENGINE`.
-  `manifest.json` gains `fingerprints.bundle` for engine exports.
+  `manifest.json` gains `fingerprints.bundle` for engine exports. A create's outcome follows the engine's answer: a
+  duplicate-filter answer of another bundle (re-posting an earlier bundle behind a newer one) is refused
+  `TTRP-DEPLOY-ENGINE`, never `current`; a bearer that is not an RFC 6750 token is refused before any request, unprinted.
 
 ### Changed — Breaking: `native` retired, SPI v2 revision 3 (AU-export S1.5.2)
 

@@ -199,8 +199,13 @@ name (`GET /deployment?name=…`) and changes nothing: `absent` and `current` ex
 `--deploy` creates for `absent` or `stale` (a new definition version; running instances finish on theirs), posts
 nothing for `current`, and refuses `TTRP-DEPLOY-FOREIGN` for a deployment of the name that `ttrp emit` did not make,
 unless `--force`. Any transport failure or engine refusal is `TTRP-DEPLOY-ENGINE <status|cause>` with exit 2 and never
-claims a deployment. With `--deploy` the export folder is written only when `--out` is given. The bearer is read from
-the environment and appears in no output or file. Customer `camunda_7` / `camunda_8` exports stay files: `--deploy`
+claims a deployment. The outcome comes from the engine's answer, not from the read: a create that the duplicate filter
+matches reports `current` only when the answered deployment carries this bundle's source (a racing deployer of the same
+bundle). The engine compares a bundle only with its own earlier deployment of the same source, so re-posting an earlier
+bundle behind a newer one (A → B → A) creates nothing and is refused `TTRP-DEPLOY-ENGINE <newest id> (<its source>)
+stays the newest …`; `--deploy --check` keeps reporting `stale`. With `--deploy` the export folder is written only when
+`--out` is given. The bearer is read from the environment, must be an RFC 6750 token (a pasted newline or space is
+refused before any request), and appears in no output or file. Customer `camunda_7` / `camunda_8` exports stay files: `--deploy`
 refuses them.
 
 > **Grammar 0.22 (D-142).** The paragraphs below on process exports, step bundles, digests and batch schedule hints

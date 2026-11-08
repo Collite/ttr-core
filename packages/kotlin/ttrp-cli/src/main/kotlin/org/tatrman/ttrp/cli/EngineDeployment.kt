@@ -112,7 +112,8 @@ internal sealed interface DeployCheck {
 /**
  * The two engine routes `--deploy` consumes (process-engine `contracts.md` §1): the newest deployment of a name and the
  * multipart create. Any transport failure or non-2xx answer is `TTRP-DEPLOY-ENGINE <status|cause>`. The bearer goes
- * only into the Authorization header; redirects are not followed, so it never reaches another origin.
+ * only into the Authorization header and never into a message; redirects are not followed, so it never reaches another
+ * origin.
  */
 internal class EngineClient(
     baseUrl: String,
@@ -128,6 +129,21 @@ internal class EngineClient(
         val id: String,
         val source: String?,
     )
+
+    /**
+     * The create's answer. [fresh] is whether the engine made a new deployment: it lists the definitions it deployed
+     * only then. When duplicate filtering matches, the engine answers the newest deployment of the name instead, which
+     * may carry another bundle's source.
+     */
+    data class Created(
+        val id: String,
+        val source: String?,
+        val fresh: Boolean,
+    )
+
+    init {
+        if (!isToken(bearer)) throw DeployRefusal(INVALID_BEARER)
+    }
 
     private val base = baseUrl.trimEnd('/')
 
@@ -150,12 +166,12 @@ internal class EngineClient(
         return rows.firstOrNull()?.let { deployment(it) }
     }
 
-    /** Post [resources] as one deployment; the engine's answer id (an existing one when duplicate filtering hit). */
+    /** Post [resources] as one deployment; the engine's answer (an existing deployment when duplicate filtering hit). */
     fun create(
         name: String,
         source: String,
         resources: List<Pair<String, ByteArray>>,
-    ): String {
+    ): Created {
         val boundary = "ttrp-deploy-" + source.removePrefix("ttrp:")
         val form = ByteArrayOutputStream()
 
@@ -194,8 +210,10 @@ internal class EngineClient(
                     .header("Content-Type", "multipart/form-data; boundary=$boundary")
                     .POST(HttpRequest.BodyPublishers.ofByteArray(form.toByteArray())),
             )
-        return (parse(body) as? JsonObject)?.let { deployment(it).id }
-            ?: throw DeployRefusal("TTRP-DEPLOY-ENGINE malformed deployment answer")
+        val answer = parse(body) as? JsonObject ?: throw DeployRefusal("TTRP-DEPLOY-ENGINE malformed deployment answer")
+        val deployed = deployment(answer)
+        val fresh = (answer["deployedProcessDefinitions"] as? JsonObject)?.isNotEmpty() == true
+        return Created(deployed.id, deployed.source, fresh)
     }
 
     private fun uri(text: String): URI =
@@ -212,6 +230,9 @@ internal class EngineClient(
                     request.header("Authorization", "Bearer $bearer").timeout(Duration.ofSeconds(60)).build(),
                     HttpResponse.BodyHandlers.ofString(),
                 )
+            } catch (e: IllegalArgumentException) {
+                // The HTTP client's header check quotes the header value, which may be the bearer: never echo it.
+                throw DeployRefusal("TTRP-DEPLOY-ENGINE the HTTP client refused the request (a header value)")
             } catch (e: IOException) {
                 throw DeployRefusal("TTRP-DEPLOY-ENGINE ${e.javaClass.simpleName}${e.message?.let { ": $it" } ?: ""}")
             } catch (e: InterruptedException) {
@@ -220,6 +241,17 @@ internal class EngineClient(
             }
         if (response.statusCode() !in 200..299) throw DeployRefusal("TTRP-DEPLOY-ENGINE ${response.statusCode()}")
         return response.body()
+    }
+
+    companion object {
+        /** RFC 6750 `b64token`: a pasted newline or space is the usual way a bearer fails it. */
+        private val TOKEN = Regex("[A-Za-z0-9._~+/-]+=*")
+
+        const val INVALID_BEARER =
+            "the engine bearer is not an RFC 6750 token (letters, digits, -._~+/ and trailing =); " +
+                "a pasted newline or space is the usual cause; its value is not shown"
+
+        fun isToken(bearer: String) = TOKEN.matches(bearer)
     }
 
     private fun parse(body: String) =

@@ -731,6 +731,7 @@ class EmitCommand(
                 ?: error(
                     "--deploy needs the engine bearer in $variable (a personal bearer, D-160) or --token-env <variable>",
                 )
+        if (!EngineClient.isToken(bearer)) error("$variable: ${EngineClient.INVALID_BEARER}")
         val executor = world.executors.single { it.qname.name == deployment.target }
         val url =
             engineUrl
@@ -760,10 +761,21 @@ class EmitCommand(
             else -> Unit
         }
         if (outcome is DeployCheck.Current) return
-        val id = client.create(deploymentName, source, resources)
-        val existing = (outcome as? DeployCheck.Stale)?.id ?: (outcome as? DeployCheck.Foreign)?.id
-        // The engine's duplicate filter answers an existing deployment's id when nothing changed.
-        echo(if (id == existing) "current $id" else "deployed $id")
+        val created = client.create(deploymentName, source, resources)
+        // Duplicate filtering compares the bundle with the newest deployment of the name that has the same source; when
+        // they match it creates nothing and answers the newest deployment of the name, whatever its source. So the
+        // answer's source, not its id, says whether this bundle is now the newest: a racing deployer of the same bundle
+        // answers it (current); an older deployment of this bundle behind a newer one answers the newer one (refused).
+        when {
+            created.source != source ->
+                throw DeployRefusal(
+                    "TTRP-DEPLOY-ENGINE ${created.id} (${created.source ?: "no source"}) stays the newest deployment " +
+                        "of $deploymentName: the engine holds this bundle ($source) as an older deployment, so its " +
+                        "duplicate filter created nothing; re-posting an earlier bundle cannot make it the newest again",
+                )
+            created.fresh -> echo("deployed ${created.id}")
+            else -> echo("current ${created.id}")
+        }
     }
 
     companion object {

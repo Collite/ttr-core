@@ -296,54 +296,6 @@ class ProcessEngineDeploySpec :
             result.output shouldContain "egress_url"
         }
 
-        // ---- the engine fixture: `GET /deployment` + `POST /deployment/create` (process-engine contracts §1a) ----
-
-        class Engine(
-            var newest: String = "[]",
-            var readStatus: Int = 200,
-            var createStatus: Int = 200,
-            var createId: String = "dep-new-1",
-        ) {
-            val requests = mutableListOf<Triple<String, String, ByteArray>>()
-            val authorizations = mutableListOf<String?>()
-            val contentTypes = mutableListOf<String?>()
-            private val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-
-            init {
-                server.createContext("/engine-rest/deployment") { ex ->
-                    val body = ex.requestBody.readAllBytes()
-                    requests += Triple(ex.requestMethod, ex.requestURI.toString(), body)
-                    authorizations += ex.requestHeaders.getFirst("Authorization")
-                    contentTypes += ex.requestHeaders.getFirst("Content-Type")
-                    val (status, answer) =
-                        if (ex.requestMethod == "GET") {
-                            readStatus to newest
-                        } else {
-                            createStatus to
-                                """{"id":"$createId","name":"release_event","source":"ignored","deploymentTime":"2026-11-07T10:00:00.000+0000"}"""
-                        }
-                    val bytes = answer.toByteArray()
-                    ex.responseHeaders.add("Content-Type", "application/json")
-                    ex.sendResponseHeaders(status, bytes.size.toLong())
-                    ex.responseBody.use { it.write(bytes) }
-                }
-                server.start()
-            }
-
-            val url get() = "http://127.0.0.1:${server.address.port}/engine-rest"
-
-            fun creates() = requests.filter { it.first == "POST" }
-
-            fun stop() = server.stop(0)
-        }
-
-        fun row(
-            id: String,
-            source: String?,
-        ) = """[{"id":"$id","name":"release_event","source":${source?.let {
-            "\"$it\""
-        } ?: "null"},"deploymentTime":"2026-11-06T09:00:00.000+0000","tenantId":null}]"""
-
         /** Parse a `multipart/form-data` body into (name, filename?, bytes). */
         fun parts(
             contentType: String,
@@ -362,6 +314,109 @@ class ProcessEngineDeploySpec :
                     val file = Regex("filename=\"([^\"]*)\"").find(head)?.groupValues?.get(1)
                     Triple(name, file, content.toByteArray(Charsets.ISO_8859_1))
                 }
+        }
+
+        // ---- the engine fixture: `GET /deployment` + `POST /deployment/create` (process-engine contracts §1a) ----
+
+        /**
+         * The engine as CIB seven / Camunda 7.24 answers the two routes (`DeployCmd`, `DefaultDeploymentHandler`,
+         * `DeploymentWithDefinitionsDto`). It holds deployments newest last. A create with duplicate filtering compares
+         * the posted resources with the newest deployment of the name that has the same source: if every resource matches,
+         * it creates nothing and answers the newest deployment of the name, whatever its source, with no deployed
+         * definitions. Otherwise it creates a deployment and lists its definitions. [readOverride] replaces the GET body,
+         * e.g. a read that predates a racing deployer, or an error body.
+         */
+        class Engine(
+            var readStatus: Int = 200,
+            var createStatus: Int = 200,
+            createId: String = "dep-new-1",
+        ) {
+            inner class Held(
+                val id: String,
+                val source: String?,
+                val resources: Map<String, ByteArray>,
+            ) {
+                fun json(fresh: Boolean? = null) =
+                    buildString {
+                        append("""{"links":[],"id":"$id","name":"release_event","source":""")
+                        append(source?.let { "\"$it\"" } ?: "null")
+                        append(""","deploymentTime":"2026-11-08T07:10:53.326+0000","tenantId":null""")
+                        if (fresh != null) {
+                            val definition = "release_on_placement:1:$id"
+                            val defs = if (fresh) """{"$definition":{"id":"$definition"}}""" else "null"
+                            append(""","deployedProcessDefinitions":$defs,"deployedCaseDefinitions":null""")
+                            append(""","deployedDecisionDefinitions":${if (fresh) "{}" else "null"}""")
+                            append(""","deployedDecisionRequirementsDefinitions":null""")
+                        }
+                        append("}")
+                    }
+            }
+
+            val held = mutableListOf<Held>()
+            var readOverride: String? = null
+            val requests = mutableListOf<Triple<String, String, ByteArray>>()
+            val authorizations = mutableListOf<String?>()
+            val contentTypes = mutableListOf<String?>()
+            private val ids = ArrayDeque(listOf(createId))
+            private var serial = 1
+            private val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+
+            /** A deployment someone else made before the test: no resources of ours. */
+            fun seed(
+                id: String,
+                source: String?,
+            ) {
+                held += Held(id, source, emptyMap())
+            }
+
+            private fun create(
+                contentType: String,
+                body: ByteArray,
+            ): String {
+                val form = parts(contentType, body)
+                val fields = form.filter { it.second == null }.associate { it.first to String(it.third) }
+                val files = form.filter { it.second != null }.associate { it.second!! to it.third }
+                val source = fields["deployment-source"]
+                if (fields["enable-duplicate-filtering"] == "true") {
+                    val same = held.lastOrNull { it.source == source }
+                    val unchanged =
+                        same != null &&
+                            files.all { (name, bytes) -> same.resources[name]?.contentEquals(bytes) == true }
+                    if (unchanged) return held.last().json(fresh = false)
+                }
+                val made = Held(ids.removeFirstOrNull() ?: "dep-new-${++serial}", source, files)
+                held += made
+                return made.json(fresh = true)
+            }
+
+            init {
+                server.createContext("/engine-rest/deployment") { ex ->
+                    val body = ex.requestBody.readAllBytes()
+                    val contentType = ex.requestHeaders.getFirst("Content-Type")
+                    requests += Triple(ex.requestMethod, ex.requestURI.toString(), body)
+                    authorizations += ex.requestHeaders.getFirst("Authorization")
+                    contentTypes += contentType
+                    val (status, answer) =
+                        if (ex.requestMethod == "GET") {
+                            readStatus to (readOverride ?: "[" + (held.lastOrNull()?.json() ?: "") + "]")
+                        } else if (createStatus != 200) {
+                            createStatus to """{"type":"ProcessEngineException","message":"refused"}"""
+                        } else {
+                            200 to create(contentType, body)
+                        }
+                    val bytes = answer.toByteArray()
+                    ex.responseHeaders.add("Content-Type", "application/json")
+                    ex.sendResponseHeaders(status, bytes.size.toLong())
+                    ex.responseBody.use { it.write(bytes) }
+                }
+                server.start()
+            }
+
+            val url get() = "http://127.0.0.1:${server.address.port}/engine-rest"
+
+            fun creates() = requests.filter { it.first == "POST" }
+
+            fun stop() = server.stop(0)
         }
 
         "--deploy posts BPMN and DMN as one multipart deployment with duplicate filtering and the bundle source" {
@@ -474,7 +529,7 @@ class ProcessEngineDeploySpec :
         // ---- T4: the nine §1a cases ----
 
         "check · no deployment of the name → absent, exit 0, read-only" {
-            val engine = Engine(newest = "[]")
+            val engine = Engine()
             try {
                 val result = emit(project(engine.url), "--deploy", "--check")
                 withClue(result.output) { result.statusCode shouldBe 0 }
@@ -490,7 +545,7 @@ class ProcessEngineDeploySpec :
             try {
                 val dir = project(engine.url)
                 val fp = bundleFingerprint(exported(dir))
-                engine.newest = row("dep-7", "ttrp:${fp.take(16)}")
+                engine.seed("dep-7", "ttrp:${fp.take(16)}")
                 val check = emit(dir, "--deploy", "--check")
                 withClue(check.output) { check.statusCode shouldBe 0 }
                 check.output.trim() shouldBe "current dep-7"
@@ -508,7 +563,7 @@ class ProcessEngineDeploySpec :
             try {
                 val dir = project(engine.url)
                 val fp = bundleFingerprint(exported(dir))
-                engine.newest = row("dep-7", "ttrp:0123456789abcdef")
+                engine.seed("dep-7", "ttrp:0123456789abcdef")
                 val check = emit(dir, "--deploy", "--check")
                 check.statusCode shouldBe 2
                 check.output.trim() shouldBe "stale 0123456789abcdef → ${fp.take(16)} dep-7"
@@ -517,6 +572,7 @@ class ProcessEngineDeploySpec :
                 withClue(deploy.output) { deploy.statusCode shouldBe 0 }
                 deploy.output.trim() shouldBe "deployed dep-8"
                 engine.creates().size shouldBe 1
+                emit(dir, "--deploy", "--check").output.trim() shouldBe "current dep-8"
             } finally {
                 engine.stop()
             }
@@ -524,7 +580,7 @@ class ProcessEngineDeploySpec :
 
         "null source and a non-ttrp source → foreign: refused TTRP-DEPLOY-FOREIGN unless --force" {
             for (source in listOf(null, "process application")) {
-                val engine = Engine(newest = row("dep-x", source), createId = "dep-forced")
+                val engine = Engine(createId = "dep-forced").also { it.seed("dep-x", source) }
                 try {
                     val dir = project(engine.url)
                     val check = emit(dir, "--deploy", "--check")
@@ -546,7 +602,7 @@ class ProcessEngineDeploySpec :
         }
 
         "401 on the read → TTRP-DEPLOY-ENGINE 401, no success claim, no create" {
-            val engine = Engine(readStatus = 401, newest = """{"type":"AuthenticationException"}""")
+            val engine = Engine(readStatus = 401).also { it.readOverride = """{"type":"AuthenticationException"}""" }
             try {
                 for (flags in listOf(listOf("--deploy", "--check"), listOf("--deploy"))) {
                     val result = emit(project(engine.url), *flags.toTypedArray())
@@ -582,13 +638,70 @@ class ProcessEngineDeploySpec :
             result.output shouldNotContain "deployed"
         }
 
-        "the create answering the existing id (duplicate filtering) is reported as current" {
-            val engine = Engine(newest = row("dep-7", "ttrp:0123456789abcdef"), createId = "dep-7")
+        "A → B → A: the engine's duplicate filter keeps B newest, so re-deploying A refuses and never claims current" {
+            val engine = Engine()
             try {
-                val result = emit(project(engine.url), "--deploy")
-                withClue(result.output) { result.statusCode shouldBe 0 }
-                result.output.trim() shouldBe "current dep-7"
-                engine.creates().size shouldBe 1
+                val a = project(engine.url)
+                val egressB =
+                    listOf(
+                        "http://process-engine-egress/automation" to "http://process-engine-egress-b/automation",
+                    )
+                val b = project(engine.url, worldEdits = egressB)
+                val fpA = bundleFingerprint(exported(a)).take(16)
+                val fpB = bundleFingerprint(exported(b)).take(16)
+                fpA shouldNotBe fpB
+                emit(a, "--deploy").output.trim() shouldBe "deployed dep-new-1"
+                emit(b, "--deploy").output.trim() shouldBe "deployed dep-new-2"
+                val again = emit(project(engine.url), "--deploy")
+                withClue(again.output) { again.statusCode shouldBe 2 }
+                again.output shouldContain "TTRP-DEPLOY-ENGINE dep-new-2 (ttrp:$fpB) stays the newest"
+                again.output.lines().none { it.startsWith("current") || it.startsWith("deployed") } shouldBe true
+                engine.held.map { it.id } shouldContainExactly listOf("dep-new-1", "dep-new-2")
+                val check = emit(a, "--deploy", "--check")
+                check.statusCode shouldBe 2
+                check.output.trim() shouldBe "stale $fpB → $fpA dep-new-2"
+            } finally {
+                engine.stop()
+            }
+        }
+
+        "a racing deployer of the same bundle: the read saw none, the create answers its deployment → current" {
+            val engine = Engine(createId = "dep-race-winner")
+            try {
+                val dir = project(engine.url)
+                emit(dir, "--deploy").output.trim() shouldBe "deployed dep-race-winner"
+                engine.readOverride = "[]"
+                val raced = emit(dir, "--deploy")
+                withClue(raced.output) { raced.statusCode shouldBe 0 }
+                raced.output.trim() shouldBe "current dep-race-winner"
+                engine.creates().size shouldBe 2
+                engine.held.size shouldBe 1
+            } finally {
+                engine.stop()
+            }
+        }
+
+        "a malformed bearer (a pasted newline or space) refuses before any request and is never printed" {
+            val engine = Engine()
+            try {
+                val secret = "fixture-secret-393"
+                for ((variable, value) in listOf("TTR_BEARER" to "$secret\n", "DEPLOYER_BEARER" to "$secret tail")) {
+                    val flags = if (variable == "TTR_BEARER") emptyArray() else arrayOf("--token-env", variable)
+                    for (check in listOf(false, true)) {
+                        val result =
+                            emit(
+                                project(engine.url),
+                                "--deploy",
+                                *flags,
+                                *(if (check) arrayOf("--check") else emptyArray()),
+                                env = mapOf(variable to value),
+                            )
+                        result.statusCode shouldBe 2
+                        result.output shouldContain "$variable: the engine bearer is not an RFC 6750 token"
+                        result.output shouldNotContain secret
+                    }
+                }
+                engine.requests.shouldBeEmpty()
             } finally {
                 engine.stop()
             }
