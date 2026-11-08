@@ -6,6 +6,24 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — The process engine target and `ttrp emit --deploy` (AU-export S1.5.2, D-145, D-170)
+
+- `ttr-emit-camunda` ships `ProcessEngineEmitPlugin` (`process_engine`): the C7 dialect whose HTTP steps call the
+  executor's `egress_url` without a bearer, `camunda:candidateStarterGroups` from `startable_by` roles' Keycloak groups,
+  and element templates with an `http-connector` implementation. Refusals `TTRP-EXPORT-EGRESS`, `TTRP-EXPORT-ROLE`.
+- `ttrp emit --deploy [--check] [--force] [--token-env] [--engine-url]` deploys a `process_engine` export's BPMN and DMN
+  to the engine (`POST /deployment/create`, duplicate filtering off, `deployment-source = ttrp:<bundle fp>`) and checks
+  the newest deployment of the name: `absent | current | stale | foreign`; `TTRP-DEPLOY-FOREIGN`, `TTRP-DEPLOY-ENGINE`.
+  `manifest.json` gains `fingerprints.bundle` for engine exports. After a create the CLI re-reads the newest deployment
+  and prints `deployed` only when it is the created one with this bundle's source, else `TTRP-DEPLOY-ENGINE`; a rollback
+  to an earlier bundle makes a new version. A bearer that is not an RFC 6750 token is refused before any request, unprinted.
+
+### Changed — Breaking: `native` retired, SPI v2 revision 3 (AU-export S1.5.2)
+
+- The `org.tatrman:ttr-emit-native` artifact and its `native` executor manifest are deleted (D-145, delete-not-deprecate);
+  a world executor that `extends: native` is refused `TTRP-TGT-006`.
+- `DeploymentMeta.startableGroups` is added; SPI v2 plugins must rebuild and declare `spiRevision = 3`.
+
 ### Added — Structural profile execution (MW P3 S3.2, ttr-core#388)
 
 - `ttr-profile` now executes original-tree record selectors, `kinds`, `package`, `rename`, `nest`/`unnest`, `ignore` and `codes`; inherited profiles emit located canonical documents grouped by package and model. Missing record IDs, unconsumed keys and conflicting targets are refused.

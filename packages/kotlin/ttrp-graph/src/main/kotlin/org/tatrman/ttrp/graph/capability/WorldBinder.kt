@@ -58,6 +58,10 @@ class WorldBinder(
             // An automation executor (`extends: n8n_l1`, …) runs recipe programs, not TTR-P bundles: its type
             // manifest is the exporters' registry's (AU D-35), so the TTR-P binder leaves it unbound (AU-core-P1).
             if (x.extendsRef in AUTOMATION_EXECUTOR_TYPES) continue
+            if (x.extendsRef in RETIRED_EXECUTOR_TYPES) {
+                diags += diag(TtrpDiagnosticId.TGT_006, retired(x.qname.name), SourceLocation.UNKNOWN)
+                continue
+            }
             val m = matchExecution(x.type, x.extendsRef)
             if (m == null) {
                 diags +=
@@ -113,7 +117,6 @@ class WorldBinder(
         /** The automation executor types (AU exporters contracts §1, spelled as TTR-M ids). */
         val AUTOMATION_EXECUTOR_TYPES =
             setOf(
-                "native",
                 "n8n_l1",
                 "camunda_7",
                 "camunda_8",
@@ -122,5 +125,13 @@ class WorldBinder(
                 "python_offline",
                 "sql_job",
             )
+
+        /** Executor types D-145 retired: `native` (the Server is no executor; the process engine calls its run API). */
+        val RETIRED_EXECUTOR_TYPES = setOf("native")
+
+        /** The one wording of the refusal, shared by the checker and `ttrp emit`. */
+        fun retired(executor: String): String =
+            "TTRP-TGT-006: executor `$executor` extends the retired `native` type (D-145); " +
+                "the estate's process engine replaces it — `extends: process_engine` with `url:` and `egress_url:`"
     }
 }

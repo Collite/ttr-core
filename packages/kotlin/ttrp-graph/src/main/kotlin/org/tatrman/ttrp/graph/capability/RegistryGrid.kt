@@ -68,8 +68,9 @@ class RegistryGrid(
     companion object {
         /**
          * The type of the world executor [deployment] targets. Grammar 0.22 (D-142): there is no `target: native`
-         * pseudo-executor any more — the Server is an executor of the world (`def executor server { extends: native }`),
-         * and an executor named `native` is resolved like any other.
+         * pseudo-executor any more, and an executor named `native` is resolved like any other. D-145 retired the
+         * `native` executor *type* too: the estate's engine is `def executor engine { extends: process_engine }`,
+         * and a world executor that still extends `native` is refused `TTRP-TGT-006`.
          */
         fun executorType(
             world: World,
@@ -88,8 +89,8 @@ class RegistryGrid(
     }
 }
 
-/** The Server's executor type. */
-private const val NATIVE = "native"
+/** The estate's process engine (D-145): it acts on the action rows the Server records. */
+private const val PROCESS_ENGINE = "process_engine"
 
 internal fun recipeCellCheck(
     manifest: RecipeExecutorManifest,
@@ -120,8 +121,8 @@ internal fun recipeCellCheck(
         for ((action, sink) in recipe.sinks) {
             val supported = manifest.entries("sinks")
             // D-142: the Server records the action row of every wired action. One with no native sink is that row
-            // only — the engine acts on it (a send task, a user task, a call activity) — so the Server takes it.
-            if (sink == "no" && manifest.id == NATIVE) continue
+            // only — the engine acts on it (a send task, a user task, a call activity) — so the engine target takes it.
+            if (sink == "no" && manifest.id == PROCESS_ENGINE) continue
             if (sink == "no" ||
                 (
                     supported["all"] in listOf(null, "no") &&

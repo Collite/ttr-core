@@ -87,7 +87,6 @@ include(":packages:kotlin:ttr-import-schema")
 // generator, two callers (I-2): the `ttr security-gen` CLI + Perun's build pipeline.
 include(":packages:kotlin:ttr-security-gen")
 
-include(":packages:kotlin:ttr-emit-native")
 
 include(":packages:kotlin:ttr-emit-n8n")
 
