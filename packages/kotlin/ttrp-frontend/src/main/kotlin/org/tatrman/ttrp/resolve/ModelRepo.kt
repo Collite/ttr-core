@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttrp.resolve
 
-import org.tatrman.ttr.metadata.reconcile.ModelReconciler
-import org.tatrman.ttr.metadata.model.ModelDescriptor
+import org.tatrman.ttr.metadata.PackageLayout
 import org.tatrman.ttr.metadata.layout.LayoutResolver
 import org.tatrman.ttr.metadata.graph.ModelGraph
 import org.tatrman.ttr.metadata.registry.RegistrySnapshot
-import org.tatrman.ttr.metadata.source.FileBasedSource
-import org.tatrman.ttr.metadata.source.LocalFsStorage
+import org.tatrman.ttrp.project.ProjectModel
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
@@ -22,7 +20,7 @@ import java.time.Instant
 object ModelRepo {
     /**
      * Loads [modelsRoot] (the `models/` dir) plus any [extraRoots] (`[ttrp] extra-model-roots`, AG-P0)
-     * into one model — one file source per root, so each keeps its own package = directory rule.
+     * into one model through [ProjectModel] — one file source per root, the stock roles ahead of them.
      * Returns null when none of the roots exists.
      */
     fun snapshotOf(
@@ -36,31 +34,17 @@ object ModelRepo {
     ): ModelIndex? {
         val roots = (listOf(modelsRoot) + extraRoots).filter { Files.isDirectory(it) }
         if (roots.isEmpty()) return null
-        val sources =
-            roots.mapIndexed { i, root ->
-                // Resolve symlinks: `Files.walk` does not descend a symlink used as the walk
-                // root, so a `models/` symlink (the test fixture's link to the shared models)
-                // must be canonicalised first.
-                val realRoot = runCatching { root.toRealPath() }.getOrDefault(root)
-                val id = if (i == 0) "ttrp" else "ttrp-$i"
-                FileBasedSource(
-                    sourceId = id,
-                    priority = 100 - i,
-                    storage = LocalFsStorage(id = id, rootPath = realRoot),
-                )
-            }
-        return runCatching {
-            val snapshots = sources.map { it.load() }
-            val reconciled = ModelReconciler(ModelDescriptor(id = "model", name = "model")).reconcile(snapshots)
-            val model = reconciled.model
-            val snapshot =
-                RegistrySnapshot(
-                    model = model,
-                    graph = ModelGraph.build(model),
-                    swappedAt = Instant.EPOCH,
-                    warnings = emptyList(),
-                )
-            ModelIndex(snapshot, LayoutResolver.packagesFromFiles(reconciled.files))
-        }.getOrNull()
+        // The checker is tolerant: it reports its own diagnostics, so the load verdict is not a gate here. The
+        // model is the one `ttrp emit` gates on (S1.5.4): the stock roles first, every root a peer source.
+        val loaded = ProjectModel.load(roots, PackageLayout.Flexible)
+        val model = loaded.model ?: return null
+        val snapshot =
+            RegistrySnapshot(
+                model = model,
+                graph = ModelGraph.build(model),
+                swappedAt = Instant.EPOCH,
+                warnings = emptyList(),
+            )
+        return ModelIndex(snapshot, LayoutResolver.packagesFromFiles(loaded.files))
     }
 }

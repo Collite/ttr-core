@@ -231,6 +231,79 @@ class ProcessEngineDeploySpec :
             Files.exists(out.resolve("release_event.process_engine.export/release_order.c7.bpmn")) shouldBe true
         }
 
+        /**
+         * S1.5.4 (D-173): the same project at hartland's served layout — the model by kind under `model/<kind>/<f>`, the
+         * automation package and world under `automation/`, one declared `package hartland` that differs from the
+         * directories under `[packages] layout`, and no copy of the stock roles (the loader injects them).
+         */
+        fun servedLayout(
+            staged: Project,
+            layout: String = "off",
+        ): Project {
+            val dir = Files.createTempDirectory("pe-served-layout")
+            copyTree(queriesRoot, dir.resolve("model"))
+            Files.delete(dir.resolve("model/README.md"))
+            copyTree(staged.dir.resolve("models/hartland/automation"), dir.resolve("automation"))
+            copyTree(staged.dir.resolve("models/hartland/worlds"), dir.resolve("automation/worlds"))
+            copyTree(staged.dir.resolve("recipes"), dir.resolve("recipes"))
+            Files.writeString(
+                dir.resolve("modeler.toml"),
+                "[packages]\nlayout = \"$layout\"\n\n[ttrp]\nworld = \"hartland.worlds.demo\"\n" +
+                    "extra-model-roots = [\"model\", \"automation\"]\n",
+            )
+            return Project(dir, staged.bundle)
+        }
+
+        /** Every exported file, with the two values a layout changes (the model fingerprint and its derivatives) masked. */
+        fun layoutFree(folder: Path): Map<String, String> =
+            Files.walk(folder).use { paths ->
+                paths.filter { Files.isRegularFile(it) }.toList().associate { path ->
+                    val text = Files.readString(path)
+                    folder.relativize(path).toString() to
+                        when {
+                            path.fileName.toString() == "manifest.json" ->
+                                text
+                                    .replace(Regex("\"model\": \"sha256:[0-9a-f]{64}\""), "\"model\": \"<model>\"")
+                                    .replace(
+                                        Regex("\"(templates/[^\"]+)\": \"sha256:[0-9a-f]{64}\""),
+                                        "\"$1\": \"<t>\"",
+                                    ).replace(Regex("\"bundle\": \"[0-9a-f]{64}\""), "\"bundle\": \"<b>\"")
+                            path.toString().contains("/templates/") ->
+                                text.replace(Regex("\"fingerprint\": \"[0-9a-f]{64}\""), "\"fingerprint\": \"<f>\"")
+                            else -> text
+                        }
+                }
+            }
+
+        "hartland's served layout exports H-1 as the staged copy did, except the model fingerprint (D-173)" {
+            val staged = project()
+            val served = servedLayout(staged)
+            val stagedFolder = exported(staged)
+            val servedFolder = exported(served)
+            val a = layoutFree(stagedFolder)
+            val b = layoutFree(servedFolder)
+            b.keys shouldBe a.keys
+            a.keys.filter { a[it] != b[it] }.shouldBeEmpty()
+            // The BPMN and DMN are byte-identical; what moves is the model fingerprint, as it hashes the roots' paths.
+            Files.readString(servedFolder.resolve("release_order.c7.bpmn")) shouldBe
+                Files.readString(stagedFolder.resolve("release_order.c7.bpmn"))
+            Files.readString(servedFolder.resolve("manifest.json")) shouldNotBe
+                Files.readString(stagedFolder.resolve("manifest.json"))
+        }
+
+        "the served layout under [packages] layout = strict refuses on the declared package, before building" {
+            val result =
+                emit(
+                    servedLayout(project(), layout = "strict"),
+                    "--out",
+                    Files.createTempDirectory("pe-strict").toString(),
+                )
+            result.statusCode shouldBe 2
+            result.output shouldContain "the model does not load"
+            result.output shouldContain "package-mismatch"
+            result.output shouldContain "model/er/"
+        }
+
         "the export is deterministic, so the bundle fingerprint is stable across runs" {
             val dir = project()
             bundleFingerprint(exported(dir)) shouldBe bundleFingerprint(exported(dir))
