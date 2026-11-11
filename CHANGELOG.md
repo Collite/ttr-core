@@ -6,6 +6,14 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — Record fan-out (MW P3 S3.2b, ttr-core#392)
+
+- `ttr-profile` makes one record per canonical kind from one foreign node: two `kinds` operations can turn one entry into an `entity` (model `er`) and its `er2db_entity` (model `binding`). The same node mapped twice to the same kind is still refused.
+
+### Fixed — Bare attribute bindings under a standalone `er2db_entity` (ttr-metadata, MW P3 S3.2b)
+
+- An entity with no inline `binding:` block now takes its table from the `def er2db_entity` whose `entity:` names it, so bare attribute bindings (`binding: ID`) load as the table's column (`db.dbo.T.ID`) instead of a dangling `db.dbo.ID`. Inline blocks, `columns:` maps and qualified references are unchanged.
+
 ### Added — Structural profile execution (MW P3 S3.2, ttr-core#388)
 
 - `ttr-profile` now executes original-tree record selectors, `kinds`, `package`, `rename`, `nest`/`unnest`, `ignore` and `codes`; inherited profiles emit located canonical documents grouped by package and model. Missing record IDs, unconsumed keys and conflicting targets are refused.

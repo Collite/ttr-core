@@ -108,6 +108,18 @@ def er2db_entity active_customer {
 
 This expresses "the *active customer* entity is the `CUSTOMER` table filtered to `active = 1`" — something the inline form cannot say, and the legacy YAML could only smuggle into a `table:` string like `"CUSTOMER WHERE ACTIVE = 1"`.
 
+When the condition is not a set of column equalities, write it as SQL text:
+
+```ttr
+def er2db_entity open_order {
+    entity: er.entity.open_order,
+    target: { table: db.dbo.ORDERS },
+    whereFilter: { sql: "STAV = 1 AND ZRUSENO = 0" }
+}
+```
+
+The condition is kept verbatim; the serving layer applies it as `SELECT * FROM <target> WHERE <sql>`. The `{ column: value }` form above is unchanged.
+
 ## Choosing a style
 
 | Situation | Use |
