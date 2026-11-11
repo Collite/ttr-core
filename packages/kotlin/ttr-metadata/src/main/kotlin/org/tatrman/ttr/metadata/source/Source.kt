@@ -339,6 +339,7 @@ class FileBasedSource(
         val mappings = mutableListOf<org.tatrman.ttr.metadata.model.Mapping>()
         val queries = mutableMapOf<QualifiedName, Query>()
         val shortQueryTargets = mutableSetOf<String>()
+        val unanchoredColumns = mutableMapOf<String, QualifiedName>()
         val roles = mutableMapOf<QualifiedName, Role>()
         val drillMaps = mutableMapOf<QualifiedName, org.tatrman.ttr.metadata.model.DrillMap>()
         val areas = mutableMapOf<String, AreaRecord>()
@@ -552,6 +553,7 @@ class FileBasedSource(
                     drillMaps,
                     semanticsResolved,
                     shortQueryTargets,
+                    unanchoredColumns,
                 )
             }
             loadedFiles.add(
@@ -569,6 +571,7 @@ class FileBasedSource(
         }
 
         resolveShortQueryTargets(mappings, queries, shortQueryTargets)
+        anchorToStandaloneEntityTables(mappings, unanchoredColumns)
 
         // Grammar 0.17 — the conceptual tier over the source as one project; its model-level `cn/…` errors and
         // warnings are load issues (the automation-validator precedent), its hygiene / advisory ones ride the
@@ -842,6 +845,7 @@ class FileBasedSource(
         drillMaps: MutableMap<QualifiedName, org.tatrman.ttr.metadata.model.DrillMap>,
         semanticsResolved: Map<SourceLocation, ResolvedSemantics>,
         shortQueryTargets: MutableSet<String>,
+        unanchoredColumns: MutableMap<String, QualifiedName>,
     ) {
         when (def) {
             is TableDef -> {
@@ -990,7 +994,7 @@ class FileBasedSource(
                 // catches collisions where the inline and explicit forms target the
                 // same qname.
                 synthesiseInlineEntityMappings(def, qn, sourceFile, mappings, shortQueryTargets)
-                synthesiseInlineAttributeMappings(def, qn, sourceFile, mappings)
+                synthesiseInlineAttributeMappings(def, qn, sourceFile, mappings, unanchoredColumns)
             }
             is RelationDef -> {
                 val qn = qname(schemaCode, namespace, def.name)
@@ -1343,12 +1347,18 @@ class FileBasedSource(
      * Materialises `mapping:` on each `def attribute X { mapping: ... }` nested
      * inside an entity. Qname mirrors `<entityName>.<attrName>` to match the
      * explicit `def er2db_attribute <entity>.<attr>` convention.
+     *
+     * MW S3.2b T1b (✅D-MW-70) — an entity with no inline `binding:` block has its table on a standalone
+     * `def er2db_entity`, which may sit in a file not read yet: its bare column refs are noted in
+     * [unanchoredColumns] (mapping id → entity) and [anchorToStandaloneEntityTables] canonicalises them
+     * once every file is in.
      */
     private fun synthesiseInlineAttributeMappings(
         def: EntityDef,
         entityQn: QualifiedName,
         sourceFile: String,
         mappings: MutableList<org.tatrman.ttr.metadata.model.Mapping>,
+        unanchoredColumns: MutableMap<String, QualifiedName>,
     ) {
         // Resolve the entity's physical table once so bare column refs
         // (`mapping: s_store_id`) can be canonicalised to the table-embedded qname.
@@ -1390,9 +1400,13 @@ class FileBasedSource(
                     entityQn.namespace,
                     "${def.name}.${attr.name}",
                 )
+            val attrMappingId = idFor("map.er2db_attribute", attrQn)
+            if (def.binding !is BindingPropertyBlock && isBareColumn(attrTarget)) {
+                unanchoredColumns[attrMappingId] = entityQn
+            }
             mappings +=
                 Er2DbAttributeMapping(
-                    internalId = idFor("map.er2db_attribute", attrQn),
+                    internalId = attrMappingId,
                     qname = attrQn,
                     description = "",
                     tags = emptyList(),
@@ -1455,6 +1469,38 @@ class FileBasedSource(
             null -> null
         }
     }
+
+    /**
+     * MW S3.2b T1b (✅D-MW-70) — the second half of [synthesiseInlineAttributeMappings]: a bare column ref of an
+     * entity with no inline `binding:` block is canonicalised under the `table`/`view` target of the first
+     * explicit `def er2db_entity` (document order) whose `entity:` is that entity — the bridge [PhysicalIndex]
+     * already makes for the entity → table edge. A `query` target, or no explicit mapping, leaves the ref as-is.
+     */
+    private fun anchorToStandaloneEntityTables(
+        mappings: MutableList<org.tatrman.ttr.metadata.model.Mapping>,
+        unanchoredColumns: Map<String, QualifiedName>,
+    ) {
+        if (unanchoredColumns.isEmpty()) return
+        val explicitTable = mutableMapOf<QualifiedName, QualifiedName?>()
+        for (m in mappings) {
+            if (m !is Er2DbEntityMapping || m.mappingSource != MappingSource.Explicit) continue
+            explicitTable.getOrPut(m.entity) {
+                when (val t = m.target) {
+                    is MappingTarget.Table -> t.qname
+                    is MappingTarget.View -> t.qname
+                    else -> null
+                }
+            }
+        }
+        mappings.replaceAll { m ->
+            val entity = unanchoredColumns[m.internalId] ?: return@replaceAll m
+            val table = explicitTable[entity] ?: return@replaceAll m
+            (m as Er2DbAttributeMapping).copy(target = canonicaliseColumnTarget(m.target, table))
+        }
+    }
+
+    private fun isBareColumn(target: AttributeMappingTarget): Boolean =
+        target is AttributeMappingTarget.Column && !target.qname.name.contains('.')
 
     /**
      * Canonicalises an attribute's column mapping target so its qname carries the
