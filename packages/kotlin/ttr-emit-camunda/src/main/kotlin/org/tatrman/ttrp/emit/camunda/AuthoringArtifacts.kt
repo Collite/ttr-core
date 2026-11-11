@@ -9,6 +9,8 @@ import java.security.MessageDigest
 internal class AuthoringArtifacts(
     private val request: RecipeEmitRequest,
     private val dialect: Dialect,
+    /** The estate's process engine: templates carry their HTTP connector implementation, addressed to the egress. */
+    private val engine: Boolean = false,
 ) {
     private val json = Json { prettyPrint = true }
     private val world = request.world
@@ -82,6 +84,127 @@ internal class AuthoringArtifacts(
             )
         }
 
+    /**
+     * The engine's egress (D-158) for the templates' HTTP connector, validated like the BPMN's: a plain http(s) URL,
+     * and nothing a Groovy single-quoted string would need escaped.
+     */
+    private val egress: String by lazy {
+        val raw =
+            requireNotNull(
+                request.graph.deployment.egressUrl
+                    ?.takeIf { it.isNotBlank() },
+            ) {
+                "TTRP-EXPORT-EGRESS: deployment ${request.graph.deployment.name}: executor " +
+                    "${request.graph.deployment.target} declares no egress_url (D-158)"
+            }
+        require(raw.none { it == '\'' || it == '\\' || it == '$' || it.isWhitespace() }) {
+            "TTRP-EXPORT-EGRESS: egress_url $raw cannot be written into a template script"
+        }
+        raw.trimEnd('/')
+    }
+
+    private fun hidden(
+        value: String,
+        binding: JsonObject,
+    ): JsonObject =
+        buildJsonObject {
+            put("type", "Hidden")
+            put("value", value)
+            put("binding", binding)
+        }
+
+    private fun input(
+        name: String,
+        script: Boolean = false,
+    ): JsonObject =
+        buildJsonObject {
+            put("type", "camunda:inputParameter")
+            put("name", name)
+            if (script) put("scriptFormat", "groovy")
+        }
+
+    /**
+     * The engine template's implementation (⚑R223-D, S1.5.2 T2b): Camunda Connect's `http-connector`, addressed to the
+     * egress, which injects the bearer. The step's choice (`ttr_source`) picks the run-API call at run time: a world
+     * program opens a run of `ttr_deployment` (`POST <egress>/recipes/<recipe>/runs`, the port from `ttrInput` as the
+     * generated BPMN reads it); a world query is `POST <egress>/query` with its parameters bound by name (D-146).
+     */
+    private fun connectorScope(): JsonObject {
+        val programs =
+            world.programs
+                .sortedBy { it.name }
+                .joinToString(", ", "[", "]") { p ->
+                    val port =
+                        when (p.port) {
+                            null, "none" -> "none"
+                            "key", "keys" -> p.port
+                            else -> error("TTRP-EXPORT-REF: unsupported template port ${p.port} for ${p.name}")
+                        }
+                    "'${identifier(p.name)}': [recipe: '${identifier(p.recipe)}', port: '$port']"
+                }.let { if (it == "[]") "[:]" else it }
+        val queries =
+            world.queries
+                .sortedBy { it.qname }
+                .joinToString(", ", "[", "]") { q ->
+                    "'${identifier(q.qname)}': " +
+                        q.params.sortedBy { it.name }.joinToString(", ", "[", "]") { "'${identifier(it.name)}'" }
+                }.let { if (it == "[]") "[:]" else it }
+        val url =
+            """
+            def source = execution.getVariable('ttr_source')
+            def programs = $programs
+            programs.containsKey(source) ? '$egress/recipes/' + programs[source].recipe + '/runs' : '$egress/query'
+            """.trimIndent()
+        val payload =
+            """
+            def source = execution.getVariable('ttr_source')
+            def programs = $programs
+            def queries = $queries
+            if (programs.containsKey(source)) {
+                def kind = programs[source].port
+                def port = kind == 'none' ? [none: true] : [(kind): execution.getVariable('ttrInput')[kind]]
+                return org.camunda.spin.Spin.JSON([deployment: execution.getVariable('ttr_deployment'), port: port, origin: 'engine']).toString()
+            }
+            if (!queries.containsKey(source)) throw new IllegalArgumentException('unknown world program or query ' + source)
+            return org.camunda.spin.Spin.JSON([query: source, parameters: queries[source].collectEntries { [(it): execution.getVariable(it)] }]).toString()
+            """.trimIndent()
+        val result =
+            """
+            def code = ((Number) statusCode).intValue()
+            if (code < 200 || code >= 300) throw new IllegalStateException('run API HTTP ' + code)
+            return org.camunda.spin.Spin.JSON(response)
+            """.trimIndent()
+        return buildJsonObject {
+            put("type", "camunda:Connector")
+            put(
+                "properties",
+                JsonArray(
+                    listOf(
+                        hidden(
+                            "http-connector",
+                            buildJsonObject {
+                                put("type", "property")
+                                put("name", "connectorId")
+                            },
+                        ),
+                        hidden("POST", input("method")),
+                        hidden(url, input("url", script = true)),
+                        hidden("['Content-Type': 'application/json']", input("headers", script = true)),
+                        hidden(payload, input("payload", script = true)),
+                        hidden(
+                            "ttr_response",
+                            buildJsonObject {
+                                put("type", "camunda:outputParameter")
+                                put("source", result)
+                                put("scriptFormat", "groovy")
+                            },
+                        ),
+                    ),
+                ),
+            )
+        }
+    }
+
     private fun template(name: String): ByteArray {
         identifier(name)
         val properties =
@@ -121,6 +244,23 @@ internal class AuthoringArtifacts(
                                 it.columns + ColumnMeta("row_count", "integer"),
                             )
                         }
+                if (engine) {
+                    add(
+                        buildJsonObject {
+                            put("id", "ttr_deployment")
+                            put("label", "World deployment (program steps: the run this task opens)")
+                            put("type", "String")
+                            put("value", "")
+                            put(
+                                "binding",
+                                buildJsonObject {
+                                    put("type", "camunda:inputParameter")
+                                    put("name", "ttr_deployment")
+                                },
+                            )
+                        },
+                    )
+                }
                 sources.sortedBy { it.first }.forEach { (choice, inputs, outputs) ->
                     inputs.sortedBy { it.name }.forEach { param ->
                         identifier(param.name)
@@ -163,6 +303,7 @@ internal class AuthoringArtifacts(
                     put("version", version)
                     put("appliesTo", JsonArray(listOf(JsonPrimitive("bpmn:ServiceTask"))))
                     put("properties", JsonArray(properties))
+                    if (engine) put("scopes", JsonArray(listOf(connectorScope())))
                     put("metadata", buildJsonObject { put("fingerprint", fingerprint) })
                 },
             ) + "\n"

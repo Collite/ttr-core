@@ -14,6 +14,7 @@
   <xs:element name="script"><xs:complexType mixed="true"><xs:attribute name="scriptFormat" type="xs:string" use="required"/></xs:complexType></xs:element>
   <xs:attribute name="historyTimeToLive" type="xs:positiveInteger"/>
   <xs:attribute name="candidateGroups" type="xs:string"/>
+  <xs:attribute name="candidateStarterGroups" type="xs:string"/>
   <xs:attribute name="asyncAfter" type="xs:boolean"/>
   <xs:attribute name="asyncBefore" type="xs:boolean"/><xs:attribute name="type" type="xs:string"/><xs:attribute name="topic" type="xs:string"/>
   <xs:attribute name="collection" type="xs:string"/><xs:attribute name="elementVariable" type="xs:string"/>

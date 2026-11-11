@@ -437,6 +437,9 @@ enum class TtrpDiagnosticId(
     TGT_004("TTRP-TGT-004", "Recipe executor capability refusal"),
     TGT_005("TTRP-TGT-005", "Recipe executor capability refusal"),
 
+    /** D-145: `native` is no executor type any more; the estate's process engine (`process_engine`) replaces it. */
+    TGT_006("TTRP-TGT-006", "retired executor type: the process engine replaces `native` (D-145)"),
+
     // ---- AU-core CG (D-142, grammar 0.22): the orchestration constructs the process engine took over parse for one
     // release and are refused, one id per construct; the suggestion is what models it now (ttr-semantics
     // RemovedConstructs — the one table, shared with the automation validator). ----

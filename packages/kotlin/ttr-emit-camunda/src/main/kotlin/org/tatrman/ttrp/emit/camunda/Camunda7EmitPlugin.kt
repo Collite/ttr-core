@@ -25,10 +25,11 @@ class Camunda7EmitPlugin : TtrEmitPlugin {
 internal fun emitCamunda(
     request: RecipeEmitRequest,
     dialect: Dialect,
+    engine: Boolean = false,
 ): EmitResult {
-    val renderer = CamundaRenderer(request, dialect)
+    val renderer = CamundaRenderer(request, dialect, engine)
     val xml = renderer.render()
-    val artifacts = AuthoringArtifacts(request, dialect).files()
+    val artifacts = AuthoringArtifacts(request, dialect, engine).files()
     return EmitResult(
         sortedMapOf(
             "${request.graph.recipe.name}.${dialect.suffix}.bpmn" to xml.toByteArray(Charsets.UTF_8),
@@ -61,7 +62,14 @@ internal fun emitCamunda(
                         Parameter defaults are authoring suggestions. Review date/time and expression-like text
                         defaults in Modeler before use; program overrides are not applied.
 
-                        Templates bind IO only; configure their implementation in Modeler before deployment.
+                        ${if (engine) {
+                            "Templates carry their implementation: Camunda Connect's http-connector to the executor's egress\n" +
+                                "                        (it injects the bearer). A world program step opens a run of the World deployment property\n" +
+                                "                        (ttr_deployment) with the port from ttrInput; a world query step posts {query, parameters} to\n" +
+                                "                        the egress's /query. The response is the ttr_response variable; non-2xx raises an incident."
+                        } else {
+                            "Templates bind IO only; configure their implementation in Modeler before deployment."
+                        }}
                         version is ${request.templateVersion} (default 1). Raise --template-version whenever a regenerated
                         template metadata.fingerprint differs: Modeler prefers the highest version of an id.
                         Regenerate into a new export folder and reinstall its templates. Preserve authored DMN

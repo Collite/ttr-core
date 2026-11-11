@@ -2,7 +2,7 @@
   "version": 2,
   "world": {
     "qname": "hartland.worlds.demo",
-    "fingerprint": "sha256:53c0785903729aa5cd8e7b25cb3cde492adc5c643011d4294d79d348ffc36d6e",
+    "fingerprint": "sha256:eb63628541c85d774037e72b0fc94f1338db431637d5335360bd75088cec5974",
     "engines": [
       {
         "name": "erp",
@@ -15,8 +15,8 @@
     ],
     "executors": [
       {
-        "name": "server",
-        "type": "native"
+        "name": "engine",
+        "type": "process_engine"
       },
       {
         "name": "n8n",
@@ -3903,6 +3903,11 @@
       "id": "TTRP-TGT-005",
       "area": "TGT",
       "suggestedAlternative": "Recipe executor capability refusal"
+    },
+    {
+      "id": "TTRP-TGT-006",
+      "area": "TGT",
+      "suggestedAlternative": "retired executor type: the process engine replaces `native` (D-145)"
     },
     {
       "id": "TTRP-CUT-001",

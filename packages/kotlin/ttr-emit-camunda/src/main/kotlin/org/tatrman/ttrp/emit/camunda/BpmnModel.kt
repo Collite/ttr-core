@@ -63,6 +63,9 @@ internal class BpmnModel(
     val processId: String,
     val dialect: Dialect,
 ) {
+    /** Extra `bpmn:process` attributes, after id/name/isExecutable/TTL (the engine's start groups, ⚑R226-A). */
+    val processAttributes: MutableMap<String, String> = linkedMapOf()
+
     class Node(
         val id: String,
         val tag: String,
@@ -319,7 +322,8 @@ internal class BpmnModel(
             Xml(
                 "bpmn:process",
                 mapOf("id" to processId, "name" to processId, "isExecutable" to "true") +
-                    if (dialect == Dialect.C7) mapOf("camunda:historyTimeToLive" to "30") else emptyMap(),
+                    (if (dialect == Dialect.C7) mapOf("camunda:historyTimeToLive" to "30") else emptyMap()) +
+                    processAttributes,
                 listOf(
                     Xml("bpmn:extensionElements", children = listOf(Xml("ttr:contract", text = contract.toString()))),
                 ) +

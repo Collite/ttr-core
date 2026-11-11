@@ -8,6 +8,7 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import org.tatrman.ttr.metadata.model.QualifiedName
 import org.tatrman.ttr.metadata.world.ResolvedEngine
+import org.tatrman.ttr.metadata.world.ResolvedExecutor
 import org.tatrman.ttr.metadata.world.ResolvedWorld
 import org.tatrman.ttrp.diagnostics.TtrpDiagnosticId
 import org.tatrman.ttrp.graph.GraphFixtures
@@ -99,6 +100,24 @@ class WorldBindingSpec :
             val bound = WorldBinder(manifests).bind(worldWithPgVersion("16beta"))
             bound.engines["pg"].shouldBeNull()
             bound.diagnostics.map { it.id } shouldContainExactlyInAnyOrder listOf(TtrpDiagnosticId.WLD_005)
+        }
+
+        "an executor extending retired native is refused TTRP-TGT-006; the engine type binds silently (D-145)" {
+            fun executor(
+                name: String,
+                base: String,
+            ) = ResolvedExecutor(QualifiedName(name = name), null, null, base, emptyMap())
+            val bound =
+                WorldBinder(manifests).bind(
+                    worldWithPgVersion("16").copy(
+                        executors = listOf(executor("server", "native"), executor("engine", "process_engine")),
+                    ),
+                )
+            bound.diagnostics.map { it.id } shouldContainExactlyInAnyOrder listOf(TtrpDiagnosticId.TGT_006)
+            val message = bound.diagnostics.single().message
+            message.contains("`server`") shouldBe true
+            message.contains("process_engine") shouldBe true
+            bound.executors.keys shouldBe emptySet()
         }
 
         "a wrong parseable major is still rejected (WLD-005)" {

@@ -1,7 +1,8 @@
 // The recipe-checker fixture world (AU-core-P1): hartland's `model/worlds/demo.ttrm` (ttr-demo 2fd80d5) written
 // for grammar 0.16 — `writable:` on the storages (D-76, D-79) and the automation half of design 17 §2
 // (the ttr-parser automation fixture's members, nested in `def world demo`), cut by D-142 for grammar 0.22: no
-// `trigger:`, no `def process`, and the Server is an executor (`target: native` is gone).
+// `trigger:`, no `def process`, and the Server is an executor (`target: native` is gone); D-145 retired the
+// `native` type: the deployments the Server ran target the estate's process engine.
 package hartland.worlds
 model world
 
@@ -19,7 +20,8 @@ def world demo {
     def storage stage         { type: local_dir, staging: true }
 
     def identity automation_decider { principal: "svc-hartland-automation", credential: TTR_CONN_AUTOMATION_DECIDER }   // no policy narrows it; D-132
-    def executor server { extends: native }                                                       // the Server's run API (D-142)
+    def executor engine { extends: process_engine, url: "http://process-engine.process-engine.svc/engine-rest",
+                          egress_url: "http://process-engine-egress.process-engine.svc/automation", connection: engine_bp_dsk }   // D-145, D-158
     def executor n8n   { extends: n8n_l1,   url: "https://n8n.hartland.example",  connection: n8n_hartland }
     def executor bpmn  { extends: camunda_8 }                                                     // file only (D-41)
     def executor py    { extends: python_client }
@@ -28,19 +30,19 @@ def world demo {
     def grant { who: role.sales_manager, program: release_on_placement, as: identity.automation_decider }   // "release 4711" from Hebe: a service run she instructs
     def grant { who: role.process_owner, program: *,                    as: identity.automation_decider }   // debug runs "as the recipe runs" (D-93)
 
-    def deployment release_native_morning { program: morning_release,      target: server, run_as: identity.automation_decider }
-    def deployment release_native_event   { program: release_on_placement, target: server, run_as: identity.automation_decider }
+    def deployment release_morning { program: morning_release,      target: engine, run_as: identity.automation_decider }
+    def deployment release_event   { program: release_on_placement, target: engine, run_as: identity.automation_decider }
     def deployment release_n8n            { program: release_on_placement, target: n8n,    run_as: identity.automation_decider, granularity: parts }
     def deployment release_py             { program: release_on_placement, target: py,     run_as: identity.automation_decider }
     def deployment release_bpmn           { program: release_on_placement, target: bpmn,   run_as: identity.automation_decider }
 
-    // H-2, orchestrator-free: six Server deployments (on-event + batch per recipe)
-    def deployment decide_native_event    { program: decide_on_request,   target: server, run_as: identity.automation_decider }
-    def deployment decide_native_batch    { program: decide_catch_up,     target: server, run_as: identity.automation_decider }
-    def deployment inbound_native_event   { program: inbound_on_receipt,  target: server, run_as: identity.automation_decider }
-    def deployment inbound_native_batch   { program: inbound_daily,       target: server, run_as: identity.automation_decider }
-    def deployment settle_native_event    { program: settle_on_document,  target: server, run_as: identity.automation_decider }
-    def deployment settle_native_batch    { program: settle_daily,        target: server, run_as: identity.automation_decider }
+    // H-2: six engine deployments (on-event + batch per recipe)
+    def deployment decide_event    { program: decide_on_request,   target: engine, run_as: identity.automation_decider }
+    def deployment decide_batch    { program: decide_catch_up,     target: engine, run_as: identity.automation_decider }
+    def deployment inbound_event   { program: inbound_on_receipt,  target: engine, run_as: identity.automation_decider }
+    def deployment inbound_batch   { program: inbound_daily,       target: engine, run_as: identity.automation_decider }
+    def deployment settle_event    { program: settle_on_document,  target: engine, run_as: identity.automation_decider }
+    def deployment settle_batch    { program: settle_daily,        target: engine, run_as: identity.automation_decider }
 
     // H-2 on n8n, one program per deployment: the engine owns the waiting between them (D-142 took `def process`)
     def deployment decide_n8n             { program: decide_on_request,   target: n8n,    run_as: identity.automation_decider }

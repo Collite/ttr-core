@@ -52,6 +52,11 @@ data class DeploymentMeta(
     val connectors: Map<String, String>,
     val startableBy: List<String>? = null,
     val egressUrl: String? = null,
+    /**
+     * The Keycloak groups of [startableBy]'s roles, in declaration order, resolved by the host like
+     * [ActionMeta.candidateGroup] (⚑R226-A; SPI v2 revision 3). Null when no `startable_by` is declared.
+     */
+    val startableGroups: List<String>? = null,
 )
 
 data class Roles(

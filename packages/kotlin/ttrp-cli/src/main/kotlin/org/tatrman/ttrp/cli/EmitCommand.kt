@@ -3,6 +3,7 @@ package org.tatrman.ttrp.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.ProgramResult
+import com.github.ajalt.clikt.core.UsageError
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
@@ -18,10 +19,6 @@ import kotlinx.serialization.json.jsonArray
 import org.tatrman.ttr.metadata.model.World
 import org.tatrman.ttr.metadata.model.AutomationProgram
 import org.tatrman.ttr.metadata.model.AutomationAction
-import org.tatrman.ttr.metadata.model.ModelDescriptor
-import org.tatrman.ttr.metadata.reconcile.ModelReconciler
-import org.tatrman.ttr.metadata.source.FileBasedSource
-import org.tatrman.ttr.metadata.source.LocalFsStorage
 import org.tatrman.ttrp.bundle.RunManifest
 import org.tatrman.ttrp.bundle.BundleAssembler
 import org.tatrman.ttrp.bundle.EmitPluginLoader
@@ -39,6 +36,8 @@ import org.tatrman.ttrp.emit.spi.RecipeEmitRequest
 import org.tatrman.ttrp.graph.capability.RecipeManifestSource
 import org.tatrman.ttrp.graph.capability.RegistryRecipe
 import org.tatrman.ttrp.graph.capability.ExecutorManifestGate
+import org.tatrman.ttrp.graph.capability.WorldBinder
+import org.tatrman.ttrp.project.ProjectModel
 import org.tatrman.ttrp.project.TtrpManifestReader
 import com.github.ajalt.clikt.parameters.options.validate
 import com.github.ajalt.clikt.parameters.types.int
@@ -48,13 +47,36 @@ import java.security.MessageDigest
 import java.util.ServiceLoader
 
 /** Export a world deployment from its compiler bundle. All filesystem writes belong to the host. */
-class EmitCommand : CliktCommand(name = "emit") {
+class EmitCommand(
+    /** The environment `--deploy` reads its bearer from (injectable for tests). */
+    private val env: Map<String, String> = System.getenv(),
+) : CliktCommand(name = "emit") {
     private val deploymentName by option("--deployment").required()
     private val project by option("--project", help = "modeler.toml project root").default(".")
     private val bundlePath by option("--bundle", help = "existing recipe bundle directory; otherwise build the recipe")
     private val granularity by option("--granularity")
-    private val out by option("--out").default(".")
+    private val outOption by option(
+        "--out",
+        help = "directory for the export folder (default .; with --deploy the folder is written only when given)",
+    )
     private val json by option("--json").flag()
+    private val deploy by option(
+        "--deploy",
+        help = "deploy a process_engine export's BPMN and DMN to the executor's engine (D-145, D-170)",
+    ).flag()
+    private val check by option(
+        "--check",
+        help = "with --deploy: read-only; answer absent | current | stale | foreign",
+    ).flag()
+    private val force by option("--force", help = "with --deploy: create over a foreign deployment of the name").flag()
+    private val tokenEnv by option(
+        "--token-env",
+        help = "with --deploy: the environment variable holding the engine bearer (default TTR_BEARER)",
+    )
+    private val engineUrl by option(
+        "--engine-url",
+        help = "with --deploy: the engine REST base (…/engine-rest), overriding the executor's url (a port-forward)",
+    )
     private val templateVersion by option(
         "--template-version",
         help = "positive Modeler template version; raise after fingerprint changes",
@@ -63,20 +85,32 @@ class EmitCommand : CliktCommand(name = "emit") {
         .validate { require(it > 0) { "template version must be a positive integer" } }
 
     override fun run() {
+        if (!deploy) {
+            listOf(
+                "--check" to check,
+                "--force" to force,
+                "--token-env" to (tokenEnv != null),
+                "--engine-url" to (engineUrl != null),
+            ).firstOrNull { it.second }
+                ?.let { throw UsageError("${it.first} needs --deploy") }
+        }
+        if (deploy && json) throw UsageError("--json cannot be combined with --deploy")
+        if (deploy && check && force) throw UsageError("--check is read-only; drop --force")
         try {
             val root = Path.of(project).toAbsolutePath().normalize()
             val config = TtrpManifestReader.resolve(root)
             require(
                 config.diagnostics.none { it.severity.name == "ERROR" },
             ) { config.diagnostics.joinToString { it.render() } }
-            val roots = listOf(config.manifest.modelsRoot()) + config.manifest.extraModelRootPaths()
-            val snapshots =
-                roots.mapIndexed { i, path ->
-                    FileBasedSource("export-$i", 0, LocalFsStorage("export-$i", path.toRealPath())).load()
-                }
-            val loaded = ModelReconciler(ModelDescriptor("export", "export")).reconcile(snapshots)
-            require(loaded.ok) { loaded.errors.joinToString { it.message } }
-            val objects = loaded.model.objectByQname().values
+            // S1.5.4 (D-173): the model as the services load it — every declared root that exists (hartland keeps no
+            // `models/`, only `extra-model-roots`), the stock roles, the verdict of the LoadReport under the manifest's
+            // `[packages].layout`. A declared-package/directory mismatch refuses only under `strict`.
+            val project = ProjectModel.load(config.manifest)
+            val roots = project.roots
+            require(roots.isNotEmpty()) { "no model root: neither models/ nor an extra-model-roots entry exists" }
+            require(project.ok) { "the model does not load:\n" + project.errors(root) }
+            val model = requireNotNull(project.result.model)
+            val objects = model.objectByQname().values
             val worlds =
                 objects.filterIsInstance<World>().filter { w ->
                     config.manifest.world == null ||
@@ -99,11 +133,16 @@ class EmitCommand : CliktCommand(name = "emit") {
                         it.qname.name == deployment.program
                     },
                 ) { "unknown or ambiguous program ${deployment.program}" }
-            val plugin =
-                EmitPluginLoader.builtin(
-                    org.tatrman.ttrp.graph.capability.RegistryGrid
-                        .executorType(world, deployment),
-                )
+            val executorType =
+                org.tatrman.ttrp.graph.capability.RegistryGrid
+                    .executorType(world, deployment)
+            require(executorType !in WorldBinder.RETIRED_EXECUTOR_TYPES) { WorldBinder.retired(deployment.target) }
+            if (deploy) {
+                require(executorType == PROCESS_ENGINE) {
+                    "--deploy needs a process_engine deployment (D-145); a $executorType export is files only"
+                }
+            }
+            val plugin = EmitPluginLoader.builtin(executorType)
             val temp = Files.createTempDirectory("ttrp-export-build")
             try {
                 data class Loaded(
@@ -114,14 +153,14 @@ class EmitCommand : CliktCommand(name = "emit") {
 
                 val registrySnapshot =
                     org.tatrman.ttr.metadata.registry.RegistrySnapshot(
-                        model = loaded.model,
+                        model = model,
                         graph =
                             org.tatrman.ttr.metadata.graph.ModelGraph
-                                .build(loaded.model),
+                                .build(model),
                         swappedAt = java.time.Instant.EPOCH,
                         warnings = emptyList(),
                     )
-                val packageOf = LayoutResolver.packagesFromFiles(loaded.files)
+                val packageOf = LayoutResolver.packagesFromFiles(project.result.files)
                 val index = ModelIndex(registrySnapshot, packageOf)
                 val resolved =
                     org.tatrman.ttr.metadata.world
@@ -258,7 +297,7 @@ class EmitCommand : CliktCommand(name = "emit") {
                             wiredActions.values.toList(),
                         )
                     val governed =
-                        if (plugin.targetId in setOf("camunda_7", "camunda_8")) {
+                        if (plugin.targetId in CAMUNDA_TARGETS) {
                             projected.copy(
                                 actions =
                                     projected.actions.mapValues { (name, action) ->
@@ -270,6 +309,10 @@ class EmitCommand : CliktCommand(name = "emit") {
                                                 ),
                                         )
                                     },
+                                deployment =
+                                    projected.deployment.copy(
+                                        startableGroups = ApprovalGroupsProjector.startGroups(deployment, index),
+                                    ),
                             )
                         } else {
                             projected
@@ -293,8 +336,8 @@ class EmitCommand : CliktCommand(name = "emit") {
                 }
                 val selected = load(program)
                 val choices =
-                    if (plugin.targetId in setOf("camunda_7", "camunda_8")) {
-                        WorldChoicesProjector.project(loaded.model, world) { choice ->
+                    if (plugin.targetId in CAMUNDA_TARGETS) {
+                        WorldChoicesProjector.project(model, world) { choice ->
                             if (choice.recipe == program.recipe) {
                                 selected.graph.recipe.parameters
                             } else {
@@ -478,10 +521,20 @@ class EmitCommand : CliktCommand(name = "emit") {
                 val folder =
                     Path
                         .of(
-                            out,
+                            outOption ?: ".",
                         ).toAbsolutePath()
                         .normalize()
                         .resolve("$deploymentName.${graph.deployment.type}.export")
+                // ✅D-170: an engine export records the fingerprint of exactly the resources `--deploy` posts.
+                val engineResources =
+                    if (plugin.targetId ==
+                        PROCESS_ENGINE
+                    ) {
+                        EngineBundle.resources(result.files)
+                    } else {
+                        null
+                    }
+                val bundleFingerprint = engineResources?.let(EngineBundle::fingerprint)
                 val fixtureBytes = linkedMapOf<String, ByteArray>()
                 fixtures.forEach { relative ->
                     require(relative in bundle.files) { "fixture missing from bundle hashes: $relative" }
@@ -509,13 +562,30 @@ class EmitCommand : CliktCommand(name = "emit") {
                             .jsonArray
                     }
                 val renderedCalls = workflowCalls ?: bpmnCalls
+                val fingerprinted =
+                    if (bundleFingerprint == null) {
+                        exportManifest
+                    } else {
+                        JsonObject(
+                            exportManifest +
+                                (
+                                    "fingerprints" to
+                                        JsonObject(
+                                            (
+                                                exportManifest.getValue("fingerprints").jsonObject +
+                                                    ("bundle" to JsonPrimitive(bundleFingerprint))
+                                            ).toSortedMap(),
+                                        )
+                                ),
+                        )
+                    }
                 val callManifest =
                     if (renderedCalls ==
                         null
                     ) {
-                        exportManifest
+                        fingerprinted
                     } else {
-                        JsonObject(exportManifest + ("calls" to renderedCalls))
+                        JsonObject(fingerprinted + ("calls" to renderedCalls))
                     }
                 val finalManifest =
                     JsonObject(
@@ -597,15 +667,24 @@ class EmitCommand : CliktCommand(name = "emit") {
                                             ),
                                         )
                                     },
-                            ).filterKeys { it != "authoring" || plugin.targetId in setOf("camunda_7", "camunda_8") },
+                            ).filterKeys { it != "authoring" || plugin.targetId in CAMUNDA_TARGETS },
                     )
-                ExportFolderWriter.write(
-                    folder,
-                    formatter.encodeToString(JsonObject.serializer(), finalManifest) + "\n",
-                    result,
-                    fixtureBytes,
-                )
-                if (json) {
+                if (!deploy || outOption != null) {
+                    ExportFolderWriter.write(
+                        folder,
+                        formatter.encodeToString(JsonObject.serializer(), finalManifest) + "\n",
+                        result,
+                        fixtureBytes,
+                    )
+                }
+                if (deploy) {
+                    deployToEngine(
+                        world,
+                        deployment,
+                        requireNotNull(engineResources),
+                        requireNotNull(bundleFingerprint),
+                    )
+                } else if (json) {
                     echo(
                         buildJsonObject {
                             put("directory", folder.toString())
@@ -620,13 +699,83 @@ class EmitCommand : CliktCommand(name = "emit") {
             } finally {
                 temp.toFile().deleteRecursively()
             }
+        } catch (e: ProgramResult) {
+            throw e
         } catch (e: Exception) {
             echo("ttrp emit: ${e.message}", err = true)
             throw ProgramResult(2)
         }
     }
 
+    /**
+     * `--deploy [--check] [--force]` (process-engine `contracts.md` §1a, ✅D-170): read the newest engine deployment of
+     * the name, then apply the outcome table. Prints one line; a refusal (stale/foreign under `--check`, foreign without
+     * `--force`, any engine failure) exits with the CLI's refusal code and never claims a deployment.
+     */
+    private fun deployToEngine(
+        world: World,
+        deployment: org.tatrman.ttr.metadata.model.WorldDeployment,
+        resources: List<Pair<String, ByteArray>>,
+        fingerprint: String,
+    ) {
+        val variable = tokenEnv ?: "TTR_BEARER"
+        val bearer =
+            env[variable]?.takeIf { it.isNotBlank() }
+                ?: error(
+                    "--deploy needs the engine bearer in $variable (a personal bearer, D-160) or --token-env <variable>",
+                )
+        if (!EngineClient.isToken(bearer)) error("$variable: ${EngineClient.INVALID_BEARER}")
+        val executor = world.executors.single { it.qname.name == deployment.target }
+        val url =
+            engineUrl
+                ?: when (val value = executor.manifest["url"]) {
+                    is org.tatrman.ttr.parser.model.PropertyValue.StringValue -> value.raw
+                    is org.tatrman.ttr.parser.model.PropertyValue.TripleStringValue -> value.raw
+                    else -> null
+                }
+                ?: error("executor ${executor.qname.name} declares no url: (the engine REST base); pass --engine-url")
+        val source = EngineBundle.source(fingerprint)
+        val client = EngineClient(url, bearer)
+        val outcome = DeployCheck.of(client.newest(deploymentName), source)
+        if (check) {
+            echo(outcome.line)
+            if (outcome is DeployCheck.Stale || outcome is DeployCheck.Foreign) throw ProgramResult(2)
+            return
+        }
+        when (outcome) {
+            is DeployCheck.Current -> echo(outcome.line)
+            is DeployCheck.Foreign ->
+                if (!force) {
+                    throw DeployRefusal(
+                        "TTRP-DEPLOY-FOREIGN ${outcome.id}: the newest deployment of $deploymentName was not made by " +
+                            "ttrp emit --deploy; --force creates a new one over it",
+                    )
+                }
+            else -> Unit
+        }
+        if (outcome is DeployCheck.Current) return
+        val created = client.create(deploymentName, source, resources)
+        // process-engine §1a (⚑AU-X-4): the CLI owns idempotency. The answer must carry this bundle's source, and a
+        // re-read must find that very deployment as the newest of the name; anything else (another source, a racing
+        // deployer after the create) is not a success, and never `current`.
+        val newest = client.newest(deploymentName)
+        if (created.source != source || newest?.id != created.id || newest.source != source) {
+            throw DeployRefusal(
+                "TTRP-DEPLOY-ENGINE the engine did not make the bundle current: the create answered ${created.id} " +
+                    "(${created.source ?: "no source"}), the newest deployment of $deploymentName is " +
+                    (newest?.let { "${it.id} (${it.source ?: "no source"})" } ?: "none") + ", this bundle is $source",
+            )
+        }
+        echo("deployed ${created.id}")
+    }
+
     companion object {
+        /** The targets the Camunda renderer serves: customers' C7/C8 files and the estate's engine (D-145). */
+        val CAMUNDA_TARGETS = setOf("camunda_7", "camunda_8", "process_engine")
+
+        /** The estate's engine target: the only one `--deploy` deploys (D-145). */
+        const val PROCESS_ENGINE = "process_engine"
+
         val RECIPE_TYPES =
             org.tatrman.ttrp.graph.capability.WorldBinder.AUTOMATION_EXECUTOR_TYPES
     }
