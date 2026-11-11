@@ -1,0 +1,18 @@
+ttr: "0.22"
+package: "demo"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "Odberatel"
+    properties:
+      description: "Odběratel"
+  -
+    kind: "entity"
+    id: "Dodavka"
+    properties:
+      description: "Dodávka"
+  -
+    kind: "entity"
+    id: "Sklad"
+    properties: {}

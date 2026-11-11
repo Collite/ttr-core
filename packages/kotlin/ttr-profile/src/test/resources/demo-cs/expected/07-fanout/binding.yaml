@@ -1,0 +1,22 @@
+ttr: "0.22"
+package: "demo"
+model: "binding"
+defs:
+  -
+    kind: "er2db_entity"
+    id: "Odberatel"
+    properties:
+      entity: "Odberatel"
+      target: "ODBERATELE"
+  -
+    kind: "er2db_entity"
+    id: "Dodavka"
+    properties:
+      entity: "Dodavka"
+      target: "DODAVKY"
+  -
+    kind: "er2db_entity"
+    id: "Sklad"
+    properties:
+      entity: "Sklad"
+      target: "SKLADY"

@@ -117,5 +117,7 @@ class RecordFanoutSpec :
                 )
             nested.code shouldBe "ys/profile-invalid"
             nested.detail shouldBe "er2db_attribute cannot nest unambiguously under entity"
+            nested.location.line shouldBe 3
+            nested.location.column shouldBe 16
         }
     })
