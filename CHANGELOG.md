@@ -12,7 +12,7 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ### Fixed — Bare attribute bindings under a standalone `er2db_entity` (ttr-metadata, MW P3 S3.2b)
 
-- An entity with no inline `binding:` block now takes its table from the `def er2db_entity` whose `entity:` names it, so bare attribute bindings (`binding: ID`) load as the table's column (`db.dbo.T.ID`) instead of a dangling `db.dbo.ID`. Inline blocks, `columns:` maps and qualified references are unchanged.
+- An entity with no inline `table` or `view` target now takes its table from the first `def er2db_entity` with a `table`/`view` target whose `entity:` names it (in file order; `query` mappings are skipped). Its bare attribute bindings (`binding: ID`) and bare `columns:` entries now load as the table's column (`db.dbo.T.ID`) instead of a dangling `db.dbo.ID`. This covers entities with no inline block, an inline block without a table (`columns:` only, or a `query` target), and package-qualified `entity:` refs (`demo.er.entity.E`). Qualified column references are unchanged.
 
 ### Changed — `ttrp emit` and `ttrp check` read the served layout (AU-export S1.5.4, D-173)
 
