@@ -1,0 +1,4 @@
+entity:
+  Objednavka: {}
+vztahy:
+  ObjednavkaKlienta: {od: Objednavka, do: Klient}

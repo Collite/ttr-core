@@ -1,0 +1,12 @@
+{
+  "documents": [
+    {"package": "prodej", "model": "er", "imports": [], "defs": 1},
+    {"package": "demo", "model": "er", "imports": ["prodej.*"], "defs": 2},
+    {"package": "demo", "model": "binding", "imports": ["prodej.*"], "defs": 1}
+  ],
+  "ignored": [],
+  "overridden": [
+    {"qname": "demo.er.entity.Objednavka", "property": "description", "from": "Objednávka", "to": "Objednávka (overlay)"},
+    {"qname": "prodej.er.entity.Zakaznik", "property": "description", "from": "Zákazník", "to": {"cs": "Zákazník (overlay)", "en": "Customer"}}
+  ]
+}

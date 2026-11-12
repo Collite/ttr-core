@@ -16,10 +16,12 @@ data class ProfileSpan(
     val path: String,
 )
 
+/** [suggestion] carries machine-readable help, e.g. `{delta: {renamed: {from, to, since}}}` on `xm/overlay-orphan`. */
 class ProfileException(
     val code: String,
     val location: ProfileSpan,
     val detail: String,
+    val suggestion: JsonObject? = null,
 ) : IllegalArgumentException("${location.file}:${location.line}:${location.column}: $code ${location.path}: $detail")
 
 data class LocatedOp(

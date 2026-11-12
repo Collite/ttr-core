@@ -1,0 +1,6 @@
+entity:
+  Sklad: {}
+tabulka:
+  Sklad: {}
+vztahy:
+  SkladSklad: {od: Sklad, do: Sklad}

@@ -2,3 +2,5 @@ unknown-kind.yaml: {code: ys/unknown-kind, line: 2, column: 6}
 unknown-key.yaml: {code: ys/unknown-key, line: 3, column: 5}
 missing-id.yaml: {code: ys/record-id-missing, line: 2, column: 5}
 conflict.yaml: {code: ys/profile-conflict, line: 2, column: 26}
+link-unresolved.yaml: {code: xm/link-unresolved, line: 4, column: 39}
+link-ambiguous.yaml: {code: xm/link-ambiguous, line: 6, column: 16}

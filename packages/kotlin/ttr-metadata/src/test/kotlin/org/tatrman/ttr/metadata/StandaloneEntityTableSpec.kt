@@ -117,7 +117,7 @@ class StandaloneEntityTableSpec :
             }
         }
 
-        // F2: S3.3 `link` emits package-qualified refs across packages.
+        // F2: S3.3 `link` emits package-qualified (single-segment package) refs across packages.
         "a package-qualified entity: ref from another package matches the entity" {
             columnTargets(
                 mapOf(
@@ -138,6 +138,32 @@ class StandaloneEntityTableSpec :
                     "q.ttrm" to "model er\n\ndef query q { sourceText: \"SELECT 1\" }\n",
                     "a-binding.ttrm" to standalone("a_E", "er.entity.E", "query: er.query.q"),
                     "b-binding.ttrm" to binding,
+                ),
+            ).shouldContainExactlyInAnyOrder(tTargets)
+        }
+
+        // review-245 N3: an inline block whose target is a `query` has no table either; the standalone er2db_entity
+        // (named apart from the entity, so it is no `ttr/duplicate-mapping`) anchors the bare bindings.
+        "an inline query target takes the standalone er2db_entity's table" {
+            val erQueryTarget =
+                """
+                model er
+
+                def query q { sourceText: "SELECT 1" }
+
+                def entity E {
+                    binding: { target: { query: er.query.q } },
+                    attributes: [
+                        def attribute id { type: int, binding: ID },
+                        def attribute nazev { type: string, binding: NAZEV }
+                    ]
+                }
+                """.trimIndent()
+            columnTargets(
+                mapOf(
+                    "db.ttrm" to db,
+                    "er.ttrm" to erQueryTarget,
+                    "binding.ttrm" to standalone("E_tbl", "er.entity.E", "table: db.dbo.T"),
                 ),
             ).shouldContainExactlyInAnyOrder(tTargets)
         }
