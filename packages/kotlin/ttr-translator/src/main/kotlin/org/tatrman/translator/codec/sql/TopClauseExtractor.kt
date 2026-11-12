@@ -13,8 +13,8 @@ package org.tatrman.translator.codec.sql
  * back. So the only missing piece is turning the `TOP` surface into a `FETCH` clause the parser
  * accepts. (NX-A.S4 — ported from ai-platform's query-translator, decision D9.)
  *
- * The scan mirrors [TableHintExtractor]: a single left-to-right pass that is aware of single-quoted
- * string literals (doubled `''` stays inside) and `-- …` / `/* … */` comments, so a `TOP` inside a
+ * The scan shares [SqlTextScanner] with [TableHintExtractor]: a left-to-right pass aware of quoted
+ * identifiers, single-quoted string literals (doubled `''` stays inside) and `-- …` / `/* … */` comments, so a `TOP` inside a
  * literal or comment is never matched.
  *
  * Scope-correct placement: the `FETCH` clause is inserted at the end of the **same** query scope the
@@ -48,25 +48,11 @@ object TopClauseExtractor {
 
     fun rewrite(sql: String): String {
         val edits = mutableListOf<TopEdit>()
-        var inLiteral = false
         var i = 0
         while (i < sql.length) {
-            val ch = sql[i]
+            val protectedEnd = SqlTextScanner.protectedEnd(sql, i)
             when {
-                ch == '\'' && inLiteral && i + 1 < sql.length && sql[i + 1] == '\'' -> i += 2
-                ch == '\'' -> {
-                    inLiteral = !inLiteral
-                    i++
-                }
-                inLiteral -> i++
-                ch == '-' && i + 1 < sql.length && sql[i + 1] == '-' -> {
-                    val nl = sql.indexOf('\n', i)
-                    i = if (nl < 0) sql.length else nl
-                }
-                ch == '/' && i + 1 < sql.length && sql[i + 1] == '*' -> {
-                    val close = sql.indexOf("*/", i + 2)
-                    i = if (close < 0) sql.length else close + 2
-                }
+                protectedEnd > i -> i = protectedEnd
                 isKeywordAt(sql, i, SELECT) -> {
                     topEditForSelectAt(sql, i)?.let { edits.add(it) }
                     i += SELECT.length
@@ -131,24 +117,15 @@ object TopClauseExtractor {
         fromPos: Int,
     ): Int {
         var depth = 0
-        var inLit = false
         var j = fromPos
         while (j < sql.length) {
+            val protectedEnd = SqlTextScanner.protectedEnd(sql, j)
+            if (protectedEnd > j) {
+                j = protectedEnd
+                continue
+            }
             val c = sql[j]
             when {
-                c == '\'' && inLit && j + 1 < sql.length && sql[j + 1] == '\'' -> j++
-                c == '\'' -> inLit = !inLit
-                inLit -> {}
-                c == '-' && j + 1 < sql.length && sql[j + 1] == '-' -> {
-                    val nl = sql.indexOf('\n', j)
-                    j = if (nl < 0) sql.length else nl
-                    continue
-                }
-                c == '/' && j + 1 < sql.length && sql[j + 1] == '*' -> {
-                    val close = sql.indexOf("*/", j + 2)
-                    j = if (close < 0) sql.length else close + 2
-                    continue
-                }
                 c == '(' -> depth++
                 c == ')' -> {
                     if (depth == 0) return j
