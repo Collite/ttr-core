@@ -1,7 +1,7 @@
 profile: demo-base/1
 grammar: '>=0.22 <1.0'
 operations:
-  - {op: package, mapping: {}, default: demo}
+  - {op: package, mapping: {l1-prodej: prodej}, default: demo}
   - {op: kinds, at: /entity, id: /nazev, mapping: {entita: entity}, files: [01-sequence.yaml]}
   - {op: kinds, at: /entity, mapping: {entita: entity}, files: [02-mapping.yaml, 04-nest.yaml, 05-unnest.yaml, '*-key.yaml', conflict.yaml]}
   - {op: kinds, at: /entity, id: /nazev, mapping: {entita: entity}, files: [missing-id.yaml]}
@@ -13,9 +13,10 @@ operations:
   - {op: kinds, in: table, at: /sloupce, mapping: {sloupec: column}}
   - {op: rename, in: entity, at: /popis, to: {kind: entity, property: description}}
   - {op: rename, in: table, at: /popis, to: {kind: table, property: description}}
-  - {op: rename, in: attribute, at: /typ, to: {kind: attribute, property: type}}
+  - {op: rename, in: attribute, at: /typ, to: {kind: attribute, property: type}, files: [01-sequence.yaml]}
   - {op: rename, in: column, at: /typ, to: {kind: column, property: type}}
-  - {op: rename, in: er2db_entity, at: /$key, to: {kind: er2db_entity, property: entity}, files: [07-fanout.yaml]}
-  - {op: rename, in: er2db_entity, at: /zdroj/tabulka, to: {kind: er2db_entity, property: target}, files: [07-fanout.yaml]}
-  - {op: ignore, in: er2db_entity, at: /zdroj/filtr, reason: "S3.3: shape → whereFilter {sql}", files: [07-fanout.yaml]}
+  # S3.3 (✅D-MW-67): the entity and its table are links (qualified qnames); `filtr` is the whereFilter's SQL text.
+  - {op: link, in: er2db_entity, at: /$key, to: {kind: er2db_entity, property: entity}, by: sourceName, files: [07-fanout.yaml]}
+  - {op: link, in: er2db_entity, at: /zdroj/tabulka, to: {kind: er2db_entity, path: [target, table]}, by: sourceName, files: [07-fanout.yaml]}
+  - {op: shape, in: er2db_entity, at: /zdroj, to: {kind: er2db_entity, property: whereFilter}, template: {sql: {input: /filtr}}, files: [07-fanout.yaml]}
   - {op: codes, mapping: {E_BASE: ys/unknown-key, E_SAME: ys/unknown-key}}

@@ -1,0 +1,17 @@
+ttr: "0.22"
+package: "demo"
+imports:
+  - "prodej.*"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "Objednavka"
+    properties:
+      description: "Objednávka"
+  -
+    kind: "relation"
+    id: "ObjednavkaZakaznika"
+    properties:
+      from: "demo.er.entity.Objednavka"
+      to: "prodej.er.entity.Zakaznik"

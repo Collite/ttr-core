@@ -21,13 +21,21 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   request's exported budget plus one re-open; each recovered run gets its own budget. Polling leaves time for a final
   status read. Service diagnostics retain configuration errors and suppress unexpected exception messages.
 
+### Added — `values`, `shape`, `link` and the overlay (MW P3 S3.3)
+
+- `ttr-profile` runs the last three operations. `values` maps a foreign string to a canonical value (scalar, qname or localized map), with an optional `default`. `shape` fills a literal template from `{input: <pointer>}` substitutions; a list element, object member or nested container whose inputs are all missing is dropped (a literal `{}`/`[]` stays), and nothing is written when every input is missing. A `default` covers a missing, null or unmapped scalar; an object or list source is always `ys/value-unmapped`.
+- `link` turns a foreign reference into a qualified qname, matched `by: sourceName | iri | path` against every record of the run and the root's `<package>.sources.json` sidecars. The sidecars are read only when a lookup needs them, and never below directories named `.*`, `build` or `node_modules`; an unreadable directory is `ys/profile-invalid`. It only considers records of the kind its target names (`er2db_entity.entity` → `entity`, `target.table` → `table`). A target in another package adds `<package>.*` to the document's `imports`. Errors: `xm/link-unresolved`, `xm/link-ambiguous`.
+- A profile's `overlay:` (inline, or a path relative to the profile and inside the root) applies after all operations and wins. `ApplyReport.overridden` lists each property that both the transform and the overlay supplied. A sourceName key that names several records (fan-out) applies to the one whose kind defines the property, else to the one outside the `binding` model; a remaining tie is `xm/link-ambiguous`, naming the qnames to key by. A key that names no record is `xm/overlay-orphan`; when `renames.yaml` names it, the error carries a `delta.renamed` suggestion.
+- `ProfileEngine.apply` takes the model root; `ApplyResult.reportJson()` gives `documents[]`, `ignored[]` and `overridden[]`.
+- A canonical-validation error on a transformed value now names the dialect key the author typed, not only its record.
+
 ### Added — Record fan-out (MW P3 S3.2b, ttr-core#392)
 
 - `ttr-profile` makes one record per canonical kind from one foreign node: two `kinds` operations can turn one entry into an `entity` (model `er`) and its `er2db_entity` (model `binding`). The same node mapped twice to the same kind is still refused.
 
 ### Fixed — Bare attribute bindings under a standalone `er2db_entity` (ttr-metadata, MW P3 S3.2b)
 
-- An entity with no inline `table` or `view` target now takes its table from the first `def er2db_entity` with a `table`/`view` target whose `entity:` names it (in file order; `query` mappings are skipped). Its bare attribute bindings (`binding: ID`) and bare `columns:` entries now load as the table's column (`db.dbo.T.ID`) instead of a dangling `db.dbo.ID`. This covers entities with no inline block, an inline block without a table (`columns:` only, or a `query` target), and package-qualified `entity:` refs (`demo.er.entity.E`). Qualified column references are unchanged.
+- An entity with no inline `table` or `view` target now takes its table from the first `def er2db_entity` with a `table`/`view` target whose `entity:` names it (in file order; `query` mappings are skipped). Its bare attribute bindings (`binding: ID`) and bare `columns:` entries now load as the table's column (`db.dbo.T.ID`) instead of a dangling `db.dbo.ID`. This covers entities with no inline block, an inline block without a table (`columns:` only, or a `query` target), and package-qualified (single-segment package) `entity:` refs (`demo.er.entity.E`). Qualified column references are unchanged.
 
 ### Changed — `ttrp emit` and `ttrp check` read the served layout (AU-export S1.5.4, D-173)
 

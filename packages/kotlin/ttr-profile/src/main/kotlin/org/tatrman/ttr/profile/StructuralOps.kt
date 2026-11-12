@@ -2,6 +2,7 @@
 package org.tatrman.ttr.profile
 
 import kotlinx.serialization.json.*
+import java.nio.file.Path
 
 internal interface Op {
     fun apply(
@@ -54,8 +55,7 @@ internal class WriteOp(
         builder: CanonicalBuilder,
         ignored: MutableList<Ignored>,
     ) {
-        val target = op.value.getValue("to").jsonObject
-        val path = target["path"]?.jsonArray?.map { it.jsonPrimitive.content } ?: listOf(target.string("property"))
+        val path = op.targetPath()
         for (record in plan.records.filter { it.kind == op.scope }) {
             val source = op.at.resolve(record.source, includeNull = true) ?: continue
             plan.consumption.consume(source)
@@ -100,9 +100,12 @@ internal class IgnoreOp(
 }
 
 internal object StructuralExecutor {
+    /** [root] is the model root: `<package>.sources.json` sidecars and `renames.yaml` are read from it when given. */
     fun apply(
         tree: List<ForeignTree>,
         operations: List<LocatedOp>,
+        overlay: List<OverlayEntry> = emptyList(),
+        root: Path? = null,
     ): ApplyResult {
         val ops = operations.map(::PlannedOp)
         val ignored = mutableListOf<Ignored>()
@@ -160,23 +163,28 @@ internal object StructuralExecutor {
                 }
             }
         val builder = CanonicalBuilder(plans, packages)
+        val index = LinkIndex.build(plans, packages, root)
         plans.forEach { plan ->
             ops.filter { it.matches(plan.tree) }.forEach { op ->
                 val implementation =
                     when (op.name) {
                         "kinds", "package", "codes" -> null
                         "rename", "nest", "unnest" -> WriteOp(op)
+                        "values" -> ValuesOp(op)
+                        "shape" -> ShapeOp(op)
+                        "link" -> LinkOp(op, index, packages.getValue(plan))
                         "ignore" -> IgnoreOp(op)
                         else -> throw ProfileException(
                             "ys/profile-invalid",
                             op.located.location,
-                            "${op.name} execution belongs to S3.3",
+                            "Unknown operation ${op.name}",
                         )
                     }
                 implementation?.apply(plan, builder, ignored)
             }
             plan.consumption.check(plan.tree.root)
         }
-        return ApplyResult(builder.documents(), ignored.distinct(), ApplyReport(codes))
+        val overridden = OverlayApplier.apply(overlay, index, builder, root)
+        return ApplyResult(builder.documents(), ignored.distinct(), ApplyReport(codes, overridden))
     }
 }

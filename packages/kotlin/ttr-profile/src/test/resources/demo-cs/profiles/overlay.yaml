@@ -1,0 +1,5 @@
+# One hit and one orphan: `Klient` was renamed to `Zakaznik` (renames.yaml).
+demo.er.entity.Objednavka:
+  description: Objednávka (overlay)
+Klient:
+  description: Klient

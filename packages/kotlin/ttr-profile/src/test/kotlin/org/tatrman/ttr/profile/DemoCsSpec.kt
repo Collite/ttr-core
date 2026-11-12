@@ -13,9 +13,15 @@ class DemoCsSpec :
     FunSpec({
         test("every positive demo-cs file matches its independently authored canonical bytes") {
             val inputs = demoRoot.resolve("input").listDirectoryEntries("*.yaml").sorted()
-            inputs.size shouldBe 7
+            inputs.size shouldBe 9
             inputs.forEach { input ->
-                val result = ProfileEngine.apply(listOf(ForeignTree.read(input.readText(), input.name)), demoChain())
+                // S3.3: values.yaml extends demo-cs/1; the root supplies demo.sources.json for the links.
+                val result =
+                    ProfileEngine.apply(
+                        listOf(ForeignTree.read(input.readText(), input.name)),
+                        demoChain("values.yaml"),
+                        demoRoot,
+                    )
                 val expected =
                     demoRoot
                         .resolve(
@@ -42,7 +48,8 @@ class DemoCsSpec :
                     shouldThrow<ProfileException> {
                         ProfileEngine.apply(
                             listOf(ForeignTree.read(demoRoot.resolve("negative/$file").readText(), file)),
-                            demoChain(),
+                            demoChain("values.yaml"),
+                            demoRoot,
                         )
                     }
                 val fields = item.jsonObject
@@ -54,13 +61,30 @@ class DemoCsSpec :
         }
         test("combined files retain author order in each package and model and expose original source locations") {
             val inputs = demoRoot.resolve("input").listDirectoryEntries("*.yaml").sorted()
-            val result = ProfileEngine.apply(inputs.map { ForeignTree.read(it.readText(), it.name) }, demoChain())
+            val result =
+                ProfileEngine.apply(
+                    inputs.map { ForeignTree.read(it.readText(), it.name) },
+                    demoChain("values.yaml"),
+                    demoRoot,
+                )
             val er = result.documents.single { it.value.string("model") == "er" }
             er.value
                 .getValue("defs")
                 .jsonArray
                 .map { it.jsonObject.string("id") } shouldBe
-                listOf("Customer", "Invoice", "Supplier", "Order", "Product", "Odberatel", "Dodavka", "Sklad")
+                listOf(
+                    "Customer",
+                    "Invoice",
+                    "Supplier",
+                    "Order",
+                    "Product",
+                    "Odberatel",
+                    "Dodavka",
+                    "Sklad",
+                    "Objednavka",
+                    "Zakaznik",
+                    "ObjednavkaZakaznika",
+                )
             er.locations.getValue("/defs/0").file shouldBe "01-sequence.yaml"
             er.locations.getValue("/defs/0/properties/description").path shouldBe "/entity/0/popis"
             er.locations.getValue("/defs/0/properties/attributes/0").path shouldBe "/entity/0/sloupce/kod"
@@ -120,5 +144,30 @@ class DemoCsSpec :
                 .single { it.jsonObject.string("code") == "ys/record-id-missing" }
                 .jsonObject
                 .string("where") shouldBe "RecordPlan (at the authored record)"
+        }
+        test("S3.3 links group: cross-file links by sourceName and by path, a cross-package import, as one run") {
+            val result = ProfileEngine.apply(linkInputs(), demoChain("values.yaml"), demoRoot)
+            result.documents.map { it.value.string("package") + "-" + it.value.string("model") } shouldBe
+                listOf("prodej-er", "demo-er", "demo-binding")
+            result.documents.forEach { document ->
+                val name = document.value.string("package") + "-" + document.value.string("model")
+                document.write() shouldBe demoRoot.resolve("links/expected/$name.yaml").readText()
+                CanonicalYaml.write(CanonicalYaml.read(document.write())) shouldBe document.write()
+            }
+        }
+        test("S3.3 overlay on the links group: the overlay wins and overridden[] is reported") {
+            val result = ProfileEngine.apply(linkInputs(), demoChain("overlay-inline.yaml"), demoRoot)
+            result.documents
+                .single { it.value.string("package") == "demo" && it.value.string("model") == "er" }
+                .value
+                .getValue("defs")
+                .jsonArray
+                .first()
+                .jsonObject
+                .getValue("properties")
+                .jsonObject
+                .string("description") shouldBe "Objednávka (overlay)"
+            result.report.overridden.map { it.qname } shouldBe
+                listOf("demo.er.entity.Objednavka", "prodej.er.entity.Zakaznik")
         }
     })

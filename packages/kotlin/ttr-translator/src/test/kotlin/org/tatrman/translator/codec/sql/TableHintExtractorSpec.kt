@@ -118,4 +118,8 @@ class TableHintExtractorSpec :
                 )
             r.cleanedSql.shouldNotContainIgnoringCase("WITH (")
         }
+        "backtick table references remain accepted by direct extraction" {
+            TableHintExtractor.extract("FROM `dbo`.`mu` AS `m` WITH (NOLOCK)").byTable shouldBe
+                mapOf("mu" to listOf(TableHintSpec("NOLOCK")))
+        }
     })

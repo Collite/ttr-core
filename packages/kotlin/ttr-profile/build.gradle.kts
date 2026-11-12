@@ -11,6 +11,8 @@ kotlin { jvmToolchain(21) }
 dependencies {
     api(project(":packages:kotlin:ttr-yaml"))
     implementation(project(":packages:kotlin:ttr-semantics"))
+    // review-251 F5: renames.yaml is a list document, read as ttr-metadata reads it (YamlData takes mappings only).
+    implementation(libs.snakeyaml.engine)
     testImplementation(libs.bundles.kotest)
     // S3.2b T1: the fan-out probe asserts on the loaded model; production stays metadata-free.
     testImplementation(project(":packages:kotlin:ttr-metadata"))

@@ -4,6 +4,7 @@ package org.tatrman.translator.detect
 import org.tatrman.plan.v1.SchemaCode
 import org.tatrman.translate.v1.Language
 import org.tatrman.translator.codec.sql.ParseResult
+import org.tatrman.translator.codec.sql.PreParseRails
 import org.tatrman.translator.codec.sql.SqlParser
 import org.tatrman.translator.framework.ModelHandle
 
@@ -64,7 +65,7 @@ object SchemaDetector {
             )
         }
 
-        val parseResult = SqlParser.parseQuery(source)
+        val parseResult = SqlParser.parseQuery(PreParseRails.prepare(source).cleanedSql)
         if (parseResult !is ParseResult.Success) {
             return SchemaDetectionResult(
                 effectiveSchema = statedSchema,

@@ -1,0 +1,12 @@
+{
+  "documents": [
+    {"package": "demo", "model": "er", "imports": [], "defs": 11},
+    {"package": "demo", "model": "binding", "imports": [], "defs": 4},
+    {"package": "demo", "model": "db", "imports": [], "defs": 3}
+  ],
+  "ignored": [
+    {"file": "layouts/view.yaml", "line": 1, "column": 1, "path": "", "reason": "Layout source"},
+    {"file": "01-sequence.yaml", "line": 6, "column": 5, "path": "/entity/0/poznamka", "reason": "Other consumer"}
+  ],
+  "overridden": []
+}

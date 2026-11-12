@@ -33,7 +33,8 @@ class StructuralEmissionSpec :
             result.report.codes["E_SAME"] shouldBe "ys/value-unmapped"
             result.documents.all { it.write().endsWith('\n') } shouldBe true
         }
-        test("canonical value validation points to the authored record instead of the generated JSON") {
+        // S3.3 T5 (contracts §3): a canonical failure on a transformed value names the authored key, not just its record.
+        test("canonical value validation points to the authored key instead of the generated JSON") {
             val error =
                 shouldThrow<ProfileException> {
                     runOps(
@@ -42,7 +43,8 @@ class StructuralEmissionSpec :
                     )
                 }
             error.code shouldBe "ys/profile-invalid"
-            error.location.path shouldBe "/entity/Customer"
+            error.location.path shouldBe "/entity/Customer/popis"
             error.location.line shouldBe 3
+            error.location.column shouldBe 5
         }
     })

@@ -1,0 +1,5 @@
+profile: demo-overlay-file/1
+grammar: '>=0.22 <1.0'
+extends: ./values.yaml
+overlay: ./overlay.yaml
+operations: []

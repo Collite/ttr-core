@@ -1357,9 +1357,9 @@ class FileBasedSource(
      * explicit `def er2db_attribute <entity>.<attr>` convention.
      *
      * MW S3.2b T1b (✅D-MW-70, widened by ✅R245-A) — an entity with no inline `table`/`view` target (no block,
-     * a `columns:`-only block, or a `query` target) may have its table on a standalone `def er2db_entity`, which may sit in a file not read yet: its bare column refs are noted in
-     * [unanchoredColumns] (mapping id → entity) and [anchorToStandaloneEntityTables] canonicalises them
-     * once every file is in.
+     * a `columns:`-only block, or a `query` target) may have its table on a standalone `def er2db_entity`,
+     * which may sit in a file not read yet: its bare column refs are noted in [unanchoredColumns]
+     * (mapping id → entity) and [anchorToStandaloneEntityTables] canonicalises them once every file is in.
      */
     private fun synthesiseInlineAttributeMappings(
         def: EntityDef,
@@ -1484,8 +1484,9 @@ class FileBasedSource(
      * canonicalised under the target of the first explicit `def er2db_entity` with a `table`/`view` target whose
      * `entity:` is that entity, in file-ingestion order (sorted paths, then document order) — the bridge
      * [PhysicalIndex] already makes for the entity → table edge. `query` mappings are skipped; with none, the ref
-     * stays as-is. The `entity:` ref is matched without its package: ttr-metadata entity qnames carry none, and
-     * same-named entities in two packages already fail the load (`ttr/duplicate-mapping`).
+     * stays as-is. A package-qualified (single-segment package) `entity:` ref is matched without its package:
+     * ttr-metadata entity qnames carry none. Same-named entities in two packages therefore load clean and share one
+     * entity qname, so a standalone `er2db_entity` naming either one anchors both (pre-existing; not T1b's).
      */
     private fun anchorToStandaloneEntityTables(
         mappings: MutableList<org.tatrman.ttr.metadata.model.Mapping>,

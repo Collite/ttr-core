@@ -1,0 +1,3 @@
+dotazy:
+  q_obrat: {vzor: 'obrat za {rok}', vzor_alt: 'tržby v roce {rok}'}
+  q_sklad: {vzor: stav skladu}
