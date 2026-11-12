@@ -182,17 +182,22 @@ internal class YamlTreeReader(
         val problems = Problems(sourceId)
         val control = listed.associateBy { it.underRoot() }
         val root = listed.firstNotNullOfOrNull { it.rootPath }?.toAbsolutePath()
-        val ignore = control["model.ignore"]?.let { modelIgnore(it, storage, problems) }
-        val content =
+        val candidates =
             listed.filter { file ->
                 val path = file.underRoot()
                 val segments = path.split('/')
                 file.extension() in setOf("yaml", "yml") &&
                     segments.none { it.startsWith(".") } &&
                     segments.first() != "agents" &&
-                    path !in CONTROL_FILES &&
-                    ignore?.matches(path) != true
+                    path !in CONTROL_FILES
             }
+        val ignore =
+            control["model.ignore"]?.let { modelIgnore(it, storage, problems) }?.getOrElse { e ->
+                // Fail closed (review-260 F4): without the ignore list no file is known to be content.
+                candidates.forEach { problems.drop(it, (e as Recorded).issue) }
+                return ReadFiles(emptyList(), problems.errors, dropped = problems.dropped)
+            }
+        val content = candidates.filter { ignore?.matches(it.underRoot()) != true }
         val profiles = Profiles(root, catalog, problems)
         val tree = treeDeclaration(control["ttr.yaml"], storage, profiles, problems)
         val parsed = mutableListOf<ParsedFile>()
@@ -232,15 +237,14 @@ internal class YamlTreeReader(
         file: StorageFile,
         storage: ModelStorage,
         problems: Problems,
-    ): FileSelector? =
+    ): Result<FileSelector> =
         try {
-            FileSelector(storage.read(file).lines())
+            Result.success(FileSelector(storage.read(file).lines()))
         } catch (e: IOException) {
-            problems.error(file.path, 1, 1, "ys/profile-invalid: model.ignore is unreadable (${e::class.simpleName})")
-            null
+            val detail = "model.ignore is unreadable (${e::class.simpleName})"
+            Result.failure(Recorded(problems.error(file.path, 1, 1, "ys/profile-invalid: $detail")))
         } catch (e: IllegalArgumentException) {
-            problems.error(file.path, 1, 1, "ys/profile-invalid: model.ignore: ${e.message}")
-            null
+            Result.failure(Recorded(problems.error(file.path, 1, 1, "ys/profile-invalid: model.ignore: ${e.message}")))
         }
 
     /**

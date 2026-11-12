@@ -323,6 +323,48 @@ class YamlSourceSpec :
             messages.none { it.split("ys/profile-not-found").size > 2 } shouldBe true
         }
 
+        fun ignoreTree(ignore: String) =
+            tree(
+                "p/d.yaml" to profile,
+                "model.ignore" to ignore,
+                "ttr.yaml" to "profile: ./p/d.yaml\ngrammar: '>=0.22 <1.0'\n",
+                "a.yaml" to "entity:\n  A: {}\n",
+            )
+
+        fun failsClosed(
+            root: Path,
+            issue: String,
+        ) {
+            val storage = Recording(LocalFsStorage("t", root))
+            MetadataLoader(listOf(BuiltinStockSource(), YamlFileSource("t", 100, storage)))
+                .load()
+                .errors
+                .map { "${root.relativize(Path.of(it.file))} ${it.message}" } shouldContainExactly
+                listOf("model.ignore $issue", "a.yaml dropped: $issue", "p/d.yaml dropped: $issue")
+            // No candidate is read, so the profile is never taken for content.
+            storage.reads.filter { it != "model.ignore" } shouldBe emptyList()
+            names(yaml(root)) shouldBe emptyList()
+            MetadataLoader(listOf(BuiltinStockSource(), yaml(root)))
+                .load(LoadOptions(strict = true))
+                .report!!
+                .droppedFiles shouldContainExactly
+                listOf(root.resolve("a.yaml").toString(), root.resolve("p/d.yaml").toString())
+        }
+
+        test("review-260 F4: an invalid model.ignore fails closed: no yaml content loads, each candidate is dropped") {
+            failsClosed(
+                ignoreTree("p/\n!p/keep.yaml\n"),
+                "ys/profile-invalid: model.ignore: '!' (re-include) is not supported",
+            )
+        }
+
+        test("review-260 F4: an unreadable model.ignore fails closed the same way").config(enabledIf = { lockable }) {
+            val root = ignoreTree("p/\n")
+            locked(root.resolve("model.ignore")) {
+                failsClosed(root, "ys/profile-invalid: model.ignore is unreadable (AccessDeniedException)")
+            }
+        }
+
         test("review-260 F2: an unmapped package key drops only its file, named by its storage path") {
             val root =
                 tree(
