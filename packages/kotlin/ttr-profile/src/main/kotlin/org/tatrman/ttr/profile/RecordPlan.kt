@@ -101,14 +101,22 @@ internal class PlannedOp(
     fun matches(tree: ForeignTree) = files?.matches(tree.file) != false
 }
 
-/** Record discovery is a separate pass, so child selectors never depend on writing-operation order. */
+/**
+ * Record discovery is a separate pass, so child selectors never depend on writing-operation order.
+ *
+ * S3.2b (✅D-MW-67 c′): a record is identified by (node path, canonical kind), so one node may become one record per
+ * canonical kind — an `entity` and its `er2db_entity` — each going to its own kind's model document.
+ */
 internal class RecordPlan(
     val tree: ForeignTree,
     private val operations: List<PlannedOp>,
 ) {
     val consumption = ConsumptionLedger()
     val conflicts = ConflictLedger()
-    private val found = linkedMapOf<String, Record>()
+    private val found = linkedMapOf<Pair<String, String>, Record>()
+    private val madeBy = mutableMapOf<Record, Int>()
+
+    /** Source position first; records of one node follow the index of the `kinds` operation that made them. */
     val records: List<Record> by lazy {
         val order = mutableMapOf<String, Int>()
 
@@ -117,7 +125,7 @@ internal class RecordPlan(
             node.entries().forEach(::walk)
         }
         walk(tree.root)
-        found.values.sortedBy { order.getValue(it.source.path) }
+        found.values.sortedWith(compareBy({ order.getValue(it.source.path) }, { madeBy.getValue(it) }))
     }
 
     fun nestedKinds(parent: Record): List<String> =
@@ -194,7 +202,7 @@ internal class RecordPlan(
                                 "A record cannot nest inside itself",
                             )
                         }
-                        if (source.path in found) {
+                        if ((source.path to kind) in found) {
                             throw ProfileException(
                                 "ys/profile-conflict",
                                 source.span(key = true),
@@ -204,7 +212,9 @@ internal class RecordPlan(
                         consumption.open(source)
                         kindNode?.let(consumption::consume)
                         idNode?.let(consumption::consume)
-                        found[source.path] = Record(source, kind, id, parent)
+                        val record = Record(source, kind, id, parent)
+                        found[source.path to kind] = record
+                        madeBy[record] = index
                         changed = true
                     }
                 }

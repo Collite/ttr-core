@@ -81,6 +81,11 @@ class ForeignTreeSpec :
                     .contains("😀") shouldBe true
             }
         }
+        test("double stars require a left segment boundary") {
+            val selector = FileSelector(listOf("a**/b.yaml"))
+            listOf("a/b.yaml", "ax/b.yaml", "ab.yaml", "a/c/b.yaml").map(selector::matches) shouldBe
+                listOf(true, true, false, false)
+        }
         test("gitignore whole-segment double stars and escaped literals agree with git's oracle") {
             listOf(
                 Triple("a**b.yaml", "a/b.yaml", false),

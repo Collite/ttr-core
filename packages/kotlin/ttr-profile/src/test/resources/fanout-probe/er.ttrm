@@ -1,0 +1,9 @@
+package demo
+model er
+
+def entity E {
+    attributes: [
+        def attribute id { type: int, binding: ID },
+        def attribute nazev { type: string, binding: NAZEV }
+    ]
+}

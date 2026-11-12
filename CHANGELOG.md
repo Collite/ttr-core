@@ -6,6 +6,14 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — Record fan-out (MW P3 S3.2b, ttr-core#392)
+
+- `ttr-profile` makes one record per canonical kind from one foreign node: two `kinds` operations can turn one entry into an `entity` (model `er`) and its `er2db_entity` (model `binding`). The same node mapped twice to the same kind is still refused.
+
+### Fixed — Bare attribute bindings under a standalone `er2db_entity` (ttr-metadata, MW P3 S3.2b)
+
+- An entity with no inline `table` or `view` target now takes its table from the first `def er2db_entity` with a `table`/`view` target whose `entity:` names it (in file order; `query` mappings are skipped). Its bare attribute bindings (`binding: ID`) and bare `columns:` entries now load as the table's column (`db.dbo.T.ID`) instead of a dangling `db.dbo.ID`. This covers entities with no inline block, an inline block without a table (`columns:` only, or a `query` target), and package-qualified `entity:` refs (`demo.er.entity.E`). Qualified column references are unchanged.
+
 ### Changed — `ttrp emit` and `ttrp check` read the served layout (AU-export S1.5.4, D-173)
 
 - The project model loads through `ttr-metadata`'s `MetadataLoader` with the built-in stock roles, every existing

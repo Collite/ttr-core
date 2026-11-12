@@ -12,6 +12,8 @@ dependencies {
     api(project(":packages:kotlin:ttr-yaml"))
     implementation(project(":packages:kotlin:ttr-semantics"))
     testImplementation(libs.bundles.kotest)
+    // S3.2b T1: the fan-out probe asserts on the loaded model; production stays metadata-free.
+    testImplementation(project(":packages:kotlin:ttr-metadata"))
 }
 tasks.test {
     useJUnitPlatform()

@@ -13,7 +13,7 @@ class DemoCsSpec :
     FunSpec({
         test("every positive demo-cs file matches its independently authored canonical bytes") {
             val inputs = demoRoot.resolve("input").listDirectoryEntries("*.yaml").sorted()
-            inputs.size shouldBe 6
+            inputs.size shouldBe 7
             inputs.forEach { input ->
                 val result = ProfileEngine.apply(listOf(ForeignTree.read(input.readText(), input.name)), demoChain())
                 val expected =
@@ -60,7 +60,7 @@ class DemoCsSpec :
                 .getValue("defs")
                 .jsonArray
                 .map { it.jsonObject.string("id") } shouldBe
-                listOf("Customer", "Invoice", "Supplier", "Order", "Product")
+                listOf("Customer", "Invoice", "Supplier", "Order", "Product", "Odberatel", "Dodavka", "Sklad")
             er.locations.getValue("/defs/0").file shouldBe "01-sequence.yaml"
             er.locations.getValue("/defs/0/properties/description").path shouldBe "/entity/0/popis"
             er.locations.getValue("/defs/0/properties/attributes/0").path shouldBe "/entity/0/sloupce/kod"

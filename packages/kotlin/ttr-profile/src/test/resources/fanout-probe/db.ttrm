@@ -1,0 +1,10 @@
+package demo
+model db schema dbo
+
+def table T {
+    columns: [
+        def column ID { type: int },
+        def column NAZEV { type: varchar },
+        def column STAV { type: int }
+    ]
+}

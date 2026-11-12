@@ -7,10 +7,15 @@ operations:
   - {op: kinds, at: /entity, id: /nazev, mapping: {entita: entity}, files: [missing-id.yaml]}
   - {op: kinds, at: /zaznamy, kind: /druh, id: /nazev, mapping: {entita: entity, vazba: er2db_entity}}
   - {op: kinds, at: /tabulka, mapping: {tabulka: table}}
+  - {op: kinds, at: /entity, mapping: {entita: entity}, files: [07-fanout.yaml]}
+  - {op: kinds, at: /entity, mapping: {entita: er2db_entity}, files: [07-fanout.yaml]}
   - {op: kinds, in: entity, at: /sloupce, mapping: {sloupec: attribute}}
   - {op: kinds, in: table, at: /sloupce, mapping: {sloupec: column}}
   - {op: rename, in: entity, at: /popis, to: {kind: entity, property: description}}
   - {op: rename, in: table, at: /popis, to: {kind: table, property: description}}
   - {op: rename, in: attribute, at: /typ, to: {kind: attribute, property: type}}
   - {op: rename, in: column, at: /typ, to: {kind: column, property: type}}
+  - {op: rename, in: er2db_entity, at: /$key, to: {kind: er2db_entity, property: entity}, files: [07-fanout.yaml]}
+  - {op: rename, in: er2db_entity, at: /zdroj/tabulka, to: {kind: er2db_entity, property: target}, files: [07-fanout.yaml]}
+  - {op: ignore, in: er2db_entity, at: /zdroj/filtr, reason: "S3.3: shape → whereFilter {sql}", files: [07-fanout.yaml]}
   - {op: codes, mapping: {E_BASE: ys/unknown-key, E_SAME: ys/unknown-key}}
