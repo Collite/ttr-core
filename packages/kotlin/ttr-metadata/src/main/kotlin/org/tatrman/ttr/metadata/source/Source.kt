@@ -259,7 +259,8 @@ class LocalFsStorage(
         Files
             .walk(rootPath)
             .filter {
-                Files.isRegularFile(it) && it.fileName.toString().substringAfterLast('.', "") in extensions
+                // By suffix, as listing matches (review-260 F5): `sources.json` hashes sidecars, not every `.json`.
+                Files.isRegularFile(it) && extensions.any { ext -> it.fileName.toString().endsWith(".$ext") }
             }.sorted()
             .map { "$it=${Files.getLastModifiedTime(it).toMillis()}" }
             .toList()

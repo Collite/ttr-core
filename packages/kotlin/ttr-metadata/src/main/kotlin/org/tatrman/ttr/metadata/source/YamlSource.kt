@@ -105,8 +105,14 @@ internal class YamlTreeReader(
     private val profile: String?,
     private val catalog: Map<String, Path>,
 ) : ModelFileReader {
-    // json: the `<package>.sources.json` link sidecars change what a dialect file loads to.
-    override val extensions = listOf("yml", "json")
+    // `sources.json`: the `<package>.sources.json` link sidecars change what a dialect file loads to; `ignore`:
+    // `model.ignore` changes what is content. Both version the source; storages match extensions by suffix.
+    override val extensions = listOf("yml", "sources.json", "ignore")
+
+    /** A problem already recorded once; every file it removes is dropped with this same issue (review-260 F6). */
+    private class Recorded(
+        val issue: LoadWarning,
+    ) : RuntimeException(issue.message)
 
     private class Problems(
         val sourceId: String,
@@ -134,39 +140,76 @@ internal class YamlTreeReader(
             error(e.location.file, e.location.line, e.location.column, "${e.code}: ${e.detail}")
     }
 
+    /**
+     * Profile resolution reads profile files, path overlays and sidecars from the filesystem under the storage root
+     * (contracts §4, ✅R260-B), so it is built only when a file needs a profile, and a root that is not a directory on
+     * disk fails it once with `ys/profile-not-found`; canonical files load regardless.
+     */
+    private class Profiles(
+        val root: Path?,
+        private val catalog: Map<String, Path>,
+        private val problems: Problems,
+    ) {
+        private var resolver: Result<ProfileResolver>? = null
+
+        fun resolver(at: String): ProfileResolver = (resolver ?: create(at).also { resolver = it }).getOrThrow()
+
+        private fun create(at: String): Result<ProfileResolver> {
+            fun failure(): Result<ProfileResolver> {
+                val issue =
+                    problems.error(
+                        at,
+                        1,
+                        1,
+                        "ys/profile-not-found: profiles need a filesystem-backed storage (root ${root ?: "none"})",
+                    )
+                return Result.failure(Recorded(issue))
+            }
+            if (root == null || !Files.isDirectory(root)) return failure()
+            return try {
+                Result.success(ProfileResolver(root, catalog))
+            } catch (e: IOException) {
+                failure()
+            }
+        }
+    }
+
     override fun read(
         listed: List<StorageFile>,
         storage: ModelStorage,
         sourceId: String,
     ): ReadFiles {
         val problems = Problems(sourceId)
-        val yaml = listed.filter { it.extension() in setOf("yaml", "yml") }
-        val root = yaml.firstNotNullOfOrNull { it.rootPath }?.toAbsolutePath() ?: return ReadFiles(emptyList())
-        val ignore = modelIgnore(root, problems)
+        val control = listed.associateBy { it.underRoot() }
+        val root = listed.firstNotNullOfOrNull { it.rootPath }?.toAbsolutePath()
+        val ignore = control["model.ignore"]?.let { modelIgnore(it, storage, problems) }
         val content =
-            yaml.filter { file ->
+            listed.filter { file ->
                 val path = file.underRoot()
                 val segments = path.split('/')
-                segments.dropLast(1).none { it.startsWith(".") } &&
-                    !segments.last().startsWith(".") &&
+                file.extension() in setOf("yaml", "yml") &&
+                    segments.none { it.startsWith(".") } &&
                     segments.first() != "agents" &&
                     path !in CONTROL_FILES &&
                     ignore?.matches(path) != true
             }
-        val resolver = ProfileResolver(root, catalog)
-        val tree = treeDeclaration(root, resolver, problems)
+        val profiles = Profiles(root, catalog, problems)
+        val tree = treeDeclaration(control["ttr.yaml"], storage, profiles, problems)
         val parsed = mutableListOf<ParsedFile>()
         val dialect = linkedMapOf<List<String>, Pair<List<ProfileDefinition>, MutableList<Pair<StorageFile, String>>>>()
         for (file in content) {
             val text = storage.read(file)
             val chain =
                 try {
-                    val declaration = DeclarationReader.readFile(text, file.path)
+                    val declaration = DeclarationReader.readFile(text, file.absolute())
                     when {
-                        declaration != null -> resolver.resolve(declaration)
+                        declaration != null -> profiles.resolver(file.path).resolve(declaration)
                         tree != null -> tree.getOrThrow()
                         else -> null
                     }
+                } catch (e: Recorded) {
+                    problems.drop(file, e.issue)
+                    continue
                 } catch (e: ProfileException) {
                     problems.drop(file, problems.profile(e))
                     continue
@@ -177,56 +220,59 @@ internal class YamlTreeReader(
                 dialect.getOrPut(chain.map { it.file }) { chain to mutableListOf() }.second += file to text
             }
         }
-        dialect.values.forEach { (chain, files) -> parsed += apply(root, chain, files, problems) }
+        // A dialect chain exists only once a resolver did, and a resolver only over an on-disk root.
+        dialect.values.forEach { (chain, files) ->
+            parsed +=
+                apply(requireNotNull(profiles.root), chain, files, problems)
+        }
         return ReadFiles(parsed.sortedBy { it.file.path }, problems.errors, dropped = problems.dropped)
     }
 
     private fun modelIgnore(
-        root: Path,
+        file: StorageFile,
+        storage: ModelStorage,
         problems: Problems,
-    ): FileSelector? {
-        val file = root.resolve("model.ignore")
-        if (!Files.isRegularFile(file)) return null
-        return try {
-            FileSelector(Files.readAllLines(file))
+    ): FileSelector? =
+        try {
+            FileSelector(storage.read(file).lines())
         } catch (e: IOException) {
-            problems.error(
-                file.toString(),
-                1,
-                1,
-                "ys/profile-invalid: model.ignore is unreadable (${e::class.simpleName})",
-            )
+            problems.error(file.path, 1, 1, "ys/profile-invalid: model.ignore is unreadable (${e::class.simpleName})")
             null
         } catch (e: IllegalArgumentException) {
-            problems.error(file.toString(), 1, 1, "ys/profile-invalid: model.ignore: ${e.message}")
+            problems.error(file.path, 1, 1, "ys/profile-invalid: model.ignore: ${e.message}")
             null
         }
-    }
 
-    /** The override, else `<root>/ttr.yaml`, else none (canonical). A failure fails every file it would declare. */
+    /**
+     * The override, else `<root>/ttr.yaml`, else none (canonical). A failure is recorded once and fails every file it
+     * would declare with that same issue.
+     */
     private fun treeDeclaration(
-        root: Path,
-        resolver: ProfileResolver,
+        declarationFile: StorageFile?,
+        storage: ModelStorage,
+        profiles: Profiles,
         problems: Problems,
     ): Result<List<ProfileDefinition>>? {
-        val declarationFile = root.resolve("ttr.yaml")
+        val label = declarationFile?.absolute() ?: profiles.root?.resolve("ttr.yaml")?.toString() ?: "ttr.yaml"
         return try {
             when {
-                profile != null -> Result.success(resolver.resolve(profile, declarationFile))
-                Files.isRegularFile(declarationFile) -> {
-                    val declaration: ProfileDeclaration =
-                        DeclarationReader.readTree(Files.readString(declarationFile), declarationFile.toString())
-                    Result.success(resolver.resolve(declaration))
+                profile != null -> Result.success(profiles.resolver(label).resolve(profile, Path.of(label)))
+                declarationFile != null -> {
+                    val text =
+                        try {
+                            storage.read(declarationFile)
+                        } catch (e: IOException) {
+                            throw Recorded(problems.error(label, 1, 1, "ys/profile-not-found: ttr.yaml is unreadable"))
+                        }
+                    val declaration: ProfileDeclaration = DeclarationReader.readTree(text, label)
+                    Result.success(profiles.resolver(label).resolve(declaration))
                 }
                 else -> null
             }
-        } catch (e: ProfileException) {
-            problems.profile(e)
+        } catch (e: Recorded) {
             Result.failure(e)
-        } catch (e: IOException) {
-            val issue =
-                problems.error(declarationFile.toString(), 1, 1, "ys/profile-not-found: ttr.yaml is unreadable")
-            Result.failure(ProfileException("ys/profile-not-found", locationOf(issue), issue.message))
+        } catch (e: ProfileException) {
+            Result.failure(Recorded(problems.profile(e)))
         }
     }
 
@@ -296,9 +342,13 @@ internal class YamlTreeReader(
         return emptyList()
     }
 
-    private fun locationOf(issue: LoadWarning) =
-        org.tatrman.ttr.profile
-            .ProfileSpan(issue.file, issue.line, issue.column, issue.line, issue.column, "")
+    /** The resolver bases a relative declaring file on its own root, so a storage with a relative root passes this. */
+    private fun StorageFile.absolute(): String =
+        try {
+            Path.of(path).toAbsolutePath().toString()
+        } catch (e: java.nio.file.InvalidPathException) {
+            path
+        }
 
     companion object {
         /** Root files that steer the load and are never model content. */

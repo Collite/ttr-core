@@ -5,15 +5,20 @@ import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldNotContain
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldStartWith
 import org.tatrman.ttr.metadata.LoadIssue
 import org.tatrman.ttr.metadata.LoadOptions
 import org.tatrman.ttr.metadata.MetadataLoader
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.FileTime
+import java.nio.file.attribute.PosixFilePermissions
 import kotlin.io.path.createDirectories
 import kotlin.io.path.name
+import kotlin.io.path.setPosixFilePermissions
 import kotlin.io.path.writeText
 
 /** MW S3.4 T1 — the `yaml` source kind (contracts §4). */
@@ -110,9 +115,10 @@ class YamlSourceSpec :
             result.errors.filter { it.category != LoadIssue.Category.PACKAGE_MISMATCH } shouldBe emptyList()
             names(YamlFileSource("t", 100, LocalFsStorage("t", root))) shouldContainExactly listOf("A", "B")
             // ✅MW-44: never read, not merely dropped — so no tool built on this source can lint an agent file.
-            // renames.yaml is read once, as the export sidecar it always was; never as content.
+            // renames.yaml is read once, as the export sidecar it always was; never as content. The control files
+            // ttr.yaml and model.ignore are read through the storage too (review-260 F3).
             storage.reads.sorted() shouldContainExactly
-                listOf("a.yaml", "deep/er/b.yml", "renames.yaml", "skipped/s.yaml")
+                listOf("a.yaml", "deep/er/b.yml", "model.ignore", "renames.yaml", "skipped/s.yaml", "ttr.yaml")
             storage.reads shouldNotContain "agents/golem.yaml"
         }
 
@@ -180,6 +186,141 @@ class YamlSourceSpec :
                     .map { it.name }
                     .filter { it != "Bad" }
             names(yaml(root)) shouldContainExactly listOf("Good")
+        }
+
+        /** An in-memory storage whose root is not a directory on disk (the shape of a snapshot archive). */
+        fun memory(vararg docs: Pair<String, String>): ModelStorage {
+            val root = Path.of("/synthetic-r260-root")
+            val files = docs.toMap()
+            return object : ModelStorage {
+                override val id = "mem"
+
+                override fun fetchVersion() = "1"
+
+                override fun listFiles(
+                    extensions: List<String>,
+                    prefixes: List<String>,
+                ) = files.keys.filter { k -> extensions.any { k.endsWith(".$it") } }.map {
+                    StorageFile(root.resolve(it).toString(), 1, root)
+                }
+
+                override fun read(file: StorageFile) = files.getValue(root.relativize(Path.of(file.path)).toString())
+            }
+        }
+
+        test("review-260 F3: a storage without an on-disk root loads canonical files; profiles fail once, cleanly") {
+            val canonical = "a.yaml" to entity.format("A")
+            val plain = MetadataLoader.of(SourceKind.YAML, memory(canonical)).load()
+            plain.errors shouldBe emptyList()
+            plain.model!!
+                .objectByQname()
+                .keys
+                .map { it.name } shouldContain "A"
+            // A tree declaration needs profile resolution: one issue at ttr.yaml, its files dropped, no failed load.
+            val declared =
+                memory(
+                    canonical,
+                    "ttr.yaml" to "profile: ./p/d.yaml\ngrammar: '>=0.22 <1.0'\n",
+                    "b.yaml" to "entity:\n  B: {}\n",
+                )
+            val strict = MetadataLoader.of(SourceKind.YAML, declared).load(LoadOptions(strict = true))
+            val notFound = strict.issues.filter { "ys/profile-not-found" in it.message && "dropped" !in it.message }
+            notFound.map { it.file to it.message } shouldContainExactly
+                listOf(
+                    "/synthetic-r260-root/ttr.yaml" to
+                        "ys/profile-not-found: profiles need a filesystem-backed storage (root /synthetic-r260-root)",
+                )
+            strict.issues.none { "load failed" in it.message } shouldBe true
+            strict.report!!.droppedFiles shouldContainExactly
+                listOf("/synthetic-r260-root/a.yaml", "/synthetic-r260-root/b.yaml")
+            // Without ttr.yaml only the file whose header names a profile is dropped; the canonical file loads.
+            val mixed =
+                memory(canonical, "h.yaml" to "ttr: {profile: ./d.yaml, grammar: '>=0.22 <1.0'}\nentity:\n  H: {}\n")
+            val lenient = MetadataLoader.of(SourceKind.YAML, mixed).load(LoadOptions(strict = true))
+            lenient.report!!.droppedFiles shouldContainExactly listOf("/synthetic-r260-root/h.yaml")
+            lenient.model!!
+                .objectByQname()
+                .keys
+                .map { it.name } shouldContain "A"
+        }
+
+        test("review-260 F5: the source version moves with model.ignore and sidecars, never with other .json") {
+            val root = tree("a.yaml" to "entity: {}\n", "model.ignore" to "p/\n", "demo.sources.json" to "{}")
+            val storage = LocalFsStorage("t", root)
+            val extensions = MODEL_EXTENSIONS + listOf("toml", "yaml") + YamlTreeReader(null, emptyMap()).extensions
+            var stamp = 1_000_000L
+
+            fun touch(name: String) =
+                root.resolve(name).also { it.parent.createDirectories() }.also { file ->
+                    if (!Files.exists(file)) file.writeText("{}")
+                    Files.setLastModifiedTime(file, FileTime.fromMillis(stamp++))
+                }
+            val before = storage.fetchVersion(extensions)
+            touch("node_modules/x/package.json")
+            touch("build/out.json")
+            storage.fetchVersion(extensions) shouldBe before
+            touch("model.ignore")
+            val ignored = storage.fetchVersion(extensions)
+            ignored shouldNotBe before
+            touch("demo.sources.json")
+            storage.fetchVersion(extensions) shouldNotBe ignored
+        }
+
+        // Reported as skipped where a file cannot be locked (no POSIX, or running as root), as review-251 R6.
+        val lockable =
+            Files.createTempFile("r260-lock", ".yaml").let { probe ->
+                "posix" in probe.fileSystem.supportedFileAttributeViews() &&
+                    try {
+                        probe.setPosixFilePermissions(emptySet())
+                        !Files.isReadable(probe)
+                    } finally {
+                        probe.setPosixFilePermissions(PosixFilePermissions.fromString("rw-------"))
+                    }
+            }
+
+        fun <T> locked(
+            file: Path,
+            block: () -> T,
+        ): T {
+            file.setPosixFilePermissions(emptySet())
+            try {
+                return block()
+            } finally {
+                file.setPosixFilePermissions(PosixFilePermissions.fromString("rw-------"))
+            }
+        }
+
+        fun messages(root: Path) =
+            MetadataLoader(listOf(BuiltinStockSource(), yaml(root)))
+                .load()
+                .errors
+                .filter { it.category != LoadIssue.Category.PACKAGE_MISMATCH }
+                .map { "${root.relativize(Path.of(it.file))} ${it.message}" }
+
+        fun declaredTree(declaration: String) =
+            tree(
+                "p/d.yaml" to profile,
+                "model.ignore" to "p/\n",
+                "ttr.yaml" to declaration,
+                "a.yaml" to "entity:\n  A: {}\n",
+                "b.yaml" to "entity:\n  B: {}\n",
+            )
+
+        test("review-260 F6: an unreadable ttr.yaml is one issue, and each file is dropped with it").config(
+            enabledIf = { lockable },
+        ) {
+            val root = declaredTree("profile: ./p/d.yaml\ngrammar: '>=0.22 <1.0'\n")
+            val issue = "ys/profile-not-found: ttr.yaml is unreadable"
+            locked(root.resolve("ttr.yaml")) { messages(root) } shouldContainExactly
+                listOf("ttr.yaml $issue", "a.yaml dropped: $issue", "b.yaml dropped: $issue")
+        }
+
+        test("review-260 F6: a ttr.yaml naming a missing profile is one issue, and each file is dropped with it") {
+            val root = declaredTree("profile: ./p/missing.yaml\ngrammar: '>=0.22 <1.0'\n")
+            val issue = "ys/profile-not-found: Profile not found: ./p/missing.yaml"
+            val messages = messages(root)
+            messages shouldContainExactly listOf("ttr.yaml $issue", "a.yaml dropped: $issue", "b.yaml dropped: $issue")
+            messages.none { it.split("ys/profile-not-found").size > 2 } shouldBe true
         }
 
         test("review-260 F2: an unmapped package key drops only its file, named by its storage path") {
