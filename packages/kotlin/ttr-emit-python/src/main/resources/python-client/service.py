@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """One JSON request per subprocess; calls the generated typed HTTP client."""
 import sys
 from .client import Client

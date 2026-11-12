@@ -203,6 +203,7 @@ class Client(BaseClient):
 }
 
 === worker/release_order_client/main.py ===
+# SPDX-License-Identifier: Apache-2.0
 import argparse
 import sys
 from .client import Client
@@ -242,6 +243,7 @@ if __name__ == "__main__":
 === worker/release_order_client/py.typed ===
 
 === worker/release_order_client/runtime.py ===
+# SPDX-License-Identifier: Apache-2.0
 """Generated HTTP run-API support. No model access or executable recipe payloads."""
 from __future__ import annotations
 
@@ -540,6 +542,7 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
         raise
 
 === worker/release_order_client/service.py ===
+# SPDX-License-Identifier: Apache-2.0
 """One JSON request per subprocess; calls the generated typed HTTP client."""
 import sys
 from .client import Client

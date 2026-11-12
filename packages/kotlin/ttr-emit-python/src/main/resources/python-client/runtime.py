@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Generated HTTP run-API support. No model access or executable recipe payloads."""
 from __future__ import annotations
 
