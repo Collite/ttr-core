@@ -2519,7 +2519,8 @@
       "sinks": {
         "camunda": "user task",
         "hebe": "task",
-        "n8n": "door"
+        "n8n": "door",
+        "python_client": "door"
       },
       "approval": "required"
     },
@@ -2610,7 +2611,8 @@
       "sinks": {
         "camunda": "send task",
         "hebe": "message",
-        "n8n": "n8n-nodes-base.emailSend"
+        "n8n": "n8n-nodes-base.emailSend",
+        "python_client": "door"
       },
       "approval": "none"
     },
