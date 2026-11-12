@@ -3,6 +3,7 @@ package org.tatrman.ttr.profile
 
 import kotlinx.serialization.json.*
 import org.tatrman.ttr.semantics.modelForKind
+import org.tatrman.ttr.parser.model.SourceLocation
 import org.tatrman.ttr.yaml.CanonicalYaml
 import org.tatrman.ttr.yaml.CanonicalYamlException
 import java.util.Optional
@@ -142,14 +143,22 @@ internal object ProfileVocabulary {
     }
 }
 
+/** One emitted document: a package and a model, and with per-file grouping the dialect file as well. */
+internal data class DocumentKey(
+    val file: String?,
+    val pkg: String,
+    val model: String,
+)
+
 internal class CanonicalBuilder(
     private val plans: List<RecordPlan>,
     private val packages: Map<RecordPlan, String>,
+    private val perFile: Boolean = false,
 ) {
     private val properties = mutableMapOf<Record, MutableMap<String, JsonElement>>()
     private val children = mutableMapOf<Record, MutableMap<String, MutableList<Record>>>()
     private val origins = mutableMapOf<Record, MutableMap<String, ProfileSpan>>()
-    private val imports = mutableMapOf<Pair<String, String>, MutableSet<String>>()
+    private val imports = mutableMapOf<DocumentKey, MutableSet<String>>()
 
     init {
         val identities = mutableSetOf<List<String>>()
@@ -256,8 +265,12 @@ internal class CanonicalBuilder(
     private fun group(
         plan: RecordPlan,
         record: Record,
-    ): Pair<String, String> =
-        packages.getValue(plan) to ProfileVocabulary.model(generateSequence(record) { it.parent }.last().kind)
+    ): DocumentKey =
+        DocumentKey(
+            plan.tree.file.takeIf { perFile },
+            packages.getValue(plan),
+            ProfileVocabulary.model(generateSequence(record) { it.parent }.last().kind),
+        )
 
     /** A resolved cross-package `link` imports the target package into the record's document. */
     fun import(
@@ -290,14 +303,40 @@ internal class CanonicalBuilder(
         return previous
     }
 
+    /**
+     * MW S3.4: the typed AST of an emitted document carries the authored dialect spans. A canonical pointer takes the
+     * location written for it or for its nearest ancestor (an authored key, else its record), with the dialect
+     * parser's own offsets; a header pointer takes the first record's.
+     */
+    private fun relocation(locations: Map<String, ProfileSpan>): (String) -> SourceLocation? {
+        val trees = plans.associate { it.tree.label to it.tree }
+        val cache = HashMap<String, SourceLocation?>()
+
+        fun located(span: ProfileSpan): SourceLocation? {
+            val data = trees[span.file]?.data ?: return null
+            val value = data.source(span.path)
+            val key = data.source(span.path, key = true)
+            return if (key.line == span.line && key.column + 1 == span.column) key else value
+        }
+        return { pointer ->
+            cache.getOrPut(pointer) {
+                var at = pointer
+                var span = locations[at]
+                while (span == null && at.isNotEmpty()) {
+                    at = at.substringBeforeLast('/', "")
+                    span = locations[at]
+                }
+                (span ?: locations["/defs/0"])?.let(::located)
+            }
+        }
+    }
+
     fun documents(): List<EmittedDocument> {
-        val groups = linkedMapOf<Pair<String, String>, MutableList<Record>>()
+        val groups = linkedMapOf<DocumentKey, MutableList<Record>>()
         plans.forEach { plan ->
             plan.records.filter { it.parent == null }.forEach { record ->
                 groups
-                    .getOrPut(
-                        packages.getValue(plan) to ProfileVocabulary.model(record.kind),
-                    ) { mutableListOf() }
+                    .getOrPut(group(plan, record)) { mutableListOf() }
                     .add(record)
             }
         }
@@ -339,9 +378,9 @@ internal class CanonicalBuilder(
             val raw =
                 buildJsonObject {
                     put("ttr", GrammarRange.runningGrammar)
-                    put("package", group.first)
+                    put("package", group.pkg)
                     put("imports", JsonArray(imports[group].orEmpty().map(::JsonPrimitive)))
-                    put("model", group.second)
+                    put("model", group.model)
                     put(
                         "defs",
                         JsonArray(
@@ -377,16 +416,13 @@ internal class CanonicalBuilder(
                 throw ProfileException(
                     "ys/profile-invalid",
                     records.first().source.span(),
-                    "Canonical document ${group.first}/${group.second} exceeds 3000000 code points",
+                    "Canonical document ${group.pkg}/${group.model} exceeds 3000000 code points",
                 )
             }
-            val file =
-                records
-                    .first()
-                    .source.tree.file
+            val tree = records.first().source.tree
             val canonical =
                 try {
-                    CanonicalYaml.read(json, file)
+                    CanonicalYaml.read(json, tree.label, relocation(locations))
                 } catch (error: CanonicalYamlException) {
                     // Contracts §3, without parsing again: the authored value at or above the failing path; else the
                     // first one written beneath it (an object-level rule such as dependentRequired); else the record.
@@ -408,7 +444,7 @@ internal class CanonicalBuilder(
                             ?: records.first().source.span()
                     throw ProfileException("ys/profile-invalid", origin, error.detail)
                 }
-            EmittedDocument(canonical, locations)
+            EmittedDocument(canonical, locations, group.file)
         }
     }
 }

@@ -1,0 +1,301 @@
+// SPDX-License-Identifier: Apache-2.0
+package org.tatrman.ttr.metadata.source
+
+import org.tatrman.ttr.parser.loader.ParseResult
+import org.tatrman.ttr.profile.DeclarationReader
+import org.tatrman.ttr.profile.FileSelector
+import org.tatrman.ttr.profile.ForeignTree
+import org.tatrman.ttr.profile.ProfileDeclaration
+import org.tatrman.ttr.profile.ProfileDefinition
+import org.tatrman.ttr.profile.ProfileEngine
+import org.tatrman.ttr.profile.ProfileException
+import org.tatrman.ttr.profile.ProfileResolver
+import org.tatrman.ttr.yaml.CanonicalYaml
+import org.tatrman.ttr.yaml.CanonicalYamlException
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.Path
+
+/** The two model-file kinds a source can read (contracts §4). */
+enum class SourceKind {
+    /** `.ttr` / `.ttrm` text, the [FileBasedSource] default. */
+    TTR,
+
+    /** Canonical YAML, or dialect YAML with a profile ([YamlFileSource]). */
+    YAML,
+    ;
+
+    /**
+     * A source of this kind over [storage]. [profile] (YAML only) replaces the tree declaration `<root>/ttr.yaml`, as
+     * `METADATA_PROFILE` will (P4); a per-file header still wins. [catalog] names profiles for the resolver.
+     */
+    fun source(
+        sourceId: String,
+        priority: Int,
+        storage: ModelStorage,
+        profile: String? = null,
+        catalog: Map<String, Path> = emptyMap(),
+        layouts: Boolean = false,
+    ): ModelSource =
+        when (this) {
+            TTR -> {
+                require(profile == null) { "A profile applies to the yaml source kind only" }
+                FileBasedSource(sourceId, priority, storage, layouts = layouts)
+            }
+            YAML -> YamlFileSource(sourceId, priority, storage, profile, catalog, layouts)
+        }
+}
+
+/**
+ * MW S3.4 — the `yaml` source kind (contracts §4, ✅D-MW-57): a [FileBasedSource] whose files are canonical YAML or
+ * dialect YAML plus a resolved profile. Both become the same [LoadedFile]/definition objects the `.ttrm` path makes;
+ * a document emitted from a dialect file keeps the dialect file as its path and the authored spans. A dialect file
+ * that emits a second model (✅D-MW-67 fan-out) gives that document the path `<file>#<model>`.
+ *
+ * The tree walk (C-4): every `.yaml`/`.yml` under the root is content except dot-segments, the root's `agents/`
+ * (✅MW-44: never read), `model.ignore` matches and the profile's `files` ignores; the root's `ttr.yaml` (the tree
+ * declaration) and `renames.yaml` (the rename ledger) are control files, not content. A profile error on one file
+ * drops that file with an issue; [org.tatrman.ttr.metadata.LoadOptions] `strict` then fails the load.
+ */
+class YamlFileSource(
+    private val sourceId: String,
+    private val priority: Int,
+    private val storage: ModelStorage,
+    private val profile: String? = null,
+    private val catalog: Map<String, Path> = emptyMap(),
+    private val layouts: Boolean = false,
+    private val allMdHopIssues: Boolean = false,
+) : ModelSource {
+    override fun load(): SourceSnapshot =
+        FileBasedSource(
+            sourceId,
+            priority,
+            storage,
+            layouts,
+            allMdHopIssues,
+            YamlTreeReader(profile, catalog),
+        ).load()
+}
+
+/** One file's AST for the [FileBasedSource] loop: what the `.ttrm` parser returns, from wherever it came. */
+internal data class ParsedFile(
+    val file: StorageFile,
+    val result: ParseResult,
+)
+
+internal class ReadFiles(
+    val files: List<ParsedFile>,
+    val errors: List<LoadWarning> = emptyList(),
+    val warnings: List<LoadWarning> = emptyList(),
+    val dropped: List<LoadWarning> = emptyList(),
+)
+
+internal interface ModelFileReader {
+    /** Extensions listed besides the `.ttrm` ones (and hashed into the source version). */
+    val extensions: List<String>
+
+    fun read(
+        listed: List<StorageFile>,
+        storage: ModelStorage,
+        sourceId: String,
+    ): ReadFiles
+}
+
+internal class YamlTreeReader(
+    private val profile: String?,
+    private val catalog: Map<String, Path>,
+) : ModelFileReader {
+    // json: the `<package>.sources.json` link sidecars change what a dialect file loads to.
+    override val extensions = listOf("yml", "json")
+
+    private class Problems(
+        val sourceId: String,
+    ) {
+        val errors = mutableListOf<LoadWarning>()
+        val dropped = mutableListOf<LoadWarning>()
+
+        fun error(
+            file: String,
+            line: Int,
+            column: Int,
+            message: String,
+        ) = LoadWarning(sourceId, file, line, column, message).also { errors += it }
+
+        /** The issue names where the problem is; the dropped entry names the dialect file it removes. */
+        fun drop(
+            file: StorageFile,
+            issue: LoadWarning,
+        ) {
+            dropped += issue.copy(file = file.path)
+            if (issue.file != file.path) errors += issue.copy(file = file.path, message = "dropped: ${issue.message}")
+        }
+
+        fun profile(e: ProfileException) =
+            error(e.location.file, e.location.line, e.location.column, "${e.code}: ${e.detail}")
+    }
+
+    override fun read(
+        listed: List<StorageFile>,
+        storage: ModelStorage,
+        sourceId: String,
+    ): ReadFiles {
+        val problems = Problems(sourceId)
+        val yaml = listed.filter { it.extension() in setOf("yaml", "yml") }
+        val root = yaml.firstNotNullOfOrNull { it.rootPath }?.toAbsolutePath() ?: return ReadFiles(emptyList())
+        val ignore = modelIgnore(root, problems)
+        val content =
+            yaml.filter { file ->
+                val path = file.underRoot()
+                val segments = path.split('/')
+                segments.dropLast(1).none { it.startsWith(".") } &&
+                    !segments.last().startsWith(".") &&
+                    segments.first() != "agents" &&
+                    path !in CONTROL_FILES &&
+                    ignore?.matches(path) != true
+            }
+        val resolver = ProfileResolver(root, catalog)
+        val tree = treeDeclaration(root, resolver, problems)
+        val parsed = mutableListOf<ParsedFile>()
+        val dialect = linkedMapOf<List<String>, Pair<List<ProfileDefinition>, MutableList<Pair<StorageFile, String>>>>()
+        for (file in content) {
+            val text = storage.read(file)
+            val chain =
+                try {
+                    val declaration = DeclarationReader.readFile(text, file.path)
+                    when {
+                        declaration != null -> resolver.resolve(declaration)
+                        tree != null -> tree.getOrThrow()
+                        else -> null
+                    }
+                } catch (e: ProfileException) {
+                    problems.drop(file, problems.profile(e))
+                    continue
+                }
+            if (chain == null || chain.all { it.operations.isEmpty() && it.overlay == null }) {
+                canonical(file, text, problems)?.let { parsed += it }
+            } else {
+                dialect.getOrPut(chain.map { it.file }) { chain to mutableListOf() }.second += file to text
+            }
+        }
+        dialect.values.forEach { (chain, files) -> parsed += apply(root, chain, files, problems) }
+        return ReadFiles(parsed.sortedBy { it.file.path }, problems.errors, dropped = problems.dropped)
+    }
+
+    private fun modelIgnore(
+        root: Path,
+        problems: Problems,
+    ): FileSelector? {
+        val file = root.resolve("model.ignore")
+        if (!Files.isRegularFile(file)) return null
+        return try {
+            FileSelector(Files.readAllLines(file))
+        } catch (e: IOException) {
+            problems.error(
+                file.toString(),
+                1,
+                1,
+                "ys/profile-invalid: model.ignore is unreadable (${e::class.simpleName})",
+            )
+            null
+        } catch (e: IllegalArgumentException) {
+            problems.error(file.toString(), 1, 1, "ys/profile-invalid: model.ignore: ${e.message}")
+            null
+        }
+    }
+
+    /** The override, else `<root>/ttr.yaml`, else none (canonical). A failure fails every file it would declare. */
+    private fun treeDeclaration(
+        root: Path,
+        resolver: ProfileResolver,
+        problems: Problems,
+    ): Result<List<ProfileDefinition>>? {
+        val declarationFile = root.resolve("ttr.yaml")
+        return try {
+            when {
+                profile != null -> Result.success(resolver.resolve(profile, declarationFile))
+                Files.isRegularFile(declarationFile) -> {
+                    val declaration: ProfileDeclaration =
+                        DeclarationReader.readTree(Files.readString(declarationFile), declarationFile.toString())
+                    Result.success(resolver.resolve(declaration))
+                }
+                else -> null
+            }
+        } catch (e: ProfileException) {
+            problems.profile(e)
+            Result.failure(e)
+        } catch (e: IOException) {
+            val issue =
+                problems.error(declarationFile.toString(), 1, 1, "ys/profile-not-found: ttr.yaml is unreadable")
+            Result.failure(ProfileException("ys/profile-not-found", locationOf(issue), issue.message))
+        }
+    }
+
+    private fun canonical(
+        file: StorageFile,
+        text: String,
+        problems: Problems,
+    ): ParsedFile? =
+        try {
+            ParsedFile(file, CanonicalYaml.read(text, file.path).ast)
+        } catch (e: CanonicalYamlException) {
+            problems.drop(file, problems.error(e.file, e.line, e.column, "ys/canonical-invalid: ${e.detail}"))
+            null
+        }
+
+    /**
+     * One run per profile chain, so links resolve across its files. A profile error naming one of them drops it and
+     * the run repeats without it; one naming anything else (the profile, an overlay, a sidecar) drops them all.
+     */
+    private fun apply(
+        root: Path,
+        chain: List<ProfileDefinition>,
+        files: List<Pair<StorageFile, String>>,
+        problems: Problems,
+    ): List<ParsedFile> {
+        val trees = linkedMapOf<String, Pair<StorageFile, ForeignTree>>()
+        for ((file, text) in files) {
+            try {
+                trees[file.path] = file to ForeignTree.read(text, file.underRoot(), file.path)
+            } catch (e: ProfileException) {
+                problems.drop(file, problems.profile(e))
+            }
+        }
+        while (trees.isNotEmpty()) {
+            val result =
+                try {
+                    ProfileEngine.apply(trees.values.map { it.second }, chain, root, perFile = true)
+                } catch (e: ProfileException) {
+                    val issue = problems.profile(e)
+                    val culprit = trees.remove(e.location.file)
+                    if (culprit != null) {
+                        problems.drop(culprit.first, issue)
+                    } else {
+                        trees.values.forEach { problems.drop(it.first, issue) }
+                        trees.clear()
+                    }
+                    continue
+                }
+            val byFile = trees.values.associate { (file, tree) -> tree.file to file }
+            return result.documents.groupBy { requireNotNull(it.file) }.flatMap { (relative, documents) ->
+                val file = byFile.getValue(relative)
+                documents.mapIndexed { i, document ->
+                    val ast = document.canonical.ast
+                    // Downstream keys a document by its path (symbol table, reference pass), so a file's second model
+                    // takes `<path>#<model>`; each keeps its own directive, so every qname is the canonical twin's.
+                    val path = if (i == 0) file.path else "${file.path}#${ast.modelDirective?.modelCode ?: i}"
+                    ParsedFile(file.copy(path = path), ast)
+                }
+            }
+        }
+        return emptyList()
+    }
+
+    private fun locationOf(issue: LoadWarning) =
+        org.tatrman.ttr.profile
+            .ProfileSpan(issue.file, issue.line, issue.column, issue.line, issue.column, "")
+
+    companion object {
+        /** Root files that steer the load and are never model content. */
+        val CONTROL_FILES = setOf("ttr.yaml", "renames.yaml")
+    }
+}
