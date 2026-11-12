@@ -27,6 +27,13 @@ internal object ProfileVocabulary {
     private val ruleSeparator = Regex("[^A-Za-z0-9_]+")
     private val slots = ConcurrentHashMap<Pair<String, String>, Optional<String>>()
 
+    /**
+     * ✅D-MW-67 (c′): the kind a `link` target accepts is the one its last path step names — a keyword property
+     * (`er2db_entity.entity`, `binding.fk`) or a free-form step (`target.table`, `binding.target.column`). Any other
+     * step accepts every kind.
+     */
+    fun referentKind(path: List<String>): String? = path.lastOrNull()?.takeIf { it in kinds }
+
     fun semanticsKind(kind: String): String = if (kind in conceptKinds) "concept" else kind
 
     fun model(kind: String): String {
@@ -130,6 +137,7 @@ internal class CanonicalBuilder(
     private val properties = mutableMapOf<Record, MutableMap<String, JsonElement>>()
     private val children = mutableMapOf<Record, MutableMap<String, MutableList<Record>>>()
     private val origins = mutableMapOf<Record, MutableMap<String, ProfileSpan>>()
+    private val imports = mutableMapOf<Pair<String, String>, MutableSet<String>>()
 
     init {
         val identities = mutableSetOf<List<String>>()
@@ -229,7 +237,42 @@ internal class CanonicalBuilder(
             putAll(updated)
         }
         val canonicalPath = path.joinToString("/", prefix = "/") { escapePointer(it) }
-        origins.getValue(record)[canonicalPath] = source.span()
+        // The authored key: a diagnostic on the transformed value names it (contracts §3).
+        origins.getValue(record)[canonicalPath] = source.span(key = true)
+    }
+
+    private fun group(
+        plan: RecordPlan,
+        record: Record,
+    ): Pair<String, String> =
+        packages.getValue(plan) to ProfileVocabulary.model(generateSequence(record) { it.parent }.last().kind)
+
+    /** A resolved cross-package `link` imports the target package into the record's document. */
+    fun import(
+        plan: RecordPlan,
+        record: Record,
+        pkg: String,
+    ) {
+        imports.getOrPut(group(plan, record)) { sortedSetOf() } += "$pkg.*"
+    }
+
+    /** Overlay values bypass the conflict ledger: the overlay wins. Returns the transform's value, if any. */
+    fun overlay(
+        record: Record,
+        property: String,
+        value: JsonElement,
+        origin: ProfileSpan,
+    ): JsonElement? {
+        if (children[record]?.containsKey(property) == true) {
+            throw ProfileException(
+                "ys/profile-invalid",
+                origin,
+                "An overlay cannot replace nested records at $property",
+            )
+        }
+        val previous = properties.getValue(record).put(property, value)
+        origins.getValue(record)["/${escapePointer(property)}"] = origin
+        return previous
     }
 
     fun documents(): List<EmittedDocument> {
@@ -245,7 +288,6 @@ internal class CanonicalBuilder(
         }
         return groups.map { (group, records) ->
             val locations = linkedMapOf<String, ProfileSpan>()
-            val recordLocations = linkedMapOf<String, ProfileSpan>()
 
             fun definition(
                 record: Record,
@@ -254,7 +296,6 @@ internal class CanonicalBuilder(
             ): JsonObject {
                 val propertyKey = if (ProfileVocabulary.storageMember(record)) "fields" else "properties"
                 locations[path] = record.source.span()
-                recordLocations[path] = record.source.span()
                 origins.getValue(record).forEach { (target, origin) -> locations["$path/$propertyKey$target"] = origin }
                 val props = LinkedHashMap(properties.getValue(record))
                 children[record]?.forEach { (slot, items) ->
@@ -280,7 +321,7 @@ internal class CanonicalBuilder(
                 buildJsonObject {
                     put("ttr", GrammarRange.runningGrammar)
                     put("package", group.first)
-                    put("imports", JsonArray(emptyList()))
+                    put("imports", JsonArray(imports[group].orEmpty().map(::JsonPrimitive)))
                     put("model", group.second)
                     put(
                         "defs",
@@ -328,10 +369,10 @@ internal class CanonicalBuilder(
                 try {
                     CanonicalYaml.read(json, file)
                 } catch (error: CanonicalYamlException) {
-                    // Canonical paths map to the closest authored record without parsing the failed bridge again.
+                    // Canonical paths map to the closest authored value, else its record, without parsing again.
                     val path = error.keyPath
                     val origin =
-                        recordLocations.entries
+                        locations.entries
                             .filter { path == it.key || path.startsWith(it.key + "/") }
                             .maxByOrNull { it.key.length }
                             ?.value ?: records.first().source.span()
