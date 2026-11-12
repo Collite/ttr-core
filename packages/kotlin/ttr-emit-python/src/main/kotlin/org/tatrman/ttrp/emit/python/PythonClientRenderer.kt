@@ -55,6 +55,18 @@ internal class PythonClientRenderer(
                 put("islands", strings(graph.islandWaves.flatten()))
                 put("routes", strings(graph.routes.map { it.name }))
                 put("actions", strings(graph.actions.keys.sorted()))
+                // D-142: Server ApplyPlanner uses the native sink, not the Python executor's sink.
+                put(
+                    "held_actions",
+                    strings(
+                        graph.actions
+                            .filterValues {
+                                it.approval == "required" &&
+                                    it.sinks["native"] in setOf("transition", "writer", "obligation")
+                            }.keys
+                            .sorted(),
+                    ),
+                )
                 put("base_path", graph.runApi.basePath)
                 put(
                     "calls",
@@ -86,14 +98,6 @@ internal class PythonClientRenderer(
                     "fingerprints",
                     JsonObject(
                         graph.recipe.fingerprints.mapValues { JsonPrimitive(it.value) } + exported,
-                    ),
-                )
-                put(
-                    "budget",
-                    JsonObject(
-                        graph.program.budget
-                            .toSortedMap()
-                            .mapValues { JsonPrimitive(it.value) },
                     ),
                 )
                 put(
@@ -167,7 +171,7 @@ internal class PythonClientRenderer(
                 .joinToString("\n") + "\n\n" +
                 """
                 Python client for `${graph.recipe.name}` (`${graph.deployment.name}`). HTTP run API,
-                ttr-server contracts §1 (⚑AU-EXP-3, ✅R254-A/B). Open baseline: f28120e1; action wire: #391.
+                ttr-server contracts §1 (⚑AU-EXP-3, ✅R254-A/B/D). Open baseline: f28120e1; action wire: #391.
                 The baseline has no perform route; real-Server acceptance remains P1C / #366.
                 Python 3.13.9; standard library runtime; pytest 8.3.5. No gRPC or proto wheel.
 
@@ -179,6 +183,8 @@ internal class PythonClientRenderer(
                 port.at; a run-clock program needs a dry/debug run for a literal override. `--dry-run` strengthens policy.
                 On-event redeliveries need the same caller-supplied clock to deduplicate.
                 The Server owns action eligibility and execution; this package has no waits, asks or processes.
+                Approval-required actions on native transition/writer/obligation sinks are marked held_actions;
+                their dry-run perform keys must be skipped held, all other actions' keys skipped dry-run.
                 `service.py` accepts `{"requests": [...]}` on stdin and emits `{"results": [...]}` in order,
                 with errors per request;
                 `conform --replay` uses it in a subprocess with dryRun true. Replays never override parameters.

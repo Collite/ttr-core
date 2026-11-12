@@ -46,6 +46,7 @@ class PythonClientDriver(
             }
         val inputs = mutableListOf<JsonObject>()
         val labels = mutableListOf<Pair<String, JsonElement?>>()
+        val budgets = mutableListOf<Long>()
         for (recipe in fixture.recipes) {
             val (_, config) =
                 configs.singleOrNull { (_, c) ->
@@ -92,6 +93,7 @@ class PythonClientDriver(
                         put("parameters", fixture.parameters)
                     }
                 labels += recipe to key
+                budgets += config.getValue("budget_seconds").jsonPrimitive.long
             }
         }
         val envelope =
@@ -101,6 +103,7 @@ class PythonClientDriver(
                         it.second["recipe"]?.jsonPrimitive?.content in fixture.recipes
                 },
                 buildJsonObject { put("requests", JsonArray(inputs)) },
+                pythonServiceTimeoutSeconds(budgets),
             )
         val responses = envelope.getValue("results").jsonArray.map { it.jsonObject }
         require(responses.size == inputs.size) { "Python service result count differs from requests" }
@@ -178,6 +181,7 @@ class PythonClientDriver(
     private fun execute(
         configs: List<Pair<Path, JsonObject>>,
         input: JsonObject,
+        timeoutSeconds: Long,
     ): JsonObject {
         val output = Files.createTempFile("ttrp-python-", ".json")
         val errors = Files.createTempFile("ttrp-python-", ".stderr")
@@ -204,7 +208,7 @@ class PythonClientDriver(
                         environment()["TTR_BEARER"] = token
                     }.start()
             process.outputStream.bufferedWriter().use { it.write(input.toString()) }
-            require(process.waitFor(35, TimeUnit.MINUTES)) { "Python service timed out" }
+            require(process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) { "Python service timed out" }
             require(Files.size(output) <= 50_000_000) { "Python service output exceeds replay limit" }
             val exit = process.exitValue()
 
@@ -251,3 +255,9 @@ class PythonClientDriver(
             }
         }
 }
+
+/** Each request may observe a foreign claim, then execute one fresh claim; uv gets a minute to start. */
+internal fun pythonServiceTimeoutSeconds(budgets: List<Long>): Long =
+    budgets.fold(60L) { total, budget ->
+        Math.addExact(total, Math.addExact(Math.multiplyExact(budget, 2L), 240L))
+    }

@@ -21,6 +21,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonObject
@@ -95,6 +96,8 @@ internal class ContractServer(
     val performBodies = CopyOnWriteArrayList<JsonObject>()
 
     @Volatile var performFault: String? = null
+
+    @Volatile var heldRelease = false
 
     @Volatile var failKey: Int? = null
     private val closed =
@@ -197,8 +200,8 @@ internal class ContractServer(
                 "/parts/" in path || "/islands/" in path -> """{"rows":[],"rowCount":0,"ref":"dry"}"""
                 path.endsWith("/perform") -> {
                     val body = Json.parseToJsonElement(call.receiveText()).jsonObject
-                    val selected = body.getValue("keys").jsonArray
                     if (legacyN8nPerform) {
+                        val selected = body.getValue("keys").jsonArray
                         val eligible = keys(id)
                         val action = path.substringAfter("/actions/").substringBefore('/')
                         val performed = selected.filter { action == "release" && it in eligible }
@@ -231,14 +234,24 @@ internal class ContractServer(
                         )
                         return
                     }
-                    if (selected.any { it !is JsonObject }) {
+                    val requested = body["keys"]?.takeUnless { it == JsonNull }
+                    if (requested != null && (requested !is JsonArray || requested.any { it !is JsonObject })) {
                         call.respondText("{}", ContentType.Application.Json, HttpStatusCode.BadRequest)
                         return
                     }
                     performBodies += body
                     val eligible = keys(id).map { key -> buildJsonObject { put("order_number", key) } }
                     val action = path.substringAfter("/actions/").substringBefore('/')
-                    val performed = if (performFault == "performs") selected else emptyList()
+                    if (eligible.isEmpty() || (action != "release" && !(includeMail && action == "notify"))) {
+                        call.respondText(
+                            "the run has no rows of action $action",
+                            ContentType.Text.Plain,
+                            HttpStatusCode.BadRequest,
+                        )
+                        return
+                    }
+                    val selected = (requested as? JsonArray ?: eligible).distinct()
+                    val performed = if (performFault == "performs") selected.filter { it in eligible } else emptyList()
                     val skipped =
                         selected.filterNot { it in performed }.let {
                             if (performFault ==
@@ -266,16 +279,24 @@ internal class ContractServer(
                             JsonArray(
                                 skipped.map { key ->
                                     buildJsonObject {
-                                        put("key", key)
+                                        put(
+                                            "key",
+                                            if (performFault ==
+                                                "key"
+                                            ) {
+                                                JsonObject(key.jsonObject + ("extra" to JsonPrimitive(1)))
+                                            } else {
+                                                key
+                                            },
+                                        )
                                         put(
                                             "reason",
-                                            if (performFault == "reason" ||
-                                                action != "release" ||
-                                                key !in eligible
-                                            ) {
-                                                "not selected by preview"
-                                            } else {
-                                                "dry-run"
+                                            when {
+                                                key !in eligible -> "not-a-key"
+                                                performFault == "reason" -> "wrong-reason"
+                                                performFault == "dry-run" -> "dry-run"
+                                                heldRelease && action == "release" -> "held"
+                                                else -> "dry-run"
                                             },
                                         )
                                     }

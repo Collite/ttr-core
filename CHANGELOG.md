@@ -13,10 +13,13 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - `ttrp conform --replay --cells python-client.on-event --export <export>` runs that package under uv,
   forces dry-run/fixture clocks, and compares exact verdicts, actions, details and transition effects.
   `--driver python-client` selects the on-event cell. The wire is the Server HTTP contract (⚑AU-EXP-3).
-- review-254 repair: action keys are objects; dry-run perform validates skips and wet approval holds are reported.
+- review-254 repair: action keys are objects; dry-run perform validates skips per action's native sink and approval:
+  required transition/writer/obligation actions must be held, others skipped dry-run; wet holds are legal only for marked actions.
   Replay uses one service process per fixture and one perform call per action. Authored budgets become seconds,
   deadlines belong to each run, dropped claims reopen once, and polling honors Retry-After. Startup failures retain
-  bounded stderr diagnostics; action detail normalization matches the Kotlin column shape.
+  bounded stderr diagnostics; action detail normalization matches the Kotlin column shape. Fixture timeouts sum each
+  request's exported budget plus one re-open; each recovered run gets its own budget. Polling leaves time for a final
+  status read. Service diagnostics retain configuration errors and suppress unexpected exception messages.
 
 ### Added — Record fan-out (MW P3 S3.2b, ttr-core#392)
 

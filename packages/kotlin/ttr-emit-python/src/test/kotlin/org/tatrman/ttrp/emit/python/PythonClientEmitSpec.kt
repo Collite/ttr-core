@@ -97,6 +97,25 @@ class PythonClientEmitSpec :
                 JsonPrimitive(600)
             seconds(graph) shouldBe JsonPrimitive(60)
             seconds(graph.copy(program = graph.program.copy(mode = "batch"))) shouldBe JsonPrimitive(1800)
+            render().files.getValue("python-client.json").decodeToString() shouldNotContain "\"budget\":"
+        }
+        "approval holds use the Server native sink, independent of the Python executor sink" {
+            val action = graph.actions.getValue("release")
+            val actions =
+                mapOf(
+                    "writer" to action.copy(sinks = mapOf("native" to "writer", "python_client" to "door")),
+                    "obligation" to action.copy(sinks = mapOf("native" to "obligation")),
+                    "transition" to action.copy(sinks = mapOf("native" to "transition")),
+                    "not_required" to action.copy(approval = null),
+                    "python_only" to action.copy(sinks = mapOf("native" to "door", "python_client" to "transition")),
+                    "no_native" to action.copy(sinks = mapOf("python_client" to "writer")),
+                )
+            val config =
+                Json
+                    .parseToJsonElement(
+                        render(graph.copy(actions = actions)).files.getValue("python-client.json").decodeToString(),
+                    ).jsonObject
+            config["held_actions"] shouldBe JsonArray(listOf("obligation", "transition", "writer").map(::JsonPrimitive))
         }
         "release_py package matches the complete checked-in H-1 golden" {
             val golden = Path.of("src/test/resources/goldens/release_py.txt")
@@ -132,7 +151,7 @@ class PythonClientEmitSpec :
                         .start()
                 process.waitFor(120, TimeUnit.SECONDS) shouldBe true
                 io.kotest.assertions.withClue(Files.readString(log)) { process.exitValue() shouldBe 0 }
-                Files.readString(log) shouldContain "24 passed"
+                Files.readString(log) shouldContain "40 passed"
             } finally {
                 dir.toFile().deleteRecursively()
             }
@@ -177,8 +196,8 @@ private fun pythonGraph() =
             "release" to
                 ActionMeta(
                     mapOf("order" to "order.order_number"),
-                    mapOf("python_client" to "door"),
-                    null,
+                    mapOf("native" to "transition", "python_client" to "door"),
+                    "required",
                     false,
                     null,
                     emptyMap(),

@@ -80,7 +80,10 @@ def canonical_key(key: Any) -> Any:
         return (type(value).__name__, value)
     if not isinstance(key, dict):
         raise ApiError("perform returned a non-object key")
-    return canonical(key_object(key))
+    try:
+        return canonical(key_object(key))
+    except ValueError:
+        raise ApiError("perform effects differ from selected actions") from None
 
 
 class ApiError(RuntimeError):
@@ -147,7 +150,7 @@ class BaseClient:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise ApiError("run polling timed out")
-        time.sleep(min(seconds, remaining))
+        time.sleep(min(seconds, max(0, remaining - 1)))
 
     def open(self, port: dict[str, Any], as_of: str | None = None, *, dry_run: bool = False, idempotency_key: str | None = None) -> BaseRun:
         kind = CONFIG["port"].replace("on_event", "event")
@@ -174,9 +177,8 @@ class BaseClient:
             body["idempotencyKey"] = idempotency_key
         return self._claim(body)
 
-    def _claim(self, body: dict[str, Any], deadline: float | None = None) -> BaseRun:
-        if deadline is None:
-            deadline = time.monotonic() + CONFIG["budget_seconds"] + 120
+    def _claim(self, body: dict[str, Any]) -> BaseRun:
+        deadline = time.monotonic() + CONFIG["budget_seconds"] + 120
         code, data, headers = self.request("POST", "open", body, recipe=CONFIG["recipe"])
         return self.run_type(self, data["runId"], code, deadline=deadline, headers=headers, open_body=body)
 
@@ -265,7 +267,7 @@ def normalize_arguments(value: Any) -> Any:
     return result
 
 
-def verify_perform(effect: dict[str, Any], keys: list[dict[str, Any]], dry_run: bool) -> None:
+def verify_perform(effect: dict[str, Any], keys: list[dict[str, Any]], dry_run: bool, held: bool) -> None:
     sent = {canonical_key(key) for key in keys}
     performed, skipped = effect.get("performed"), effect.get("skipped")
     if not isinstance(performed, list) or not isinstance(skipped, list):
@@ -276,7 +278,8 @@ def verify_perform(effect: dict[str, Any], keys: list[dict[str, Any]], dry_run: 
             raise ApiError("perform effects differ from selected actions")
         seen.append(canonical_key(row.get("key")))
     for row in skipped:
-        if not isinstance(row, dict) or row.get("reason") != ("dry-run" if dry_run else "held"):
+        reason = "held" if held else "dry-run" if dry_run else None
+        if not isinstance(row, dict) or reason is None or row.get("reason") != reason:
             raise ApiError("perform effects differ from selected actions")
         seen.append(canonical_key(row.get("key")))
     if len(seen) != len(sent) or set(seen) != sent:
@@ -305,16 +308,13 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
     # Observe another executor's claim; reclaim a dropped handle only once.
     status = None
     if run.claim != 201:
-        headers = run.headers
+        open_headers = run.headers
         status = run.status()
-        if any(key.lower() == "retry-after" for key in run.headers):
-            headers = run.headers
         while status["status"] in ("open", "running", "evaluated"):
-            run.pause(headers)
+            run.pause(run.headers if any(key.lower() == "retry-after" for key in run.headers) else open_headers)
             status = run.status()
-            headers = run.headers
         if status["status"] in ("failed", "abandoned"):
-            run = client._claim(run.open_body, deadline=run.deadline)
+            run = client._claim(run.open_body)
             if run.claim != 201:
                 raise ApiError("second live handle")
         elif status["status"] not in ("closed", "waiting"):
@@ -362,7 +362,7 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
         if run.claim == 201:
             for name, keys in selected.items():
                 effect = Action(run, name).perform(keys)
-                verify_perform(effect, keys, status.get("dryRun") is True)
+                verify_perform(effect, keys, status.get("dryRun") is True, name in CONFIG["held_actions"])
                 perform_effects.append({"action": name, **effect})
         batch = run.request("GET", "batch")[1]
         if run.claim == 201:

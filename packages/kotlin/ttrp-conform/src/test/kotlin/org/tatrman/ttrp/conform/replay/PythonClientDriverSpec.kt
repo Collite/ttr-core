@@ -9,6 +9,7 @@ import kotlinx.serialization.json.*
 import org.tatrman.ttrp.emit.python.PythonClientEmitPlugin
 import org.tatrman.ttrp.emit.spi.*
 import java.nio.file.Files
+import java.util.concurrent.TimeUnit
 import io.kotest.assertions.throwables.shouldThrow
 
 /** The existing contract HTTP fixture is not a real Server recording; P1C owns that acceptance. */
@@ -35,7 +36,10 @@ class PythonClientDriverSpec :
         val dirs = mutableListOf<java.nio.file.Path>()
         afterSpec { dirs.forEach { it.toFile().deleteRecursively() } }
 
-        fun export(mode: String): java.nio.file.Path {
+        fun export(
+            mode: String,
+            held: Boolean = false,
+        ): java.nio.file.Path {
             val graph =
                 RecipeGraph(
                     RecipeMeta(
@@ -79,8 +83,8 @@ class PythonClientDriverSpec :
                         "release" to
                             ActionMeta(
                                 mapOf("order" to "order.order_number"),
-                                mapOf("python_client" to "door"),
-                                null,
+                                mapOf("native" to "transition", "python_client" to "door"),
+                                if (held) "required" else null,
                                 false,
                                 null,
                                 emptyMap(),
@@ -162,11 +166,82 @@ class PythonClientDriverSpec :
             ContractServer().use { server ->
                 server.asyncOnce = false
                 val driver = PythonClientDriver(server.url, "test-token", listOf(export("batch")))
-                for (fault in listOf("performs", "reason", "omits")) {
+                for (fault in listOf("performs", "reason", "omits", "key")) {
                     server.performFault = fault
                     val report = ReplayRunner.run(fixture, listOf("python-client.batch")) { driver }
                     report.exitCode shouldBe 2
                     report.summary() shouldContain "perform effects differ"
+                }
+            }
+        }
+        "dry replay requires held only for approval-required actions on native held sinks" {
+            ContractServer().use { server ->
+                server.asyncOnce = false
+                server.heldRelease = true
+                val held = PythonClientDriver(server.url, "test-token", listOf(export("batch", held = true)))
+                val accepted = ReplayRunner.run(fixture, listOf("python-client.batch")) { held }
+                io.kotest.assertions.withClue(accepted.summary()) { accepted.exitCode shouldBe 0 }
+                server.performFault = "dry-run"
+                val wrongDry = ReplayRunner.run(fixture, listOf("python-client.batch")) { held }
+                wrongDry.exitCode shouldBe 2
+                wrongDry.summary() shouldContain "perform effects differ"
+                server.performFault = null
+                val unmarked = PythonClientDriver(server.url, "test-token", listOf(export("batch")))
+                val wrongHeld = ReplayRunner.run(fixture, listOf("python-client.batch")) { unmarked }
+                wrongHeld.exitCode shouldBe 2
+                wrongHeld.summary() shouldContain "perform effects differ"
+            }
+        }
+        "fixture timeout sums each request budget, including one re-open and uv startup" {
+            pythonServiceTimeoutSeconds(listOf(60)) shouldBe 420L
+            pythonServiceTimeoutSeconds(List(12) { 60L }) shouldBe 4380L
+            pythonServiceTimeoutSeconds(listOf(1800)) shouldBe 3900L
+            pythonServiceTimeoutSeconds(listOf(60, 600)) shouldBe 1860L
+        }
+        "typed Action perform without keys uses all rows and the strict Server error shapes" {
+            ContractServer().use { server ->
+                server.asyncOnce = false
+                server.heldRelease = true
+                val folder = export("batch", held = true)
+                val script =
+                    """
+                    from release_order_client.client import Client
+                    from release_order_client.runtime import Action, ApiError
+                    run = Client().open({"none": True}, dry_run=True)
+                    run.evaluate()
+                    effect = run.actions.release.perform()
+                    assert effect["performed"] == []
+                    assert effect["skipped"] == [
+                        {"key": {"order_number": k}, "reason": "held"} for k in [4711, 4712]]
+                    assert run.actions.release.perform([9999])["skipped"] == [
+                        {"key": {"order_number": 9999}, "reason": "not-a-key"}]
+                    empty = Client().open({"keys": []}, dry_run=True)
+                    for invoke in [lambda: Action(run, "absent").perform(),
+                                   lambda: empty.actions.release.perform(),
+                                   lambda: run.request("POST", "perform", {"keys": [4711]}, action="release")]:
+                        try:
+                            invoke()
+                        except ApiError as error:
+                            assert "HTTP 400" in str(error)
+                        else:
+                            raise AssertionError("Server accepted an invalid perform")
+                    """.trimIndent()
+                val log = folder.resolve("typed-perform.txt")
+                val process =
+                    ProcessBuilder("uv", "run", "--no-dev", "--python", "3.13.9", "python", "-c", script)
+                        .directory(folder.resolve("worker").toFile())
+                        .redirectErrorStream(true)
+                        .redirectOutput(log.toFile())
+                        .apply {
+                            environment()["TTR_SERVER"] = server.url
+                            environment()["TTR_BEARER"] = "test-token"
+                        }.start()
+                try {
+                    process.waitFor(120, TimeUnit.SECONDS) shouldBe true
+                    io.kotest.assertions.withClue(Files.readString(log)) { process.exitValue() shouldBe 0 }
+                    server.performBodies.first() shouldBe buildJsonObject { }
+                } finally {
+                    if (process.isAlive) process.destroyForcibly().waitFor()
                 }
             }
         }
@@ -223,6 +298,19 @@ class PythonClientDriverSpec :
                 error.message!! shouldContain "startup diagnostic [redacted]"
                 error.message!! shouldNotContain "test-token"
             }
+        }
+        "a malformed service envelope retains the service diagnostic on nonzero exit" {
+            val folder = export("batch")
+            val wrapper = folder.resolve("bad-envelope.sh")
+            Files.writeString(wrapper, "#!/bin/sh\nexec uv \"\$@\" <<'ENVELOPE'\n{}\nENVELOPE\n")
+            wrapper.toFile().setExecutable(true)
+            val error =
+                shouldThrow<IllegalStateException> {
+                    PythonClientDriver("http://127.0.0.1", "test-token", listOf(folder), wrapper.toString())
+                        .run(fixture, "python-client.batch")
+                }
+            error.message!! shouldContain "Python service failed (exit 2)"
+            error.message!! shouldContain "invalid service input or configuration"
         }
         "wrong verdicts disagree; truncated details and denied HTTP fail without bearer disclosure" {
             ContractServer().use { server ->

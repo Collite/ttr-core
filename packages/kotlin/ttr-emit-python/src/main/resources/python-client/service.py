@@ -6,6 +6,7 @@ from .runtime import dumps, loads
 
 
 def run(clients, request):
+    runtime = None
     try:
         module = request.get("module", __package__)
         runtime = import_module(module + ".runtime")
@@ -13,11 +14,11 @@ def run(clients, request):
             clients[module] = import_module(module + ".client").Client()
         return runtime.execute(clients[module], request["port"], request.get("as_of"),
                                dry_run=request.get("dry_run", False), parameters=request.get("parameters"))
-    except (RuntimeError, ValueError) as error:
-        message = str(error) if isinstance(error, RuntimeError) else "invalid input or replay parameter"
-        return {"error": message}
-    except Exception:
-        return {"error": "generated service failed"}
+    except ValueError:
+        return {"error": "invalid input or replay parameter"}
+    except Exception as error:
+        # Only our API errors have messages that exclude values and response bodies.
+        return {"error": str(error) if runtime is not None and isinstance(error, runtime.ApiError) else "generated service failed"}
 
 
 def main() -> int:
@@ -27,7 +28,9 @@ def main() -> int:
         print(dumps({"results": [run(clients, request) for request in envelope["requests"]]}))
         return 0
     except Exception:
-        print(dumps({"error": "invalid service input or configuration"}))
+        message = "invalid service input or configuration"
+        print(dumps({"error": message}))
+        print(message, file=sys.stderr)
         return 2
 
 
