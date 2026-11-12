@@ -47,6 +47,7 @@ internal class PythonClientRenderer(
                 put("deployment", graph.deployment.name)
                 put("mode", requireNotNull(graph.program.mode).replace('_', '-'))
                 put("port", graph.program.port ?: "none")
+                put("clock", graph.program.asOf ?: "run")
                 put("dry_run", graph.deployment.dryRun)
                 put("granularity", graph.deployment.granularity)
                 put("key", strings(graph.recipe.key.map { it.substringAfterLast('.') }))
@@ -165,7 +166,8 @@ internal class PythonClientRenderer(
                 From worker/: `uv run python -m $module.main --key 4711 --as-of 2026-11-02T08:00:00Z`.
                 `--key` is JSON (an object for composite keys); `--batch` accepts an optional JSON keys array,
                 or selects all with no argument. The chosen port must match the exported program.
-                `--as-of` is an ISO instant with offset; `--dry-run` only strengthens the deployment policy.
+                `--as-of` accepts `now` or an ISO instant with offset. An event program sends the literal clock in
+                port.at; a run-clock program needs a dry/debug run for a literal override. `--dry-run` strengthens policy.
                 On-event redeliveries need the same caller-supplied clock to deduplicate.
                 The Server owns action eligibility and execution; this package has no waits, asks or processes.
                 `service.py` accepts one JSON request on stdin and emits observed run evidence on stdout;

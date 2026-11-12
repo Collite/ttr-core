@@ -126,15 +126,17 @@ class BaseClient:
         accepted = {"none", "keys"} if CONFIG["mode"] == "batch" else {kind}
         if len(set(port) - {"at"}) != 1 or not (set(port) - {"at"}) <= accepted:
             raise ValueError("port differs from exported program")
-        if as_of is not None:
+        literal_clock = as_of is not None and as_of != "now"
+        if literal_clock:
             instant = datetime.fromisoformat(as_of.replace("Z", "+00:00"))
             if instant.tzinfo is None:
                 raise ValueError("as-of requires an offset")
-            if kind in ("key", "event"):
+            if kind in ("key", "keys", "event"):
                 port = dict(port, at=as_of)
         fps = CONFIG["fingerprints"]
         body = {"deployment": CONFIG["deployment"], "port": port, "dryRun": CONFIG["dry_run"] or dry_run, "origin": "driver"}
-        if as_of is not None:
+        event_clock = CONFIG["clock"] == "event" and kind in ("key", "keys", "event")
+        if as_of is not None and (not literal_clock or not event_clock or body["dryRun"]):
             body["asOf"] = as_of
         for field, dimension in (("recipeFingerprint", "text"), ("recipeValuesFingerprint", "values"), ("programFingerprint", "program"), ("deploymentFingerprint", "deployment")):
             if dimension in fps:
@@ -249,7 +251,7 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
                     run.request("POST", "island", island=name)
             run.evaluate()
             status = run.status()
-        if dry_run and status.get("dryRun") is not True:
+        if (dry_run or CONFIG["dry_run"]) and status.get("dryRun") is not True:
             raise ApiError("Server did not confirm dryRun")
         summaries = status["verdict"]["routes"]
         if set(summaries) - set(CONFIG["routes"]):

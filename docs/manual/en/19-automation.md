@@ -196,7 +196,9 @@ uv run --group dev pytest
 
 Python is pinned to 3.13.9, pytest to 8.3.5; the runtime uses only the standard library. `--key` accepts JSON;
 composite keys are objects. For a batch program, `--batch '[4711,4712]'` selects keys and `--batch` selects all.
-The port must match the exported program. On-event redeliveries reuse the caller's explicit clock.
+The port must match the exported program. On-event redeliveries reuse the caller's explicit clock in `port.at`;
+normal execution does not send that clock as a replay override. Use `--as-of now` for the Server's current clock.
+A literal override of a run-clock program requires a dry/debug run.
 
 ## Deploying to the process engine
 

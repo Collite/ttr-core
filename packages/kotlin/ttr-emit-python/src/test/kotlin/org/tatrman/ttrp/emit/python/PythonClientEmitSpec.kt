@@ -114,7 +114,7 @@ class PythonClientEmitSpec :
                     from decimal import Decimal
                     import pytest
                     from release_order_client.client import Client
-                    from release_order_client.runtime import dumps, loads
+                    from release_order_client.runtime import CONFIG, dumps, loads
 
                     def test_exact_decimal_and_bearer_validation():
                         value = Decimal("1.00000000000000000001")
@@ -122,7 +122,7 @@ class PythonClientEmitSpec :
                         with pytest.raises(ValueError, match="invalid bearer token"):
                             Client("http://127.0.0.1", "secret\\nheader")
 
-                    def test_open_pins_fingerprints_and_forces_dry_run():
+                    def test_open_pins_fingerprints_and_forces_dry_run(monkeypatch):
                         client = Client("http://127.0.0.1", "test-token")
                         seen = []
                         def request(method, name, body=None, **values):
@@ -134,6 +134,13 @@ class PythonClientEmitSpec :
                         assert seen[0]["programFingerprint"] == "program-fp"
                         assert seen[0]["dryRun"] is True
                         assert seen[0]["port"]["at"] == "2026-11-02T08:00:00Z"
+                        monkeypatch.setitem(CONFIG, "dry_run", False)
+                        client.open({"key": 4711}, "2026-11-02T08:00:00Z")
+                        assert "asOf" not in seen[1]
+                        assert seen[1]["port"]["at"] == "2026-11-02T08:00:00Z"
+                        client.open({"key": 4711}, "now")
+                        assert seen[2]["asOf"] == "now"
+                        assert "at" not in seen[2]["port"]
                     """.trimIndent(),
                 )
                 val log = dir.resolve("pytest-output.txt")

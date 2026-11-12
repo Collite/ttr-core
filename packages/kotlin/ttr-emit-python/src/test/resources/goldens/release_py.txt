@@ -9,7 +9,8 @@ Set TTR_SERVER to the Server origin and TTR_BEARER to your authorized bearer.
 From worker/: `uv run python -m release_order_client.main --key 4711 --as-of 2026-11-02T08:00:00Z`.
 `--key` is JSON (an object for composite keys); `--batch` accepts an optional JSON keys array,
 or selects all with no argument. The chosen port must match the exported program.
-`--as-of` is an ISO instant with offset; `--dry-run` only strengthens the deployment policy.
+`--as-of` accepts `now` or an ISO instant with offset. An event program sends the literal clock in
+port.at; a run-clock program needs a dry/debug run for a literal override. `--dry-run` strengthens policy.
 On-event redeliveries need the same caller-supplied clock to deduplicate.
 The Server owns action eligibility and execution; this package has no waits, asks or processes.
 `service.py` accepts one JSON request on stdin and emits observed run evidence on stdout;
@@ -21,7 +22,7 @@ Only run trusted generated packages, like other executable conformance artifacts
 === conformance.json ===
 {}
 === python-client.json ===
-{"module":"release_order_client","recipe":"release_order","program":"release_on_placement","deployment":"release_py","mode":"on-event","port":"key","dry_run":true,"granularity":"recipe","key":["order_number"],"parts":["candidates","stock","decision"],"islands":["input","decision"],"routes":["release","hold"],"actions":["notify","release"],"base_path":"/automation","calls":{"batch":"/runs/{id}/batch","close":"/runs/{id}/close","detail":"/runs/{id}/routes/{route}/details/{context}","evaluate":"/runs/{id}/evaluate","island":"/runs/{id}/islands/{island}","open":"/recipes/{recipe}/runs","outcome":"/runs/{id}/actions/{action}/outcome","part":"/runs/{id}/parts/{part}","perform":"/runs/{id}/actions/{action}/perform","route":"/runs/{id}/routes/{route}","status":"/runs/{id}"},"callPlan":[{"name":"open","path":"/recipes/{recipe}/runs"},{"name":"part","path":"/runs/{id}/parts/{part}"},{"name":"island","path":"/runs/{id}/islands/{island}"},{"name":"evaluate","path":"/runs/{id}/evaluate"},{"name":"status","path":"/runs/{id}"},{"name":"route","path":"/runs/{id}/routes/{route}"},{"name":"detail","path":"/runs/{id}/routes/{route}/details/{context}"},{"name":"perform","path":"/runs/{id}/actions/{action}/perform"},{"name":"outcome","path":"/runs/{id}/actions/{action}/outcome"},{"name":"batch","path":"/runs/{id}/batch"},{"name":"close","path":"/runs/{id}/close"}],"fingerprints":{"deployment":"deployment-fp","program":"program-fp","text":"text-fp","values":"values-fp"},"budget":{},"parameters":[]}
+{"module":"release_order_client","recipe":"release_order","program":"release_on_placement","deployment":"release_py","mode":"on-event","port":"key","clock":"event","dry_run":true,"granularity":"recipe","key":["order_number"],"parts":["candidates","stock","decision"],"islands":["input","decision"],"routes":["release","hold"],"actions":["notify","release"],"base_path":"/automation","calls":{"batch":"/runs/{id}/batch","close":"/runs/{id}/close","detail":"/runs/{id}/routes/{route}/details/{context}","evaluate":"/runs/{id}/evaluate","island":"/runs/{id}/islands/{island}","open":"/recipes/{recipe}/runs","outcome":"/runs/{id}/actions/{action}/outcome","part":"/runs/{id}/parts/{part}","perform":"/runs/{id}/actions/{action}/perform","route":"/runs/{id}/routes/{route}","status":"/runs/{id}"},"callPlan":[{"name":"open","path":"/recipes/{recipe}/runs"},{"name":"part","path":"/runs/{id}/parts/{part}"},{"name":"island","path":"/runs/{id}/islands/{island}"},{"name":"evaluate","path":"/runs/{id}/evaluate"},{"name":"status","path":"/runs/{id}"},{"name":"route","path":"/runs/{id}/routes/{route}"},{"name":"detail","path":"/runs/{id}/routes/{route}/details/{context}"},{"name":"perform","path":"/runs/{id}/actions/{action}/perform"},{"name":"outcome","path":"/runs/{id}/actions/{action}/outcome"},{"name":"batch","path":"/runs/{id}/batch"},{"name":"close","path":"/runs/{id}/close"}],"fingerprints":{"deployment":"deployment-fp","program":"program-fp","text":"text-fp","values":"values-fp"},"budget":{},"parameters":[]}
 
 === worker/.python-version ===
 3.13.9
@@ -110,6 +111,7 @@ class Client(BaseClient):
     "deployment": "release_py",
     "mode": "on-event",
     "port": "key",
+    "clock": "event",
     "dry_run": true,
     "granularity": "recipe",
     "key": [
@@ -215,7 +217,7 @@ def main() -> int:
     port = parser.add_mutually_exclusive_group(required=True)
     port.add_argument("--key", help="JSON scalar or composite key object")
     port.add_argument("--batch", nargs="?", const="all", help="optional JSON keys array; no argument selects all")
-    parser.add_argument("--as-of", required=True, help="ISO instant with offset")
+    parser.add_argument("--as-of", required=True, help="now or ISO instant with offset")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     try:
@@ -371,15 +373,17 @@ class BaseClient:
         accepted = {"none", "keys"} if CONFIG["mode"] == "batch" else {kind}
         if len(set(port) - {"at"}) != 1 or not (set(port) - {"at"}) <= accepted:
             raise ValueError("port differs from exported program")
-        if as_of is not None:
+        literal_clock = as_of is not None and as_of != "now"
+        if literal_clock:
             instant = datetime.fromisoformat(as_of.replace("Z", "+00:00"))
             if instant.tzinfo is None:
                 raise ValueError("as-of requires an offset")
-            if kind in ("key", "event"):
+            if kind in ("key", "keys", "event"):
                 port = dict(port, at=as_of)
         fps = CONFIG["fingerprints"]
         body = {"deployment": CONFIG["deployment"], "port": port, "dryRun": CONFIG["dry_run"] or dry_run, "origin": "driver"}
-        if as_of is not None:
+        event_clock = CONFIG["clock"] == "event" and kind in ("key", "keys", "event")
+        if as_of is not None and (not literal_clock or not event_clock or body["dryRun"]):
             body["asOf"] = as_of
         for field, dimension in (("recipeFingerprint", "text"), ("recipeValuesFingerprint", "values"), ("programFingerprint", "program"), ("deploymentFingerprint", "deployment")):
             if dimension in fps:
@@ -494,7 +498,7 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
                     run.request("POST", "island", island=name)
             run.evaluate()
             status = run.status()
-        if dry_run and status.get("dryRun") is not True:
+        if (dry_run or CONFIG["dry_run"]) and status.get("dryRun") is not True:
             raise ApiError("Server did not confirm dryRun")
         summaries = status["verdict"]["routes"]
         if set(summaries) - set(CONFIG["routes"]):
