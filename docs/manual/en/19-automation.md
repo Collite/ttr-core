@@ -393,8 +393,11 @@ replay and event-body fixtures remain separate from the H-1 key-based dry replay
 
 Python replay runs the generated package itself in a uv/Python subprocess, using `--cells python-client.on-event`
 (or `--driver python-client`) plus `--export release_py.python_client.export`. Batch exports use
-`--cells python-client.batch`. The service forces dryRun and the fixture clock, reads complete route/detail
-pages and checks actual perform results against selected action rows before comparing evidence. HTTP failures,
+`--cells python-client.batch`. One service process handles the fixture's ordered per-key requests (or one batch
+request), retaining errors per key. The service forces dryRun and the fixture clock, reads complete route/detail
+pages and calls perform once per action with object keys. Dry-run results must skip every selected key with
+reason `dry-run`; wet runs may report approval holds as `held`. Declared budgets apply separately to each run,
+and live handles poll using Retry-After (15 seconds by default). HTTP failures,
 truncated details and missing exports are driver errors. `python-client` remains an HTTP run-API consumer;
 live Python certification belongs to the P2 certification stage.
 

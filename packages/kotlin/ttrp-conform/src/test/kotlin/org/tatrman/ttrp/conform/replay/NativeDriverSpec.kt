@@ -85,9 +85,18 @@ class NativeDriverSpec :
         }
     })
 
-internal class ContractServer : AutoCloseable {
+internal class ContractServer(
+    // Frozen n8n orchestration tests predate the #391 key shape; they do not certify that wire.
+    // Python always uses the default strict contract. The n8n gap is recorded for planner triage.
+    private val legacyN8nPerform: Boolean = false,
+) : AutoCloseable {
     val opens = CopyOnWriteArrayList<JsonObject>()
     val requests = CopyOnWriteArrayList<String>()
+    val performBodies = CopyOnWriteArrayList<JsonObject>()
+
+    @Volatile var performFault: String? = null
+
+    @Volatile var failKey: Int? = null
     private val closed =
         java.util.concurrent.ConcurrentHashMap
             .newKeySet<String>()
@@ -155,6 +164,7 @@ internal class ContractServer : AutoCloseable {
         val id = path.substringAfter("/runs/").substringBefore('/')
         if (path.endsWith("/evaluate") && asyncOnce) {
             asyncOnce = false
+            call.response.headers.append("Retry-After", "0.01")
             call.respondText("{}", ContentType.Application.Json, HttpStatusCode.Accepted)
             return
         }
@@ -174,6 +184,10 @@ internal class ContractServer : AutoCloseable {
                     opens += body
                     val runId = "r${opens.size}"
                     bodies[runId] = body
+                    if (failKey != null && body.getValue("port").jsonObject["key"] == failKey?.let(::JsonPrimitive)) {
+                        call.respondText("{}", ContentType.Application.Json, HttpStatusCode.BadRequest)
+                        return
+                    }
                     buildJsonObject {
                         put("runId", runId)
                         put("status", "open")
@@ -184,9 +198,57 @@ internal class ContractServer : AutoCloseable {
                 path.endsWith("/perform") -> {
                     val body = Json.parseToJsonElement(call.receiveText()).jsonObject
                     val selected = body.getValue("keys").jsonArray
-                    val eligible = keys(id)
+                    if (legacyN8nPerform) {
+                        val eligible = keys(id)
+                        val action = path.substringAfter("/actions/").substringBefore('/')
+                        val performed = selected.filter { action == "release" && it in eligible }
+                        call.respondText(
+                            buildJsonObject {
+                                put(
+                                    "performed",
+                                    JsonArray(
+                                        performed.map { key ->
+                                            buildJsonObject {
+                                                put("key", key)
+                                                put("batchRows", JsonArray(emptyList()))
+                                            }
+                                        },
+                                    ),
+                                )
+                                put(
+                                    "skipped",
+                                    JsonArray(
+                                        (selected - performed.toSet()).map { key ->
+                                            buildJsonObject {
+                                                put("key", key)
+                                                put("reason", "not selected by preview")
+                                            }
+                                        },
+                                    ),
+                                )
+                            }.toString(),
+                            ContentType.Application.Json,
+                        )
+                        return
+                    }
+                    if (selected.any { it !is JsonObject }) {
+                        call.respondText("{}", ContentType.Application.Json, HttpStatusCode.BadRequest)
+                        return
+                    }
+                    performBodies += body
+                    val eligible = keys(id).map { key -> buildJsonObject { put("order_number", key) } }
                     val action = path.substringAfter("/actions/").substringBefore('/')
-                    val performed = selected.filter { action == "release" && it in eligible }
+                    val performed = if (performFault == "performs") selected else emptyList()
+                    val skipped =
+                        selected.filterNot { it in performed }.let {
+                            if (performFault ==
+                                "omits"
+                            ) {
+                                it.dropLast(1)
+                            } else {
+                                it
+                            }
+                        }
                     buildJsonObject {
                         put(
                             "performed",
@@ -202,10 +264,20 @@ internal class ContractServer : AutoCloseable {
                         put(
                             "skipped",
                             JsonArray(
-                                (selected - performed.toSet()).map { key ->
+                                skipped.map { key ->
                                     buildJsonObject {
                                         put("key", key)
-                                        put("reason", "not selected by preview")
+                                        put(
+                                            "reason",
+                                            if (performFault == "reason" ||
+                                                action != "release" ||
+                                                key !in eligible
+                                            ) {
+                                                "not selected by preview"
+                                            } else {
+                                                "dry-run"
+                                            },
+                                        )
                                     }
                                 },
                             ),

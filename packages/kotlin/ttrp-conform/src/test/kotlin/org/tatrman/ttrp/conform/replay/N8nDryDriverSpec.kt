@@ -73,7 +73,7 @@ class N8nDryDriverSpec :
                         put("calls", contract.getValue("calls"))
                     }.toString(),
                 )
-                ContractServer().use { server ->
+                ContractServer(legacyN8nPerform = true).use { server ->
                     val exports = listOf(camunda, n8n) // Camunda first: n8n must filter before reading workflow.json.
                     N8nDryDriver(server.url, "test-token", exports).use { driver ->
                         val report =
@@ -90,7 +90,7 @@ class N8nDryDriverSpec :
             }
         }
         "parts, recipe and island workflows execute their declared calls and agree with native" {
-            ContractServer().use { server ->
+            ContractServer(legacyN8nPerform = true).use { server ->
                 val native =
                     NativeDriver(
                         server.url,
@@ -120,7 +120,7 @@ class N8nDryDriverSpec :
         "batch rendering pages route rows and suppresses SMTP in a Server-confirmed dry run" {
             val directory = export("morning_release")
             try {
-                ContractServer().use { server ->
+                ContractServer(legacyN8nPerform = true).use { server ->
                     val native =
                         NativeDriver(
                             server.url,
@@ -146,7 +146,7 @@ class N8nDryDriverSpec :
         "reason changes disagree while truncated evidence and HTTP errors refuse certification" {
             val directory = export("release_n8n")
             try {
-                ContractServer().use { server ->
+                ContractServer(legacyN8nPerform = true).use { server ->
                     N8nDryDriver(server.url, "test-token", listOf(directory)).use { driver ->
                         server.wrongReason = true
                         ReplayRunner.run(fixture, listOf("n8n-l1.on-event")) { driver }.exitCode shouldBe 3
@@ -229,7 +229,7 @@ class N8nDryDriverSpec :
                         )
                     }
                 try {
-                    ContractServer().use { server ->
+                    ContractServer(legacyN8nPerform = true).use { server ->
                         N8nDryDriver(server.url, "test-token", listOf(directory)).use { driver ->
                             val report = ReplayRunner.run(fixture, listOf("n8n-l1.on-event")) { driver }
                             io.kotest.assertions.withClue(mutation + report.summary()) { report.exitCode shouldBe 3 }
@@ -301,7 +301,7 @@ class N8nDryDriverSpec :
                         )
                     }
                 try {
-                    ContractServer().use { server ->
+                    ContractServer(legacyN8nPerform = true).use { server ->
                         server.includeMail = true
                         val native =
                             NativeDriver(
@@ -330,7 +330,7 @@ class N8nDryDriverSpec :
         "R10 a batch all fixture preserves the rendered none port" {
             val directory = export("morning_release")
             try {
-                ContractServer().use { server ->
+                ContractServer(legacyN8nPerform = true).use { server ->
                     N8nDryDriver(server.url, "test-token", listOf(directory)).use { driver ->
                         ReplayComparator.compare(
                             fixture.copy(keys = null),
@@ -383,7 +383,7 @@ class N8nDryDriverSpec :
                     )
                 }
             try {
-                ContractServer().use { server ->
+                ContractServer(legacyN8nPerform = true).use { server ->
                     N8nDryDriver(server.url, "test-token", listOf(directory)).use { driver ->
                         val report = ReplayRunner.run(fixture, listOf("n8n-l1.on-event")) { driver }
                         report.exitCode shouldBe 2

@@ -6,7 +6,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 
-/** Executes the exported service itself, once per key (or batch), with a dry run and an explicit clock. */
+/** One exported service process per fixture; ordered dry-run requests use the fixture clock. */
 class PythonClientDriver(
     private val server: String,
     private val token: String,
@@ -44,17 +44,15 @@ class PythonClientDriver(
                 require(manifest["calls"] == config["callPlan"]) { "Python manifest calls differ from package" }
                 folder to config
             }
-        val results = linkedMapOf<String, Expected>()
-        val effects = mutableListOf<JsonObject>()
+        val inputs = mutableListOf<JsonObject>()
+        val labels = mutableListOf<Pair<String, JsonElement?>>()
         for (recipe in fixture.recipes) {
-            val (folder, config) =
+            val (_, config) =
                 configs.singleOrNull { (_, c) ->
                     c["recipe"] == JsonPrimitive(recipe) && c["mode"] == JsonPrimitive(mode)
                 } ?: error("$recipe.$mode: expected one matching Python export")
             val keys =
-                if (mode ==
-                    "batch"
-                ) {
+                if (mode == "batch") {
                     listOf<JsonElement?>(null)
                 } else {
                     requireNotNull(fixture.keys) { "on-event replay requires keys" }
@@ -68,20 +66,15 @@ class PythonClientDriver(
                 } else {
                     key
                 }
-            val verdicts = mutableListOf<JsonObject>()
-            val actions = mutableListOf<JsonObject>()
-            val details = mutableListOf<JsonObject>()
-            val counts = linkedMapOf<String, MutableMap<String, Int>>()
             for (key in keys) {
-                val input =
+                inputs +=
                     buildJsonObject {
+                        put("module", config.getValue("module"))
                         put(
                             "port",
                             buildJsonObject {
                                 if (mode == "batch") {
-                                    if (fixture.keys ==
-                                        null
-                                    ) {
+                                    if (fixture.keys == null) {
                                         put("none", true)
                                     } else {
                                         put("keys", JsonArray(fixture.keys.map(::portKey)))
@@ -98,7 +91,36 @@ class PythonClientDriver(
                         put("dry_run", true)
                         put("parameters", fixture.parameters)
                     }
-                val observed = execute(folder, config.getValue("module").jsonPrimitive.content, input)
+                labels += recipe to key
+            }
+        }
+        val envelope =
+            execute(
+                configs.filter {
+                    it.second["mode"] == JsonPrimitive(mode) &&
+                        it.second["recipe"]?.jsonPrimitive?.content in fixture.recipes
+                },
+                buildJsonObject { put("requests", JsonArray(inputs)) },
+            )
+        val responses = envelope.getValue("results").jsonArray.map { it.jsonObject }
+        require(responses.size == inputs.size) { "Python service result count differs from requests" }
+        val failures =
+            responses.mapIndexedNotNull { i, result ->
+                result["error"]?.let {
+                    val (recipe, key) = labels[i]
+                    "$recipe key ${key ?: "batch"}: ${it.jsonPrimitive.content}"
+                }
+            }
+        require(failures.isEmpty()) { failures.joinToString("; ") }
+        val effects = mutableListOf<JsonObject>()
+        val results = linkedMapOf<String, Expected>()
+        for (recipe in fixture.recipes) {
+            val verdicts = mutableListOf<JsonObject>()
+            val actions = mutableListOf<JsonObject>()
+            val details = mutableListOf<JsonObject>()
+            val counts = linkedMapOf<String, MutableMap<String, Int>>()
+            responses.forEachIndexed { i, observed ->
+                if (labels[i].first != recipe) return@forEachIndexed
 
                 fun rows(name: String) = observed.getValue(name).jsonArray.map { it.jsonObject }
                 verdicts += rows("verdicts")
@@ -108,8 +130,7 @@ class PythonClientDriver(
                 observed.getValue("detail_counts").jsonObject.forEach { (k, value) ->
                     val perKey = counts.getOrPut(k) { linkedMapOf() }
                     value.jsonObject.forEach { (context, n) ->
-                        perKey[context] =
-                            (perKey[context] ?: 0) + n.jsonPrimitive.int
+                        perKey[context] = (perKey[context] ?: 0) + n.jsonPrimitive.int
                     }
                 }
             }
@@ -118,11 +139,7 @@ class PythonClientDriver(
                     verdicts,
                     actions,
                     details,
-                    JsonObject(
-                        counts.mapValues { (_, v) ->
-                            JsonObject(v.mapValues { JsonPrimitive(it.value) })
-                        },
-                    ),
+                    JsonObject(counts.mapValues { (_, v) -> JsonObject(v.mapValues { JsonPrimitive(it.value) }) }),
                 )
         }
         val finalStates =
@@ -159,29 +176,51 @@ class PythonClientDriver(
     }
 
     private fun execute(
-        folder: Path,
-        module: String,
+        configs: List<Pair<Path, JsonObject>>,
         input: JsonObject,
     ): JsonObject {
         val output = Files.createTempFile("ttrp-python-", ".json")
         val errors = Files.createTempFile("ttrp-python-", ".stderr")
         var process: Process? = null
         try {
+            val (folder, config) = configs.first()
+            val module = config.getValue("module").jsonPrimitive.content
             process =
                 ProcessBuilder(uvCommand, "run", "--no-dev", "--python", "3.13.9", "python", "-m", "$module.service")
                     .directory(folder.resolve("worker").toFile())
                     .redirectOutput(output.toFile())
                     .redirectError(errors.toFile())
                     .apply {
+                        environment()["PYTHONPATH"] =
+                            configs.joinToString(
+                                java.io.File.pathSeparator,
+                            ) {
+                                it.first
+                                    .resolve("worker")
+                                    .toAbsolutePath()
+                                    .toString()
+                            }
                         environment()["TTR_SERVER"] = server
                         environment()["TTR_BEARER"] = token
                     }.start()
             process.outputStream.bufferedWriter().use { it.write(input.toString()) }
             require(process.waitFor(35, TimeUnit.MINUTES)) { "Python service timed out" }
             require(Files.size(output) <= 50_000_000) { "Python service output exceeds replay limit" }
-            val result = json(output)
+            val exit = process.exitValue()
+
+            fun failed(): Nothing {
+                val tail =
+                    Files.newByteChannel(errors).use { channel ->
+                        channel.position((channel.size() - 4096).coerceAtLeast(0))
+                        val bytes = java.nio.ByteBuffer.allocate(4096)
+                        channel.read(bytes)
+                        String(bytes.array(), 0, bytes.position(), Charsets.UTF_8).replace(token, "[redacted]")
+                    }
+                error("Python service failed (exit $exit): $tail")
+            }
+            if (exit != 0) failed()
+            val result = runCatching { json(output) }.getOrElse { failed() }
             result["error"]?.let { error("Python service: ${it.jsonPrimitive.content}") }
-            require(process.exitValue() == 0) { "Python service failed" }
             return result
         } finally {
             process?.takeIf { it.isAlive }?.destroyForcibly()?.waitFor()

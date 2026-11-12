@@ -1,24 +1,33 @@
 # SPDX-License-Identifier: Apache-2.0
-"""One JSON request per subprocess; calls the generated typed HTTP client."""
+"""One fixture per subprocess; each request has its own evidence or error."""
 import sys
-from .client import Client
-from .runtime import ApiError, dumps, execute, loads
+from importlib import import_module
+from .runtime import dumps, loads
+
+
+def run(clients, request):
+    try:
+        module = request.get("module", __package__)
+        runtime = import_module(module + ".runtime")
+        if module not in clients:
+            clients[module] = import_module(module + ".client").Client()
+        return runtime.execute(clients[module], request["port"], request.get("as_of"),
+                               dry_run=request.get("dry_run", False), parameters=request.get("parameters"))
+    except (RuntimeError, ValueError) as error:
+        message = str(error) if isinstance(error, RuntimeError) else "invalid input or replay parameter"
+        return {"error": message}
+    except Exception:
+        return {"error": "generated service failed"}
 
 
 def main() -> int:
     try:
-        request = loads(sys.stdin.read())
-        result = execute(Client(), request["port"], request.get("as_of"),
-                         dry_run=request.get("dry_run", False), parameters=request.get("parameters"))
-        print(dumps(result))
+        envelope = loads(sys.stdin.read())
+        clients = {}
+        print(dumps({"results": [run(clients, request) for request in envelope["requests"]]}))
         return 0
-    except (ApiError, ValueError) as error:
-        # Values/HTTP bodies/tokens are never copied into diagnostics.
-        message = str(error) if isinstance(error, ApiError) else "invalid input or replay parameter"
-        print(dumps({"error": message}))
-        return 2
     except Exception:
-        print(dumps({"error": "generated service failed"}))
+        print(dumps({"error": "invalid service input or configuration"}))
         return 2
 
 

@@ -12,7 +12,11 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   with pinned Python 3.13.9 and pytest 8.3.5. Paths and recipe/action names come from SPI v2; exports contain no SQL.
 - `ttrp conform --replay --cells python-client.on-event --export <export>` runs that package under uv,
   forces dry-run/fixture clocks, and compares exact verdicts, actions, details and transition effects.
-  `--driver python-client` selects the on-event cell. The wire is the existing Server HTTP API (⚑AU-EXP-3).
+  `--driver python-client` selects the on-event cell. The wire is the Server HTTP contract (⚑AU-EXP-3).
+- review-254 repair: action keys are objects; dry-run perform validates skips and wet approval holds are reported.
+  Replay uses one service process per fixture and one perform call per action. Authored budgets become seconds,
+  deadlines belong to each run, dropped claims reopen once, and polling honors Retry-After. Startup failures retain
+  bounded stderr diagnostics; action detail normalization matches the Kotlin column shape.
 
 ### Added — Record fan-out (MW P3 S3.2b, ttr-core#392)
 

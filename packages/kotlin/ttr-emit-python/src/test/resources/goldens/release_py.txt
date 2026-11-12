@@ -1,8 +1,9 @@
 === README.md ===
-stale rule
+
 
 Python client for `release_order` (`release_py`). HTTP run API,
-ttr-server contracts §1 at f28120e12f8f25540394018e99b5920fc670c47d (⚑AU-EXP-3).
+ttr-server contracts §1 (⚑AU-EXP-3, ✅R254-A/B). Open baseline: f28120e1; action wire: #391.
+The baseline has no perform route; real-Server acceptance remains P1C / #366.
 Python 3.13.9; standard library runtime; pytest 8.3.5. No gRPC or proto wheel.
 
 Set TTR_SERVER to the Server origin and TTR_BEARER to your authorized bearer.
@@ -13,7 +14,8 @@ or selects all with no argument. The chosen port must match the exported program
 port.at; a run-clock program needs a dry/debug run for a literal override. `--dry-run` strengthens policy.
 On-event redeliveries need the same caller-supplied clock to deduplicate.
 The Server owns action eligibility and execution; this package has no waits, asks or processes.
-`service.py` accepts one JSON request on stdin and emits observed run evidence on stdout;
+`service.py` accepts `{"requests": [...]}` on stdin and emits `{"results": [...]}` in order,
+with errors per request;
 `conform --replay` uses it in a subprocess with dryRun true. Replays never override parameters.
 Run generated route tests: `uv run --group dev pytest`.
 Re-export after any recipe text/values, program, deployment or world fingerprint change.
@@ -22,7 +24,7 @@ Only run trusted generated packages, like other executable conformance artifacts
 === conformance.json ===
 {}
 === python-client.json ===
-{"module":"release_order_client","recipe":"release_order","program":"release_on_placement","deployment":"release_py","mode":"on-event","port":"key","clock":"event","dry_run":true,"granularity":"recipe","key":["order_number"],"parts":["candidates","stock","decision"],"islands":["input","decision"],"routes":["release","hold"],"actions":["notify","release"],"base_path":"/automation","calls":{"batch":"/runs/{id}/batch","close":"/runs/{id}/close","detail":"/runs/{id}/routes/{route}/details/{context}","evaluate":"/runs/{id}/evaluate","island":"/runs/{id}/islands/{island}","open":"/recipes/{recipe}/runs","outcome":"/runs/{id}/actions/{action}/outcome","part":"/runs/{id}/parts/{part}","perform":"/runs/{id}/actions/{action}/perform","route":"/runs/{id}/routes/{route}","status":"/runs/{id}"},"callPlan":[{"name":"open","path":"/recipes/{recipe}/runs"},{"name":"part","path":"/runs/{id}/parts/{part}"},{"name":"island","path":"/runs/{id}/islands/{island}"},{"name":"evaluate","path":"/runs/{id}/evaluate"},{"name":"status","path":"/runs/{id}"},{"name":"route","path":"/runs/{id}/routes/{route}"},{"name":"detail","path":"/runs/{id}/routes/{route}/details/{context}"},{"name":"perform","path":"/runs/{id}/actions/{action}/perform"},{"name":"outcome","path":"/runs/{id}/actions/{action}/outcome"},{"name":"batch","path":"/runs/{id}/batch"},{"name":"close","path":"/runs/{id}/close"}],"fingerprints":{"deployment":"deployment-fp","program":"program-fp","text":"text-fp","values":"values-fp"},"budget":{},"parameters":[]}
+{"module":"release_order_client","recipe":"release_order","program":"release_on_placement","deployment":"release_py","mode":"on-event","port":"key","clock":"event","dry_run":true,"granularity":"recipe","key":["order_number"],"parts":["candidates","stock","decision"],"islands":["input","decision"],"routes":["release","hold"],"actions":["notify","release"],"base_path":"/automation","calls":{"batch":"/runs/{id}/batch","close":"/runs/{id}/close","detail":"/runs/{id}/routes/{route}/details/{context}","evaluate":"/runs/{id}/evaluate","island":"/runs/{id}/islands/{island}","open":"/recipes/{recipe}/runs","outcome":"/runs/{id}/actions/{action}/outcome","part":"/runs/{id}/parts/{part}","perform":"/runs/{id}/actions/{action}/perform","route":"/runs/{id}/routes/{route}","status":"/runs/{id}"},"callPlan":[{"name":"open","path":"/recipes/{recipe}/runs"},{"name":"part","path":"/runs/{id}/parts/{part}"},{"name":"island","path":"/runs/{id}/islands/{island}"},{"name":"evaluate","path":"/runs/{id}/evaluate"},{"name":"status","path":"/runs/{id}"},{"name":"route","path":"/runs/{id}/routes/{route}"},{"name":"detail","path":"/runs/{id}/routes/{route}/details/{context}"},{"name":"perform","path":"/runs/{id}/actions/{action}/perform"},{"name":"outcome","path":"/runs/{id}/actions/{action}/outcome"},{"name":"batch","path":"/runs/{id}/batch"},{"name":"close","path":"/runs/{id}/close"}],"fingerprints":{"deployment":"deployment-fp","program":"program-fp","text":"text-fp","values":"values-fp"},"budget":{},"budget_seconds":60,"parameters":[]}
 
 === worker/.python-version ===
 3.13.9
@@ -201,6 +203,7 @@ class Client(BaseClient):
         "values": "values-fp"
     },
     "budget": {},
+    "budget_seconds": 60,
     "parameters": []
 }
 
@@ -296,6 +299,40 @@ def port_key(key: Any) -> Any:
     return key
 
 
+def key_object(key: Any) -> dict[str, Any]:
+    """Action keys are objects; Open's port may still carry a scalar."""
+    names = CONFIG["key"]
+    if isinstance(key, dict):
+        if set(key) != set(names):
+            raise ValueError("key columns differ")
+        result = key
+    elif isinstance(key, list):
+        if len(key) != len(names):
+            raise ValueError("composite key arity")
+        result = dict(zip(names, key))
+    else:
+        if len(names) != 1:
+            raise ValueError("composite key arity")
+        result = {names[0]: key}
+    if any(value is None for value in result.values()):
+        raise ValueError("missing key value")
+    return result
+
+
+def canonical_key(key: Any) -> Any:
+    def canonical(value: Any) -> Any:
+        if isinstance(value, dict):
+            return tuple((k, canonical(v)) for k, v in sorted(value.items()))
+        if isinstance(value, list):
+            return tuple(canonical(v) for v in value)
+        if isinstance(value, (int, float, Decimal)) and not isinstance(value, bool):
+            return ("number", Decimal(str(value)))
+        return (type(value).__name__, value)
+    if not isinstance(key, dict):
+        raise ApiError("perform returned a non-object key")
+    return canonical(key_object(key))
+
+
 class ApiError(RuntimeError):
     pass
 
@@ -321,13 +358,8 @@ class BaseClient:
         if not re.fullmatch(r"[A-Za-z0-9._~+/\-]+=*", self.token):
             raise ValueError("invalid bearer token")
         self.opener = build_opener(NoRedirect())
-        budget = CONFIG["budget"].get("batch" if CONFIG["mode"] == "batch" else "sync", "1800s" if CONFIG["mode"] == "batch" else "60s")
-        match = re.fullmatch(r"(\d+)\s*(ms|s|m|h|milliseconds|seconds|minutes|hours)?", budget)
-        units = {"ms": 0.001, "s": 1, "m": 60, "h": 3600, "milliseconds": 0.001, "seconds": 1, "minutes": 60, "hours": 3600, None: 1}
-        seconds = int(match[1]) * units[match[2]] if match else 1800 if CONFIG["mode"] == "batch" else 60
-        self.deadline = time.monotonic() + seconds + 120
 
-    def request(self, method: str, name: str, body: dict[str, Any] | None = None, **values: Any) -> tuple[int, dict[str, Any], dict[str, str]]:
+    def request(self, method: str, name: str, body: dict[str, Any] | None = None, *, deadline: float | None = None, **values: Any) -> tuple[int, dict[str, Any], dict[str, str]]:
         query = values.pop("query", None)
         path = CONFIG["calls"][name]
         for key, value in values.items():
@@ -337,7 +369,7 @@ class BaseClient:
             path = path.replace("{" + key + "}", quote(text, safe=""))
         if "{" in path or not path.startswith("/") or path.startswith("//") or "://" in path:
             raise ValueError("invalid runApi path")
-        remaining = self.deadline - time.monotonic()
+        remaining = 30 if deadline is None else deadline - time.monotonic()
         if remaining <= 0:
             raise ApiError("run deadline exceeded")
         url = self.base + path + ("?" + urlencode(query) if query else "")
@@ -356,16 +388,16 @@ class BaseClient:
             raise ApiError(f"{method} {name}: invalid response")
         return code, data, headers
 
-    def pause(self, headers: dict[str, str]) -> None:
-        value = next((v for k, v in headers.items() if k.lower() == "retry-after"), "0.25")
+    def pause(self, headers: dict[str, str], deadline: float) -> None:
+        value = next((v for k, v in headers.items() if k.lower() == "retry-after"), "15")
         try:
             seconds = max(0.01, float(value))
         except ValueError:
-            seconds = 0.25
-        remaining = self.deadline - time.monotonic()
+            seconds = 15
+        remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise ApiError("run polling timed out")
-        time.sleep(min(seconds, remaining, 15))
+        time.sleep(min(seconds, remaining))
 
     def open(self, port: dict[str, Any], as_of: str | None = None, *, dry_run: bool = False, idempotency_key: str | None = None) -> BaseRun:
         kind = CONFIG["port"].replace("on_event", "event")
@@ -390,16 +422,30 @@ class BaseClient:
                 body[field] = fps[dimension]
         if idempotency_key is not None:
             body["idempotencyKey"] = idempotency_key
-        code, data, _ = self.request("POST", "open", body, recipe=CONFIG["recipe"])
-        return self.run_type(self, data["runId"], code)
+        return self._claim(body)
+
+    def _claim(self, body: dict[str, Any], deadline: float | None = None) -> BaseRun:
+        if deadline is None:
+            deadline = time.monotonic() + CONFIG["budget_seconds"] + 120
+        code, data, headers = self.request("POST", "open", body, recipe=CONFIG["recipe"])
+        return self.run_type(self, data["runId"], code, deadline=deadline, headers=headers, open_body=body)
 
 
 class BaseRun:
-    def __init__(self, client: BaseClient, run_id: str, claim: int) -> None:
+    def __init__(self, client: BaseClient, run_id: str, claim: int, *, deadline: float | None = None,
+                 headers: dict[str, str] | None = None, open_body: dict[str, Any] | None = None) -> None:
         self.client, self.id, self.claim = client, run_id, claim
+        self.deadline = deadline if deadline is not None else time.monotonic() + CONFIG["budget_seconds"] + 120
+        self.headers = headers or {}
+        self.open_body = open_body
 
     def request(self, method: str, name: str, body: dict[str, Any] | None = None, **values: Any):
-        return self.client.request(method, name, body, id=self.id, **values)
+        response = self.client.request(method, name, body, deadline=self.deadline, id=self.id, **values)
+        self.headers = response[2]
+        return response
+
+    def pause(self, headers: dict[str, str] | None = None) -> None:
+        self.client.pause(self.headers if headers is None else headers, self.deadline)
 
     def part(self, name: str) -> dict[str, Any]:
         return self.request("POST", "part", part=name)[1]
@@ -410,7 +456,7 @@ class BaseRun:
     def evaluate(self) -> dict[str, Any]:
         code, data, headers = self.request("POST", "evaluate", {})
         while code == 202 or data.get("status") in ("open", "running"):
-            self.client.pause(headers)
+            self.pause(headers)
             code, data, headers = self.request("GET", "status")
         if data.get("status") in ("failed", "abandoned"):
             raise ApiError("run evaluation failed")
@@ -445,21 +491,46 @@ class Action:
         self.run, self.name = run, name
 
     def perform(self, keys: list[Any] | None = None) -> dict[str, Any]:
-        return self.run.request("POST", "perform", {} if keys is None else {"keys": keys}, action=self.name)[1]
+        return self.run.request("POST", "perform", {} if keys is None else {"keys": [key_object(key) for key in keys]}, action=self.name)[1]
 
     def outcome(self, outcomes: list[dict[str, Any]]) -> dict[str, Any]:
-        return self.run.request("POST", "outcome", {"outcomes": outcomes}, action=self.name)[1]
+        return self.run.request("POST", "outcome", {"outcomes": [dict(outcome, key=key_object(outcome["key"])) for outcome in outcomes]}, action=self.name)[1]
 
 
 def normalize_arguments(value: Any) -> Any:
-    if isinstance(value, dict):
-        if "refs" in value:
-            refs = value["refs"]
-            if not isinstance(refs, list) or any(ref.get("truncated") is True for ref in refs):
+    if not isinstance(value, dict):
+        raise ApiError("malformed action arguments")
+    result = dict(value)
+    for column, item in value.items():
+        if not isinstance(item, dict) or not isinstance(item.get("refs"), list):
+            continue
+        refs = []
+        for ref in item["refs"]:
+            if not isinstance(ref, dict) or not isinstance(ref.get("context"), str) or not isinstance(ref.get("ref"), str):
+                raise ApiError("malformed action detail reference")
+            if ref.get("truncated") is True:
                 raise ApiError("action detail evidence is truncated")
-            return dict(value, refs=[{k: v for k, v in ref.items() if k != "ref"} for ref in refs])
-        return {key: normalize_arguments(item) for key, item in value.items()}
-    return value
+            refs.append({key: v for key, v in ref.items() if key != "ref"})
+        result[column] = dict(item, refs=refs)
+    return result
+
+
+def verify_perform(effect: dict[str, Any], keys: list[dict[str, Any]], dry_run: bool) -> None:
+    sent = {canonical_key(key) for key in keys}
+    performed, skipped = effect.get("performed"), effect.get("skipped")
+    if not isinstance(performed, list) or not isinstance(skipped, list):
+        raise ApiError("perform effects differ from selected actions")
+    seen = []
+    for row in performed:
+        if dry_run or not isinstance(row, dict):
+            raise ApiError("perform effects differ from selected actions")
+        seen.append(canonical_key(row.get("key")))
+    for row in skipped:
+        if not isinstance(row, dict) or row.get("reason") != ("dry-run" if dry_run else "held"):
+            raise ApiError("perform effects differ from selected actions")
+        seen.append(canonical_key(row.get("key")))
+    if len(seen) != len(sent) or set(seen) != sent:
+        raise ApiError("perform effects differ from selected actions")
 
 
 def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_run: bool = False, parameters: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -481,13 +552,23 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
             if not equal:
                 raise ValueError("replay parameter differs")
     run = client.open(port, as_of, dry_run=dry_run)
-    # A live claim belongs to another executor. Observe it; never evaluate or perform its work.
-    status = run.status() if run.claim != 201 else None
-    while run.claim == 202 and status["status"] in ("open", "running", "evaluated"):
-        client.pause({})
+    # Observe another executor's claim; reclaim a dropped handle only once.
+    status = None
+    if run.claim != 201:
+        headers = run.headers
         status = run.status()
-    if run.claim != 201 and status["status"] not in ("closed", "waiting"):
-        raise ApiError("existing run did not complete")
+        if any(key.lower() == "retry-after" for key in run.headers):
+            headers = run.headers
+        while status["status"] in ("open", "running", "evaluated"):
+            run.pause(headers)
+            status = run.status()
+            headers = run.headers
+        if status["status"] in ("failed", "abandoned"):
+            run = client._claim(run.open_body, deadline=run.deadline)
+            if run.claim != 201:
+                raise ApiError("second live handle")
+        elif status["status"] not in ("closed", "waiting"):
+            raise ApiError("existing run did not complete")
     try:
         if run.claim == 201:
             if CONFIG["granularity"] == "parts":
@@ -519,24 +600,26 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
         previews = status.get("actions")
         if not isinstance(previews, list):
             raise ApiError("status omitted preview actions")
+        selected: dict[str, list[dict[str, Any]]] = {}
         for preview in previews:
             name = preview["action"]
             if name not in CONFIG["actions"]:
                 raise ApiError("Server returned an undeclared action")
-            raw_key = preview["key"]
-            key = key_of(raw_key) if isinstance(raw_key, dict) else raw_key
-            if run.claim == 201:
-                effect = Action(run, name).perform([port_key(key)])
-                performed = effect.get("performed", [])
-                if effect.get("skipped") or len(performed) != 1 or performed[0].get("key") not in (key, port_key(key)):
-                    raise ApiError("perform effects differ from selected actions")
-            actions.append({"key": key, "action": name, "columns": normalize_arguments(preview["arguments"])})
+            obj = key_object(preview["key"])
+            selected.setdefault(name, []).append(obj)
+            actions.append({"key": key_of(obj), "action": name, "columns": normalize_arguments(preview["arguments"])})
+        perform_effects = []
+        if run.claim == 201:
+            for name, keys in selected.items():
+                effect = Action(run, name).perform(keys)
+                verify_perform(effect, keys, status.get("dryRun") is True)
+                perform_effects.append({"action": name, **effect})
         batch = run.request("GET", "batch")[1]
         if run.claim == 201:
             closed = run.close()
             if closed.get("status") not in ("closed", "waiting"):
                 raise ApiError("run did not close")
-        return {"verdicts": verdicts, "actions": actions, "details": details, "detail_counts": counts, "effects": batch.get("rows", [])}
+        return {"verdicts": verdicts, "actions": actions, "details": details, "detail_counts": counts, "effects": batch.get("rows", []), "perform_effects": perform_effects}
     except Exception:
         if run.claim == 201:
             try:
@@ -547,26 +630,35 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
 
 === worker/release_order_client/service.py ===
 # SPDX-License-Identifier: Apache-2.0
-"""One JSON request per subprocess; calls the generated typed HTTP client."""
+"""One fixture per subprocess; each request has its own evidence or error."""
 import sys
-from .client import Client
-from .runtime import ApiError, dumps, execute, loads
+from importlib import import_module
+from .runtime import dumps, loads
+
+
+def run(clients, request):
+    try:
+        module = request.get("module", __package__)
+        runtime = import_module(module + ".runtime")
+        if module not in clients:
+            clients[module] = import_module(module + ".client").Client()
+        return runtime.execute(clients[module], request["port"], request.get("as_of"),
+                               dry_run=request.get("dry_run", False), parameters=request.get("parameters"))
+    except (RuntimeError, ValueError) as error:
+        message = str(error) if isinstance(error, RuntimeError) else "invalid input or replay parameter"
+        return {"error": message}
+    except Exception:
+        return {"error": "generated service failed"}
 
 
 def main() -> int:
     try:
-        request = loads(sys.stdin.read())
-        result = execute(Client(), request["port"], request.get("as_of"),
-                         dry_run=request.get("dry_run", False), parameters=request.get("parameters"))
-        print(dumps(result))
+        envelope = loads(sys.stdin.read())
+        clients = {}
+        print(dumps({"results": [run(clients, request) for request in envelope["requests"]]}))
         return 0
-    except (ApiError, ValueError) as error:
-        # Values/HTTP bodies/tokens are never copied into diagnostics.
-        message = str(error) if isinstance(error, ApiError) else "invalid input or replay parameter"
-        print(dumps({"error": message}))
-        return 2
     except Exception:
-        print(dumps({"error": "generated service failed"}))
+        print(dumps({"error": "invalid service input or configuration"}))
         return 2
 
 

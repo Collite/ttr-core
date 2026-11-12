@@ -6,6 +6,7 @@ import com.github.ajalt.clikt.testing.test
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.string.shouldMatch
 import kotlinx.serialization.json.Json
 import org.tatrman.ttr.metadata.source.FileBasedSource
@@ -526,7 +527,14 @@ class RecipeExportSpec :
             manifest["calls"] shouldBe config["callPlan"]
             config.getValue("fingerprints").jsonObject shouldBe manifest.getValue("fingerprints").jsonObject
             val client = Files.readString(folder.resolve("worker/release_order_client/client.py"))
-            golden("release_py_client", client.trimEnd())
+            val readme = Files.readString(folder.resolve("README.md"))
+            readme shouldNotContain "Native deployment"
+            readme shouldNotContain "No client-side run API calls"
+            readme shouldContain "Stale when"
+            golden(
+                "release_py_client",
+                "=== README.md ===\n${readme.trimEnd()}\n=== client.py ===\n${client.trimEnd()}",
+            )
             client shouldContain "def release(self)"
             client shouldContain "def ask(self)"
             val secondOut = temporaryDirectory("python-real-h1-repeat")

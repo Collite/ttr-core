@@ -97,6 +97,11 @@ internal class PythonClientRenderer(
                     ),
                 )
                 put(
+                    "budget_seconds",
+                    graph.program.budget[if (graph.program.mode == "batch") "batch" else "sync"]
+                        ?.let(::durationSeconds) ?: if (graph.program.mode == "batch") 1800L else 60L,
+                )
+                put(
                     "parameters",
                     JsonArray(
                         graph.recipe.parameters.map { p ->
@@ -156,10 +161,14 @@ internal class PythonClientRenderer(
         file("python-client.json", config.toString() + "\n")
         file(
             "README.md",
-            request.readme + "\n\n" +
+            request.readme
+                .lineSequence()
+                .filter { it.startsWith("Stale when") }
+                .joinToString("\n") + "\n\n" +
                 """
                 Python client for `${graph.recipe.name}` (`${graph.deployment.name}`). HTTP run API,
-                ttr-server contracts §1 at f28120e12f8f25540394018e99b5920fc670c47d (⚑AU-EXP-3).
+                ttr-server contracts §1 (⚑AU-EXP-3, ✅R254-A/B). Open baseline: f28120e1; action wire: #391.
+                The baseline has no perform route; real-Server acceptance remains P1C / #366.
                 Python 3.13.9; standard library runtime; pytest 8.3.5. No gRPC or proto wheel.
 
                 Set TTR_SERVER to the Server origin and TTR_BEARER to your authorized bearer.
@@ -170,7 +179,8 @@ internal class PythonClientRenderer(
                 port.at; a run-clock program needs a dry/debug run for a literal override. `--dry-run` strengthens policy.
                 On-event redeliveries need the same caller-supplied clock to deduplicate.
                 The Server owns action eligibility and execution; this package has no waits, asks or processes.
-                `service.py` accepts one JSON request on stdin and emits observed run evidence on stdout;
+                `service.py` accepts `{"requests": [...]}` on stdin and emits `{"results": [...]}` in order,
+                with errors per request;
                 `conform --replay` uses it in a subprocess with dryRun true. Replays never override parameters.
                 Run generated route tests: `uv run --group dev pytest`.
                 Re-export after any recipe text/values, program, deployment or world fingerprint change.

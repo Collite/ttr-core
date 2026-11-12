@@ -87,6 +87,17 @@ class PythonClientEmitSpec :
             config["base_path"] shouldBe JsonPrimitive("/custom")
             config.getValue("calls").jsonObject["open"] shouldBe JsonPrimitive("/begin/{recipe}")
         }
+        "authored decimal duration budgets are compiled into seconds with mode defaults" {
+            fun seconds(g: RecipeGraph) =
+                Json
+                    .parseToJsonElement(
+                        render(g).files.getValue("python-client.json").decodeToString(),
+                    ).jsonObject["budget_seconds"]
+            seconds(graph.copy(program = graph.program.copy(budget = mapOf("sync" to "10.0 minutes")))) shouldBe
+                JsonPrimitive(600)
+            seconds(graph) shouldBe JsonPrimitive(60)
+            seconds(graph.copy(program = graph.program.copy(mode = "batch"))) shouldBe JsonPrimitive(1800)
+        }
         "release_py package matches the complete checked-in H-1 golden" {
             val golden = Path.of("src/test/resources/goldens/release_py.txt")
             val text =
@@ -108,41 +119,9 @@ class PythonClientEmitSpec :
                     Files.createDirectories(dir.resolve(path).parent)
                     Files.write(dir.resolve(path), bytes)
                 }
-                Files.writeString(
-                    dir.resolve("worker/tests/test_transport.py"),
-                    """
-                    from decimal import Decimal
-                    import pytest
-                    from release_order_client.client import Client
-                    from release_order_client.runtime import CONFIG, dumps, loads
-
-                    def test_exact_decimal_and_bearer_validation():
-                        value = Decimal("1.00000000000000000001")
-                        assert loads(dumps({"v": value}))["v"] == value
-                        with pytest.raises(ValueError, match="invalid bearer token"):
-                            Client("http://127.0.0.1", "secret\\nheader")
-
-                    def test_open_pins_fingerprints_and_forces_dry_run(monkeypatch):
-                        client = Client("http://127.0.0.1", "test-token")
-                        seen = []
-                        def request(method, name, body=None, **values):
-                            seen.append(body)
-                            return 201, {"runId": "r1"}, {}
-                        client.request = request
-                        client.open({"key": 4711}, "2026-11-02T08:00:00Z", dry_run=True)
-                        assert seen[0]["recipeFingerprint"] == "text-fp"
-                        assert seen[0]["programFingerprint"] == "program-fp"
-                        assert seen[0]["dryRun"] is True
-                        assert seen[0]["port"]["at"] == "2026-11-02T08:00:00Z"
-                        monkeypatch.setitem(CONFIG, "dry_run", False)
-                        client.open({"key": 4711}, "2026-11-02T08:00:00Z")
-                        assert "asOf" not in seen[1]
-                        assert seen[1]["port"]["at"] == "2026-11-02T08:00:00Z"
-                        client.open({"key": 4711}, "now")
-                        assert seen[2]["asOf"] == "now"
-                        assert "at" not in seen[2]["port"]
-                    """.trimIndent(),
-                )
+                requireNotNull(javaClass.getResourceAsStream("/python/test_runtime.py")).use {
+                    Files.copy(it, dir.resolve("worker/tests/test_runtime.py"))
+                }
                 val log = dir.resolve("pytest-output.txt")
                 val process =
                     ProcessBuilder("uv", "run", "--python", "3.13.9", "--group", "dev", "pytest", "-q")
@@ -153,7 +132,7 @@ class PythonClientEmitSpec :
                         .start()
                 process.waitFor(120, TimeUnit.SECONDS) shouldBe true
                 io.kotest.assertions.withClue(Files.readString(log)) { process.exitValue() shouldBe 0 }
-                Files.readString(log) shouldContain "4 passed"
+                Files.readString(log) shouldContain "24 passed"
             } finally {
                 dir.toFile().deleteRecursively()
             }
