@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.profile
 
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.tatrman.ttr.parser.model.EntityDef
+import org.tatrman.ttr.parser.model.SourceLocation
+import java.nio.file.Files
 
 /** MW S3.4: per-file documents for a loader, with the authored spans in their typed AST. */
 class PerFileEmissionSpec :
@@ -47,5 +52,61 @@ class PerFileEmissionSpec :
             // Spans and selectors stay apart: the label never reaches a file selector or the package map.
             trees().map { it.file to it.label } shouldContainExactly
                 listOf("x/a.yaml" to "/abs/x/a.yaml", "b.yaml" to "/abs/b.yaml")
+        }
+
+        /** Every [SourceLocation] in a typed AST (the parser's data classes, lists and maps). */
+        fun locations(value: Any?): List<SourceLocation> =
+            when {
+                value == null -> emptyList()
+                value is SourceLocation -> listOf(value)
+                value is List<*> -> value.flatMap(::locations)
+                value is Map<*, *> -> value.values.flatMap(::locations)
+                value.javaClass.packageName.startsWith("org.tatrman.ttr.parser") && !value.javaClass.isEnum ->
+                    generateSequence<Class<*>>(value.javaClass) { it.superclass }
+                        .flatMap { it.declaredFields.asSequence() }
+                        .filter {
+                            !java.lang.reflect.Modifier
+                                .isStatic(it.modifiers)
+                        }.flatMap { field ->
+                            if (field.trySetAccessible()) locations(field.get(value)) else emptyList()
+                        }.toList()
+                else -> emptyList()
+            }
+
+        test("review-260 F7: an overlay value takes its record's authored span, never generated coordinates") {
+            val root = Files.createTempDirectory("r260-f7").toRealPath()
+            val text = "entity:\n  A: {}\n  B: {}\n"
+            Files.writeString(
+                root.resolve("d.yaml"),
+                "profile: d/1\ngrammar: '>=0.22 <1.0'\noperations:\n" +
+                    "  - {op: package, mapping: {}, default: demo}\n" +
+                    "  - {op: kinds, at: /entity, mapping: {entita: entity}}\n" +
+                    "overlay:\n  B: {roles: [fact]}\n",
+            )
+            val label = root.resolve("a.yaml").toString()
+            val chain = ProfileResolver(root, emptyMap()).resolve("./d.yaml", root.resolve("ttr.yaml"))
+            val document =
+                ProfileEngine
+                    .apply(listOf(ForeignTree.read(text, "a.yaml", label)), chain, root, perFile = true)
+                    .documents
+                    .single()
+            val b =
+                document.canonical.ast.definitions
+                    .single { it.name == "B" } as EntityDef
+            val role = b.roles.single()
+            role.toString() shouldContain "fact"
+            // The overlay value is written for B, whose record is the mapping on line 3 of the dialect file.
+            withClue(role.source) {
+                role.source.file shouldBe label
+                role.source.line shouldBe 3
+                role.source.offsetStart shouldBe text.indexOf("{}", text.indexOf("B:"))
+            }
+            locations(document.canonical.ast).forEach { location ->
+                withClue(location) {
+                    location.file shouldBe label
+                    location.offsetEnd shouldBeLessThanOrEqual text.length
+                    location.line shouldBeLessThanOrEqual text.lines().size
+                }
+            }
         }
     })

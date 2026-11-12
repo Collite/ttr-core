@@ -320,13 +320,15 @@ internal class CanonicalBuilder(
         }
         return { pointer ->
             cache.getOrPut(pointer) {
+                // A span outside the dialect trees (an overlay value's origin is the overlay or profile file) is
+                // passed over for the nearest ancestor that is in one, normally the record (review-260 F7).
                 var at = pointer
-                var span = locations[at]
-                while (span == null && at.isNotEmpty()) {
+                var found = locations[at]?.let(::located)
+                while (found == null && at.isNotEmpty()) {
                     at = at.substringBeforeLast('/', "")
-                    span = locations[at]
+                    found = locations[at]?.let(::located)
                 }
-                (span ?: locations["/defs/0"])?.let(::located)
+                found ?: locations["/defs/0"]?.let(::located)
             }
         }
     }
