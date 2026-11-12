@@ -1,0 +1,3 @@
+zaznamy:
+  - {druh: entita, nazev: Supplier, popis: Dodavatel}
+  - {druh: vazba, nazev: SupplierStorage, entita: Supplier, cil: SupplierTable}

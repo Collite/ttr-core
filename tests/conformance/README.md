@@ -32,4 +32,16 @@ points and the enabled C-7 `DefsJsonRoundTripSpec`. That test starts with serial
 `defs.json` values, adapts the invented snapshot's C-7 aliases/defaults to canonical
 syntax, writes and reads actual YAML, and compares the resulting export bytes with
 the original header/connections context. It is a test adapter, not a general snapshot
-import API. Metadata's codec dependency is test-only; the codec stays below metadata.
+import API. The codec stays below metadata: since MW S3.4 metadata reaches it at runtime
+through `ttr-profile` (the `yaml` source kind), never the other way round.
+
+## Dialect trees (`dialect/`)
+
+`dialect/<case>/tree/` is a model root in a dialect: its `ttr.yaml` declares the profile,
+`model.ignore` keeps the profile definitions out of the content. `dialect/<case>/canonical/`
+is its canonical YAML twin. `DialectConformanceSpec` (ttr-metadata) loads both through the
+`yaml` source kind and requires the same snapshot dump; a case without both folders is red.
+The set lives beside `fixtures/`, not in it, so the TS/Python/Kotlin parser rosters and their
+dump outputs never see it. The twins were written from the profile engine and checked byte for
+byte against the hand-written `demo-cs/1` expectations in `ttr-profile` (the links case adds
+its inline overlay's values).

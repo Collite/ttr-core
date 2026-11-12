@@ -1,0 +1,10 @@
+ttr: "0.22"
+package: "demo"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "Order"
+    properties:
+      semantics:
+        role: "customer"

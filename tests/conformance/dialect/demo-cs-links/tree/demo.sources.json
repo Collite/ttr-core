@@ -1,0 +1,10 @@
+{
+  "generated-from": "demo-cs fixture (S3.3): the db side the dialect links into",
+  "entries": [
+    {"qname": "demo.db.dbo.DODAVKY", "kind": "table", "foreignId": "urn:demo:table:DODAVKY", "sourceName": "DODAVKY", "locator": "dbo/DODAVKY"},
+    {"qname": "demo.db.dbo.FK_OBJEDNAVKA_ZAKAZNIK", "kind": "fk", "sourceName": "FK_OBJEDNAVKA_ZAKAZNIK"},
+    {"qname": "demo.db.dbo.OBJEDNAVKY.CISLO", "kind": "column", "sourceName": "CISLO", "locator": "dbo/OBJEDNAVKY/CISLO"},
+    {"qname": "demo.db.dbo.ODBERATELE", "kind": "table", "foreignId": "urn:demo:table:ODBERATELE", "sourceName": "ODBERATELE", "locator": "dbo/ODBERATELE"},
+    {"qname": "demo.db.dbo.SKLADY", "kind": "table", "foreignId": "urn:demo:table:SKLADY", "sourceName": "SKLADY", "locator": "dbo/SKLADY"}
+  ]
+}

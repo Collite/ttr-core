@@ -1,0 +1,9 @@
+entity:
+  Odberatel:
+    popis: Odběratel
+    zdroj: {tabulka: ODBERATELE, filtr: "STAV = 1"}
+  Dodavka:
+    popis: Dodávka
+    zdroj: {tabulka: DODAVKY, filtr: "ZRUSENO = 0"}
+  Sklad:
+    zdroj: {tabulka: SKLADY}
