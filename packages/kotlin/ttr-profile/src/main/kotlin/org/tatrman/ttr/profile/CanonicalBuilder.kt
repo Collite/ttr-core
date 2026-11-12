@@ -288,6 +288,7 @@ internal class CanonicalBuilder(
         }
         return groups.map { (group, records) ->
             val locations = linkedMapOf<String, ProfileSpan>()
+            val authored = mutableSetOf<String>()
 
             fun definition(
                 record: Record,
@@ -296,7 +297,10 @@ internal class CanonicalBuilder(
             ): JsonObject {
                 val propertyKey = if (ProfileVocabulary.storageMember(record)) "fields" else "properties"
                 locations[path] = record.source.span()
-                origins.getValue(record).forEach { (target, origin) -> locations["$path/$propertyKey$target"] = origin }
+                origins.getValue(record).forEach { (target, origin) ->
+                    locations["$path/$propertyKey$target"] = origin
+                    authored += "$path/$propertyKey$target"
+                }
                 val props = LinkedHashMap(properties.getValue(record))
                 children[record]?.forEach { (slot, items) ->
                     props[slot] =
@@ -369,13 +373,24 @@ internal class CanonicalBuilder(
                 try {
                     CanonicalYaml.read(json, file)
                 } catch (error: CanonicalYamlException) {
-                    // Canonical paths map to the closest authored value, else its record, without parsing again.
+                    // Contracts §3, without parsing again: the authored value at or above the failing path; else the
+                    // first one written beneath it (an object-level rule such as dependentRequired); else the record.
                     val path = error.keyPath
-                    val origin =
+                    val enclosing =
                         locations.entries
                             .filter { path == it.key || path.startsWith(it.key + "/") }
                             .maxByOrNull { it.key.length }
-                            ?.value ?: records.first().source.span()
+                    val origin =
+                        enclosing?.takeIf { it.key in authored }?.value
+                            ?: locations.entries
+                                .firstOrNull {
+                                    it.key in authored &&
+                                        it.key.startsWith(
+                                            "$path/",
+                                        )
+                                }?.value
+                            ?: enclosing?.value
+                            ?: records.first().source.span()
                     throw ProfileException("ys/profile-invalid", origin, error.detail)
                 }
             EmittedDocument(canonical, locations)
