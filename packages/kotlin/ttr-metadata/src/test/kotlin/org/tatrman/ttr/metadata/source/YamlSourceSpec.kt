@@ -181,4 +181,26 @@ class YamlSourceSpec :
                     .filter { it != "Bad" }
             names(yaml(root)) shouldContainExactly listOf("Good")
         }
+
+        test("review-260 F2: an unmapped package key drops only its file, named by its storage path") {
+            val root =
+                tree(
+                    "p/d.yaml" to
+                        profile.replace("mapping: {}, default: demo", "mapping: {a: demo}"),
+                    "model.ignore" to "p/\n",
+                    "ttr.yaml" to "profile: ./p/d.yaml\ngrammar: '>=0.22 <1.0'\n",
+                    "a.yaml" to "entity:\n  Good: {}\n",
+                    "x.yaml" to "entity:\n  Bad: {}\n",
+                )
+            val x = root.resolve("x.yaml").toString()
+            val result = MetadataLoader(listOf(BuiltinStockSource(), yaml(root))).load()
+            names(yaml(root)) shouldContainExactly listOf("Good")
+            MetadataLoader(listOf(BuiltinStockSource(), yaml(root)))
+                .load(LoadOptions(strict = true))
+                .report!!
+                .droppedFiles shouldContainExactly listOf(x)
+            result.errors.filter { it.category != LoadIssue.Category.PACKAGE_MISMATCH }.map {
+                "${it.file} ${it.message}"
+            } shouldContainExactly listOf("$x ys/value-unmapped: Unmapped package key x")
+        }
     })

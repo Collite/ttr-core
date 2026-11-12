@@ -34,7 +34,7 @@ internal class PackageOp(
             ?: op.value.optionalString("default")
             ?: throw ProfileException(
                 "ys/value-unmapped",
-                ProfileSpan(plan.tree.file, 1, 1, 1, 1, ""),
+                ProfileSpan(plan.tree.label, 1, 1, 1, 1, ""),
                 if (key ==
                     null
                 ) {
@@ -158,7 +158,7 @@ internal object StructuralExecutor {
                 } else {
                     throw ProfileException(
                         "ys/value-unmapped",
-                        ProfileSpan(plan.tree.file, 1, 1, 1, 1, ""),
+                        ProfileSpan(plan.tree.label, 1, 1, 1, 1, ""),
                         "No package operation for ${plan.tree.file}",
                     )
                 }

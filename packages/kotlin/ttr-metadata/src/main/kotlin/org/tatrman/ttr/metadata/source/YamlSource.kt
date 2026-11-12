@@ -266,7 +266,13 @@ internal class YamlTreeReader(
                     ProfileEngine.apply(trees.values.map { it.second }, chain, root, perFile = true)
                 } catch (e: ProfileException) {
                     val issue = problems.profile(e)
-                    val culprit = trees.remove(e.location.file)
+                    // Spans name a tree by its label (the storage path); the root-relative name is a second guard,
+                    // so a relative span can never widen one file's drop to the whole chain (review-260 F2).
+                    val culprit =
+                        trees.remove(e.location.file)
+                            ?: trees.entries
+                                .firstOrNull { it.value.second.file == e.location.file }
+                                ?.let { trees.remove(it.key) }
                     if (culprit != null) {
                         problems.drop(culprit.first, issue)
                     } else {
