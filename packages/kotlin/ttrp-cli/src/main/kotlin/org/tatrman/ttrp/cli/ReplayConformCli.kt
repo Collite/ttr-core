@@ -5,6 +5,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import org.tatrman.ttrp.conform.replay.FixtureLoader
 import org.tatrman.ttrp.conform.replay.NativeDriver
+import org.tatrman.ttrp.conform.replay.PythonClientDriver
 import org.tatrman.ttrp.conform.replay.N8nDryDriver
 import org.tatrman.ttrp.conform.replay.CamundaStructureDriver
 import org.tatrman.ttrp.conform.replay.ReplayRunner
@@ -40,6 +41,7 @@ object ReplayConformCli {
                     when (cell.substringBefore('.').replace('-', '_')) {
                         "native" -> native ?: NativeDriver(url, token).also { native = it }
                         "n8n_l1" -> n8n ?: N8nDryDriver(url, token, exports.map { Path.of(it) }).also { n8n = it }
+                        "python_client" -> PythonClientDriver(url, token, exports.map { Path.of(it) })
                         else -> error("no driver for replay cell $cell")
                     }
                 }
