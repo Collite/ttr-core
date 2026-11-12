@@ -1,0 +1,600 @@
+=== README.md ===
+stale rule
+
+Python client for `release_order` (`release_py`). HTTP run API,
+ttr-server contracts §1 at f28120e12f8f25540394018e99b5920fc670c47d (⚑AU-EXP-3).
+Python 3.13.9; standard library runtime; pytest 8.3.5. No gRPC or proto wheel.
+
+Set TTR_SERVER to the Server origin and TTR_BEARER to your authorized bearer.
+From worker/: `uv run python -m release_order_client.main --key 4711 --as-of 2026-11-02T08:00:00Z`.
+`--key` is JSON (an object for composite keys); `--batch` accepts an optional JSON keys array,
+or selects all with no argument. The chosen port must match the exported program.
+`--as-of` is an ISO instant with offset; `--dry-run` only strengthens the deployment policy.
+On-event redeliveries need the same caller-supplied clock to deduplicate.
+The Server owns action eligibility and execution; this package has no waits, asks or processes.
+`service.py` accepts one JSON request on stdin and emits observed run evidence on stdout;
+`conform --replay` uses it in a subprocess with dryRun true. Replays never override parameters.
+Run generated route tests: `uv run --group dev pytest`.
+Re-export after any recipe text/values, program, deployment or world fingerprint change.
+Only run trusted generated packages, like other executable conformance artifacts.
+
+=== conformance.json ===
+{}
+=== python-client.json ===
+{"module":"release_order_client","recipe":"release_order","program":"release_on_placement","deployment":"release_py","mode":"on-event","port":"key","dry_run":true,"granularity":"recipe","key":["order_number"],"parts":["candidates","stock","decision"],"islands":["input","decision"],"routes":["release","hold"],"actions":["notify","release"],"base_path":"/automation","calls":{"batch":"/runs/{id}/batch","close":"/runs/{id}/close","detail":"/runs/{id}/routes/{route}/details/{context}","evaluate":"/runs/{id}/evaluate","island":"/runs/{id}/islands/{island}","open":"/recipes/{recipe}/runs","outcome":"/runs/{id}/actions/{action}/outcome","part":"/runs/{id}/parts/{part}","perform":"/runs/{id}/actions/{action}/perform","route":"/runs/{id}/routes/{route}","status":"/runs/{id}"},"callPlan":[{"name":"open","path":"/recipes/{recipe}/runs"},{"name":"part","path":"/runs/{id}/parts/{part}"},{"name":"island","path":"/runs/{id}/islands/{island}"},{"name":"evaluate","path":"/runs/{id}/evaluate"},{"name":"status","path":"/runs/{id}"},{"name":"route","path":"/runs/{id}/routes/{route}"},{"name":"detail","path":"/runs/{id}/routes/{route}/details/{context}"},{"name":"perform","path":"/runs/{id}/actions/{action}/perform"},{"name":"outcome","path":"/runs/{id}/actions/{action}/outcome"},{"name":"batch","path":"/runs/{id}/batch"},{"name":"close","path":"/runs/{id}/close"}],"fingerprints":{"deployment":"deployment-fp","program":"program-fp","text":"text-fp","values":"values-fp"},"budget":{},"parameters":[]}
+
+=== worker/.python-version ===
+3.13.9
+
+=== worker/pyproject.toml ===
+[project]
+name = "release_order_client"
+version = "0.0.0"
+requires-python = "==3.13.*"
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest==8.3.5"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+=== worker/release_order_client/__init__.py ===
+from .client import Client, Run
+
+__all__ = ["Client", "Run"]
+
+=== worker/release_order_client/client.py ===
+from __future__ import annotations
+from typing import Any
+from .runtime import BaseClient, BaseRun, Action
+
+class Parts:
+    def __init__(self, run: BaseRun) -> None:
+        self._run = run
+
+    def candidates(self) -> dict[str, Any]:
+        return self._run.part("candidates")
+
+    def stock(self) -> dict[str, Any]:
+        return self._run.part("stock")
+
+    def decision(self) -> dict[str, Any]:
+        return self._run.part("decision")
+
+
+class Routes:
+    def __init__(self, run: BaseRun) -> None:
+        self._run = run
+
+    def release(self) -> list[dict[str, Any]]:
+        return self._run.route("release")
+
+    def hold(self) -> list[dict[str, Any]]:
+        return self._run.route("hold")
+
+
+class Actions:
+    def __init__(self, run: BaseRun) -> None:
+        self._run = run
+
+    @property
+    def notify(self) -> Action:
+        return Action(self._run, "notify")
+
+    @property
+    def release(self) -> Action:
+        return Action(self._run, "release")
+
+
+class Run(BaseRun):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.parts = Parts(self)
+        self.routes = Routes(self)
+        self.actions = Actions(self)
+
+
+class Client(BaseClient):
+    run_type = Run
+
+    def open(self, port: dict[str, Any], as_of: str | None = None, *, dry_run: bool = False, idempotency_key: str | None = None) -> Run:
+        return super().open(port, as_of, dry_run=dry_run, idempotency_key=idempotency_key)
+
+=== worker/release_order_client/config.json ===
+{
+    "module": "release_order_client",
+    "recipe": "release_order",
+    "program": "release_on_placement",
+    "deployment": "release_py",
+    "mode": "on-event",
+    "port": "key",
+    "dry_run": true,
+    "granularity": "recipe",
+    "key": [
+        "order_number"
+    ],
+    "parts": [
+        "candidates",
+        "stock",
+        "decision"
+    ],
+    "islands": [
+        "input",
+        "decision"
+    ],
+    "routes": [
+        "release",
+        "hold"
+    ],
+    "actions": [
+        "notify",
+        "release"
+    ],
+    "base_path": "/automation",
+    "calls": {
+        "batch": "/runs/{id}/batch",
+        "close": "/runs/{id}/close",
+        "detail": "/runs/{id}/routes/{route}/details/{context}",
+        "evaluate": "/runs/{id}/evaluate",
+        "island": "/runs/{id}/islands/{island}",
+        "open": "/recipes/{recipe}/runs",
+        "outcome": "/runs/{id}/actions/{action}/outcome",
+        "part": "/runs/{id}/parts/{part}",
+        "perform": "/runs/{id}/actions/{action}/perform",
+        "route": "/runs/{id}/routes/{route}",
+        "status": "/runs/{id}"
+    },
+    "callPlan": [
+        {
+            "name": "open",
+            "path": "/recipes/{recipe}/runs"
+        },
+        {
+            "name": "part",
+            "path": "/runs/{id}/parts/{part}"
+        },
+        {
+            "name": "island",
+            "path": "/runs/{id}/islands/{island}"
+        },
+        {
+            "name": "evaluate",
+            "path": "/runs/{id}/evaluate"
+        },
+        {
+            "name": "status",
+            "path": "/runs/{id}"
+        },
+        {
+            "name": "route",
+            "path": "/runs/{id}/routes/{route}"
+        },
+        {
+            "name": "detail",
+            "path": "/runs/{id}/routes/{route}/details/{context}"
+        },
+        {
+            "name": "perform",
+            "path": "/runs/{id}/actions/{action}/perform"
+        },
+        {
+            "name": "outcome",
+            "path": "/runs/{id}/actions/{action}/outcome"
+        },
+        {
+            "name": "batch",
+            "path": "/runs/{id}/batch"
+        },
+        {
+            "name": "close",
+            "path": "/runs/{id}/close"
+        }
+    ],
+    "fingerprints": {
+        "deployment": "deployment-fp",
+        "program": "program-fp",
+        "text": "text-fp",
+        "values": "values-fp"
+    },
+    "budget": {},
+    "parameters": []
+}
+
+=== worker/release_order_client/main.py ===
+import argparse
+import sys
+from .client import Client
+from .runtime import ApiError, dumps, execute, loads, port_key
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Run the exported program through the Server HTTP API")
+    port = parser.add_mutually_exclusive_group(required=True)
+    port.add_argument("--key", help="JSON scalar or composite key object")
+    port.add_argument("--batch", nargs="?", const="all", help="optional JSON keys array; no argument selects all")
+    parser.add_argument("--as-of", required=True, help="ISO instant with offset")
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+    try:
+        if args.key is not None:
+            selected = {"key": port_key(loads(args.key))}
+        elif args.batch == "all":
+            selected = {"none": True}
+        else:
+            keys = loads(args.batch)
+            if not isinstance(keys, list):
+                raise ValueError("batch requires an array")
+            selected = {"keys": [port_key(key) for key in keys]}
+        print(dumps(execute(Client(), selected, args.as_of, dry_run=args.dry_run)))
+        return 0
+    except ApiError as error:
+        print(str(error), file=sys.stderr)
+    except Exception:
+        print("invalid input or configuration", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+
+=== worker/release_order_client/py.typed ===
+
+=== worker/release_order_client/runtime.py ===
+"""Generated HTTP run-API support. No model access or executable recipe payloads."""
+from __future__ import annotations
+
+import json
+import os
+import re
+import time
+from datetime import datetime
+from decimal import Decimal
+from pathlib import Path
+from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlencode, urlsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
+
+CONFIG = json.loads(Path(__file__).with_name("config.json").read_text())
+
+
+def loads(text: str) -> Any:
+    return json.loads(text, parse_float=Decimal)
+
+
+def dumps(value: Any) -> str:
+    """Preserve exact decimal JSON numbers across the subprocess and HTTP seams."""
+    if isinstance(value, Decimal):
+        if not value.is_finite():
+            raise ValueError("non-finite number")
+        return str(value)
+    if isinstance(value, dict):
+        return "{" + ",".join(json.dumps(k) + ":" + dumps(v) for k, v in value.items()) + "}"
+    if isinstance(value, (list, tuple)):
+        return "[" + ",".join(dumps(v) for v in value) + "]"
+    return json.dumps(value, allow_nan=False)
+
+
+def key_of(row: dict[str, Any]) -> Any:
+    values = [row[k] for k in CONFIG["key"]]
+    if not values or any(v is None for v in values):
+        raise ValueError("route omitted key")
+    return values[0] if len(values) == 1 else values
+
+
+def port_key(key: Any) -> Any:
+    if isinstance(key, list):
+        if len(key) != len(CONFIG["key"]):
+            raise ValueError("composite key arity")
+        return dict(zip(CONFIG["key"], key))
+    return key
+
+
+class ApiError(RuntimeError):
+    pass
+
+
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+class BaseClient:
+    run_type: type[BaseRun]
+
+    def __init__(self, server: str | None = None, token: str | None = None) -> None:
+        server = (server if server is not None else os.environ.get("TTR_SERVER", "")).rstrip("/")
+        url = urlsplit(server)
+        if url.scheme not in ("http", "https") or not url.hostname or url.username or url.password or url.query or url.fragment:
+            raise ValueError("TTR_SERVER must be an HTTP(S) origin or run-API base URL")
+        base = CONFIG["base_path"].rstrip("/")
+        if url.path not in ("", base):
+            raise ValueError("TTR_SERVER path differs from runApi")
+        self.base = server if url.path else server + base
+        self.token = token if token is not None else os.environ.get("TTR_BEARER", "")
+        if not re.fullmatch(r"[A-Za-z0-9._~+/\-]+=*", self.token):
+            raise ValueError("invalid bearer token")
+        self.opener = build_opener(NoRedirect())
+        budget = CONFIG["budget"].get("batch" if CONFIG["mode"] == "batch" else "sync", "1800s" if CONFIG["mode"] == "batch" else "60s")
+        match = re.fullmatch(r"(\d+)\s*(ms|s|m|h|milliseconds|seconds|minutes|hours)?", budget)
+        units = {"ms": 0.001, "s": 1, "m": 60, "h": 3600, "milliseconds": 0.001, "seconds": 1, "minutes": 60, "hours": 3600, None: 1}
+        seconds = int(match[1]) * units[match[2]] if match else 1800 if CONFIG["mode"] == "batch" else 60
+        self.deadline = time.monotonic() + seconds + 120
+
+    def request(self, method: str, name: str, body: dict[str, Any] | None = None, **values: Any) -> tuple[int, dict[str, Any], dict[str, str]]:
+        query = values.pop("query", None)
+        path = CONFIG["calls"][name]
+        for key, value in values.items():
+            text = str(value)
+            if text in (".", ".."):
+                raise ValueError("invalid API identifier")
+            path = path.replace("{" + key + "}", quote(text, safe=""))
+        if "{" in path or not path.startswith("/") or path.startswith("//") or "://" in path:
+            raise ValueError("invalid runApi path")
+        remaining = self.deadline - time.monotonic()
+        if remaining <= 0:
+            raise ApiError("run deadline exceeded")
+        url = self.base + path + ("?" + urlencode(query) if query else "")
+        request = Request(url, data=None if body is None else dumps(body).encode(), method=method,
+                          headers={"Authorization": "Bearer " + self.token, "Accept": "application/json", "Content-Type": "application/json"})
+        try:
+            with self.opener.open(request, timeout=min(30, remaining)) as response:
+                code = response.status
+                data = loads(response.read().decode())
+                headers = dict(response.headers)
+        except HTTPError as error:
+            raise ApiError(f"{method} {name}: HTTP {error.code}") from None
+        except (URLError, OSError, ValueError):
+            raise ApiError(f"{method} {name}: transport or response error") from None
+        if not isinstance(data, dict) or code not in (200, 201, 202):
+            raise ApiError(f"{method} {name}: invalid response")
+        return code, data, headers
+
+    def pause(self, headers: dict[str, str]) -> None:
+        value = next((v for k, v in headers.items() if k.lower() == "retry-after"), "0.25")
+        try:
+            seconds = max(0.01, float(value))
+        except ValueError:
+            seconds = 0.25
+        remaining = self.deadline - time.monotonic()
+        if remaining <= 0:
+            raise ApiError("run polling timed out")
+        time.sleep(min(seconds, remaining, 15))
+
+    def open(self, port: dict[str, Any], as_of: str | None = None, *, dry_run: bool = False, idempotency_key: str | None = None) -> BaseRun:
+        kind = CONFIG["port"].replace("on_event", "event")
+        # Replay may replace batch `none` with explicit `keys`, as the native dry driver does.
+        accepted = {"none", "keys"} if CONFIG["mode"] == "batch" else {kind}
+        if len(set(port) - {"at"}) != 1 or not (set(port) - {"at"}) <= accepted:
+            raise ValueError("port differs from exported program")
+        if as_of is not None:
+            instant = datetime.fromisoformat(as_of.replace("Z", "+00:00"))
+            if instant.tzinfo is None:
+                raise ValueError("as-of requires an offset")
+            if kind in ("key", "event"):
+                port = dict(port, at=as_of)
+        fps = CONFIG["fingerprints"]
+        body = {"deployment": CONFIG["deployment"], "port": port, "dryRun": CONFIG["dry_run"] or dry_run, "origin": "driver"}
+        if as_of is not None:
+            body["asOf"] = as_of
+        for field, dimension in (("recipeFingerprint", "text"), ("recipeValuesFingerprint", "values"), ("programFingerprint", "program"), ("deploymentFingerprint", "deployment")):
+            if dimension in fps:
+                body[field] = fps[dimension]
+        if idempotency_key is not None:
+            body["idempotencyKey"] = idempotency_key
+        code, data, _ = self.request("POST", "open", body, recipe=CONFIG["recipe"])
+        return self.run_type(self, data["runId"], code)
+
+
+class BaseRun:
+    def __init__(self, client: BaseClient, run_id: str, claim: int) -> None:
+        self.client, self.id, self.claim = client, run_id, claim
+
+    def request(self, method: str, name: str, body: dict[str, Any] | None = None, **values: Any):
+        return self.client.request(method, name, body, id=self.id, **values)
+
+    def part(self, name: str) -> dict[str, Any]:
+        return self.request("POST", "part", part=name)[1]
+
+    def status(self) -> dict[str, Any]:
+        return self.request("GET", "status")[1]
+
+    def evaluate(self) -> dict[str, Any]:
+        code, data, headers = self.request("POST", "evaluate", {})
+        while code == 202 or data.get("status") in ("open", "running"):
+            self.client.pause(headers)
+            code, data, headers = self.request("GET", "status")
+        if data.get("status") in ("failed", "abandoned"):
+            raise ApiError("run evaluation failed")
+        return data
+
+    def pages(self, name: str, **values: Any) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for _ in range(10000):
+            query = dict(values.pop("query", {}), offset=len(rows), limit=1000)
+            _, data, _ = self.request("GET", name, query=query, **values)
+            page = data["rows"]
+            if not isinstance(page, list) or any(not isinstance(row, dict) or row.get("truncated") is True for row in page):
+                raise ApiError("detail evidence is truncated or malformed")
+            rows.extend(page)
+            if len(rows) == data["rowCount"]:
+                return rows
+            if not page or len(rows) > data["rowCount"]:
+                raise ApiError("paging stopped before rowCount")
+            # Keep the detail row selector across pages.
+            values["query"] = {k: v for k, v in query.items() if k not in ("offset", "limit")}
+        raise ApiError("paging limit exceeded")
+
+    def route(self, name: str) -> list[dict[str, Any]]:
+        return self.pages("route", route=name)
+
+    def close(self) -> dict[str, Any]:
+        return self.request("POST", "close", {})[1]
+
+
+class Action:
+    def __init__(self, run: BaseRun, name: str) -> None:
+        self.run, self.name = run, name
+
+    def perform(self, keys: list[Any] | None = None) -> dict[str, Any]:
+        return self.run.request("POST", "perform", {} if keys is None else {"keys": keys}, action=self.name)[1]
+
+    def outcome(self, outcomes: list[dict[str, Any]]) -> dict[str, Any]:
+        return self.run.request("POST", "outcome", {"outcomes": outcomes}, action=self.name)[1]
+
+
+def normalize_arguments(value: Any) -> Any:
+    if isinstance(value, dict):
+        if "refs" in value:
+            refs = value["refs"]
+            if not isinstance(refs, list) or any(ref.get("truncated") is True for ref in refs):
+                raise ApiError("action detail evidence is truncated")
+            return dict(value, refs=[{k: v for k, v in ref.items() if k != "ref"} for ref in refs])
+        return {key: normalize_arguments(item) for key, item in value.items()}
+    return value
+
+
+def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_run: bool = False, parameters: dict[str, Any] | None = None) -> dict[str, Any]:
+    if parameters:
+        declared = {p["name"]: p for p in CONFIG["parameters"]}
+        for name, value in parameters.items():
+            p = declared.get(name)
+            if p is None or "value" not in p:
+                raise ValueError("replay parameter differs")
+            expected = p["value"]
+            if p["type"] in ("int", "decimal", "days", "working_days"):
+                equal = Decimal(str(expected)) == Decimal(str(value))
+            else:
+                try:
+                    expected = loads(expected)
+                except (ValueError, TypeError):
+                    pass
+                equal = expected == value
+            if not equal:
+                raise ValueError("replay parameter differs")
+    run = client.open(port, as_of, dry_run=dry_run)
+    # A live claim belongs to another executor. Observe it; never evaluate or perform its work.
+    status = run.status() if run.claim != 201 else None
+    while run.claim == 202 and status["status"] in ("open", "running", "evaluated"):
+        client.pause({})
+        status = run.status()
+    if run.claim != 201 and status["status"] not in ("closed", "waiting"):
+        raise ApiError("existing run did not complete")
+    try:
+        if run.claim == 201:
+            if CONFIG["granularity"] == "parts":
+                for name in CONFIG["parts"]:
+                    run.part(name)
+            elif CONFIG["granularity"] == "islands":
+                for name in CONFIG["islands"]:
+                    run.request("POST", "island", island=name)
+            run.evaluate()
+            status = run.status()
+        if dry_run and status.get("dryRun") is not True:
+            raise ApiError("Server did not confirm dryRun")
+        summaries = status["verdict"]["routes"]
+        if set(summaries) - set(CONFIG["routes"]):
+            raise ApiError("Server returned an undeclared route")
+        verdicts, details, actions, counts = [], [], [], {}
+        for route in summaries:
+            for offset, row in enumerate(run.route(route)):
+                key = key_of(row)
+                verdict = {"key": key, "route": route, "verdict_reason": row.get("verdict_reason")}
+                if "fills" in row:
+                    verdict["fills"] = row["fills"]
+                verdicts.append(verdict)
+                for context in row.get("detail", {}):
+                    rows = run.pages("detail", route=route, context=context, query={"row": offset})
+                    details.append({"key": key, "route": route, "context": context, "rows": rows})
+                    slot = counts.setdefault(str(key) if not isinstance(key, list) else ":".join(map(str, key)), {})
+                    slot[context] = slot.get(context, 0) + len(rows)
+        previews = status.get("actions")
+        if not isinstance(previews, list):
+            raise ApiError("status omitted preview actions")
+        for preview in previews:
+            name = preview["action"]
+            if name not in CONFIG["actions"]:
+                raise ApiError("Server returned an undeclared action")
+            raw_key = preview["key"]
+            key = key_of(raw_key) if isinstance(raw_key, dict) else raw_key
+            if run.claim == 201:
+                effect = Action(run, name).perform([port_key(key)])
+                performed = effect.get("performed", [])
+                if effect.get("skipped") or len(performed) != 1 or performed[0].get("key") not in (key, port_key(key)):
+                    raise ApiError("perform effects differ from selected actions")
+            actions.append({"key": key, "action": name, "columns": normalize_arguments(preview["arguments"])})
+        batch = run.request("GET", "batch")[1]
+        if run.claim == 201:
+            closed = run.close()
+            if closed.get("status") not in ("closed", "waiting"):
+                raise ApiError("run did not close")
+        return {"verdicts": verdicts, "actions": actions, "details": details, "detail_counts": counts, "effects": batch.get("rows", [])}
+    except Exception:
+        if run.claim == 201:
+            try:
+                run.close()
+            except Exception:
+                pass
+        raise
+
+=== worker/release_order_client/service.py ===
+"""One JSON request per subprocess; calls the generated typed HTTP client."""
+import sys
+from .client import Client
+from .runtime import ApiError, dumps, execute, loads
+
+
+def main() -> int:
+    try:
+        request = loads(sys.stdin.read())
+        result = execute(Client(), request["port"], request.get("as_of"),
+                         dry_run=request.get("dry_run", False), parameters=request.get("parameters"))
+        print(dumps(result))
+        return 0
+    except (ApiError, ValueError) as error:
+        # Values/HTTP bodies/tokens are never copied into diagnostics.
+        message = str(error) if isinstance(error, ApiError) else "invalid input or replay parameter"
+        print(dumps({"error": message}))
+        return 2
+    except Exception:
+        print(dumps({"error": "generated service failed"}))
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+
+=== worker/tests/test_routes.py ===
+from release_order_client.client import Client, Run
+from release_order_client.runtime import CONFIG
+
+def test_route_0():
+    client = Client("http://127.0.0.1", "test-token")
+    seen = []
+    def request(method, name, body=None, **values):
+        seen.append((method, name, values))
+        return 200, {"rows": [], "rowCount": 0}, {}
+    client.request = request
+    run = Run(client, "test-run", 201)
+    assert run.routes.release() == []
+    assert seen[0][0:2] == ("GET", "route")
+    assert seen[0][2]["route"] == "release"
+    assert "release" in CONFIG["routes"]
+
+def test_route_1():
+    client = Client("http://127.0.0.1", "test-token")
+    seen = []
+    def request(method, name, body=None, **values):
+        seen.append((method, name, values))
+        return 200, {"rows": [], "rowCount": 0}, {}
+    client.request = request
+    run = Run(client, "test-run", 201)
+    assert run.routes.hold() == []
+    assert seen[0][0:2] == ("GET", "route")
+    assert seen[0][2]["route"] == "hold"
+    assert "hold" in CONFIG["routes"]
+
+
+=== END ===
