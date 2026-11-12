@@ -4,7 +4,6 @@ package org.tatrman.ttr.yaml
 import kotlinx.serialization.json.*
 import org.tatrman.ttr.parser.loader.ParseResult
 import org.tatrman.ttr.parser.loader.TtrLoader
-import org.tatrman.ttr.parser.model.SourceLocation
 
 /** Lossless syntax tree plus the existing parser's typed projection. Neither resolves references. */
 class CanonicalDocument internal constructor(
@@ -37,14 +36,14 @@ object CanonicalYaml {
     ): CanonicalDocument = read(source, file, null)
 
     /**
-     * As [read], but every location of the typed AST is taken from [relocate] (by the canonical JSON Pointer of the
-     * value it came from) when it returns one: a document generated from another source (a profile's dialect input,
+     * As [read], but every location of the typed AST is taken from [relocation] (by the canonical JSON Pointer of the
+     * value it came from) when it gives one: a document generated from another source (a profile's dialect input,
      * MW S3.4) keeps the authored spans. Errors are unaffected.
      */
     fun read(
         source: String,
         file: String,
-        relocate: ((String) -> SourceLocation?)?,
+        relocation: Relocation?,
     ): CanonicalDocument {
         val nodes = YamlNodes(file)
         val input = nodes.read(source)
@@ -71,7 +70,7 @@ object CanonicalYaml {
             // Schema validation precedes the syntax bridge; normalize mapping shorthand/order once.
             return CanonicalDocument(
                 value,
-                YamlLocations(syntax, nodes, ttr, value, relocate).remap(typed(ttr, file)),
+                YamlLocations(syntax, nodes, ttr, value, relocation).remap(typed(ttr, file)),
                 nodes::spelling,
                 nodes::invalid,
             )

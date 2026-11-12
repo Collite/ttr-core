@@ -17,14 +17,14 @@ internal class YamlLocations(
     private val nodes: YamlNodes,
     private val generated: String,
     private val canonical: JsonObject,
-    private val relocate: ((String) -> SourceLocation?)? = null,
+    private val relocation: Relocation? = null,
 ) {
     private val copies = IdentityHashMap<Any, Any>()
 
     private fun located(
         path: String,
         key: Boolean = false,
-    ): SourceLocation = relocate?.invoke(path) ?: nodes.source(path, key)
+    ): SourceLocation = relocation?.source(path) ?: nodes.source(path, key)
 
     private fun path(
         start: Int,
@@ -131,10 +131,12 @@ internal class YamlLocations(
             literal(value.source)?.let { (pointer, syntax) ->
                 if ("block" in syntax) {
                     val content = nodes.content("$pointer/block", syntax.string("block"))
+                    // Text span and indent from one file: the authored scalar when it holds the block, else generated.
+                    val block = relocation?.block("$pointer/block", syntax.string("block"))
                     return value.copy(
                         source = span(value.source),
-                        valueSource = relocate?.invoke("$pointer/block") ?: content.source,
-                        indentWidth = content.indent,
+                        valueSource = block?.source ?: content.source,
+                        indentWidth = block?.indentWidth ?: content.indent,
                         tagSource = located("$pointer/tag"),
                     )
                 }
@@ -144,6 +146,7 @@ internal class YamlLocations(
             literal(value.source)?.let { (pointer, syntax) ->
                 val contentKey = if ("triple" in syntax) "triple" else "block"
                 val content = nodes.content("$pointer/$contentKey", syntax.string(contentKey))
+                val block = relocation?.block("$pointer/$contentKey", syntax.string(contentKey))
                 val form = if ("tag" in syntax) "tagged" else syntax["form"]?.jsonPrimitive?.content ?: "tripleString"
                 return value.copy(
                     text = syntax.string(contentKey),
@@ -151,9 +154,9 @@ internal class YamlLocations(
                     language =
                         syntax["tag"]?.jsonPrimitive?.content ?: "pl",
                     source = span(value.source),
-                    textSource = relocate?.invoke("$pointer/$contentKey") ?: content.source,
-                    lineOffsets = content.lines,
-                    indentWidth = content.indent,
+                    textSource = block?.source ?: content.source,
+                    lineOffsets = block?.lineOffsets ?: content.lines,
+                    indentWidth = block?.indentWidth ?: content.indent,
                     escapes = emptyList(),
                 )
             }

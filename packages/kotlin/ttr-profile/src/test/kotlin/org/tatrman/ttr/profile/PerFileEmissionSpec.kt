@@ -8,7 +8,9 @@ import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.tatrman.ttr.parser.model.EntityDef
+import org.tatrman.ttr.parser.model.QueryDef
 import org.tatrman.ttr.parser.model.SourceLocation
+import org.tatrman.ttr.parser.model.TaggedBlockValue
 import java.nio.file.Files
 
 /** MW S3.4: per-file documents for a loader, with the authored spans in their typed AST. */
@@ -107,6 +109,38 @@ class PerFileEmissionSpec :
                     location.offsetEnd shouldBeLessThanOrEqual text.length
                     location.line shouldBeLessThanOrEqual text.lines().size
                 }
+            }
+        }
+
+        test("review-260 F8: a relocated block maps its inner lines into the dialect file, never the generated text") {
+            val text = "dotazy:\n  Q:\n    sql:\n      tag: sql\n      block: |\n        SELECT a\n          FROM t\n"
+            val label = "/abs/q.yaml"
+            val ops =
+                "- {op: package, mapping: {}, default: demo}\n" +
+                    "- {op: kinds, at: /dotazy, mapping: {d: query}}\n" +
+                    "- {op: nest, in: query, at: /sql, to: {kind: query, path: [sourceText]}}"
+            val document =
+                ProfileEngine
+                    .apply(
+                        listOf(ForeignTree.read(text, "q.yaml", label)),
+                        listOf(recordProfile(ops)),
+                        null,
+                        perFile = true,
+                    ).documents
+                    .single()
+            val query =
+                document.canonical.ast.definitions
+                    .single() as QueryDef
+            val block = query.sourceTextBlock as TaggedBlockValue
+            block.value shouldBe "SELECT a\n  FROM t"
+            // Line 2 of the block, `  FROM t`, is line 7 of the dialect file: `FROM` at column 10, offset below.
+            withClue(block) {
+                block.valueSource.file shouldBe label
+                block.valueSource.line shouldBe 6
+                block.valueSource.offsetStart shouldBe text.indexOf("SELECT a")
+                block.indentWidth shouldBe 8
+                (block.valueSource.line + 1) shouldBe 7
+                (block.indentWidth + 2) shouldBe text.indexOf("FROM") - (text.indexOf("\n          FROM") + 1)
             }
         }
     })

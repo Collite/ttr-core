@@ -4,8 +4,10 @@ package org.tatrman.ttr.profile
 import kotlinx.serialization.json.*
 import org.tatrman.ttr.semantics.modelForKind
 import org.tatrman.ttr.parser.model.SourceLocation
+import org.tatrman.ttr.yaml.BlockSpan
 import org.tatrman.ttr.yaml.CanonicalYaml
 import org.tatrman.ttr.yaml.CanonicalYamlException
+import org.tatrman.ttr.yaml.Relocation
 import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
 
@@ -308,7 +310,7 @@ internal class CanonicalBuilder(
      * location written for it or for its nearest ancestor (an authored key, else its record), with the dialect
      * parser's own offsets; a header pointer takes the first record's.
      */
-    private fun relocation(locations: Map<String, ProfileSpan>): (String) -> SourceLocation? {
+    private fun relocation(locations: Map<String, ProfileSpan>): Relocation {
         val trees = plans.associate { it.tree.label to it.tree }
         val cache = HashMap<String, SourceLocation?>()
 
@@ -318,17 +320,32 @@ internal class CanonicalBuilder(
             val key = data.source(span.path, key = true)
             return if (key.line == span.line && key.column + 1 == span.column) key else value
         }
-        return { pointer ->
-            cache.getOrPut(pointer) {
-                // A span outside the dialect trees (an overlay value's origin is the overlay or profile file) is
-                // passed over for the nearest ancestor that is in one, normally the record (review-260 F7).
-                var at = pointer
-                var found = locations[at]?.let(::located)
-                while (found == null && at.isNotEmpty()) {
-                    at = at.substringBeforeLast('/', "")
-                    found = locations[at]?.let(::located)
+        return object : Relocation {
+            override fun source(pointer: String): SourceLocation? =
+                cache.getOrPut(pointer) {
+                    // A span outside the dialect trees (an overlay value's origin is the overlay or profile file) is
+                    // passed over for the nearest ancestor that is in one, normally the record (review-260 F7).
+                    var at = pointer
+                    var found = locations[at]?.let(::located)
+                    while (found == null && at.isNotEmpty()) {
+                        at = at.substringBeforeLast('/', "")
+                        found = locations[at]?.let(::located)
+                    }
+                    found ?: locations["/defs/0"]?.let(::located)
                 }
-                found ?: locations["/defs/0"]?.let(::located)
+
+            /**
+             * A block written from a dialect value sits at the same relative path under its nearest written ancestor;
+             * the dialect scalar there must hold exactly the block (review-260 F8).
+             */
+            override fun block(
+                pointer: String,
+                text: String,
+            ): BlockSpan? {
+                var at = pointer
+                while (at.isNotEmpty() && at !in locations) at = at.substringBeforeLast('/', "")
+                val span = locations[at] ?: return null
+                return trees[span.file]?.data?.block(span.path + pointer.removePrefix(at), text)
             }
         }
     }
