@@ -159,6 +159,9 @@ internal class CanonicalBuilder(
 ) {
     private val properties = mutableMapOf<Record, MutableMap<String, JsonElement>>()
     private val children = mutableMapOf<Record, MutableMap<String, MutableList<Record>>>()
+
+    /** The dialect trees by label, built once: relocation looks a span's file up for every emitted document (F9). */
+    private val trees by lazy { plans.associate { it.tree.label to it.tree } }
     private val origins = mutableMapOf<Record, MutableMap<String, ProfileSpan>>()
     private val imports = mutableMapOf<DocumentKey, MutableSet<String>>()
 
@@ -311,7 +314,6 @@ internal class CanonicalBuilder(
      * parser's own offsets; a header pointer takes the first record's.
      */
     private fun relocation(locations: Map<String, ProfileSpan>): Relocation {
-        val trees = plans.associate { it.tree.label to it.tree }
         val cache = HashMap<String, SourceLocation?>()
 
         fun located(span: ProfileSpan): SourceLocation? {
