@@ -157,9 +157,16 @@ class OverlaySpec :
             val noRoot = shouldThrow<ProfileException> { ProfileEngine.apply(inputs, listOf(relative)) }
             noRoot.code shouldBe "ys/profile-not-found"
             noRoot.detail shouldContain "needs a root or an absolute profile file"
+            // review-251 R5: a label that is no path says so, even with a root.
+            val invalid =
+                shouldThrow<ProfileException> {
+                    ProfileEngine.apply(inputs, listOf(profile(" ./ov.yaml", "p\u0000.yaml")), root)
+                }
+            invalid.code shouldBe "ys/profile-not-found"
+            invalid.detail shouldContain "Invalid profile path"
         }
 
-        test("renames.yaml is read as ttr-metadata reads it: empty is none, --- is fine, errors at their line (F5)") {
+        test("renames.yaml: empty is none, --- is fine, errors name renames.yaml at their line (F5, R3, R4)") {
             fun orphan(ledger: String): ProfileException {
                 val root = Files.createTempDirectory("s33-renames")
                 root.resolve("renames.yaml").writeText(ledger)
@@ -176,7 +183,8 @@ class OverlaySpec :
                 error.code shouldBe "xm/overlay-orphan"
                 error.suggestion.shouldBeNull()
             }
-            orphan("---\n- {from: Klient, to: Zakaznik, since: 2026-11-01}\n").suggestion shouldBe
+            // Quoted: ttr-metadata's YAML 1.1 reader would take an unquoted date as a Date (review-251 R4).
+            orphan("---\n- {from: Klient, to: Zakaznik, since: '2026-11-01'}\n").suggestion shouldBe
                 Json.parseToJsonElement(
                     """{"delta":{"renamed":{"from":"Klient","to":"Zakaznik","since":"2026-11-01"}}}""",
                 )
@@ -184,5 +192,22 @@ class OverlaySpec :
             broken.code shouldBe "ys/profile-invalid"
             broken.location.file shouldBe "renames.yaml"
             (broken.location.line in 1..2) shouldBe true
+            // review-251 R3: a read error names renames.yaml, not the absolute path or "profile".
+            val latin1 =
+                Files.createTempDirectory("s34-renames").also {
+                    it.resolve("renames.yaml").writeBytes("- {from: Z\u00e1}\n".toByteArray(Charsets.ISO_8859_1))
+                }
+            val unreadable =
+                shouldThrow<ProfileException> {
+                    ProfileEngine.apply(
+                        listOf(ForeignTree.read(source, "one.yaml")),
+                        listOf(profile("\n  Klient: {description: X}")),
+                        latin1,
+                    )
+                }
+            unreadable.code shouldBe "ys/profile-invalid"
+            unreadable.location.file shouldBe "renames.yaml"
+            unreadable.location.line shouldBe 1
+            unreadable.detail shouldBe "Malformed UTF-8 in renames.yaml"
         }
     })

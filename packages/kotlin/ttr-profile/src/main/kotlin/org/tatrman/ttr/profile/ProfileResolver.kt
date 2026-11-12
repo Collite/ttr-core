@@ -8,19 +8,19 @@ import org.tatrman.ttr.yaml.readProfileYaml
 
 /**
  * The one root-confinement rule for files a profile names (a profile, a path overlay): the real path of [candidate]
- * must be a regular file inside the real [boundary]; any failure is `ys/profile-not-found` at [at].
+ * must be a regular file inside [boundary], which the caller passes already real; any failure is `ys/profile-not-found`
+ * at [at].
  */
 internal fun confinedFile(
     label: String,
     ref: String,
     at: ProfileSpan,
-    boundary: () -> Path,
+    boundary: Path,
     candidate: () -> Path,
 ): Path {
     try {
-        val inside = boundary().toRealPath()
         val real = candidate().toRealPath()
-        if (!real.startsWith(inside) || !Files.isRegularFile(real)) {
+        if (!real.startsWith(boundary) || !Files.isRegularFile(real)) {
             throw ProfileException("ys/profile-not-found", at, "$label is outside root or is not a file: $ref")
         }
         return real
@@ -123,7 +123,7 @@ class ProfileResolver(
         from: Path,
         at: ProfileSpan,
     ): Path =
-        confinedFile("Profile", ref, at, { root }) {
+        confinedFile("Profile", ref, at, root) {
             catalog[ref]?.let { root.resolve(it) } ?: run {
                 val path = Path.of(ref)
                 if (!ref.startsWith(".") && !path.isAbsolute && !ref.endsWith(".yaml") && !ref.endsWith(".yml")) {
