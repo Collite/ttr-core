@@ -1,0 +1,11 @@
+ttr: "0.22"
+package: "demo"
+imports:
+  - "prodej.*"
+model: "binding"
+defs:
+  -
+    kind: "er2db_attribute"
+    id: "ZakaznikKod"
+    properties:
+      attribute: "prodej.er.entity.Zakaznik.kod"

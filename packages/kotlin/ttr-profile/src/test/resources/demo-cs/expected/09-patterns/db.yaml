@@ -1,0 +1,19 @@
+ttr: "0.22"
+package: "demo"
+model: "db"
+defs:
+  -
+    kind: "query"
+    id: "q_obrat"
+    properties:
+      search:
+        patterns:
+          - "obrat za {rok}"
+          - "tržby v roce {rok}"
+  -
+    kind: "query"
+    id: "q_sklad"
+    properties:
+      search:
+        patterns:
+          - "stav skladu"

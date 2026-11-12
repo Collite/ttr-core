@@ -6,6 +6,14 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — `values`, `shape`, `link` and the overlay (MW P3 S3.3)
+
+- `ttr-profile` runs the last three operations. `values` maps a foreign string to a canonical value (scalar, qname or localized map), with an optional `default`. `shape` fills a literal template from `{input: <pointer>}` substitutions; a list element or object member whose input is missing is dropped, and nothing is written when every input is missing.
+- `link` turns a foreign reference into a qualified qname, matched `by: sourceName | iri | path` against every record of the run and the root's `<package>.sources.json` sidecars. It only considers records of the kind its target names (`er2db_entity.entity` → `entity`, `target.table` → `table`). A target in another package adds `<package>.*` to the document's `imports`. Errors: `xm/link-unresolved`, `xm/link-ambiguous`.
+- A profile's `overlay:` (inline, or a path relative to the profile and inside the root) applies after all operations and wins. `ApplyReport.overridden` lists each property that both the transform and the overlay supplied. A key that names no record is `xm/overlay-orphan`; when `renames.yaml` names it, the error carries a `delta.renamed` suggestion.
+- `ProfileEngine.apply` takes the model root; `ApplyResult.reportJson()` gives `documents[]`, `ignored[]` and `overridden[]`.
+- A canonical-validation error on a transformed value now names the dialect key the author typed, not only its record.
+
 ### Added — Record fan-out (MW P3 S3.2b, ttr-core#392)
 
 - `ttr-profile` makes one record per canonical kind from one foreign node: two `kinds` operations can turn one entry into an `entity` (model `er`) and its `er2db_entity` (model `binding`). The same node mapped twice to the same kind is still refused.

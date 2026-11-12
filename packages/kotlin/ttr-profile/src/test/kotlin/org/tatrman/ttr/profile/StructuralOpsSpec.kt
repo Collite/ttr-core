@@ -10,11 +10,19 @@ import kotlin.io.path.*
 
 internal val demoRoot = Path.of("src/test/resources/demo-cs")
 
-internal fun demoChain() =
+internal fun demoChain(profile: String = "demo-cs.yaml") =
     ProfileResolver(
         demoRoot,
         emptyMap(),
-    ).resolve("./profiles/demo-cs.yaml", demoRoot.resolve("ttr.yaml").toAbsolutePath())
+    ).resolve("./profiles/$profile", demoRoot.resolve("ttr.yaml").toAbsolutePath())
+
+/** S3.3: the cross-file, cross-package link group, read as one run. */
+internal fun linkInputs() =
+    demoRoot
+        .resolve("links/input")
+        .listDirectoryEntries("*.yaml")
+        .sorted()
+        .map { ForeignTree.read(it.readText(), it.name) }
 
 internal fun runOps(
     source: String,

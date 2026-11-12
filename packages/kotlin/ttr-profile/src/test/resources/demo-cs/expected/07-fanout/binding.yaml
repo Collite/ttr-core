@@ -6,17 +6,24 @@ defs:
     kind: "er2db_entity"
     id: "Odberatel"
     properties:
-      entity: "Odberatel"
-      target: "ODBERATELE"
+      entity: "demo.er.entity.Odberatel"
+      target:
+        table: "demo.db.dbo.ODBERATELE"
+      whereFilter:
+        sql: "STAV = 1"
   -
     kind: "er2db_entity"
     id: "Dodavka"
     properties:
-      entity: "Dodavka"
-      target: "DODAVKY"
+      entity: "demo.er.entity.Dodavka"
+      target:
+        table: "demo.db.dbo.DODAVKY"
+      whereFilter:
+        sql: "ZRUSENO = 0"
   -
     kind: "er2db_entity"
     id: "Sklad"
     properties:
-      entity: "Sklad"
-      target: "SKLADY"
+      entity: "demo.er.entity.Sklad"
+      target:
+        table: "demo.db.dbo.SKLADY"
