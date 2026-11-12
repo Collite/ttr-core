@@ -34,6 +34,18 @@ internal object ProfileVocabulary {
      */
     fun referentKind(path: List<String>): String? = path.lastOrNull()?.takeIf { it in kinds }
 
+    /** Whether [record]'s grammar body declares [property] as a canonical property (✅R251-A overlay narrowing). */
+    fun defines(
+        record: Record,
+        property: String,
+    ): Boolean =
+        bodies
+            .getValue(bodyName(record))
+            .jsonObject
+            .getValue("properties")
+            .jsonArray
+            .any { it.jsonObject.string("key") == property }
+
     fun semanticsKind(kind: String): String = if (kind in conceptKinds) "concept" else kind
 
     fun model(kind: String): String {
@@ -271,7 +283,10 @@ internal class CanonicalBuilder(
             )
         }
         val previous = properties.getValue(record).put(property, value)
-        origins.getValue(record)["/${escapePointer(property)}"] = origin
+        val key = "/${escapePointer(property)}"
+        // The replaced value's transform origins go with it: an error inside the overlay value names the overlay.
+        origins.getValue(record).keys.removeIf { it.startsWith("$key/") }
+        origins.getValue(record)[key] = origin
         return previous
     }
 

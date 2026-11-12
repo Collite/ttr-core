@@ -58,6 +58,23 @@ class ValueOpsSpec :
             error.location.column shouldBe 11
             attributes(runOps(source, "$typ, default: string}")).getValue("a").string("type") shouldBe "string"
         }
+        test("a structure is ys/value-unmapped at the authored key even with a default (review-251 F1)") {
+            listOf("{a: 1}", "[a]").forEach { value ->
+                val error =
+                    shouldThrow<ProfileException> {
+                        runOps(
+                            "entity:\n  E:\n    druh: $value\n",
+                            entityOps +
+                                "- {op: values, in: entity, at: /druh, to: {kind: entity, property: description}, " +
+                                "mapping: {x: X}, default: D}",
+                        )
+                    }
+                error.code shouldBe "ys/value-unmapped"
+                error.location.path shouldBe "/entity/E/druh"
+                error.location.line shouldBe 3
+                error.location.column shouldBe 5
+            }
+        }
 
         val patterns =
             entityOps + "- {op: shape, in: entity, at: '', to: {kind: entity, path: [search, patterns]}, " +
@@ -93,6 +110,25 @@ class ValueOpsSpec :
             val result = runOps("entity:\n  A: {zdroj: {filtr: STAV = 1}, aktivni: ano}\n", filter)
             result.properties().getValue("semantics") shouldBe
                 Json.parseToJsonElement("""{"filtr":{"sql":"STAV = 1","kind":"sql"},"flag":{"active":1}}""")
+        }
+        test("a container whose inputs are all missing is dropped, recursively; a literal {} stays (✅R251-B)") {
+            fun shaped(
+                source: String,
+                template: String,
+            ) = runOps(
+                "entity:\n  E: $source\n",
+                entityOps +
+                    "- {op: shape, in: entity, at: '', to: {kind: entity, path: [semantics, s]}, template: $template}",
+            ).properties()["semantics"]
+                ?.jsonObject
+                ?.get("s")
+            shaped("{en: Hello}", "{cs: {x: {input: /chybi}}, en: {input: /en}}") shouldBe
+                Json.parseToJsonElement("""{"en":"Hello"}""")
+            shaped("{x: 7}", "[{a: {input: /chybi}}, {input: /x}]") shouldBe Json.parseToJsonElement("[7]")
+            shaped("{x: 7}", "{lit: {}, v: {input: /x}}") shouldBe Json.parseToJsonElement("""{"lit":{},"v":7}""")
+            shaped("{en: Hello}", "{a: {lit: {}, v: {input: /chybi}}, en: {input: /en}}") shouldBe
+                Json.parseToJsonElement("""{"en":"Hello"}""")
+            shaped("{}", "{a: {b: [{input: /chybi}]}, c: [{input: /nic}]}") shouldBe null
         }
         test("a template object with input and another key is refused at load (S3.1 schema): no expressions") {
             listOf(

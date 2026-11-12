@@ -101,6 +101,27 @@ class PositionCarrySpec :
             error.location.path shouldBe "/overlay/E/description"
             error.location.line shouldBe 4
         }
+        test("an overlay replacing a transformed property drops its transform origins (review-251 F6)") {
+            val profile =
+                ProfileReader.read(
+                    "profile: demo-ov/1\ngrammar: '>=0.22 <1.0'\noverlay:\n" +
+                        "  E: {search: {searchable: true, method: {name: 5}}}\noperations:\n" + entityOps +
+                        "- {op: values, in: entity, at: /hledani, to: {kind: entity, path: [search, method]}, " +
+                        "mapping: {presne: {name: EXACT}}}\n",
+                    "profile.yaml",
+                )
+            val error =
+                shouldThrow<ProfileException> {
+                    ProfileEngine.apply(
+                        listOf(ForeignTree.read("entity:\n  E:\n    hledani: presne\n", "dialect.yaml")),
+                        listOf(profile),
+                    )
+                }
+            withClue(error.message) {
+                error.location.file shouldBe "profile.yaml"
+                error.location.path shouldBe "/overlay/E/search"
+            }
+        }
         test("the report JSON keeps its shape: documents[], ignored[], overridden[] (snapshots)") {
             val values = demoChain("values.yaml")
             val inputs =

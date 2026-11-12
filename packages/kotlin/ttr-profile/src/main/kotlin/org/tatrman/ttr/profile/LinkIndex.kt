@@ -3,8 +3,12 @@ package org.tatrman.ttr.profile
 
 import kotlinx.serialization.json.*
 import java.io.IOException
+import java.io.UncheckedIOException
+import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.attribute.BasicFileAttributes
 import kotlin.io.path.name
 
 /**
@@ -47,17 +51,60 @@ internal object Qnames {
 internal object SourcesJsonReader {
     private const val SUFFIX = ".sources.json"
 
+    /** Directories never walked below the root (✅R251-C): VCS/tool state, build output and vendored packages. */
+    private fun skipped(name: String) = name.startsWith(".") || name == "build" || name == "node_modules"
+
     fun read(root: Path): List<LinkEntry> {
-        val real = root.toRealPath()
-        val files =
-            Files.walk(real).use { paths ->
-                paths
-                    .filter { Files.isRegularFile(it) && it.name.endsWith(SUFFIX) && it.name.length > SUFFIX.length }
-                    .map { real.relativize(it).toString().replace('\\', '/') }
-                    .sorted()
-                    .toList()
-            }
-        return files.flatMap { relative -> entries(relative, real.resolve(relative)) }
+        val files = mutableListOf<String>()
+        var real: Path? = null
+
+        fun unreadable(
+            at: Path?,
+            e: IOException,
+        ): Nothing {
+            val file =
+                at?.let { real?.relativize(it)?.toString()?.replace('\\', '/') }?.ifEmpty { "." } ?: root.toString()
+            throw ProfileException(
+                "ys/profile-invalid",
+                ProfileSpan(file, 1, 1, 1, 1, ""),
+                "Cannot walk for sidecars: ${e.message}",
+            )
+        }
+        try {
+            val top = root.toRealPath().also { real = it }
+            Files.walkFileTree(
+                top,
+                object : SimpleFileVisitor<Path>() {
+                    override fun preVisitDirectory(
+                        dir: Path,
+                        attrs: BasicFileAttributes,
+                    ): FileVisitResult {
+                        val skip = dir != top && skipped(dir.name)
+                        return if (skip) FileVisitResult.SKIP_SUBTREE else FileVisitResult.CONTINUE
+                    }
+
+                    override fun visitFile(
+                        file: Path,
+                        attrs: BasicFileAttributes,
+                    ): FileVisitResult {
+                        if (attrs.isRegularFile && file.name.endsWith(SUFFIX) && file.name.length > SUFFIX.length) {
+                            files += top.relativize(file).toString().replace('\\', '/')
+                        }
+                        return FileVisitResult.CONTINUE
+                    }
+
+                    override fun visitFileFailed(
+                        file: Path,
+                        exc: IOException,
+                    ): FileVisitResult = unreadable(file, exc)
+                },
+            )
+        } catch (e: IOException) {
+            unreadable(null, e)
+        } catch (e: UncheckedIOException) {
+            unreadable(null, e.cause ?: IOException(e))
+        }
+        return files.sorted().flatMap { relative -> entries(relative, real!!.resolve(relative)) }
     }
 
     private fun entries(
@@ -98,20 +145,23 @@ internal object SourcesJsonReader {
     }
 }
 
-/** Every record of the run plus the root's sidecars; S3.6 writes the sidecar from the same entries. */
+/**
+ * Every record of the run plus the root's sidecars; S3.6 writes the sidecar from the same entries. The sidecar part is
+ * read on the first [resolve] only (✅R251-C): a run with no `link` and no sourceName overlay key never walks the root.
+ */
 internal class LinkIndex(
-    val entries: List<LinkEntry>,
+    private val run: List<LinkEntry>,
+    sidecars: () -> List<LinkEntry> = { emptyList() },
 ) {
-    private val byKey: Map<String, Map<String, List<LinkEntry>>> =
+    private val byKey: Map<String, Map<String, List<LinkEntry>>> by lazy {
+        val entries = run + sidecars()
         mapOf(
             "sourceName" to entries.filter { it.sourceName != null }.groupBy { it.sourceName!! },
             "iri" to entries.filter { it.iri != null }.groupBy { it.iri!! },
             "path" to entries.filter { it.path != null }.groupBy { it.path!! },
         )
-    private val byQname = entries.groupBy { it.qname }
-
-    val records: Map<Record, LinkEntry> =
-        entries.filter { it.record != null }.associateBy { it.record!! }
+    }
+    private val byQname = run.groupBy { it.qname }
 
     /** Candidates with distinct qnames; [kind] null accepts every kind. */
     fun resolve(
@@ -125,6 +175,7 @@ internal class LinkIndex(
             .filter { kind == null || it.kind == kind }
             .distinctBy { it.qname }
 
+    /** The run records with this qname; never reads the sidecars. */
     fun qname(value: String): List<LinkEntry> = byQname[value].orEmpty()
 
     companion object {
@@ -148,7 +199,7 @@ internal class LinkIndex(
                         )
                     }
                 }
-            return LinkIndex(run + (root?.let(SourcesJsonReader::read) ?: emptyList()))
+            return LinkIndex(run) { root?.let(SourcesJsonReader::read) ?: emptyList() }
         }
     }
 }

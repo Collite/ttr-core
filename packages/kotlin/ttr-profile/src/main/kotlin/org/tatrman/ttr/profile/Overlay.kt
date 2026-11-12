@@ -2,6 +2,10 @@
 package org.tatrman.ttr.profile
 
 import kotlinx.serialization.json.*
+import org.snakeyaml.engine.v2.api.Load
+import org.snakeyaml.engine.v2.api.LoadSettings
+import org.snakeyaml.engine.v2.exceptions.MarkedYamlEngineException
+import org.snakeyaml.engine.v2.exceptions.YamlEngineException
 import org.tatrman.ttr.yaml.YamlData
 import org.tatrman.ttr.yaml.readProfileYaml
 import java.io.IOException
@@ -35,23 +39,44 @@ internal data class RenameEntry(
 internal object Renames {
     private const val FILE = "renames.yaml"
 
-    /** Read only when an orphan needs a suggestion. A malformed ledger is reported at the file, with its pointer. */
+    /**
+     * Read only when an orphan needs a suggestion, as ttr-metadata's `Rename.read` reads it: an empty document is no
+     * renames, a leading `---` is fine. A malformed ledger is reported at the file, at the parser's own line.
+     */
     fun read(root: Path?): List<RenameEntry> {
         val file = root?.resolve(FILE)?.takeIf { Files.isRegularFile(it) } ?: return emptyList()
-        // YamlData reads mapping documents only; the ledger is a list, so it is read as the value of one key.
-        val wrapped = "renames:\n" + readProfileYaml(file).lines().joinToString("\n") { "  $it" }
-        val value = profileRead { YamlData.read(wrapped, FILE) }.value["renames"]
-        val list = value as? JsonArray ?: invalid("", "renames.yaml must be a list")
-        return list.mapIndexed { i, item ->
-            val entry = item as? JsonObject
-            if (entry == null ||
-                entry.keys != setOf("from", "to", "since")
-            ) {
+        val text =
+            try {
+                profileRead { readProfileYaml(file) }
+            } catch (e: IOException) {
+                invalid("", "Cannot read renames.yaml: ${e.message}")
+            }
+        val value =
+            try {
+                Load(LoadSettings.builder().build()).loadFromString(text)
+            } catch (e: YamlEngineException) {
+                val mark = (e as? MarkedYamlEngineException)?.problemMark?.orElse(null)
+                throw ProfileException(
+                    "ys/profile-invalid",
+                    ProfileSpan(
+                        FILE,
+                        (mark?.line ?: 0) + 1,
+                        (mark?.column ?: 0) + 1,
+                        (mark?.line ?: 0) + 1,
+                        (mark?.column ?: 0) + 1,
+                        "",
+                    ),
+                    "renames.yaml is not YAML: ${e.message}",
+                )
+            } ?: return emptyList()
+        val list = value as? List<*> ?: invalid("", "renames.yaml must be a list")
+        return list.mapIndexed { i, entry ->
+            if (entry !is Map<*, *> || entry.keys != setOf("from", "to", "since")) {
                 invalid("/$i", "rename requires from, to, since")
             }
 
             fun text(key: String) =
-                (entry[key] as? JsonPrimitive)?.takeIf { it.isString && it.content.isNotBlank() }?.content
+                (entry[key] as? String)?.takeIf { it.isNotBlank() }
                     ?: invalid("/$i/$key", "rename $key must be a nonempty string")
             RenameEntry(text("from"), text("to"), text("since"))
         }
@@ -65,8 +90,9 @@ internal object Renames {
 
 object OverlayLoader {
     /**
-     * A path overlay resolves relative to the declaring profile and must stay inside [root] (or, without a root, inside
-     * the profile's directory); an inline overlay keeps the profile's own positions.
+     * A path overlay resolves relative to the declaring profile, whose label is absolute or relative to [root] (never
+     * the cwd), and must stay inside [root] (or, without a root, inside the profile's directory); an inline overlay
+     * keeps the profile's own positions.
      */
     fun load(
         profile: ProfileDefinition,
@@ -80,23 +106,25 @@ object OverlayLoader {
         }
         val at = profile.locations.getValue("/overlay")
         val reference = overlay.jsonPrimitive.content
+        // The declaring label is absolute, or relative to the root, as ProfileResolver reads it; never the cwd.
+        val declaring =
+            try {
+                Path.of(profile.file).let { if (it.isAbsolute) it else root?.resolve(it) }
+            } catch (e: java.nio.file.InvalidPathException) {
+                null
+            }
+                ?: throw ProfileException(
+                    "ys/profile-not-found",
+                    at,
+                    "A path overlay needs a root or an absolute profile file",
+                )
+        val file =
+            confinedFile("Overlay", reference, at, { root ?: declaring.parent }) { declaring.parent.resolve(reference) }
         val data =
             try {
-                val declaring = Path.of(profile.file).toAbsolutePath()
-                val boundary = (root ?: declaring.parent).toRealPath()
-                val file = declaring.parent.resolve(reference).toRealPath()
-                if (!file.startsWith(boundary) || !Files.isRegularFile(file)) {
-                    throw ProfileException(
-                        "ys/profile-not-found",
-                        at,
-                        "Overlay is outside root or is not a file: $reference",
-                    )
-                }
                 profileRead { YamlData.read(readProfileYaml(file), file.toString()) }
             } catch (e: IOException) {
                 throw ProfileException("ys/profile-not-found", at, "Overlay not found: $reference")
-            } catch (e: java.nio.file.InvalidPathException) {
-                throw ProfileException("ys/profile-not-found", at, "Invalid overlay path: $reference")
             }
         val value =
             data.value as? JsonObject
@@ -158,16 +186,22 @@ internal object OverlayApplier {
             index
                 .resolve("sourceName", entry.key, null)
                 .flatMap { candidate ->
-                    if (candidate.record !=
-                        null
-                    ) {
+                    if (candidate.record != null) {
                         listOf(candidate)
                     } else {
                         index.qname(candidate.qname).filter { it.record != null }
                     }
                 }.distinctBy { it.qname }
-        return when (named.size) {
-            1 -> named.single()
+        // ✅R251-A: under fan-out one name yields several records; keep those whose kind defines the property (none
+        // left: all, and canonical validation reports the property), then prefer a record outside the binding model.
+        val defining = named.filter { ProfileVocabulary.defines(it.record!!, entry.property) }.ifEmpty { named }
+        val primary =
+            defining
+                .takeIf { it.size > 1 }
+                ?.filter { ProfileVocabulary.model(it.kind) != "binding" }
+                ?.ifEmpty { null } ?: defining
+        return when (primary.size) {
+            1 -> primary.single()
             0 -> {
                 val rename = renames.value.firstOrNull { it.from == entry.key }
                 throw ProfileException(
@@ -190,7 +224,9 @@ internal object OverlayApplier {
             else -> throw ProfileException(
                 "xm/link-ambiguous",
                 entry.keyLocation,
-                "Overlay key ${entry.key} matches ${named.joinToString { it.qname }}",
+                "Overlay key ${entry.key} matches ${primary.joinToString {
+                    it.qname
+                }}; key the overlay by one of these qnames",
             )
         }
     }

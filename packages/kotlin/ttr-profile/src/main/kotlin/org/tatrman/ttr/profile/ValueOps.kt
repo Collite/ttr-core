@@ -27,12 +27,18 @@ internal class ValuesOp(
                 default?.let { builder.write(plan, record, path, it, source ?: record.source) }
                 continue
             }
-            val key = (source.value as? JsonPrimitive)?.content
-            val mapped =
-                key?.let(mapping::get) ?: default ?: throw ProfileException(
+            // A default covers a missing, null or unmapped scalar, never a misauthored structure.
+            val key =
+                (source.value as? JsonPrimitive)?.content ?: throw ProfileException(
                     "ys/value-unmapped",
                     source.span(key = true),
-                    if (key == null) "values needs a scalar at ${source.path}" else "Unmapped value $key",
+                    "values needs a scalar at ${source.path}",
+                )
+            val mapped =
+                mapping[key] ?: default ?: throw ProfileException(
+                    "ys/value-unmapped",
+                    source.span(key = true),
+                    "Unmapped value $key",
                 )
             builder.write(plan, record, path, mapped, source)
         }
@@ -41,8 +47,9 @@ internal class ValuesOp(
 
 /**
  * `shape`: a literal template whose only substitutions are `{input: <pointer>}`, relative to the `at` selection
- * (✅D-MW-67 (b)): a list element or object member whose input is missing is dropped; the template yields
- * nothing only when every input is missing. No expressions, no concatenation (P-8).
+ * (✅D-MW-67 (b), recursive per ✅R251-B): a list element or object member whose input is missing is dropped, and so
+ * is a container all of whose inputs are missing; the template yields nothing when every input is missing. No
+ * expressions, no concatenation (P-8).
  */
 internal class ShapeOp(
     private val op: PlannedOp,
@@ -59,35 +66,52 @@ internal class ShapeOp(
         for (record in plan.records.filter { it.kind == op.scope }) {
             val base = op.at.resolve(record.source, includeNull = true) ?: continue
             plan.consumption.open(base)
-            var inputs = 0
-            var found = 0
 
-            fun fill(node: JsonElement): Any =
+            // value is Missing for a missing input, and for a container with inputs beneath it none of which was
+            // found (✅R251-B: dropped like a missing leaf, all the way up). A literal {} or [] has no inputs: kept.
+            class Filled(
+                val value: Any,
+                val inputs: Boolean,
+            )
+
+            fun container(
+                parts: List<Filled>,
+                build: (List<Filled>) -> JsonElement,
+            ): Filled {
+                val inputs = parts.any { it.inputs }
+                val present = parts.filter { it.value !== Missing }
+                // Inputs beneath and none found: a literal sibling does not keep the container (✅R251-B).
+                val emptied = inputs && present.none { it.inputs }
+                return if (emptied) Filled(Missing, true) else Filled(build(present), inputs)
+            }
+
+            fun fill(node: JsonElement): Filled =
                 when {
                     node is JsonObject && node.keys == setOf("input") -> {
-                        inputs++
                         val input = JsonPointer(node.string("input")).resolve(base, includeNull = true)
                         input?.let(plan.consumption::consume)
-                        if (input == null || input.value == JsonNull) {
-                            Missing
-                        } else {
-                            found++
-                            input.value
+                        Filled(input?.value?.takeIf { it != JsonNull } ?: Missing, true)
+                    }
+                    node is JsonObject -> {
+                        val members = node.entries.map { (key, value) -> key to fill(value) }
+                        container(members.map { it.second }) { _ ->
+                            JsonObject(
+                                members
+                                    .filter { it.second.value !== Missing }
+                                    .associate { (key, filled) -> key to filled.value as JsonElement },
+                            )
                         }
                     }
-                    node is JsonObject ->
-                        JsonObject(
-                            node.entries
-                                .map { (key, value) -> key to fill(value) }
-                                .filter { it.second !== Missing }
-                                .associate { (key, value) -> key to value as JsonElement },
-                        )
-                    node is JsonArray -> JsonArray(node.map(::fill).filter { it !== Missing }.map { it as JsonElement })
-                    else -> node
+                    node is JsonArray ->
+                        container(
+                            node.map(::fill),
+                        ) { present -> JsonArray(present.map { it.value as JsonElement }) }
+                    else -> Filled(node, false)
                 }
-            val shaped = fill(template)
-            if (inputs == 0) plan.consumption.consume(base)
-            if (base.value == JsonNull || (inputs > 0 && found == 0) || shaped === Missing) continue
+            val filled = fill(template)
+            if (!filled.inputs) plan.consumption.consume(base)
+            val shaped = filled.value
+            if (base.value == JsonNull || shaped === Missing) continue
             builder.write(plan, record, path, shaped as JsonElement, base)
         }
     }

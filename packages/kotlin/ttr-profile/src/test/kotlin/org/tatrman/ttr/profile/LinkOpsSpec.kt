@@ -8,6 +8,7 @@ import io.kotest.matchers.string.shouldContain
 import kotlinx.serialization.json.*
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermissions
 import kotlin.io.path.*
 
 /** S3.3 T1: `link` (contracts §3, ✅D-MW-67 (c′)). Package names stay single-segment (control room §18 (f)). */
@@ -149,8 +150,49 @@ class LinkOpsSpec :
             run("entity:\n  A: {role: [A]}\n", ops, same).properties().getValue("roles") shouldBe
                 JsonArray(listOf(JsonPrimitive("demo.er.entity.A")))
             val bad = sidecarRoot("x/demo.sources.json" to """{"entries": [{"kind": "entity"}]}""")
-            val error = shouldThrow<ProfileException> { run("entity:\n  A: {}\n", entityOps, bad) }
+            val error = shouldThrow<ProfileException> { run("entity:\n  A: {role: [A]}\n", ops, bad) }
             error.code shouldBe "ys/profile-invalid"
             error.location.file shouldBe "x/demo.sources.json"
+        }
+
+        // review-251 F4 (✅R251-C): the sidecar part is read only when a lookup needs it, and never below
+        // dot-directories, build or node_modules.
+        val tableLink =
+            binding +
+                "- {op: link, in: er2db_entity, at: /cil, to: {kind: er2db_entity, path: [target, table]}, by: sourceName}"
+        test("no link and no overlay reads no sidecar; with a link, a malformed sidecar is still an error") {
+            val root = sidecarRoot("build/x.sources.json" to "not json", "sidecars/x.sources.json" to "not json")
+            run("entity:\n  A: {}\n", entityOps, root).defs().single().string("id") shouldBe "A"
+            root.resolve("build/x.sources.json").deleteExisting()
+            val error = shouldThrow<ProfileException> { run("vazby:\n  V: {cil: T}\n", tableLink, root) }
+            error.code shouldBe "ys/profile-invalid"
+            error.location.file shouldBe "sidecars/x.sources.json"
+        }
+        test("sidecars under .modeler, build and node_modules are not read") {
+            listOf(".modeler/x", "build", "node_modules", "a/build").forEach { dir ->
+                val root = sidecarRoot("$dir/sklad.sources.json" to db)
+                val error = shouldThrow<ProfileException> { run("vazby:\n  V: {cil: T}\n", tableLink, root) }
+                error.code shouldBe "xm/link-unresolved"
+            }
+            run("vazby:\n  V: {cil: T}\n", tableLink, sidecarRoot("a/sklad.sources.json" to db))
+                .properties()
+                .getValue("target") shouldBe buildJsonObject { put("table", "sklad.db.dbo.T") }
+        }
+        test("an unreadable directory under the root is ys/profile-invalid, not an I/O exception") {
+            val root = sidecarRoot("ok/sklad.sources.json" to db)
+            val locked = root.resolve("locked").createDirectories()
+            if ("posix" in locked.fileSystem.supportedFileAttributeViews()) {
+                locked.setPosixFilePermissions(emptySet())
+                try {
+                    // Running as root reads it anyway; there is nothing to assert then.
+                    if (!Files.isReadable(locked)) {
+                        val error = shouldThrow<ProfileException> { run("vazby:\n  V: {cil: T}\n", tableLink, root) }
+                        error.code shouldBe "ys/profile-invalid"
+                        error.location.file shouldBe "locked"
+                    }
+                } finally {
+                    locked.setPosixFilePermissions(PosixFilePermissions.fromString("rwx------"))
+                }
+            }
         }
     })

@@ -7,6 +7,31 @@ import java.nio.file.Path
 import org.tatrman.ttr.yaml.readProfileYaml
 
 /**
+ * The one root-confinement rule for files a profile names (a profile, a path overlay): the real path of [candidate]
+ * must be a regular file inside the real [boundary]; any failure is `ys/profile-not-found` at [at].
+ */
+internal fun confinedFile(
+    label: String,
+    ref: String,
+    at: ProfileSpan,
+    boundary: () -> Path,
+    candidate: () -> Path,
+): Path {
+    try {
+        val inside = boundary().toRealPath()
+        val real = candidate().toRealPath()
+        if (!real.startsWith(inside) || !Files.isRegularFile(real)) {
+            throw ProfileException("ys/profile-not-found", at, "$label is outside root or is not a file: $ref")
+        }
+        return real
+    } catch (e: IOException) {
+        throw ProfileException("ys/profile-not-found", at, "$label not found: $ref")
+    } catch (e: java.nio.file.InvalidPathException) {
+        throw ProfileException("ys/profile-not-found", at, "Invalid ${label.lowercase()} path: $ref")
+    }
+}
+
+/**
  * All lookups are explicit and local. Catalog paths are root-relative; extends paths are file-relative.
  * Declaring files are absolute, or relative to the resolver's root; the label also bases relative references.
  * A chain of more than 32 distinct profiles is refused as too deep, even if it would later cycle;
@@ -97,29 +122,18 @@ class ProfileResolver(
         ref: String,
         from: Path,
         at: ProfileSpan,
-    ): Path {
-        try {
-            val candidate =
-                catalog[ref]?.let { root.resolve(it) } ?: run {
-                    val path = Path.of(ref)
-                    if (!ref.startsWith(".") && !path.isAbsolute && !ref.endsWith(".yaml") && !ref.endsWith(".yml")) {
-                        throw ProfileException("ys/profile-not-found", at, "No catalog entry for $ref")
-                    }
-                    // Relative caller paths are rooted explicitly, never resolved against the process cwd.
-                    val file = if (from.isAbsolute) from else root.resolve(from)
-                    file.parent.resolve(path)
+    ): Path =
+        confinedFile("Profile", ref, at, { root }) {
+            catalog[ref]?.let { root.resolve(it) } ?: run {
+                val path = Path.of(ref)
+                if (!ref.startsWith(".") && !path.isAbsolute && !ref.endsWith(".yaml") && !ref.endsWith(".yml")) {
+                    throw ProfileException("ys/profile-not-found", at, "No catalog entry for $ref")
                 }
-            val real = candidate.toRealPath()
-            if (!real.startsWith(root) || !Files.isRegularFile(real)) {
-                throw ProfileException("ys/profile-not-found", at, "Profile is outside root or is not a file: $ref")
+                // Relative caller paths are rooted explicitly, never resolved against the process cwd.
+                val file = if (from.isAbsolute) from else root.resolve(from)
+                file.parent.resolve(path)
             }
-            return real
-        } catch (e: IOException) {
-            throw ProfileException("ys/profile-not-found", at, "Profile not found: $ref")
-        } catch (e: java.nio.file.InvalidPathException) {
-            throw ProfileException("ys/profile-not-found", at, "Invalid profile path: $ref")
         }
-    }
 
     private fun checkCatalogIdentity(
         key: String,
