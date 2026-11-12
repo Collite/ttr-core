@@ -1,0 +1,75 @@
+from __future__ import annotations
+from typing import Any
+from .runtime import BaseClient, BaseRun, Action
+
+class Parts:
+    def __init__(self, run: BaseRun) -> None:
+        self._run = run
+
+    def candidates(self) -> dict[str, Any]:
+        return self._run.part("candidates")
+
+    def shortfall(self) -> dict[str, Any]:
+        return self._run.part("shortfall")
+
+    def price_differences(self) -> dict[str, Any]:
+        return self._run.part("price_differences")
+
+    def overdue(self) -> dict[str, Any]:
+        return self._run.part("overdue")
+
+    def decision(self) -> dict[str, Any]:
+        return self._run.part("decision")
+
+
+class Routes:
+    def __init__(self, run: BaseRun) -> None:
+        self._run = run
+
+    def hold_sales(self) -> list[dict[str, Any]]:
+        return self._run.route("hold_sales")
+
+    def hold_ar(self) -> list[dict[str, Any]]:
+        return self._run.route("hold_ar")
+
+    def release_confirmed(self) -> list[dict[str, Any]]:
+        return self._run.route("release_confirmed")
+
+    def release(self) -> list[dict[str, Any]]:
+        return self._run.route("release")
+
+
+class Actions:
+    def __init__(self, run: BaseRun) -> None:
+        self._run = run
+
+    @property
+    def ask(self) -> Action:
+        return Action(self._run, "ask")
+
+    @property
+    def hold(self) -> Action:
+        return Action(self._run, "hold")
+
+    @property
+    def notify(self) -> Action:
+        return Action(self._run, "notify")
+
+    @property
+    def release(self) -> Action:
+        return Action(self._run, "release")
+
+
+class Run(BaseRun):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.parts = Parts(self)
+        self.routes = Routes(self)
+        self.actions = Actions(self)
+
+
+class Client(BaseClient):
+    run_type = Run
+
+    def open(self, port: dict[str, Any], as_of: str | None = None, *, dry_run: bool = False, idempotency_key: str | None = None) -> Run:
+        return super().open(port, as_of, dry_run=dry_run, idempotency_key=idempotency_key)

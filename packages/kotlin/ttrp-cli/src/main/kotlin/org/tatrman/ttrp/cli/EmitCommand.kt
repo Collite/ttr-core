@@ -561,7 +561,15 @@ class EmitCommand(
                             ).getValue("calls")
                             .jsonArray
                     }
-                val renderedCalls = workflowCalls ?: bpmnCalls
+                val pythonCalls =
+                    result.files["python-client.json"]?.let {
+                        Json
+                            .parseToJsonElement(it.decodeToString())
+                            .jsonObject
+                            .getValue("callPlan")
+                            .jsonArray
+                    }
+                val renderedCalls = workflowCalls ?: bpmnCalls ?: pythonCalls
                 val fingerprinted =
                     if (bundleFingerprint == null) {
                         exportManifest

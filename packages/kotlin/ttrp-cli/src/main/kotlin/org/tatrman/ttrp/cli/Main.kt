@@ -307,7 +307,9 @@ class ConformCommand : CliktCommand(name = "conform") {
                 throw ProgramResult(2)
             }
             val selectedCells = cells.flatMap { it.split(',') } + files
-            if (replayDriver != null && selectedCells.any { it.substringBefore('.').replace('_', '-') != "python-client" }) {
+            if (replayDriver != null &&
+                selectedCells.any { it.substringBefore('.').replace('_', '-') != "python-client" }
+            ) {
                 echo("ttrp conform: --driver conflicts with --cells", err = true)
                 throw ProgramResult(2)
             }

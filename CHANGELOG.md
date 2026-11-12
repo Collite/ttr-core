@@ -6,6 +6,14 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — Python client recipe exporter (AU-export P2 S2.1)
+
+- `python_client` emits a typed HTTP run-API package, CLI, subprocess service and per-route pytest suite,
+  with pinned Python 3.13.9 and pytest 8.3.5. Paths and recipe/action names come from SPI v2; exports contain no SQL.
+- `ttrp conform --replay --cells python-client.on-event --export <export>` runs that package under uv,
+  forces dry-run/fixture clocks, and compares exact verdicts, actions, details and transition effects.
+  `--driver python-client` selects the on-event cell. The wire is the existing Server HTTP API (⚑AU-EXP-3).
+
 ### Added — Record fan-out (MW P3 S3.2b, ttr-core#392)
 
 - `ttr-profile` makes one record per canonical kind from one foreign node: two `kinds` operations can turn one entry into an `entity` (model `er`) and its `er2db_entity` (model `binding`). The same node mapped twice to the same kind is still refused.
