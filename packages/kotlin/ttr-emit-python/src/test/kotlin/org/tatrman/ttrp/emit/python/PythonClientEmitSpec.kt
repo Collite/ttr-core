@@ -117,8 +117,8 @@ class PythonClientEmitSpec :
                     ).jsonObject
             config["held_actions"] shouldBe JsonArray(listOf("obligation", "transition", "writer").map(::JsonPrimitive))
         }
-        "release_py package matches the complete checked-in H-1 golden" {
-            val golden = Path.of("src/test/resources/goldens/release_py.txt")
+        "synthetic approval-held package matches its complete golden (real H-1 is covered by the CLI)" {
+            val golden = Path.of("src/test/resources/goldens/synthetic_client.txt")
             val text =
                 render().files.entries.joinToString(
                     "",
@@ -151,7 +151,7 @@ class PythonClientEmitSpec :
                         .start()
                 process.waitFor(120, TimeUnit.SECONDS) shouldBe true
                 io.kotest.assertions.withClue(Files.readString(log)) { process.exitValue() shouldBe 0 }
-                Files.readString(log) shouldContain "40 passed"
+                Files.readString(log) shouldContain "55 passed"
             } finally {
                 dir.toFile().deleteRecursively()
             }

@@ -99,6 +99,10 @@ internal class ContractServer(
 
     @Volatile var heldRelease = false
 
+    @Volatile var emptyReleaseKey: Int? = null
+
+    @Volatile var sharedAction = false
+
     @Volatile var failKey: Int? = null
     private val closed =
         java.util.concurrent.ConcurrentHashMap
@@ -155,6 +159,30 @@ internal class ContractServer(
                 },
             )
         }
+
+    private fun batchRows(id: String): List<JsonObject> =
+        keys(id).mapIndexedNotNull { index, key ->
+            if (key == emptyReleaseKey?.let(::JsonPrimitive)) return@mapIndexedNotNull null
+            buildJsonObject {
+                put("seq", index + 1)
+                put("entity", "er.entity.order")
+                put("op", "transition")
+                put("attribute", "state")
+                put("to", "released")
+                put("key", buildJsonObject { put("order_number", key) })
+                if (heldRelease) put("group", buildJsonObject { put("order_number", key) })
+            }
+        }
+
+    private fun actionRows(
+        id: String,
+        key: JsonElement,
+    ): JsonArray =
+        JsonArray(
+            batchRows(
+                id,
+            ).filter { it["key"] == buildJsonObject { put("order_number", key) } }.map { it.getValue("seq") },
+        )
 
     private suspend fun reply(call: ApplicationCall) {
         val path = call.request.path()
@@ -242,7 +270,9 @@ internal class ContractServer(
                     performBodies += body
                     val eligible = keys(id).map { key -> buildJsonObject { put("order_number", key) } }
                     val action = path.substringAfter("/actions/").substringBefore('/')
-                    if (eligible.isEmpty() || (action != "release" && !(includeMail && action == "notify"))) {
+                    if (eligible.isEmpty() ||
+                        (action != "release" && !((includeMail || sharedAction) && action == "notify"))
+                    ) {
                         call.respondText(
                             "the run has no rows of action $action",
                             ContentType.Text.Plain,
@@ -250,7 +280,7 @@ internal class ContractServer(
                         )
                         return
                     }
-                    val selected = (requested as? JsonArray ?: eligible).distinct()
+                    val selected = (requested ?: eligible).distinct()
                     val performed = if (performFault == "performs") selected.filter { it in eligible } else emptyList()
                     val skipped =
                         selected.filterNot { it in performed }.let {
@@ -295,7 +325,8 @@ internal class ContractServer(
                                                 key !in eligible -> "not-a-key"
                                                 performFault == "reason" -> "wrong-reason"
                                                 performFault == "dry-run" -> "dry-run"
-                                                heldRelease && action == "release" -> "held"
+                                                performFault == "held" -> "held"
+                                                batchRows(id).any { it["key"] == key && it["group"] != null } -> "held"
                                                 else -> "dry-run"
                                             },
                                         )
@@ -360,17 +391,7 @@ internal class ContractServer(
                         put("mode", "preview")
                         put(
                             "rows",
-                            JsonArray(
-                                keys(id).map { key ->
-                                    buildJsonObject {
-                                        put("entity", "er.entity.order")
-                                        put("op", "transition")
-                                        put("attribute", "state")
-                                        put("to", "released")
-                                        put("key", buildJsonObject { put("order_number", key) })
-                                    }
-                                },
-                            ),
+                            JsonArray(batchRows(id)),
                         )
                     }.toString()
                 path.endsWith("/close") -> {
@@ -391,14 +412,38 @@ internal class ContractServer(
                                             put("key", buildJsonObject { put("order_number", key) })
                                             put("action", "release")
                                             put("arguments", buildJsonObject { put("order", key) })
+                                            put("batchRows", actionRows(id, key))
                                         },
                                     ) +
-                                        if (includeMail) {
+                                        if (includeMail || (sharedAction && actionRows(id, key).isNotEmpty())) {
                                             listOf(
                                                 buildJsonObject {
                                                     put("key", buildJsonObject { put("order_number", key) })
                                                     put("action", "notify")
-                                                    put("arguments", buildJsonObject { put("who", "role.sales") })
+                                                    put(
+                                                        "arguments",
+                                                        buildJsonObject {
+                                                            if (sharedAction) {
+                                                                put(
+                                                                    "order",
+                                                                    key,
+                                                                )
+                                                            } else {
+                                                                put("who", "role.sales")
+                                                            }
+                                                        },
+                                                    )
+                                                    put(
+                                                        "batchRows",
+                                                        if (sharedAction) {
+                                                            actionRows(
+                                                                id,
+                                                                key,
+                                                            )
+                                                        } else {
+                                                            JsonArray(emptyList())
+                                                        },
+                                                    )
                                                 },
                                             )
                                         } else {

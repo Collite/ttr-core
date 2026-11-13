@@ -395,12 +395,14 @@ Python replay runs the generated package itself in a uv/Python subprocess, using
 (or `--driver python-client`) plus `--export release_py.python_client.export`. Batch exports use
 `--cells python-client.batch`. One service process handles the fixture's ordered per-key requests (or one batch
 request), retaining errors per key. The service forces dryRun and the fixture clock, reads complete route/detail
-pages and calls perform once per action with object keys. The export marks `held_actions`: approval-required
-actions with native sink `transition`, `writer` or `obligation` (D-142). Their dry-run results must skip every
-selected key with reason `held`; every other action must skip all keys `dry-run`. Wet runs may report `held`
-only for marked actions. Declared budgets apply separately to each run, including a re-opened run; the fixture's
+pages and reads the batch before calling perform once per action with object keys. A key must be `held` iff
+its preview `batchRows` reference any grouped row; other keys must be `dry-run` (dry) or performed (wet).
+The export's `held_actions` lists approval-required native transition/writer/obligation actions (D-142) as a
+cross-check: every grouped row needs a marked owner, and a marked key with rows must reference a group.
+A marked key with no rows is unheld; an unmarked key sharing a grouped row is held. Declared budgets apply
+separately to each run, including a re-opened run and a completed foreign claim's evidence reads; the fixture's
 process timeout sums those budgets with allowance for one re-open per request. Live handles poll using
-Retry-After (15 seconds by default), leaving time for a final status read. HTTP failures,
+Retry-After (15 seconds by default), allowing one final status read before timing out. Malformed Server keys, HTTP failures,
 truncated details and missing exports are driver errors. `python-client` remains an HTTP run-API consumer;
 live Python certification belongs to the P2 certification stage.
 

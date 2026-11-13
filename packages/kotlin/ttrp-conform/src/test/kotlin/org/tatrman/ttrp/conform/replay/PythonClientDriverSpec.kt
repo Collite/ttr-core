@@ -39,6 +39,7 @@ class PythonClientDriverSpec :
         fun export(
             mode: String,
             held: Boolean = false,
+            shared: Boolean = false,
         ): java.nio.file.Path {
             val graph =
                 RecipeGraph(
@@ -83,14 +84,33 @@ class PythonClientDriverSpec :
                         "release" to
                             ActionMeta(
                                 mapOf("order" to "order.order_number"),
-                                mapOf("native" to "transition", "python_client" to "door"),
+                                mapOf(
+                                    "native" to if (shared) "obligation" else "transition",
+                                    "python_client" to "door",
+                                ),
                                 if (held) "required" else null,
                                 false,
                                 null,
                                 emptyMap(),
                                 null,
                             ),
-                    ),
+                    ) +
+                        if (shared) {
+                            mapOf(
+                                "notify" to
+                                    ActionMeta(
+                                        mapOf("order" to "order.order_number"),
+                                        mapOf("native" to "obligation", "python_client" to "door"),
+                                        null,
+                                        false,
+                                        null,
+                                        emptyMap(),
+                                        null,
+                                    ),
+                            )
+                        } else {
+                            emptyMap()
+                        },
                     RunApiMeta(
                         "/automation",
                         mapOf(
@@ -174,22 +194,69 @@ class PythonClientDriverSpec :
                 }
             }
         }
-        "dry replay requires held only for approval-required actions on native held sinks" {
+        "dry replay accepts a marked key with no rows and an unmarked key sharing a held row" {
             ContractServer().use { server ->
                 server.asyncOnce = false
                 server.heldRelease = true
-                val held = PythonClientDriver(server.url, "test-token", listOf(export("batch", held = true)))
-                val accepted = ReplayRunner.run(fixture, listOf("python-client.batch")) { held }
+                server.emptyReleaseKey = 4712
+                server.sharedAction = true
+                val driver =
+                    PythonClientDriver(server.url, "test-token", listOf(export("batch", held = true, shared = true)))
+                val sharedFixture =
+                    fixture.copy(
+                        expected =
+                            fixture.expected.mapValues { (_, expected) ->
+                                expected.copy(
+                                    actions =
+                                        expected.actions.orEmpty() +
+                                            buildJsonObject {
+                                                put("key", 4711)
+                                                put("action", "notify")
+                                                put("columns", buildJsonObject { put("order", 4711) })
+                                            },
+                                )
+                            },
+                        finalStates = null,
+                    )
+                val accepted = ReplayRunner.run(sharedFixture, listOf("python-client.batch")) { driver }
                 io.kotest.assertions.withClue(accepted.summary()) { accepted.exitCode shouldBe 0 }
-                server.performFault = "dry-run"
-                val wrongDry = ReplayRunner.run(fixture, listOf("python-client.batch")) { held }
-                wrongDry.exitCode shouldBe 2
-                wrongDry.summary() shouldContain "perform effects differ"
-                server.performFault = null
-                val unmarked = PythonClientDriver(server.url, "test-token", listOf(export("batch")))
-                val wrongHeld = ReplayRunner.run(fixture, listOf("python-client.batch")) { unmarked }
-                wrongHeld.exitCode shouldBe 2
-                wrongHeld.summary() shouldContain "perform effects differ"
+                server.performBodies.map { it.getValue("keys").jsonArray.size } shouldBe listOf(2, 1)
+                server.requests.count { it.endsWith("/batch") } shouldBe 1
+                (
+                    server.requests.indexOfFirst { it.endsWith("/batch") } <
+                        server.requests.indexOfFirst { it.endsWith("/perform") }
+                ) shouldBe
+                    true
+            }
+        }
+        "per-key perform rejects forged reasons and grouped rows without a marked owner" {
+            for (fault in listOf("held-without-group", "dry-run-for-group", "orphan-group")) {
+                ContractServer().use { server ->
+                    server.asyncOnce = false
+                    server.heldRelease = fault != "held-without-group"
+                    server.performFault =
+                        when (fault) {
+                            "held-without-group" -> "held"
+                            "dry-run-for-group" -> "dry-run"
+                            else -> null
+                        }
+                    val driver =
+                        PythonClientDriver(
+                            server.url,
+                            "test-token",
+                            listOf(
+                                export(
+                                    "batch",
+                                    held =
+                                        fault == "dry-run-for-group",
+                                ),
+                            ),
+                        )
+                    val report = ReplayRunner.run(fixture, listOf("python-client.batch")) { driver }
+                    report.exitCode shouldBe 2
+                    report.summary() shouldContain "perform effects differ"
+                    if (fault == "orphan-group") server.performBodies.size shouldBe 0
+                }
             }
         }
         "fixture timeout sums each request budget, including one re-open and uv startup" {
@@ -283,7 +350,10 @@ class PythonClientDriverSpec :
             val folder = export("batch")
             for (output in listOf("", "not-json")) {
                 val wrapper = folder.resolve("bad-output.sh")
-                Files.writeString(wrapper, "#!/bin/sh\necho 'startup diagnostic test-token' >&2\nprintf '$output'\n")
+                Files.writeString(
+                    wrapper,
+                    "#!/bin/sh\ncat >/dev/null\necho 'startup diagnostic test-token' >&2\nprintf '$output'\n",
+                )
                 wrapper.toFile().setExecutable(true)
                 val error =
                     shouldThrow<IllegalStateException> {
@@ -302,7 +372,7 @@ class PythonClientDriverSpec :
         "a malformed service envelope retains the service diagnostic on nonzero exit" {
             val folder = export("batch")
             val wrapper = folder.resolve("bad-envelope.sh")
-            Files.writeString(wrapper, "#!/bin/sh\nexec uv \"\$@\" <<'ENVELOPE'\n{}\nENVELOPE\n")
+            Files.writeString(wrapper, "#!/bin/sh\ncat >/dev/null\nexec uv \"\$@\" <<'ENVELOPE'\n{}\nENVELOPE\n")
             wrapper.toFile().setExecutable(true)
             val error =
                 shouldThrow<IllegalStateException> {

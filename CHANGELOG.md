@@ -13,13 +13,15 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - `ttrp conform --replay --cells python-client.on-event --export <export>` runs that package under uv,
   forces dry-run/fixture clocks, and compares exact verdicts, actions, details and transition effects.
   `--driver python-client` selects the on-event cell. The wire is the Server HTTP contract (⚑AU-EXP-3).
-- review-254 repair: action keys are objects; dry-run perform validates skips per action's native sink and approval:
-  required transition/writer/obligation actions must be held, others skipped dry-run; wet holds are legal only for marked actions.
+- review-254 repair: action keys are objects; perform expectations come from each key's actual batch rows (✅R254-E).
+  Grouped rows require held results, including shared rows; empty row sets are unheld. Exported native approval markers
+  cross-check group ownership. The batch is read once, before perform, and reused for effects.
   Replay uses one service process per fixture and one perform call per action. Authored budgets become seconds,
   deadlines belong to each run, dropped claims reopen once, and polling honors Retry-After. Startup failures retain
   bounded stderr diagnostics; action detail normalization matches the Kotlin column shape. Fixture timeouts sum each
-  request's exported budget plus one re-open; each recovered run gets its own budget. Polling leaves time for a final
-  status read. Service diagnostics retain configuration errors and suppress unexpected exception messages.
+  request's exported budget plus one re-open; recovered runs and completed foreign claims' evidence reads get fresh windows.
+  Polling allows one final status read without spinning; malformed response keys are API errors. Service diagnostics retain
+  configuration errors and suppress unexpected exception messages. Compiled-world specs cover both real H-1 and required holds.
 
 ### Added — `values`, `shape`, `link` and the overlay (MW P3 S3.3)
 

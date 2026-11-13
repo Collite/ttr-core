@@ -23,21 +23,29 @@ class Response:
 
 class Server:
     """Drive the generated HTTP transport, including request bodies and response keys."""
-    def __init__(self, monkeypatch, *, claim=201, states=None, reopen=201, dry=True, held=False):
+    def __init__(self, monkeypatch, *, claim=201, states=None, reopen=201, dry=True, held=False, marked=None):
         self.claim, self.reopen, self.dry = claim, reopen, dry
         self.states = list(states or ["evaluated"])
         self.seen, self.opens, self.sleeps = [], [], []
         self.now = 0
         self.open_retry_after = "7"
         self.status_headers, self.status_elapsed = [], []
+        self.status_reads, self.status_limit = 0, None
         self.perform_reason = "held" if held else "dry-run" if dry else None
-        self.response_key = {"order_number": Decimal("4711.0")}
+        self.perform_reasons = None
+        self.response_key = None
+        self.batch_rows = [dict(seq=1, **({"group": {"order_number": 4711}} if held else {}))]
+        self.previews = [{"key": {"order_number": 4711}, "action": "release", "arguments": {"order": 4711}, "batchRows": [1]}]
+        self.route_rows = [{"order_number": 4711}]
+        self.page_size = 1000
+        self.request_elapsed = 0
+        self.evaluate_response = Response(200, {})
         self.client = Client("http://127.0.0.1", "test-token")
         self.client.opener = self
         monkeypatch.setattr(rt.time, "monotonic", lambda: self.now)
         monkeypatch.setattr(rt.time, "sleep", self.sleep)
         monkeypatch.setitem(rt.CONFIG, "dry_run", dry)
-        monkeypatch.setitem(rt.CONFIG, "held_actions", ["release"] if held else [])
+        monkeypatch.setitem(rt.CONFIG, "held_actions", ["release"] if (held if marked is None else marked) else [])
 
     def sleep(self, seconds):
         self.sleeps.append(seconds)
@@ -47,31 +55,41 @@ class Server:
         path = urlsplit(request.full_url).path
         body = rt.loads(request.data.decode()) if request.data else None
         self.seen.append((path, body, timeout))
+        self.now += self.request_elapsed
         if path.endswith("/runs"):
             self.opens.append(body)
             return Response(self.claim if len(self.opens) == 1 else self.reopen, {"runId": "r1"}, {"Retry-After": self.open_retry_after})
         if path.endswith("/evaluate"):
-            return Response(200, {})
+            return self.evaluate_response
         if path.endswith("/routes/release"):
-            return Response(200, {"rows": [{"order_number": 4711}], "rowCount": 1})
+            from urllib.parse import parse_qs
+            offset = int(parse_qs(urlsplit(request.full_url).query)["offset"][0])
+            return Response(200, {"rows": self.route_rows[offset:offset + self.page_size], "rowCount": len(self.route_rows)})
+        if path.endswith("/details/stock"):
+            return Response(200, {"rows": [{"available": 1}], "rowCount": 1})
         if path.endswith("/perform"):
-            assert body == {"keys": [{"order_number": 4711}]}
-            row = {"key": self.response_key}
-            if self.perform_reason is not None:
-                return Response(200, {"performed": [], "skipped": [dict(row, reason=self.perform_reason)]})
-            return Response(200, {"performed": [dict(row, batchRows=[])], "skipped": []})
+            action = path.split("/actions/")[1].split("/")[0]
+            performed, skipped = [], []
+            for key in body["keys"]:
+                assert isinstance(key, dict) and set(key) == {"order_number"}
+                row = {"key": key if self.response_key is None else self.response_key}
+                reason = self.perform_reason if self.perform_reasons is None else self.perform_reasons[action][key["order_number"]]
+                (performed if reason is None else skipped).append(dict(row, batchRows=[]) if reason is None else dict(row, reason=reason))
+            return Response(200, {"performed": performed, "skipped": skipped})
         if path.endswith("/outcome"):
             return Response(200, {})
         if path.endswith("/batch"):
-            return Response(200, {"rows": []})
+            return Response(200, {"rows": self.batch_rows})
         if path.endswith("/close"):
             return Response(200, {"status": "closed"})
+        self.status_reads += 1
+        assert self.status_limit is None or self.status_reads <= self.status_limit, "too many status reads"
         state = self.states.pop(0) if len(self.states) > 1 else self.states[0]
         if self.status_elapsed:
             self.now += self.status_elapsed.pop(0)
         headers = self.status_headers.pop(0) if self.status_headers else {}
         return Response(200, {"status": state, "dryRun": self.dry, "verdict": {"routes": {"release": {"rowCount": 1}}},
-                              "actions": [{"key": {"order_number": 4711}, "action": "release", "arguments": {"order": 4711}}]}, headers)
+                              "actions": self.previews}, headers)
 
 
 def test_exact_decimal_and_bearer_validation():
@@ -204,23 +222,108 @@ def test_reopened_run_gets_its_own_full_budget(monkeypatch):
     assert next(timeout for path, _, timeout in server.seen if path.endswith("/evaluate")) == 30
 
 
-@pytest.mark.parametrize("dry,held,reason,accepted", [
-    (True, True, "held", True),
-    (True, True, "dry-run", False),
-    (True, False, "held", False),
-    (False, True, "held", True),
-    (False, True, None, True),
-    (False, False, None, True),
-    (False, False, "held", False),
+@pytest.mark.parametrize("dry,marked,grouped,empty,reason,accepted", [
+    (True, True, True, False, "held", True),
+    (True, True, True, False, "dry-run", False),
+    (True, False, False, False, "held", False),
+    (False, True, True, False, "held", True),
+    (False, True, True, False, None, False),
+    (False, False, False, False, None, True),
+    (False, False, False, False, "held", False),
+    (True, True, False, True, "dry-run", True),
+    (False, True, False, True, None, True),
+    (True, True, False, False, "dry-run", False),
 ])
-def test_perform_skip_policy_is_strict_per_action(monkeypatch, dry, held, reason, accepted):
-    server = Server(monkeypatch, dry=dry, held=held)
+def test_perform_policy_uses_each_keys_actual_rows(monkeypatch, dry, marked, grouped, empty, reason, accepted):
+    server = Server(monkeypatch, dry=dry, held=grouped, marked=marked)
+    if empty:
+        server.previews[0]["batchRows"] = []
+        server.batch_rows = []
     server.perform_reason = reason
     if accepted:
         rt.execute(server.client, {"key": 4711}, None)
     else:
         with pytest.raises(rt.ApiError, match="perform effects differ"):
             rt.execute(server.client, {"key": 4711}, None)
+
+
+def test_marked_empty_key_and_unmarked_shared_row_both_replay(monkeypatch):
+    server = Server(monkeypatch, held=True)
+    server.previews += [
+        {"action": "release", "key": {"order_number": 4712}, "arguments": {"order": 4712}, "batchRows": []},
+        {"action": "notify", "key": {"order_number": 4711}, "arguments": {"order": 4711}, "batchRows": [1]},
+    ]
+    server.perform_reasons = {"release": {4711: "held", 4712: "dry-run"}, "notify": {4711: "held"}}
+    result = rt.execute(server.client, {"key": 4711}, None)
+    assert [r["reason"] for effect in result["perform_effects"] for r in effect["skipped"]] == ["held", "dry-run", "held"]
+    paths = [path for path, _, _ in server.seen]
+    assert sum(path.endswith("/batch") for path in paths) == 1
+    assert next(i for i, path in enumerate(paths) if path.endswith("/batch")) < next(i for i, path in enumerate(paths) if path.endswith("/perform"))
+
+
+def test_grouped_row_requires_a_marked_owner(monkeypatch):
+    server = Server(monkeypatch, held=True, marked=False)
+    with pytest.raises(rt.ApiError, match="perform effects differ"):
+        rt.execute(server.client, {"key": 4711}, None)
+    assert not any(path.endswith("/perform") for path, _, _ in server.seen)
+
+
+@pytest.mark.parametrize("refs", [None, [999], "not-a-list"])
+def test_preview_batch_rows_must_reference_the_batch(monkeypatch, refs):
+    server = Server(monkeypatch)
+    if refs is None:
+        server.previews[0].pop("batchRows")
+    else:
+        server.previews[0]["batchRows"] = refs
+    with pytest.raises(rt.ApiError, match="perform effects differ"):
+        rt.execute(server.client, {"key": 4711}, None)
+    assert not any(path.endswith("/perform") for path, _, _ in server.seen)
+
+
+def test_late_foreign_completion_gets_a_fresh_evidence_window(monkeypatch):
+    server = Server(monkeypatch, claim=202, states=["open", "closed"])
+    monkeypatch.setitem(rt.CONFIG, "budget_seconds", 60)
+    server.request_elapsed = 0.5
+    server.status_elapsed = [159]
+    server.open_retry_after = "30"
+    server.page_size = 1
+    server.route_rows = [{"order_number": k, "detail": {"stock": "/unused"}} for k in (4711, 4712)]
+    result = rt.execute(server.client, {"key": 4711}, None)
+    assert len(result["verdicts"]) == len(result["details"]) == 2
+    assert server.now > 180  # Reads outlive the claim's original deadline.
+    assert all(timeout == 30 for path, _, timeout in server.seen if "/routes/" in path or path.endswith("/batch"))
+
+
+@pytest.mark.parametrize("operation", ["observe", "evaluate"])
+def test_last_half_second_allows_one_status_read_then_times_out(monkeypatch, operation):
+    server = Server(monkeypatch, claim=202, states=["running"])
+    monkeypatch.setitem(rt.CONFIG, "budget_seconds", 60)
+    if operation == "observe":
+        server.status_elapsed = [179.5]
+        invoke = lambda: rt.execute(server.client, {"key": 4711}, None)
+        expected_reads = 2  # Initial observation plus one final read.
+    else:
+        run = server.client.open({"key": 4711})
+        server.now = 179.5
+        server.evaluate_response = Response(202, {"status": "running"})
+        invoke = run.evaluate
+        expected_reads = 1
+    server.status_limit = expected_reads
+    with pytest.raises(rt.ApiError, match="run polling timed out"):
+        invoke()
+    assert sum(path == "/automation/runs/r1" for path, _, _ in server.seen) == expected_reads
+    assert not server.sleeps  # No zero-length sleeps or repeated status GETs.
+
+
+@pytest.mark.parametrize("fault", ["route-null", "route-missing", "preview-extra", "preview-null"])
+def test_malformed_server_route_and_preview_keys_are_api_errors(monkeypatch, fault):
+    server = Server(monkeypatch)
+    if fault.startswith("route"):
+        server.route_rows = [{"order_number": None}] if fault == "route-null" else [{}]
+    else:
+        server.previews[0]["key"] = {"order_number": 4711, "extra": 1} if fault == "preview-extra" else {"order_number": None}
+    result = service.run({rt.__package__: server.client}, {"port": {"key": 4711}})
+    assert result == {"error": "Server returned a malformed key"}
 
 
 @pytest.mark.parametrize("key", [{"order_number": 4711, "extra": 1}, {}])

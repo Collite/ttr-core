@@ -9,6 +9,8 @@ import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.string.shouldMatch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import org.tatrman.ttr.metadata.source.FileBasedSource
 import org.tatrman.ttr.metadata.source.LocalFsStorage
 import org.tatrman.ttrp.cli.EmitCommand
@@ -524,6 +526,7 @@ class RecipeExportSpec :
             val folder = out.resolve("release_py.python_client.export")
             val manifest = Json.parseToJsonElement(Files.readString(folder.resolve("manifest.json"))).jsonObject
             val config = Json.parseToJsonElement(Files.readString(folder.resolve("python-client.json"))).jsonObject
+            config["held_actions"] shouldBe JsonArray(emptyList())
             manifest["calls"] shouldBe config["callPlan"]
             config.getValue("fingerprints").jsonObject shouldBe manifest.getValue("fingerprints").jsonObject
             val client = Files.readString(folder.resolve("worker/release_order_client/client.py"))
@@ -569,6 +572,58 @@ class RecipeExportSpec :
             val refused = emit(temporaryDirectory("python-stale-h1"))
             (refused.statusCode != 0) shouldBe true
             refused.output shouldContain "world fingerprint differs"
+        }
+        "Python holds are projected from a compiled world with a required native transition" {
+            val project = exportProject()
+            val models = temporaryDirectory("python-required-models")
+            root.toFile().copyRecursively(models.toFile(), overwrite = true)
+            val actionFile = models.resolve("hartland/automation/automation.ttrm")
+            val text = Files.readString(actionFile)
+            val release = text.substringAfter("def action release {").substringBefore("def action hold {")
+            release shouldContain "approval:   none"
+            val required =
+                text.replace(
+                    release,
+                    release.replace("approval:   none", "approval:   required\n    by: role.sales_manager"),
+                )
+            Files.writeString(actionFile, required)
+            Files.writeString(project.resolve("models/hartland/automation/automation.ttrm"), required)
+            val source = locate("packages/kotlin/ttrp-frontend/src/test/resources/recipes/release_order.ttrp")
+            val bundle =
+                BundleAssembler("test").build(
+                    source = Files.readString(source),
+                    fileName = source.toString(),
+                    recipeDir = source.parent,
+                    pipelineManifest =
+                        org.tatrman.ttrp.project.TtrpManifest(
+                            world = "hartland.worlds.demo",
+                            manifestDir = project,
+                        ),
+                    modelsRoot = models,
+                    outDir = temporaryDirectory("python-required-bundle"),
+                )
+            val out = temporaryDirectory("python-required-export")
+            val result =
+                TtrpCommand().subcommands(EmitCommand()).test(
+                    listOf(
+                        "emit",
+                        "--deployment",
+                        "release_py",
+                        "--project",
+                        project.toString(),
+                        "--bundle",
+                        bundle.dir.toString(),
+                        "--out",
+                        out.toString(),
+                    ),
+                )
+            io.kotest.assertions.withClue(result.output) { result.statusCode shouldBe 0 }
+            val config =
+                Json
+                    .parseToJsonElement(
+                        Files.readString(out.resolve("release_py.python_client.export/python-client.json")),
+                    ).jsonObject
+            config["held_actions"] shouldBe JsonArray(listOf(JsonPrimitive("release")))
         }
         "D-142: batch n8n export uses an external webhook without an embedded schedule" {
             val bundle = build("release_order")

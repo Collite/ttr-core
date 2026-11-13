@@ -69,6 +69,16 @@ def key_object(key: Any) -> dict[str, Any]:
     return result
 
 
+def response_key(value: Any, *, row: bool = False) -> Any:
+    """Server keys are evidence; malformed evidence is never a caller input error."""
+    try:
+        if not isinstance(value, dict):
+            raise ValueError("non-object key")
+        return key_of(value) if row else key_object(value)
+    except (ValueError, KeyError, TypeError):
+        raise ApiError("Server returned a malformed key") from None
+
+
 def canonical_key(key: Any) -> Any:
     def canonical(value: Any) -> Any:
         if isinstance(value, dict):
@@ -141,7 +151,7 @@ class BaseClient:
             raise ApiError(f"{method} {name}: invalid response")
         return code, data, headers
 
-    def pause(self, headers: dict[str, str], deadline: float) -> None:
+    def pause(self, headers: dict[str, str], deadline: float) -> bool:
         value = next((v for k, v in headers.items() if k.lower() == "retry-after"), "15")
         try:
             seconds = max(0.01, float(value))
@@ -150,7 +160,10 @@ class BaseClient:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise ApiError("run polling timed out")
-        time.sleep(min(seconds, max(0, remaining - 1)))
+        if remaining > 1:
+            time.sleep(min(seconds, remaining - 1))
+        # Permit one final status read, then refuse another polling iteration.
+        return deadline - time.monotonic() <= 1
 
     def open(self, port: dict[str, Any], as_of: str | None = None, *, dry_run: bool = False, idempotency_key: str | None = None) -> BaseRun:
         kind = CONFIG["port"].replace("on_event", "event")
@@ -190,6 +203,7 @@ class BaseRun:
         self.deadline = deadline if deadline is not None else time.monotonic() + CONFIG["budget_seconds"] + 120
         self.headers = headers or {}
         self.open_body = open_body
+        self._last_poll = False
 
     def request(self, method: str, name: str, body: dict[str, Any] | None = None, **values: Any):
         response = self.client.request(method, name, body, deadline=self.deadline, id=self.id, **values)
@@ -197,7 +211,9 @@ class BaseRun:
         return response
 
     def pause(self, headers: dict[str, str] | None = None) -> None:
-        self.client.pause(self.headers if headers is None else headers, self.deadline)
+        if self._last_poll:
+            raise ApiError("run polling timed out")
+        self._last_poll = self.client.pause(self.headers if headers is None else headers, self.deadline)
 
     def part(self, name: str) -> dict[str, Any]:
         return self.request("POST", "part", part=name)[1]
@@ -267,22 +283,59 @@ def normalize_arguments(value: Any) -> Any:
     return result
 
 
-def verify_perform(effect: dict[str, Any], keys: list[dict[str, Any]], dry_run: bool, held: bool) -> None:
-    sent = {canonical_key(key) for key in keys}
+def perform_expectations(previews: list[dict[str, Any]], batch: dict[str, Any], dry_run: bool) -> dict[str, dict[Any, str]]:
+    """R254-E: holds follow each key's actual rows, including shared and empty row sets."""
+    def malformed() -> None:
+        raise ApiError("perform effects differ from selected actions")
+
+    rows = batch.get("rows")
+    if not isinstance(rows, list):
+        malformed()
+    by_seq = {}
+    for row in rows:
+        if not isinstance(row, dict) or type(row.get("seq")) is not int or row["seq"] in by_seq:
+            malformed()
+        by_seq[row["seq"]] = row
+    grouped = {seq for seq, row in by_seq.items() if row.get("group") is not None}
+    marked_owners = set()
+    expected: dict[str, dict[Any, str]] = {}
+    for preview in previews:
+        refs = preview.get("batchRows")
+        if not isinstance(refs, list) or any(type(seq) is not int or seq not in by_seq for seq in refs):
+            malformed()
+        held_rows = set(refs) & grouped
+        name = preview["action"]
+        if name in CONFIG["held_actions"]:
+            if refs and not held_rows:
+                malformed()
+            marked_owners.update(held_rows)
+        key = canonical_key(response_key(preview.get("key")))
+        expected.setdefault(name, {})[key] = "held" if held_rows else "dry-run" if dry_run else "performed"
+    if grouped - marked_owners:
+        malformed()
+    return expected
+
+
+def verify_perform(effect: dict[str, Any], expected: dict[Any, str]) -> None:
     performed, skipped = effect.get("performed"), effect.get("skipped")
     if not isinstance(performed, list) or not isinstance(skipped, list):
         raise ApiError("perform effects differ from selected actions")
     seen = []
     for row in performed:
-        if dry_run or not isinstance(row, dict):
+        if not isinstance(row, dict):
             raise ApiError("perform effects differ from selected actions")
-        seen.append(canonical_key(row.get("key")))
+        key = canonical_key(row.get("key"))
+        if expected.get(key) != "performed":
+            raise ApiError("perform effects differ from selected actions")
+        seen.append(key)
     for row in skipped:
-        reason = "held" if held else "dry-run" if dry_run else None
-        if not isinstance(row, dict) or reason is None or row.get("reason") != reason:
+        if not isinstance(row, dict):
             raise ApiError("perform effects differ from selected actions")
-        seen.append(canonical_key(row.get("key")))
-    if len(seen) != len(sent) or set(seen) != sent:
+        key = canonical_key(row.get("key"))
+        if row.get("reason") not in ("held", "dry-run") or expected.get(key) != row["reason"]:
+            raise ApiError("perform effects differ from selected actions")
+        seen.append(key)
+    if len(seen) != len(expected) or set(seen) != set(expected):
         raise ApiError("perform effects differ from selected actions")
 
 
@@ -319,6 +372,10 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
                 raise ApiError("second live handle")
         elif status["status"] not in ("closed", "waiting"):
             raise ApiError("existing run did not complete")
+        else:
+            # Observing completion and collecting its pages are separate bounded windows.
+            run.deadline = time.monotonic() + CONFIG["budget_seconds"] + 120
+            run._last_poll = False
     try:
         if run.claim == 201:
             if CONFIG["granularity"] == "parts":
@@ -337,7 +394,7 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
         verdicts, details, actions, counts = [], [], [], {}
         for route in summaries:
             for offset, row in enumerate(run.route(route)):
-                key = key_of(row)
+                key = response_key(row, row=True)
                 verdict = {"key": key, "route": route, "verdict_reason": row.get("verdict_reason")}
                 if "fills" in row:
                     verdict["fills"] = row["fills"]
@@ -352,19 +409,22 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
             raise ApiError("status omitted preview actions")
         selected: dict[str, list[dict[str, Any]]] = {}
         for preview in previews:
+            if not isinstance(preview, dict):
+                raise ApiError("malformed preview action")
             name = preview["action"]
             if name not in CONFIG["actions"]:
                 raise ApiError("Server returned an undeclared action")
-            obj = key_object(preview["key"])
+            obj = response_key(preview.get("key"))
             selected.setdefault(name, []).append(obj)
-            actions.append({"key": key_of(obj), "action": name, "columns": normalize_arguments(preview["arguments"])})
+            actions.append({"key": response_key(obj, row=True), "action": name, "columns": normalize_arguments(preview["arguments"])})
+        batch = run.request("GET", "batch")[1]
+        expected = perform_expectations(previews, batch, status.get("dryRun") is True)
         perform_effects = []
         if run.claim == 201:
             for name, keys in selected.items():
                 effect = Action(run, name).perform(keys)
-                verify_perform(effect, keys, status.get("dryRun") is True, name in CONFIG["held_actions"])
+                verify_perform(effect, expected[name])
                 perform_effects.append({"action": name, **effect})
-        batch = run.request("GET", "batch")[1]
         if run.claim == 201:
             closed = run.close()
             if closed.get("status") not in ("closed", "waiting"):

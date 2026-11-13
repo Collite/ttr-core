@@ -30,9 +30,9 @@ internal class PythonClientRenderer(
                 "status",
                 "route",
                 "detail",
+                "batch",
                 "perform",
                 "outcome",
-                "batch",
                 "close",
             )
         require(calls.all { graph.runApi.calls[it]?.startsWith('/') == true }) { "python-client: incomplete runApi" }
@@ -171,7 +171,7 @@ internal class PythonClientRenderer(
                 .joinToString("\n") + "\n\n" +
                 """
                 Python client for `${graph.recipe.name}` (`${graph.deployment.name}`). HTTP run API,
-                ttr-server contracts §1 (⚑AU-EXP-3, ✅R254-A/B/D). Open baseline: f28120e1; action wire: #391.
+                ttr-server contracts §1 (⚑AU-EXP-3, ✅R254-A/B/E). Open baseline: f28120e1; action wire: #391.
                 The baseline has no perform route; real-Server acceptance remains P1C / #366.
                 Python 3.13.9; standard library runtime; pytest 8.3.5. No gRPC or proto wheel.
 
@@ -183,8 +183,10 @@ internal class PythonClientRenderer(
                 port.at; a run-clock program needs a dry/debug run for a literal override. `--dry-run` strengthens policy.
                 On-event redeliveries need the same caller-supplied clock to deduplicate.
                 The Server owns action eligibility and execution; this package has no waits, asks or processes.
-                Approval-required actions on native transition/writer/obligation sinks are marked held_actions;
-                their dry-run perform keys must be skipped held, all other actions' keys skipped dry-run.
+                Read the batch before perform: each preview key is held iff its batchRows reference a grouped row;
+                other keys must be skipped dry-run (dry) or performed (wet). held_actions cross-checks marked owners:
+                grouped rows need an approval-required native transition/writer/obligation owner. Marked keys may have
+                no rows; unmarked keys can share a grouped row. Completed foreign claims get a fresh evidence-read budget.
                 `service.py` accepts `{"requests": [...]}` on stdin and emits `{"results": [...]}` in order,
                 with errors per request;
                 `conform --replay` uses it in a subprocess with dryRun true. Replays never override parameters.
