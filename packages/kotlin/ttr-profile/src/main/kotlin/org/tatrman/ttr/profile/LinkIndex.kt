@@ -55,56 +55,82 @@ internal object SourcesJsonReader {
     private fun skipped(name: String) = name.startsWith(".") || name == "build" || name == "node_modules"
 
     fun read(root: Path): List<LinkEntry> {
+        val top =
+            try {
+                root.toRealPath()
+            } catch (e: IOException) {
+                throw ProfileException(
+                    "ys/profile-invalid",
+                    ProfileSpan(".", 1, 1, 1, 1, ""),
+                    "Cannot walk for sidecars: the root is unreadable (${e::class.simpleName})",
+                )
+            }
+        val visitor = SidecarVisitor(top)
+        try {
+            Files.walkFileTree(top, visitor)
+        } catch (e: IOException) {
+            visitor.unreadable(top, e)
+        } catch (e: UncheckedIOException) {
+            visitor.unreadable(top, e.cause ?: IOException(e))
+        }
+        return visitor.files.sorted().flatMap { relative -> entries(relative, top.resolve(relative)) }
+    }
+
+    /**
+     * Collects `*.sources.json` below [top], never entering a [skipped] directory, not even one it cannot open
+     * (review-251 R1). Any other failure is `ys/profile-invalid` at the path relative to the root (R2).
+     */
+    internal class SidecarVisitor(
+        private val top: Path,
+    ) : SimpleFileVisitor<Path>() {
         val files = mutableListOf<String>()
-        var real: Path? = null
+
+        private fun relative(path: Path) =
+            top
+                .relativize(path)
+                .toString()
+                .replace('\\', '/')
+                .ifEmpty { "." }
+
+        private fun skip(path: Path) = path != top && skipped(path.name)
 
         fun unreadable(
-            at: Path?,
+            at: Path,
             e: IOException,
         ): Nothing {
-            val file =
-                at?.let { real?.relativize(it)?.toString()?.replace('\\', '/') }?.ifEmpty { "." } ?: root.toString()
+            val file = relative(at)
             throw ProfileException(
                 "ys/profile-invalid",
                 ProfileSpan(file, 1, 1, 1, 1, ""),
-                "Cannot walk for sidecars: ${e.message}",
+                "Cannot walk for sidecars: $file is unreadable (${e::class.simpleName})",
             )
         }
-        try {
-            val top = root.toRealPath().also { real = it }
-            Files.walkFileTree(
-                top,
-                object : SimpleFileVisitor<Path>() {
-                    override fun preVisitDirectory(
-                        dir: Path,
-                        attrs: BasicFileAttributes,
-                    ): FileVisitResult {
-                        val skip = dir != top && skipped(dir.name)
-                        return if (skip) FileVisitResult.SKIP_SUBTREE else FileVisitResult.CONTINUE
-                    }
 
-                    override fun visitFile(
-                        file: Path,
-                        attrs: BasicFileAttributes,
-                    ): FileVisitResult {
-                        if (attrs.isRegularFile && file.name.endsWith(SUFFIX) && file.name.length > SUFFIX.length) {
-                            files += top.relativize(file).toString().replace('\\', '/')
-                        }
-                        return FileVisitResult.CONTINUE
-                    }
+        override fun preVisitDirectory(
+            dir: Path,
+            attrs: BasicFileAttributes,
+        ): FileVisitResult = if (skip(dir)) FileVisitResult.SKIP_SUBTREE else FileVisitResult.CONTINUE
 
-                    override fun visitFileFailed(
-                        file: Path,
-                        exc: IOException,
-                    ): FileVisitResult = unreadable(file, exc)
-                },
-            )
-        } catch (e: IOException) {
-            unreadable(null, e)
-        } catch (e: UncheckedIOException) {
-            unreadable(null, e.cause ?: IOException(e))
+        override fun visitFile(
+            file: Path,
+            attrs: BasicFileAttributes,
+        ): FileVisitResult {
+            if (attrs.isRegularFile && file.name.endsWith(SUFFIX) && file.name.length > SUFFIX.length) {
+                files += relative(file)
+            }
+            return FileVisitResult.CONTINUE
         }
-        return files.sorted().flatMap { relative -> entries(relative, real!!.resolve(relative)) }
+
+        // The JDK opens a directory before preVisitDirectory; when that fails it calls this instead.
+        override fun visitFileFailed(
+            file: Path,
+            exc: IOException,
+        ): FileVisitResult = if (skip(file)) FileVisitResult.SKIP_SUBTREE else unreadable(file, exc)
+
+        override fun postVisitDirectory(
+            dir: Path,
+            exc: IOException?,
+        ): FileVisitResult = if (exc != null) unreadable(dir, exc) else FileVisitResult.CONTINUE
     }
 
     private fun entries(

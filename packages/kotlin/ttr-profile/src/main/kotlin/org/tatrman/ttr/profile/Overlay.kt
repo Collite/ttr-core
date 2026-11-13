@@ -6,6 +6,7 @@ import org.snakeyaml.engine.v2.api.Load
 import org.snakeyaml.engine.v2.api.LoadSettings
 import org.snakeyaml.engine.v2.exceptions.MarkedYamlEngineException
 import org.snakeyaml.engine.v2.exceptions.YamlEngineException
+import org.tatrman.ttr.yaml.CanonicalYamlException
 import org.tatrman.ttr.yaml.YamlData
 import org.tatrman.ttr.yaml.readProfileYaml
 import java.io.IOException
@@ -40,16 +41,24 @@ internal object Renames {
     private const val FILE = "renames.yaml"
 
     /**
-     * Read only when an orphan needs a suggestion, as ttr-metadata's `Rename.read` reads it: an empty document is no
-     * renames, a leading `---` is fine. A malformed ledger is reported at the file, at the parser's own line.
+     * Read only when an orphan needs a suggestion: an empty document is no renames, a leading `---` is fine, and a
+     * malformed ledger is reported at `renames.yaml`, at the parser's own line. YAML 1.2: an unquoted date or yes/no
+     * is a string here, but `ttr-metadata export` (YAML 1.1) rejects it; quote them.
      */
     fun read(root: Path?): List<RenameEntry> {
         val file = root?.resolve(FILE)?.takeIf { Files.isRegularFile(it) } ?: return emptyList()
         val text =
             try {
-                profileRead { readProfileYaml(file) }
+                readProfileYaml(file)
             } catch (e: IOException) {
-                invalid("", "Cannot read renames.yaml: ${e.message}")
+                invalid("", "Cannot read renames.yaml (${e::class.simpleName})")
+            } catch (e: CanonicalYamlException) {
+                // The reader names the absolute path and says "profile"; every ledger error names renames.yaml.
+                throw ProfileException(
+                    "ys/profile-invalid",
+                    ProfileSpan(FILE, e.line, e.column, e.line, e.column, ""),
+                    e.detail.replace(Regex("\\bprofile\\b", RegexOption.IGNORE_CASE), FILE),
+                )
             }
         val value =
             try {
@@ -111,15 +120,20 @@ object OverlayLoader {
             try {
                 Path.of(profile.file).let { if (it.isAbsolute) it else root?.resolve(it) }
             } catch (e: java.nio.file.InvalidPathException) {
-                null
+                throw ProfileException("ys/profile-not-found", at, "Invalid profile path: ${profile.file}")
             }
                 ?: throw ProfileException(
                     "ys/profile-not-found",
                     at,
                     "A path overlay needs a root or an absolute profile file",
                 )
-        val file =
-            confinedFile("Overlay", reference, at, { root ?: declaring.parent }) { declaring.parent.resolve(reference) }
+        val boundary =
+            try {
+                (root ?: declaring.parent).toRealPath()
+            } catch (e: IOException) {
+                throw ProfileException("ys/profile-not-found", at, "Overlay not found: $reference")
+            }
+        val file = confinedFile("Overlay", reference, at, boundary) { declaring.parent.resolve(reference) }
         val data =
             try {
                 profileRead { YamlData.read(readProfileYaml(file), file.toString()) }

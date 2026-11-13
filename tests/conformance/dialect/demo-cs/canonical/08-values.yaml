@@ -1,0 +1,44 @@
+ttr: "0.22"
+package: "demo"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "Objednavka"
+    properties:
+      description:
+        cs: "Objednávka"
+        en: "Order"
+      attributes:
+        -
+          id: "cislo"
+          properties:
+            type: "integer"
+            binding:
+              target:
+                column: "demo.db.dbo.OBJEDNAVKY.CISLO"
+        -
+          id: "castka"
+          properties:
+            type: "integer"
+            binding: "CASTKA"
+            domain: "demo.md.domain.Mena"
+        -
+          id: "poznamka"
+          properties:
+            type: "string"
+  -
+    kind: "entity"
+    id: "Zakaznik"
+    properties:
+      description:
+        cs: "Zákazník"
+        en: "Customer"
+  -
+    kind: "relation"
+    id: "ObjednavkaZakaznika"
+    properties:
+      from: "demo.er.entity.Objednavka"
+      to: "demo.er.entity.Zakaznik"
+      binding:
+        fk: "demo.db.dbo.FK_OBJEDNAVKA_ZAKAZNIK"

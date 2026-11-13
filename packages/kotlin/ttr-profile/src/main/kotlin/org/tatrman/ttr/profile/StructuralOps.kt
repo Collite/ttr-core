@@ -34,7 +34,7 @@ internal class PackageOp(
             ?: op.value.optionalString("default")
             ?: throw ProfileException(
                 "ys/value-unmapped",
-                ProfileSpan(plan.tree.file, 1, 1, 1, 1, ""),
+                ProfileSpan(plan.tree.label, 1, 1, 1, 1, ""),
                 if (key ==
                     null
                 ) {
@@ -106,6 +106,7 @@ internal object StructuralExecutor {
         operations: List<LocatedOp>,
         overlay: List<OverlayEntry> = emptyList(),
         root: Path? = null,
+        perFile: Boolean = false,
     ): ApplyResult {
         val ops = operations.map(::PlannedOp)
         val ignored = mutableListOf<Ignored>()
@@ -157,12 +158,12 @@ internal object StructuralExecutor {
                 } else {
                     throw ProfileException(
                         "ys/value-unmapped",
-                        ProfileSpan(plan.tree.file, 1, 1, 1, 1, ""),
+                        ProfileSpan(plan.tree.label, 1, 1, 1, 1, ""),
                         "No package operation for ${plan.tree.file}",
                     )
                 }
             }
-        val builder = CanonicalBuilder(plans, packages)
+        val builder = CanonicalBuilder(plans, packages, perFile)
         val index = LinkIndex.build(plans, packages, root)
         plans.forEach { plan ->
             ops.filter { it.matches(plan.tree) }.forEach { op ->

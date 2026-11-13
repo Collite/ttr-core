@@ -5,6 +5,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import kotlinx.serialization.json.*
 import java.nio.file.Files
 import java.nio.file.Path
@@ -178,21 +179,61 @@ class LinkOpsSpec :
                 .properties()
                 .getValue("target") shouldBe buildJsonObject { put("table", "sklad.db.dbo.T") }
         }
-        test("an unreadable directory under the root is ys/profile-invalid, not an I/O exception") {
-            val root = sidecarRoot("ok/sklad.sources.json" to db)
-            val locked = root.resolve("locked").createDirectories()
-            if ("posix" in locked.fileSystem.supportedFileAttributeViews()) {
-                locked.setPosixFilePermissions(emptySet())
-                try {
-                    // Running as root reads it anyway; there is nothing to assert then.
-                    if (!Files.isReadable(locked)) {
-                        val error = shouldThrow<ProfileException> { run("vazby:\n  V: {cil: T}\n", tableLink, root) }
-                        error.code shouldBe "ys/profile-invalid"
-                        error.location.file shouldBe "locked"
+        // review-251 R6: reported as skipped where a directory cannot be locked (no POSIX, or running as root).
+        val lockable =
+            Files.createTempDirectory("s34-lock").resolve("d").createDirectories().let { probe ->
+                "posix" in probe.fileSystem.supportedFileAttributeViews() &&
+                    try {
+                        probe.setPosixFilePermissions(emptySet())
+                        !Files.isReadable(probe)
+                    } finally {
+                        probe.setPosixFilePermissions(PosixFilePermissions.fromString("rwx------"))
                     }
-                } finally {
-                    locked.setPosixFilePermissions(PosixFilePermissions.fromString("rwx------"))
-                }
             }
+
+        fun <T> locked(
+            dir: Path,
+            block: () -> T,
+        ): T {
+            dir.setPosixFilePermissions(emptySet())
+            try {
+                return block()
+            } finally {
+                dir.setPosixFilePermissions(PosixFilePermissions.fromString("rwx------"))
+            }
+        }
+        test("an unreadable directory under the root is ys/profile-invalid at its relative path").config(
+            enabledIf = { lockable },
+        ) {
+            val root = sidecarRoot("ok/sklad.sources.json" to db)
+            val error =
+                locked(root.resolve("locked").createDirectories()) {
+                    shouldThrow<ProfileException> { run("vazby:\n  V: {cil: T}\n", tableLink, root) }
+                }
+            error.code shouldBe "ys/profile-invalid"
+            error.location.file shouldBe "locked"
+            error.detail shouldNotContain root.toString()
+        }
+        test("an unreadable directory that is skipped anyway does not fail the walk (review-251 R1)").config(
+            enabledIf = { lockable },
+        ) {
+            listOf("build", ".cache", "node_modules").forEach { name ->
+                val root = sidecarRoot("ok/sklad.sources.json" to db)
+                locked(root.resolve(name).createDirectories()) {
+                    run("vazby:\n  V: {cil: T}\n", tableLink, root)
+                }.properties().getValue("target") shouldBe buildJsonObject { put("table", "sklad.db.dbo.T") }
+            }
+        }
+        test("a listing that fails partway is reported at the directory, relative to the root (review-251 R2)") {
+            val top = Files.createTempDirectory("s34-visitor").toRealPath()
+            val error =
+                shouldThrow<ProfileException> {
+                    SourcesJsonReader
+                        .SidecarVisitor(
+                            top,
+                        ).postVisitDirectory(top.resolve("a/b"), java.io.IOException("x"))
+                }
+            error.code shouldBe "ys/profile-invalid"
+            error.location.file shouldBe "a/b"
         }
     })

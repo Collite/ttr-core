@@ -4,10 +4,14 @@ package org.tatrman.ttr.profile
 import kotlinx.serialization.json.*
 import org.tatrman.ttr.yaml.YamlData
 
-/** An immutable, safely decoded input. [file] is a path relative to the model root. */
+/**
+ * An immutable, safely decoded input. [file] is a path relative to the model root (file selectors and the package map
+ * read it); [label] names the file in every span and diagnostic, and defaults to [file].
+ */
 class ForeignTree private constructor(
     internal val data: YamlData,
     val file: String,
+    val label: String,
 ) {
     val root: ForeignNode get() = ForeignNode(this, data.value, "")
 
@@ -15,7 +19,14 @@ class ForeignTree private constructor(
         fun read(
             source: String,
             file: String = "<yaml>",
-        ): ForeignTree = profileRead { ForeignTree(YamlData.read(source, file), file) }
+        ): ForeignTree = read(source, file, file)
+
+        /** MW S3.4: a loader labels spans with the storage path, as `.ttrm` diagnostics are. */
+        fun read(
+            source: String,
+            file: String,
+            label: String,
+        ): ForeignTree = profileRead { ForeignTree(YamlData.read(source, label), file, label) }
     }
 }
 

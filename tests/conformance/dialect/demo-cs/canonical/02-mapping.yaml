@@ -1,0 +1,9 @@
+ttr: "0.22"
+package: "demo"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "Invoice"
+    properties:
+      description: "Faktura"

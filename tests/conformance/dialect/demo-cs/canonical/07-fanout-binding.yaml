@@ -1,0 +1,29 @@
+ttr: "0.22"
+package: "demo"
+model: "binding"
+defs:
+  -
+    kind: "er2db_entity"
+    id: "Odberatel"
+    properties:
+      entity: "demo.er.entity.Odberatel"
+      target:
+        table: "demo.db.dbo.ODBERATELE"
+      whereFilter:
+        sql: "STAV = 1"
+  -
+    kind: "er2db_entity"
+    id: "Dodavka"
+    properties:
+      entity: "demo.er.entity.Dodavka"
+      target:
+        table: "demo.db.dbo.DODAVKY"
+      whereFilter:
+        sql: "ZRUSENO = 0"
+  -
+    kind: "er2db_entity"
+    id: "Sklad"
+    properties:
+      entity: "demo.er.entity.Sklad"
+      target:
+        table: "demo.db.dbo.SKLADY"

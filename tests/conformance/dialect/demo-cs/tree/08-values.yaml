@@ -1,0 +1,11 @@
+entity:
+  Objednavka:
+    druh: objednavka
+    sloupce:
+      cislo: {typ: číslo, sloupec: CISLO}
+      castka: {typ: číslo, domena: mena, sloupec_holy: CASTKA}
+      poznamka: {}
+  Zakaznik:
+    druh: zakaznik
+vztahy:
+  ObjednavkaZakaznika: {od: Objednavka, do: Zakaznik, cizi_klic: FK_OBJEDNAVKA_ZAKAZNIK}

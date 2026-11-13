@@ -1,0 +1,14 @@
+ttr: "0.22"
+package: "demo"
+model: "db"
+defs:
+  -
+    kind: "table"
+    id: "Warehouse"
+    properties:
+      description: "Sklad"
+      columns:
+        -
+          id: "code"
+          properties:
+            type: "string"

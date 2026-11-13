@@ -33,6 +33,9 @@ dependencies {
     // "one coherent ttr-* set" convention above.
     api(project(":packages:kotlin:ttr-md-resolver"))
     implementation(libs.snakeyaml) // XM authored rename sidecars; safe data-only constructor.
+    // MW S3.4 — the `yaml` source kind: canonical YAML and dialect YAML + profile (contracts §4). One-way:
+    // ttr-profile never depends on ttr-metadata in production.
+    implementation(project(":packages:kotlin:ttr-profile"))
     implementation(libs.jgrapht.core)
     implementation(libs.slf4j.api)
     implementation(libs.kotlinx.coroutines.core) // MetadataRefresher (M1.2)

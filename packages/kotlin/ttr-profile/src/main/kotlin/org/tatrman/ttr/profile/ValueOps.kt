@@ -74,14 +74,14 @@ internal class ShapeOp(
                 val inputs: Boolean,
             )
 
-            fun container(
-                parts: List<Filled>,
-                build: (List<Filled>) -> JsonElement,
+            fun <K> container(
+                parts: List<Pair<K, Filled>>,
+                build: (List<Pair<K, Filled>>) -> JsonElement,
             ): Filled {
-                val inputs = parts.any { it.inputs }
-                val present = parts.filter { it.value !== Missing }
+                val inputs = parts.any { it.second.inputs }
+                val present = parts.filter { it.second.value !== Missing }
                 // Inputs beneath and none found: a literal sibling does not keep the container (✅R251-B).
-                val emptied = inputs && present.none { it.inputs }
+                val emptied = inputs && present.none { it.second.inputs }
                 return if (emptied) Filled(Missing, true) else Filled(build(present), inputs)
             }
 
@@ -92,20 +92,14 @@ internal class ShapeOp(
                         input?.let(plan.consumption::consume)
                         Filled(input?.value?.takeIf { it != JsonNull } ?: Missing, true)
                     }
-                    node is JsonObject -> {
-                        val members = node.entries.map { (key, value) -> key to fill(value) }
-                        container(members.map { it.second }) { _ ->
-                            JsonObject(
-                                members
-                                    .filter { it.second.value !== Missing }
-                                    .associate { (key, filled) -> key to filled.value as JsonElement },
-                            )
+                    node is JsonObject ->
+                        container(node.entries.map { (key, value) -> key to fill(value) }) { present ->
+                            JsonObject(present.associate { (key, filled) -> key to filled.value as JsonElement })
                         }
-                    }
                     node is JsonArray ->
-                        container(
-                            node.map(::fill),
-                        ) { present -> JsonArray(present.map { it.value as JsonElement }) }
+                        container(node.map { Unit to fill(it) }) { present ->
+                            JsonArray(present.map { it.second.value as JsonElement })
+                        }
                     else -> Filled(node, false)
                 }
             val filled = fill(template)

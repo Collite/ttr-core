@@ -6,9 +6,11 @@ import org.tatrman.ttr.yaml.CanonicalDocument
 import org.tatrman.ttr.yaml.CanonicalYaml
 import java.nio.file.Path
 
+/** [file] is the dialect file the document came from when the run grouped documents per file (MW S3.4). */
 data class EmittedDocument(
     val canonical: CanonicalDocument,
     val locations: Map<String, ProfileSpan>,
+    val file: String? = null,
 ) {
     // The execution envelope keeps imports explicit; the P2 text codec omits an empty list.
     val value: JsonObject =
@@ -89,11 +91,23 @@ object ProfileEngine {
         tree: List<ForeignTree>,
         profile: List<ProfileDefinition>,
         root: Path? = null,
+    ): ApplyResult = apply(tree, profile, root, perFile = false)
+
+    /**
+     * As above; with [perFile] each emitted document holds the records of one input file ([EmittedDocument.file]), so a
+     * loader can keep the dialect file as the document's path (contracts §4). Links still resolve across the whole run.
+     */
+    fun apply(
+        tree: List<ForeignTree>,
+        profile: List<ProfileDefinition>,
+        root: Path?,
+        perFile: Boolean,
     ): ApplyResult =
         StructuralExecutor.apply(
             tree,
             profile.flatMap { it.operations },
             profile.flatMap { OverlayLoader.load(it, root) },
             root,
+            perFile,
         )
 }

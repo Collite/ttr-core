@@ -259,7 +259,8 @@ class LocalFsStorage(
         Files
             .walk(rootPath)
             .filter {
-                Files.isRegularFile(it) && it.fileName.toString().substringAfterLast('.', "") in extensions
+                // By suffix, as listing matches (review-260 F5): `sources.json` hashes sidecars, not every `.json`.
+                Files.isRegularFile(it) && extensions.any { ext -> it.fileName.toString().endsWith(".$ext") }
             }.sorted()
             .map { "$it=${Files.getLastModifiedTime(it).toMillis()}" }
             .toList()
@@ -311,15 +312,31 @@ class FileBasedSource(
     private val layouts: Boolean = false,
     private val allMdHopIssues: Boolean = false,
 ) : ModelSource {
+    /** Null: the `.ttrm` path, unchanged. MW S3.4: the `yaml` source kind supplies its files' ASTs ([YamlFileSource]). */
+    private var reader: ModelFileReader? = null
+
+    internal constructor(
+        sourceId: String,
+        priority: Int,
+        storage: ModelStorage,
+        layouts: Boolean,
+        allMdHopIssues: Boolean,
+        reader: ModelFileReader,
+    ) : this(sourceId, priority, storage, null, layouts, allMdHopIssues) {
+        this.reader = reader
+    }
+
     override fun load(): SourceSnapshot {
-        val extensions = (if (layouts) MODEL_AND_LAYOUT_EXTENSIONS else MODEL_EXTENSIONS) + listOf("toml", "yaml")
+        val reader = reader
+        val extensions =
+            (if (layouts) MODEL_AND_LAYOUT_EXTENSIONS else MODEL_EXTENSIONS) + listOf("toml", "yaml") +
+                reader?.extensions.orEmpty()
         val version = storage.fetchVersion(extensions)
         // Golem P4 S4.2 — area files carry a `.ttrm` extension (directive-less,
         // `def area` blocks). Walk both so they load alongside the model `.ttr` files.
         // VL V-37 — the layout files ride the same listing (a git storage fetches on every call, so a
         // second one could see another commit); they are collected, never parsed as model.
         val listed = storage.listFiles(extensions)
-        val files = listed.filter { it.extension() in MODEL_EXTENSIONS }
         val exportSidecars =
             listed
                 .filter { it.underRoot() in setOf("connections.toml", "renames.yaml") }
@@ -347,9 +364,16 @@ class FileBasedSource(
         val worlds = mutableMapOf<QualifiedName, org.tatrman.ttr.metadata.model.World>()
         val automation = mutableMapOf<QualifiedName, org.tatrman.ttr.metadata.model.AutomationObject>()
 
-        for (file in files) {
-            val content = storage.read(file)
-            val pr = TtrLoader.parseString(content, fileLabel = file.path)
+        val parsed =
+            reader?.read(listed, storage, sourceId)?.let { read ->
+                errors += read.errors
+                warnings += read.warnings
+                droppedFiles += read.dropped
+                read.files.asSequence()
+            } ?: listed.filter { it.extension() in MODEL_EXTENSIONS }.asSequence().map { file ->
+                ParsedFile(file, TtrLoader.parseString(storage.read(file), fileLabel = file.path))
+            }
+        for ((file, pr) in parsed) {
             errors += pr.errors.map { it.toLoadWarning(sourceId) }
             warnings += pr.warnings.map { it.toLoadWarning(sourceId) }
             if (!pr.ok) {

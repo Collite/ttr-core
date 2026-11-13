@@ -1,0 +1,10 @@
+ttr: "0.22"
+package: "demo"
+model: "binding"
+defs:
+  -
+    kind: "er2db_entity"
+    id: "SupplierStorage"
+    properties:
+      entity: "Supplier"
+      target: "SupplierTable"
