@@ -23,6 +23,15 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   Polling allows one final status read without spinning; malformed response keys are API errors. Service diagnostics retain
   configuration errors and suppress unexpected exception messages. Compiled-world specs cover both real H-1 and required holds.
 
+### Added — the `yaml` source kind (MW P3 S3.4)
+
+- `ttr-metadata` reads a model root of canonical YAML, or of dialect YAML plus a profile, through `YamlFileSource` (`SourceKind.YAML`; `MetadataLoader.of(kind, storage, profile)`). It produces the same `LoadedFile`s and definitions as the `.ttrm` path, so the registry, graph, search, export and cn builders see no difference. `FileBasedSource`'s `.ttrm` behaviour is unchanged.
+- The walk: every `.yaml`/`.yml` under the root is content except dot-segments, the root's `agents/` (never read), `model.ignore` matches and the profile's `files` ignores; the root's `ttr.yaml` and `renames.yaml` are not content. `ttr.yaml` declares the tree, a per-file `ttr: {profile, grammar}` header wins, an undeclared tree is canonical, and `profile` overrides `ttr.yaml`.
+- A dialect document keeps the dialect file as its path and the authored line, column and offsets. A dialect file that emits a second model (an `entity` and its `er2db_entity`) gives that document the path `<file>#<model>`.
+- A profile error on one file drops that file with an issue (`ys/…`, `xm/…`); `LoadOptions(strict = true)` then fails the load.
+- `ttr-profile`: `ProfileEngine.apply(…, perFile = true)` emits one document per input file (`EmittedDocument.file`), and `ForeignTree.read(source, file, label)` labels spans apart from the root-relative path. An emitted document's typed AST now carries the authored dialect spans.
+- `ttr-yaml`: `CanonicalYaml.read(source, file, relocate)` takes each AST location from the caller by canonical JSON Pointer.
+
 ### Added — `values`, `shape`, `link` and the overlay (MW P3 S3.3)
 
 - `ttr-profile` runs the last three operations. `values` maps a foreign string to a canonical value (scalar, qname or localized map), with an optional `default`. `shape` fills a literal template from `{input: <pointer>}` substitutions; a list element, object member or nested container whose inputs are all missing is dropped (a literal `{}`/`[]` stays), and nothing is written when every input is missing. A `default` covers a missing, null or unmapped scalar; an object or list source is always `ys/value-unmapped`.

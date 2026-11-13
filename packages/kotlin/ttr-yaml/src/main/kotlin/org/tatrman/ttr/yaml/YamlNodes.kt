@@ -94,6 +94,19 @@ internal class YamlNodes(
         val indent: Int,
     )
 
+    fun block(
+        path: String,
+        text: String,
+    ): Content? {
+        val node = locations[path] as? ScalarNode ?: return null
+        if (node.value != text) return null
+        val style = node.scalarStyle
+        val exact =
+            style == org.snakeyaml.engine.v2.common.ScalarStyle.LITERAL ||
+                (style == org.snakeyaml.engine.v2.common.ScalarStyle.PLAIN && '\n' !in text)
+        return if (exact) content(path, text) else null
+    }
+
     fun content(
         path: String,
         decoded: String,

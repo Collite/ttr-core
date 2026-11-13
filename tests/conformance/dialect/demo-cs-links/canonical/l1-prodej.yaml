@@ -1,0 +1,15 @@
+ttr: "0.22"
+package: "prodej"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "Zakaznik"
+    properties:
+      description:
+        cs: "Zákazník (overlay)"
+        en: "Customer"
+      attributes:
+        -
+          id: "kod"
+          properties: {}

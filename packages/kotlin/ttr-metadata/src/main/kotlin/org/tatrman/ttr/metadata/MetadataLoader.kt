@@ -7,7 +7,10 @@ import org.tatrman.ttr.metadata.reconcile.ModelReconciler
 import org.tatrman.ttr.metadata.reconcile.ReconciliationPolicy
 import org.tatrman.ttr.metadata.source.LoadedFile
 import org.tatrman.ttr.metadata.source.LoadWarning
+import org.tatrman.ttr.metadata.source.BuiltinStockSource
 import org.tatrman.ttr.metadata.source.ModelSource
+import org.tatrman.ttr.metadata.source.ModelStorage
+import org.tatrman.ttr.metadata.source.SourceKind
 
 /**
  * Thin composition (contracts §2, no new logic): parse ([ModelSource]s) →
@@ -35,6 +38,25 @@ class MetadataLoader(
     ) : this(listOf(source), descriptor, policy)
 
     fun load(): LoadResult = load(LoadOptions())
+
+    companion object {
+        /**
+         * MW S3.4 (contracts §4): the built-in stock roles plus one source of [kind] over [storage]. [profile] (the
+         * `yaml` kind only) replaces the tree declaration `ttr.yaml`, as `METADATA_PROFILE` will (P4).
+         */
+        fun of(
+            kind: SourceKind,
+            storage: ModelStorage,
+            profile: String? = null,
+            catalog: Map<String, java.nio.file.Path> = emptyMap(),
+            sourceId: String = storage.id,
+            descriptor: ModelDescriptor = ModelDescriptor(id = "model", name = "model"),
+        ): MetadataLoader =
+            MetadataLoader(
+                listOf(BuiltinStockSource(), kind.source(sourceId, 100, storage, profile, catalog)),
+                descriptor,
+            )
+    }
 
     fun load(options: LoadOptions): LoadResult =
         runCatching {

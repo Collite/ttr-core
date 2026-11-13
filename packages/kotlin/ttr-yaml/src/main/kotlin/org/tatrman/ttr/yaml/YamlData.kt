@@ -22,6 +22,15 @@ class YamlData private constructor(
         key: Boolean = false,
     ): SourceLocation = nodes.source(path, key)
 
+    /**
+     * MW S3.4 (review-260 F8): the [BlockSpan] of the scalar at exactly [path] when it holds [text] and its lines map
+     * one to one onto the file (a literal block, or a single-line plain scalar); null otherwise.
+     */
+    fun block(
+        path: String,
+        text: String,
+    ): BlockSpan? = nodes.block(path, text)?.let { BlockSpan(it.source, it.lines, it.indent) }
+
     /** Use a branch of a bundled schema while keeping root-local $refs in its original $defs. */
     fun validate(
         schemaResource: String,

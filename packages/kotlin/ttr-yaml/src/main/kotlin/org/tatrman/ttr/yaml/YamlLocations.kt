@@ -17,8 +17,14 @@ internal class YamlLocations(
     private val nodes: YamlNodes,
     private val generated: String,
     private val canonical: JsonObject,
+    private val relocation: Relocation? = null,
 ) {
     private val copies = IdentityHashMap<Any, Any>()
+
+    private fun located(
+        path: String,
+        key: Boolean = false,
+    ): SourceLocation = relocation?.source(path) ?: nodes.source(path, key)
 
     private fun path(
         start: Int,
@@ -29,7 +35,7 @@ internal class YamlLocations(
             .minByOrNull { it.end - it.start }
             ?.path ?: ""
 
-    private fun span(source: SourceLocation) = nodes.source(path(source.offsetStart, source.offsetEnd))
+    private fun span(source: SourceLocation) = located(path(source.offsetStart, source.offsetEnd))
 
     private fun at(
         line: Int,
@@ -37,7 +43,7 @@ internal class YamlLocations(
     ): SourceLocation {
         val offset =
             generated.lines().take((line - 1).coerceAtLeast(0)).sumOf { it.length + 1 } + (column - 1).coerceAtLeast(0)
-        return nodes.source(path(offset, offset + 1))
+        return located(path(offset, offset + 1))
     }
 
     fun remap(result: ParseResult): ParseResult =
@@ -52,7 +58,7 @@ internal class YamlLocations(
                     val offset =
                         generated.lines().take((it.line - 1).coerceAtLeast(0)).sumOf { line -> line.length + 1 } +
                             (it.column - 1).coerceAtLeast(0)
-                    val source = nodes.source(path(offset, offset + 1))
+                    val source = located(path(offset, offset + 1))
                     ParseWarning(source.file, source.line, source.column + 1, it.message)
                 },
         )
@@ -77,7 +83,7 @@ internal class YamlLocations(
     internal fun copy(value: Any?): Any? {
         if (value == null) return null
         if (value is WorldSchemaField) {
-            return value.copy(source = nodes.source(path(value.source.offsetStart, value.source.offsetEnd), key = true))
+            return value.copy(source = located(path(value.source.offsetStart, value.source.offsetEnd), key = true))
         }
         if (value is SourceLocation) return span(value)
         if (value is PropertyValue.StringValue) {
@@ -95,8 +101,8 @@ internal class YamlLocations(
                             entry.language,
                             entry.dialect,
                             syntax.string("block"),
-                            nodes.source("$pointer/tag"),
-                            nodes.source("$pointer/block"),
+                            located("$pointer/tag"),
+                            located("$pointer/block"),
                             0,
                             source,
                         )
@@ -125,11 +131,13 @@ internal class YamlLocations(
             literal(value.source)?.let { (pointer, syntax) ->
                 if ("block" in syntax) {
                     val content = nodes.content("$pointer/block", syntax.string("block"))
+                    // Text span and indent from one file: the authored scalar when it holds the block, else generated.
+                    val block = relocation?.block("$pointer/block", syntax.string("block"))
                     return value.copy(
                         source = span(value.source),
-                        valueSource = content.source,
-                        indentWidth = content.indent,
-                        tagSource = nodes.source("$pointer/tag"),
+                        valueSource = block?.source ?: content.source,
+                        indentWidth = block?.indentWidth ?: content.indent,
+                        tagSource = located("$pointer/tag"),
                     )
                 }
             }
@@ -138,6 +146,7 @@ internal class YamlLocations(
             literal(value.source)?.let { (pointer, syntax) ->
                 val contentKey = if ("triple" in syntax) "triple" else "block"
                 val content = nodes.content("$pointer/$contentKey", syntax.string(contentKey))
+                val block = relocation?.block("$pointer/$contentKey", syntax.string(contentKey))
                 val form = if ("tag" in syntax) "tagged" else syntax["form"]?.jsonPrimitive?.content ?: "tripleString"
                 return value.copy(
                     text = syntax.string(contentKey),
@@ -145,9 +154,9 @@ internal class YamlLocations(
                     language =
                         syntax["tag"]?.jsonPrimitive?.content ?: "pl",
                     source = span(value.source),
-                    textSource = content.source,
-                    lineOffsets = content.lines,
-                    indentWidth = content.indent,
+                    textSource = block?.source ?: content.source,
+                    lineOffsets = block?.lineOffsets ?: content.lines,
+                    indentWidth = block?.indentWidth ?: content.indent,
                     escapes = emptyList(),
                 )
             }

@@ -33,6 +33,17 @@ object CanonicalYaml {
     fun read(
         source: String,
         file: String = "<yaml>",
+    ): CanonicalDocument = read(source, file, null)
+
+    /**
+     * As [read], but every location of the typed AST is taken from [relocation] (by the canonical JSON Pointer of the
+     * value it came from) when it gives one: a document generated from another source (a profile's dialect input,
+     * MW S3.4) keeps the authored spans. Errors are unaffected.
+     */
+    fun read(
+        source: String,
+        file: String,
+        relocation: Relocation?,
     ): CanonicalDocument {
         val nodes = YamlNodes(file)
         val input = nodes.read(source)
@@ -59,7 +70,7 @@ object CanonicalYaml {
             // Schema validation precedes the syntax bridge; normalize mapping shorthand/order once.
             return CanonicalDocument(
                 value,
-                YamlLocations(syntax, nodes, ttr, value).remap(typed(ttr, file)),
+                YamlLocations(syntax, nodes, ttr, value, relocation).remap(typed(ttr, file)),
                 nodes::spelling,
                 nodes::invalid,
             )

@@ -561,7 +561,7 @@ _release-ext kind release="false" level="" version="":
 #   edit             legacy alias: refuses; use lsp (edit is family-locked)
 #   vscode | intellij  editor extensions (GitHub Release always; Marketplace on RELEASE)
 #   bundle <name>    a named release lane — a lockstep set published together at one version:
-#                    grammar    THE TTR toolchain: ttr-parser + ttr-writer + ttr-semantics +
+#                    grammar    THE TTR toolchain: ttr-parser + ttr-writer + ttr-semantics + ttr-yaml + ttr-profile +
 #                               ttr-metadata + ttr-metadata-git + ttr-snapshot + ttr-md-resolver +
 #                               ttr-lexicon + ttr-lexicon-compile + ttr-lexicon-cli.
 #                               Unified 2026-07-30 (absorbed the old `metadata` bundle) because
@@ -667,8 +667,11 @@ publish *args:
             # `just publish bundle translator` first in that case.
             #
             # JOINED at CN-P3 S3.1 (A-CN-1): ttr-concept — the cn layer; the ttrp-emit closure again.
+            #
+            # JOINED at MW-P3 S3.4 (review-260 F1): ttr-profile — ttr-metadata `implementation`s it, so
+            # the metadata POM names it at this version.
             PREFIX=grammar
-            DESC="org.tatrman:{ttr-parser, ttr-writer, ttr-semantics, ttr-yaml, ttr-metadata, ttr-metadata-git, ttr-snapshot, ttr-md-resolver, ttr-lexicon, ttr-lexicon-compile, ttr-lexicon-cli, ttr-metadata-cli (+dist zip), ttr-report, ttr-report-cli (+dist zip/tar), ttrp-frontend, ttrp-graph, ttrp-emit, ttrp-doc, ttrp-emit-spi, ttrp-conform, ttrp-cli (+dist zip), ttr-emit-bash, ttr-emit-kestra, ttr-emit-airflow3, ttr-concept} — ttr-translator pinned to its latest tag" ;;
+            DESC="org.tatrman:{ttr-parser, ttr-writer, ttr-semantics, ttr-yaml, ttr-profile, ttr-metadata, ttr-metadata-git, ttr-snapshot, ttr-md-resolver, ttr-lexicon, ttr-lexicon-compile, ttr-lexicon-cli, ttr-metadata-cli (+dist zip), ttr-report, ttr-report-cli (+dist zip/tar), ttrp-frontend, ttrp-graph, ttrp-emit, ttrp-doc, ttrp-emit-spi, ttrp-conform, ttrp-cli (+dist zip), ttr-emit-bash, ttr-emit-kestra, ttr-emit-airflow3, ttr-concept} — ttr-translator pinned to its latest tag" ;;
         "bundle metadata")
             echo "❌ The 'metadata' bundle no longer exists — it was folded into 'grammar' on 2026-07-30." >&2
             echo "   ttr-metadata \`api\`s the grammar artifacts, so the two MUST share a version;" >&2
@@ -707,7 +710,7 @@ publish *args:
             case "$MOD_PATH" in
                 packages/kotlin/ttr-parser|packages/kotlin/ttr-semantics|packages/kotlin/ttr-writer)
                     PREFIX="$MOD_NAME"; DESC="org.tatrman:${MOD_NAME}" ;;
-                packages/kotlin/ttr-yaml|packages/kotlin/ttr-metadata|packages/kotlin/ttr-metadata-git|packages/kotlin/ttr-snapshot|packages/kotlin/ttr-md-resolver)
+                packages/kotlin/ttr-yaml|packages/kotlin/ttr-profile|packages/kotlin/ttr-metadata|packages/kotlin/ttr-metadata-git|packages/kotlin/ttr-snapshot|packages/kotlin/ttr-md-resolver)
                     echo "❌ '$MOD_NAME' publishes lockstep only — use: just publish bundle grammar" >&2
                     echo "   (the metadata family joined the grammar bundle on 2026-07-30 — one api closure, one version)" >&2
                     exit 1 ;;
