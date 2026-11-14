@@ -56,7 +56,7 @@ class LintCommand(
     override fun help(context: Context) = "Load a model root strictly and report its diagnostics on authored positions."
 
     private val root by option("--root", help = "A checkout (modeler.toml + model/) or a model root")
-    private val profile by option("--profile", help = "Profile name (from <root>/profiles/) or path; replaces ttr.yaml")
+    private val profile by option("--profile", help = PROFILE_HELP)
     private val strict by option("--strict", help = "Exit 1 on any error, as load --strict").flag()
     private val format by option("--format", help = "text, json or github")
         .choice("text" to LintFormat.TEXT, "json" to LintFormat.JSON, "github" to LintFormat.GITHUB)
@@ -74,6 +74,14 @@ class LintCommand(
     }
 }
 
+/** `--profile` on `lint` and `profile` (✅R269-B). */
+private const val PROFILE_HELP =
+    "Profile identity (canonical/1, or one <root>/profiles/ declares) or a file path relative to the working " +
+        "directory; replaces ttr.yaml"
+
+/** ✅R269-A: the profile commands fail on any error whatever `--strict` says; the flag stays for existing callers. */
+private const val PROFILE_STRICT_HELP = "Accepted for compatibility; profile commands exit 1 on any error regardless"
+
 class ProfileCommand : CliktCommand(name = "profile") {
     override fun help(context: Context) = "Apply or check a profile over a dialect YAML tree."
 
@@ -87,11 +95,13 @@ class ProfileApplyCommand(
         "Write the tree as canonical YAML: <out>/<package>/<model>.yaml, <package>.sources.json and report.json."
 
     private val root by option("--root", help = "The dialect tree (or a checkout)").required()
-    private val profile by option("--profile", help = "Profile name (from <root>/profiles/) or path; replaces ttr.yaml")
-    private val out by option("--out", help = "Output directory, outside the root").required()
-    private val strict by option("--strict", help = "Exit 1 on any error, as load --strict (and write nothing)").flag()
+    private val profile by option("--profile", help = PROFILE_HELP)
+    private val out by option("--out", help = "Output directory; no output may land inside the root").required()
 
-    override fun run() = output(LintCli.apply(Path.of(root), profile, Path.of(out), strict, LintFormat.TEXT))
+    @Suppress("unused")
+    private val strict by option("--strict", help = PROFILE_STRICT_HELP).flag()
+
+    override fun run() = output(LintCli.apply(Path.of(root), profile, Path.of(out), LintFormat.TEXT))
 }
 
 class ProfileCheckCommand(
@@ -100,13 +110,15 @@ class ProfileCheckCommand(
     override fun help(context: Context) = "Run the apply pipeline and report its diagnostics; writes nothing."
 
     private val root by option("--root", help = "The dialect tree (or a checkout)").required()
-    private val profile by option("--profile", help = "Profile name (from <root>/profiles/) or path; replaces ttr.yaml")
-    private val strict by option("--strict", help = "Exit 1 on any error, as load --strict").flag()
+    private val profile by option("--profile", help = PROFILE_HELP)
+
+    @Suppress("unused")
+    private val strict by option("--strict", help = PROFILE_STRICT_HELP).flag()
     private val format by option("--format", help = "text, json or github")
         .choice("text" to LintFormat.TEXT, "json" to LintFormat.JSON, "github" to LintFormat.GITHUB)
         .default(LintFormat.TEXT)
 
-    override fun run() = output(LintCli.check(Path.of(root), profile, strict, format))
+    override fun run() = output(LintCli.check(Path.of(root), profile, format))
 }
 
 class MetadataCommand : CliktCommand(name = "ttr-metadata") {

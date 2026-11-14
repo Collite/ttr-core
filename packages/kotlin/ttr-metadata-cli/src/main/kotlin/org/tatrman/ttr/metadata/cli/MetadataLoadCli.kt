@@ -53,23 +53,7 @@ object MetadataLoadCli {
         val (packageLayout, manifestIssues) = readManifest(project.resolve("modeler.toml"))
         val modelRoot = project.resolve("model")
         if (!Files.isDirectory(modelRoot)) {
-            return render(
-                project,
-                version,
-                LoadReport(
-                    issues =
-                        manifestIssues +
-                            LoadReportIssue(
-                                modelRoot.toString(),
-                                -1,
-                                "no-model-dir",
-                                LoadIssue.Severity.ERROR,
-                                "no model/ directory in the checkout",
-                            ),
-                ),
-                json,
-                failed = true,
-            )
+            return render(project, version, noModelDir(modelRoot, manifestIssues), json, failed = true)
         }
         // Always collect a report, including in permissive mode; --strict controls the exit status.
         val (result, report) =
@@ -82,6 +66,22 @@ object MetadataLoadCli {
     }
 
     internal const val CHECKOUT_SOURCE = "checkout"
+
+    /** A checkout without `model/`: `load`'s one ERROR, which `lint` reports the same way (review-269 F7). */
+    internal fun noModelDir(
+        modelRoot: Path,
+        manifestIssues: List<LoadReportIssue>,
+    ) = LoadReport(
+        issues =
+            manifestIssues +
+                LoadReportIssue(
+                    modelRoot.toString(),
+                    -1,
+                    "no-model-dir",
+                    LoadIssue.Severity.ERROR,
+                    "no model/ directory in the checkout",
+                ),
+    )
 
     /** The one strict load `load` and `lint` share: the stock vocabulary plus [source], a report always collected. */
     internal fun load(
@@ -189,12 +189,14 @@ internal class Rendered(
             value.replace(path, relative(path) ?: path)
         }
 
+    private fun checkoutSources() = report.sources.filter { it.sourceId == MetadataLoadCli.CHECKOUT_SOURCE }
+
     /** `load --json`'s document; [columns] adds each issue's column (`lint --format json`). */
     fun document(columns: Boolean = false): JsonObject =
         buildJsonObject {
             put("version", version)
             putJsonArray("sources") {
-                report.sources.filter { it.sourceId == MetadataLoadCli.CHECKOUT_SOURCE }.forEach { source ->
+                checkoutSources().forEach { source ->
                     addJsonObject {
                         put("path", relative(source.path))
                         put("objects", source.objects)
@@ -224,7 +226,7 @@ internal class Rendered(
                 appendLine("$location:${issue.line}: ${issue.severity.name.lowercase()} ${issue.code}: $detail")
             }
             appendLine(
-                "ttr-metadata $version: ${document()["sources"]!!.jsonArray.size} sources, ${report.issues.size} issues",
+                "ttr-metadata $version: ${checkoutSources().size} sources, ${report.issues.size} issues",
             )
         }
 }

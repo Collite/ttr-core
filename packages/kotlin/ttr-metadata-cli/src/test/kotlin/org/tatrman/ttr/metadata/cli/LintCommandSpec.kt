@@ -47,14 +47,25 @@ class LintCommandSpec :
             return to
         }
 
+        // review-269 ✅R269-A: apply fails on any error, so the positive vector is demo-cs-links (warnings only); the demo-cs
+        // tree holds two strict errors (S3.7 T0).
+        val appliedLinks =
+            setOf(
+                "demo/binding.yaml",
+                "demo/er.yaml",
+                "prodej/er.yaml",
+                "demo.sources.json",
+                "prodej.sources.json",
+                "report.json",
+            )
+
         test("apply writes <package>/<model>.yaml, <package>.sources.json and report.json, byte-equal across runs") {
             val first = Files.createTempDirectory("s35-out").resolve("a")
             val second = Files.createTempDirectory("s35-out").resolve("b")
-            run("profile", "apply", "--root", "$positive", "--out", "$first").exitCode shouldBe 0
-            run("profile", "apply", "--root", "$positive", "--out", "$second").exitCode shouldBe 0
+            run("profile", "apply", "--root", "$links", "--out", "$first").exitCode shouldBe 0
+            run("profile", "apply", "--root", "$links", "--out", "$second").exitCode shouldBe 0
             val written = files(first)
-            written.keys shouldBe
-                setOf("demo/binding.yaml", "demo/db.yaml", "demo/er.yaml", "demo.sources.json", "report.json")
+            written.keys shouldBe appliedLinks
             written shouldBe files(second)
             Json
                 .parseToJsonElement(
@@ -65,11 +76,13 @@ class LintCommandSpec :
             val report = Json.parseToJsonElement(written.getValue("report.json")).jsonObject
             report.keys shouldBe setOf("documents", "ignored", "overridden")
             report["documents"]!!.jsonArray.map { (it as JsonObject)["model"].toString() } shouldBe
-                listOf("\"binding\"", "\"db\"", "\"er\"")
+                listOf("\"binding\"", "\"er\"", "\"er\"")
         }
 
         test("apply of a canonical tree with canonical/1 is byte-identical to the input files") {
-            listOf("demo-cs", "demo-cs-links").forEach { case ->
+            // demo-cs's twin carries the same two strict errors as its tree, so the CLI identity runs on demo-cs-links;
+            // ProfileApplySpec pins the identity of both twins at the library.
+            listOf("demo-cs-links").forEach { case ->
                 val canonical = conformance.resolve("dialect/$case/canonical")
                 val out = Files.createTempDirectory("s35-identity").resolve("out")
                 run(
@@ -175,10 +188,10 @@ class LintCommandSpec :
             }
         }
 
-        test("T6: the installed binary runs lint, profile check and profile apply on demo-cs/1 from a temp dir") {
+        test("T6: the installed binary runs lint, profile check and profile apply from a temp dir") {
             val binary = Path.of(requireNotNull(System.getProperty("metadata.installedBinary"))).toAbsolutePath()
             val work = Files.createTempDirectory("s35-smoke")
-            copy(positive, work.resolve("tree"))
+            copy(links, work.resolve("tree"))
             copy(negative.resolve("tree"), work.resolve("negative"))
 
             fun exec(vararg args: String): Pair<Int, String> {
@@ -196,8 +209,7 @@ class LintCommandSpec :
             lint shouldBe negative.resolve("expected-github.txt").readText().replace("file=", "file=negative/")
             exec("profile", "check", "--root", "negative", "--strict").first shouldBe 1
             exec("profile", "apply", "--root", "tree", "--out", "out").first shouldBe 0
-            files(work.resolve("out")).keys shouldBe
-                setOf("demo/binding.yaml", "demo/db.yaml", "demo/er.yaml", "demo.sources.json", "report.json")
+            files(work.resolve("out")).keys shouldBe appliedLinks
             exec("lint", "--codes").second shouldBe DiagnosticCodes.render()
             exec("lint").first shouldBe 2
         }

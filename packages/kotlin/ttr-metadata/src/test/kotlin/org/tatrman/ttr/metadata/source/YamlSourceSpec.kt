@@ -244,6 +244,25 @@ class YamlSourceSpec :
                 .map { it.name } shouldContain "A"
         }
 
+        test("review-269 F8: on a rootless storage the shared resolver failure is recorded under ttr.yaml") {
+            // a.yaml names its own profile and needs the resolver first; b.yaml falls back to the tree. One issue, at
+            // the tree declaration, whichever file asked first; both files dropped with it.
+            val declared =
+                memory(
+                    "ttr.yaml" to "profile: ./p/d.yaml\ngrammar: '>=0.22 <1.0'\n",
+                    "a.yaml" to "ttr: {profile: ./p/e.yaml, grammar: '>=0.22 <1.0'}\nentity:\n  A: {}\n",
+                    "b.yaml" to "entity:\n  B: {}\n",
+                )
+            val strict = MetadataLoader.of(SourceKind.YAML, declared).load(LoadOptions(strict = true))
+            strict.issues
+                .filter {
+                    "ys/profile-not-found" in it.message && "dropped" !in it.message
+                }.map { it.file } shouldBe
+                listOf("/synthetic-r260-root/ttr.yaml")
+            strict.report!!.droppedFiles shouldContainExactly
+                listOf("/synthetic-r260-root/a.yaml", "/synthetic-r260-root/b.yaml")
+        }
+
         test("review-260 F5: the source version moves with model.ignore and sidecars, never with other .json") {
             val root = tree("a.yaml" to "entity: {}\n", "model.ignore" to "p/\n", "demo.sources.json" to "{}")
             val storage = LocalFsStorage("t", root)

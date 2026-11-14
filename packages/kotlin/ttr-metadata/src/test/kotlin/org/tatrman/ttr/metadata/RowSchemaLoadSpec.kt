@@ -118,4 +118,11 @@ class RowSchemaLoadSpec :
             val r = reconcile(root)
             r.errors.any { it.message.contains("ttr/duplicate-schema") } shouldBe true
         }
+
+        "review-269 F5: a load issue's column is 1-based; a definition in the first column is column 1" {
+            val root = Files.createTempDirectory("rs-col")
+            write(root, "shop/a.ttrm", "def schema s { columns: [ def column a { type: int } ] }")
+            write(root, "shop/b.ttrm", "def schema s { columns: [ def column b { type: int } ] }")
+            reconcile(root).errors.single { it.message.contains("ttr/duplicate-schema") }.column shouldBe 1
+        }
     })

@@ -95,6 +95,52 @@ class ProfileApplySpec :
             }
         }
 
+        test("review-269 F1: the files the grouped run drops reach problems") {
+            val tree = Files.createTempDirectory("r269-grouped")
+            tree.resolve("profiles").createDirectories()
+            tree.resolve("profiles/p.yaml").writeText(
+                listOf(
+                    "profile: grp/1",
+                    "grammar: '>=0.22 <1.0'",
+                    "operations:",
+                    "  - {op: package, mapping: {}, default: demo}",
+                    "  - {op: kinds, at: /entity, mapping: {entita: entity}}",
+                    "  - {op: rename, in: entity, at: /popis, to: {kind: entity, property: description}}",
+                ).joinToString("\n", postfix = "\n"),
+            )
+            tree.resolve("ttr.yaml").writeText("profile: ./profiles/p.yaml\ngrammar: '>=0.22 <1.0'\n")
+            tree.resolve("model.ignore").writeText("profiles/\n")
+            tree.resolve("a.yaml").writeText("entity:\n  X: {popis: A}\n")
+            tree.resolve("b.yaml").writeText("entity:\n  X: {popis: B}\n")
+            val applied = apply(tree)
+            applied.problems.map { it.file to it.message } shouldBe
+                listOf(
+                    tree.resolve("b.yaml").toString() to
+                        "ys/profile-conflict: Repeated canonical definition demo.er.entity.X",
+                )
+            // A plan-phase drop is the loader's, never repeated here.
+            tree.resolve("c.yaml").writeText("ttr: {profile: ./profiles/missing.yaml, grammar: '>=0.22 <1.0'}\n")
+            apply(tree).problems.none { "c.yaml" in it.file } shouldBe true
+        }
+
+        test("review-269 F4: a conflict names the storage file and the dialect file the document came from") {
+            val source = dialect.resolve("demo-cs-links/tree")
+            val tree = Files.createTempDirectory("r269-conflict")
+            inputs(source).forEach { (path, text) ->
+                tree.resolve(path).also { it.parent.createDirectories() }.writeText(text)
+            }
+            listOf("model.ignore", "demo.sources.json").forEach {
+                tree.resolve(it).writeText(source.resolve(it).readText())
+            }
+            tree
+                .resolve("demo/er.yaml")
+                .also { it.parent.createDirectories() }
+                .writeText(apply(source).files.getValue("demo/er.yaml"))
+            val conflict = apply(tree).conflicts.single()
+            conflict.file shouldBe tree.resolve("l2-objednavky.yaml").toString()
+            conflict.message shouldBe "apply: demo/er.yaml is written by both demo/er.yaml and l2-objednavky.yaml"
+        }
+
         test("two runs are byte-equal") {
             listOf("demo-cs", "demo-cs-links").forEach { case ->
                 val tree = dialect.resolve("$case/tree")

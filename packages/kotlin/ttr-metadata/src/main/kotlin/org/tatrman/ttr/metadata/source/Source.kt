@@ -401,7 +401,7 @@ class FileBasedSource(
                         sourceId = sourceId,
                         file = file.path,
                         line = d.source.line,
-                        column = d.source.column,
+                        column = oneBased(d.source.column),
                         message = "${d.code.id}: ${d.message}",
                     )
                 if (d.code == DiagnosticCode.SemLegacyMentionDeprecated) warnings += issue else errors += issue
@@ -521,7 +521,7 @@ class FileBasedSource(
                                 sourceId = sourceId,
                                 file = file.path,
                                 line = def.source.line,
-                                column = def.source.column,
+                                column = oneBased(def.source.column),
                                 message =
                                     "ttr/duplicate-schema: schema '${record.qualifiedName}' is declared more than once",
                             )
@@ -535,7 +535,7 @@ class FileBasedSource(
                     val pkg = declaredPackage ?: computedPackage
                     val world =
                         buildWorld(def, pkg, file.path) { at, message ->
-                            errors += LoadWarning(sourceId, file.path, at.line, at.column, message)
+                            errors += LoadWarning(sourceId, file.path, at.line, oneBased(at.column), message)
                         }
                     worlds[world.qname] = world
                     continue
@@ -604,7 +604,8 @@ class FileBasedSource(
         // typed model (the grades) and are not repeated here.
         val cn = CnBuilder.build(loadedFiles, allMdHopIssues = allMdHopIssues)
         for (d in cn.diagnostics) {
-            val issue = LoadWarning(sourceId, d.uri, d.source.line, d.source.column, "${d.code.id}: ${d.message}")
+            val issue =
+                LoadWarning(sourceId, d.uri, d.source.line, oneBased(d.source.column), "${d.code.id}: ${d.message}")
             when (d.severity) {
                 org.tatrman.ttr.parser.diagnostics.DiagnosticSeverity.Error -> errors += issue
                 org.tatrman.ttr.parser.diagnostics.DiagnosticSeverity.Warning -> warnings += issue
@@ -1949,3 +1950,9 @@ private fun boundsOf(
     val hi = bound(raw.substringAfter("..").trim())
     return (if (lo < 0) 0 else lo) to hi
 }
+
+/**
+ * A load issue's column is 1-based (`LoadReportIssue.column`, `ys/…` spans, parse errors); a [SourceLocation] column is
+ * 0-based (ANTLR). Unknown (negative) stays as it is (review-269 F5).
+ */
+internal fun oneBased(column: Int): Int = if (column >= 0) column + 1 else column

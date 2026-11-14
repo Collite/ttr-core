@@ -24,11 +24,13 @@ import java.util.TreeMap
  * run (`<package>/<model>.yaml`, the package's dots as directories), each canonical input file under its own path, one
  * `<package>.sources.json` sidecar per package (S3.6 fills its entries) and `report.json` (`documents[]`, `ignored[]`,
  * `overridden[]`). [conflicts] are the outputs two
- * inputs would both write; every other problem is the loader's to report.
+ * inputs would both write, anchored on the second writer's storage path. [problems] are the errors the grouped run
+ * recorded (a file it dropped); the plan's are the loader's to report, so they are not repeated here (review-269 F1).
  */
 class ProfileApplyResult(
     val files: SortedMap<String, String>,
     val conflicts: List<LoadWarning>,
+    val problems: List<LoadWarning> = emptyList(),
 )
 
 /**
@@ -51,25 +53,35 @@ object ProfileApply {
         val plan = reader.plan(listed, storage, sourceId)
         val relative = listed.associate { it.path to it.underRoot() }
         val files = TreeMap<String, String>()
-        val writers = mutableMapOf<String, String>()
+        val writers = mutableMapOf<String, List<String>>()
         val conflicts = mutableListOf<LoadWarning>()
         val documents = mutableListOf<JsonObject>()
         val ignored = mutableListOf<JsonObject>()
         val overridden = mutableListOf<JsonObject>()
 
+        /** [from] are the storage paths of the files the document comes from, sorted (review-269 F4). */
         fun write(
             value: JsonObject,
             text: String,
-            from: String,
+            from: List<String>,
             at: String? = null,
         ) {
             val pkg = (value["package"] as? JsonPrimitive)?.content.orEmpty()
             val model =
-                (value["model"] as? JsonPrimitive)?.content ?: from.substringAfterLast('/').substringBeforeLast('.')
+                (value["model"] as? JsonPrimitive)?.content
+                    ?: from.first().substringAfterLast('/').substringBeforeLast('.')
             val path = at ?: listOf(pkg.replace('.', '/'), "$model.yaml").filter { it.isNotEmpty() }.joinToString("/")
             val first = writers.putIfAbsent(path, from)
             if (first != null) {
-                conflicts += LoadWarning(sourceId, from, 1, 1, "apply: $path is written by both $first and $from")
+                fun names(files: List<String>) = files.joinToString(", ") { relative[it] ?: it }
+                conflicts +=
+                    LoadWarning(
+                        sourceId,
+                        from.first(),
+                        1,
+                        1,
+                        "apply: $path is written by both ${names(first)} and ${names(from)}",
+                    )
                 return
             }
             files[path] = text
@@ -90,14 +102,25 @@ object ProfileApply {
                     continue // the loader reports it (`ys/canonical-invalid`)
                 }
             // A canonical file keeps its own path: the identity profile leaves the tree as it is (§5 fixed point).
-            write(document.value, CanonicalYaml.write(document), file.underRoot(), at = file.underRoot())
+            write(document.value, CanonicalYaml.write(document), listOf(file.path), at = file.underRoot())
         }
+        // The plan's drops are the loader's too; what the grouped runs record after this point is apply's own.
+        val planned = plan.problems.errors.size
         plan.dialect.forEach { (chain, inputs) ->
             val (result, _) =
                 reader.run(requireNotNull(plan.root), chain, inputs, plan.problems, perFile = false)
                     ?: return@forEach
-            val label = inputs.first().first.underRoot()
-            result.documents.forEach { write(it.value, it.write(), label) }
+            // In a grouped run a document has no single file: its writers are the dialect files its records came from.
+            val paths = inputs.map { it.first.path }.toSet()
+            result.documents.forEach { document ->
+                val from =
+                    document.locations.values
+                        .map { it.file }
+                        .filter { it in paths }
+                        .distinct()
+                        .sorted()
+                write(document.value, document.write(), from.ifEmpty { listOf(inputs.first().first.path) })
+            }
             val report = result.reportJson()
             report.getValue("ignored").jsonArray.forEach { item ->
                 val entry = item.jsonObject
@@ -133,7 +156,7 @@ object ProfileApply {
                     )
                 },
             ) + "\n"
-        return ProfileApplyResult(files, conflicts)
+        return ProfileApplyResult(files, conflicts, plan.problems.errors.drop(planned))
     }
 
     private fun array(items: List<JsonElement>) = buildJsonArray { items.forEach { add(it) } }

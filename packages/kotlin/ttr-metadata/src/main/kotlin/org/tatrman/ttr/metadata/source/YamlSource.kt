@@ -77,6 +77,11 @@ class YamlFileSource(
             allMdHopIssues,
             YamlTreeReader(profile, catalog),
         ).load()
+
+    companion object {
+        /** `canonical` / `canonical/1`: the bundled identity profile, which resolves without a catalog or a root. */
+        fun isBundledProfile(reference: String): Boolean = ProfileResolver.isBundled(reference)
+    }
 }
 
 /** One file's AST for the [FileBasedSource] loop: what the `.ttrm` parser returns, from wherever it came. */
@@ -163,10 +168,15 @@ internal class YamlTreeReader(
         val root: Path?,
         private val catalog: Map<String, Path>,
         private val problems: Problems,
+        /** The tree declaration's storage name when the tree declares a profile (review-269 F8). */
+        private val tree: String?,
     ) {
         private var resolver: Result<ProfileResolver>? = null
 
-        /** [at] names the file that needs the resolver, for the one issue its absence raises. */
+        /**
+         * [at] names the file that needs the resolver. The one issue its absence raises is a storage problem, shared by
+         * every file that needs a profile, so it is recorded under the tree declaration when there is one, else [at].
+         */
         private fun resolver(at: String): ProfileResolver = (resolver ?: create(at).also { resolver = it }).getOrThrow()
 
         fun resolve(
@@ -185,7 +195,7 @@ internal class YamlTreeReader(
             fun failure(): Result<ProfileResolver> {
                 val issue =
                     problems.error(
-                        at,
+                        tree ?: at,
                         1,
                         1,
                         "ys/profile-not-found: profiles need a filesystem-backed storage (root ${root ?: "none"})",
@@ -248,7 +258,9 @@ internal class YamlTreeReader(
             }
         }
         val storageRoot = listed.firstNotNullOfOrNull { it.rootPath }
-        val profiles = Profiles(storageRoot?.toAbsolutePath(), catalog, problems)
+        val treeName = declarationFile?.path ?: storageRoot?.resolve("ttr.yaml")?.toString() ?: "ttr.yaml"
+        val declares = profile != null || declarationFile != null
+        val profiles = Profiles(storageRoot?.toAbsolutePath(), catalog, problems, treeName.takeIf { declares })
         val ignore =
             ignoreFile?.let { modelIgnore(it, storage, problems) }?.getOrElse { e ->
                 // Fail closed (review-260 F4): without the ignore list no file is known to be content.
@@ -257,10 +269,7 @@ internal class YamlTreeReader(
             }
         val content = candidates.filter { ignore?.matches(it.underRoot()) != true }
         // Resolved on the first file that falls back to it, so a tree without such a file raises nothing (RR1-1).
-        val tree by lazy {
-            val name = declarationFile?.path ?: storageRoot?.resolve("ttr.yaml")?.toString() ?: "ttr.yaml"
-            treeDeclaration(declarationFile, name, storage, profiles, problems)
-        }
+        val tree by lazy { treeDeclaration(declarationFile, treeName, storage, profiles, problems) }
         val canonical = mutableListOf<Pair<StorageFile, String>>()
         val dialect = linkedMapOf<List<String>, Pair<List<ProfileDefinition>, MutableList<Pair<StorageFile, String>>>>()
         for (file in content) {
