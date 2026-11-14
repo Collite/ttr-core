@@ -48,6 +48,7 @@ internal class PythonClientRenderer(
                 put("recipe", graph.recipe.name)
                 put("program", graph.program.name)
                 put("deployment", graph.deployment.name)
+                put("dry_run", graph.deployment.dryRun)
                 put("mode", requireNotNull(graph.program.mode).replace('_', '-'))
                 put("port", graph.program.port ?: "none")
                 put("clock", graph.program.asOf ?: "run")
@@ -184,6 +185,7 @@ internal class PythonClientRenderer(
                 or selects all with no argument. The chosen port must match the exported program.
                 `--as-of` accepts `now` or an ISO instant with offset. An event program sends the literal clock in
                 port.at; a real event run uses that event clock without an asOf override.
+                A real run of a run-clock program takes `now`; a literal instant needs a debug deployment.
                 The typed API defaults to dry_run=True; pass dry_run=False for a real run.
                 The CLI uses `--dry-run` for previews; omit it for a real run.
                 `Run.actions.<action>.perform(keys)` sends object keys once per action; `outcome(items)` records

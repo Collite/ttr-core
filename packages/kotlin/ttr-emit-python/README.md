@@ -4,6 +4,7 @@
 project and one generated test per route. The Server executes the recipe; the package
 contains no SQL or compiler code. Real runs are available in S2.1b.
 
+A real run of a run-clock program takes `now`; a literal instant needs a debug deployment.
 The typed API defaults to `dry_run=True`; pass `dry_run=False` for a real run.
 The CLI uses `--dry-run` for previews; omit it for a real run. `Run.parts.<name>()`,
 `Run.routes.<route>()`, `Run.actions.<action>.perform(keys)`, `outcome(items)` and
@@ -31,6 +32,12 @@ Polling honors Retry-After and permits one final status read. The service expose
 stranded key as `retryable: true`, `runId` and `retryAfter`. Python is 3.13.9, pytest 8.3.5.
 
 `POST /automation/runs/{id}/actions/{a}/perform { keys: [ { keyColumn: value, … } ], group? }` — keys are always objects, one call per action. Answer `200 { performed: [{ key, batchRows }], skipped: [{ key, reason }] }`; `performed[].key` and `skipped[].key` are the same objects as sent. **Hold is decided per preview entry (⚑R254-J, 2026-11-14):** the request sends each key once; the answer carries one `(key, reason)` per **preview entry** of that action (one key can have two entries — non-exclusive routes × wirings); an entry is `held` iff any of its own `batchRows` carries an approval `group` (`GET …/batch` rows, `batchRows` on the status preview action, are the wire for it). An entry sharing a deduplicated grouped row with a held entry is held too. The export's `held_actions` list is a cross-check only.
+
+On a dry-run-only deployment the client refuses a real run; pass `--dry-run` (typed API: `dry_run=True`).
+
+Hold marks: a batch row carries an approval `group` only for an action with `approval: required` on a native `transition`/`writer`/`obligation` sink; a route-level approval (D-145's user task) marks no batch row.
+
+A lost perform response on a real run: the client does **not** close; the run stays for inspection and perform is idempotent per key, so an operator re-drives it or the abandonment clock ends it.
 
 Dry run: `performed: []`; every held key `skipped {reason: "held"}` (held precedes dry-run); every other selected key `skipped {reason: "dry-run"}`. Nothing is applied; the client closes a dry run after its evidence is read.
 

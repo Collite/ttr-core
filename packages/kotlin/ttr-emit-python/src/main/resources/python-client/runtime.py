@@ -150,6 +150,8 @@ class BaseClient:
     def open(self, port: dict[str, Any], as_of: str | None = None, *, dry_run: bool = True, idempotency_key: str | None = None) -> BaseRun:
         if type(dry_run) is not bool:
             raise ValueError("dry_run requires a boolean")
+        if CONFIG["dry_run"] and dry_run is False:
+            raise ValueError("deployment is dry-run only; use --dry-run")
         kind = CONFIG["port"].replace("on_event", "event")
         # Replay may replace batch `none` with explicit `keys`, as the native dry driver does.
         accepted = {"none", "keys"} if CONFIG["mode"] == "batch" else {kind}
@@ -182,6 +184,11 @@ class BaseClient:
             policy = data if "dryRun" in data else run.status()
             run.dry_run = policy.get("dryRun") is True
             if type(policy.get("dryRun")) is not bool or policy["dryRun"] != body["dryRun"]:
+                if run.dry_run:
+                    try:
+                        run.close()
+                    except Exception:
+                        pass
                 raise ApiError("Server dryRun differs from requested value")
         return run
 
@@ -254,20 +261,24 @@ class Action:
         self.run, self.name = run, name
 
     def perform(self, keys: list[dict[str, Any]]) -> dict[str, Any]:
-        unique = {canonical_key(key): key_object(key) for key in keys}
+        validated = [key_object(key) for key in keys]
+        unique = {_canonical(key): key for key in validated}
         effect = self.run.request("POST", "perform", {"keys": list(unique.values())}, action=self.name)[1]
         # Record evidence of an applied entry before validating the rest of the answer.
-        if isinstance(effect.get("performed"), list):
-            if any(isinstance(entry, dict) and isinstance(entry.get("key"), dict) for entry in effect["performed"]):
-                self.run.performed_any = True
+        if isinstance(effect.get("performed"), list) and effect["performed"]:
+            self.run.performed_any = True
         return effect
 
     def outcome(self, outcomes: list[dict[str, Any]]) -> dict[str, Any]:
         return self.run.request("POST", "outcome", {"outcomes": [dict(item, key=key_object(item["key"])) for item in outcomes]}, action=self.name)[1]
 
 
+def _canonical(key: dict[str, Any]) -> str:
+    return dumps(dict(sorted(key.items())))
+
+
 def canonical_key(key: Any) -> str:
-    return dumps({name: value for name, value in sorted(response_key(key).items())})
+    return _canonical(response_key(key))
 
 
 def perform_expectations(previews: list[dict[str, Any]], rows: list[dict[str, Any]], dry_run: bool) -> dict[str, Counter]:
@@ -440,8 +451,7 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
                 raise ApiError("run did not close")
         return {"verdicts": verdicts, "actions": actions, "details": details, "detail_counts": counts, "effects": rows, "perform_effects": perform_effects}
     except Exception:
-        is_dry_run = status.get("dryRun") is True if status is not None else run.dry_run
-        if run.claim == 201 and (is_dry_run or run.performed_any):
+        if run.claim == 201 and (run.dry_run or run.performed_any):
             try:
                 run.close()
             except Exception:

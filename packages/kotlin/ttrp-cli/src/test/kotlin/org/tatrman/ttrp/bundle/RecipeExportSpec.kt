@@ -526,6 +526,7 @@ class RecipeExportSpec :
             val folder = out.resolve("release_py.python_client.export")
             val manifest = Json.parseToJsonElement(Files.readString(folder.resolve("manifest.json"))).jsonObject
             val config = Json.parseToJsonElement(Files.readString(folder.resolve("python-client.json"))).jsonObject
+            config["dry_run"] shouldBe JsonPrimitive(false)
             config.getValue("held_actions").jsonArray shouldBe JsonArray(emptyList())
             manifest["calls"] shouldBe config["callPlan"]
             config.getValue("fingerprints").jsonObject shouldBe manifest.getValue("fingerprints").jsonObject

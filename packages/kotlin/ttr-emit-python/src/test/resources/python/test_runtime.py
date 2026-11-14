@@ -50,6 +50,7 @@ class Server:
         self.client.opener = self
         monkeypatch.setattr(rt.time, "monotonic", lambda: self.now)
         monkeypatch.setattr(rt.time, "sleep", self.sleep)
+        monkeypatch.setitem(rt.CONFIG, "dry_run", False)
         monkeypatch.setitem(rt.CONFIG, "held_actions", ["release"] if held else [])
 
     def sleep(self, seconds):
@@ -261,6 +262,7 @@ def test_real_run_is_reachable(monkeypatch, capsys, entry):
 
 def test_cli_dry_run_reads_evidence(monkeypatch, capsys):
     server = Server(monkeypatch)
+    monkeypatch.setitem(rt.CONFIG, "dry_run", True)
     monkeypatch.setattr(main, "Client", lambda: server.client)
     monkeypatch.setattr(main.sys, "argv", ["client", "--key", "4711", "--as-of", "now", "--dry-run"])
     assert main.main() == 0
@@ -488,7 +490,9 @@ def test_open_policy_mismatch_is_refused_before_execution(monkeypatch, echo, req
     else:
         with pytest.raises(rt.ApiError, match="Server dryRun differs"):
             server.client.open({"key": 4711}, dry_run=requested)
-    assert not any(path.endswith(("/evaluate", "/perform", "/close")) for path, _, _ in server.seen)
+    assert not any(path.endswith(("/evaluate", "/perform")) for path, _, _ in server.seen)
+    stored = server.dry if echo is None else echo
+    assert sum(path.endswith("/close") for path, _, _ in server.seen) == int(stored is True and stored != requested)
     assert len(server.opens) == 1
     assert sum(path == "/automation/runs/r1" for path, _, _ in server.seen) == int(echo is None)
 
@@ -534,9 +538,10 @@ def test_a_performed_entry_is_tracked_before_answer_verification(monkeypatch):
     assert sum(path.endswith("/close") for path, _, _ in server.seen) == 1
 
 
-def test_malformed_performed_list_without_an_entry_does_not_close_real_run(monkeypatch):
+@pytest.mark.parametrize("performed", [[], None, {}])
+def test_malformed_performed_list_without_an_entry_does_not_close_real_run(monkeypatch, performed):
     server = Server(monkeypatch, dry=False)
-    server.perform_responses["release"] = {"performed": [None], "skipped": []}
+    server.perform_responses["release"] = {"performed": performed, "skipped": []}
     with pytest.raises(rt.ApiError, match="perform effects differ"):
         rt.execute(server.client, {"key": 4711}, None, dry_run=False)
     assert not any(path.endswith("/close") for path, _, _ in server.seen)
@@ -572,3 +577,72 @@ def test_a_performed_entry_with_a_mismatched_key_still_requires_cleanup(monkeypa
     with pytest.raises(rt.ApiError, match="perform effects differ"):
         rt.execute(server.client, {"key": 4711}, None, dry_run=False)
     assert sum(path.endswith("/close") for path, _, _ in server.seen) == 1
+
+
+@pytest.mark.parametrize("entry", ["typed", "service", "cli"])
+def test_dry_only_deployment_refuses_real_run_before_any_request(monkeypatch, capsys, entry):
+    server = Server(monkeypatch)
+    monkeypatch.setitem(rt.CONFIG, "dry_run", True)
+    if entry == "typed":
+        with pytest.raises(ValueError, match="deployment is dry-run only; use --dry-run"):
+            server.client.open({"key": 4711}, dry_run=False)
+    elif entry == "service":
+        assert service.run({rt.__package__: server.client}, {"port": {"key": 4711}, "dry_run": False}) == {
+            "error": "invalid input or replay parameter"}
+    else:
+        monkeypatch.setattr(main, "Client", lambda: server.client)
+        monkeypatch.setattr(main.sys, "argv", ["client", "--key", "4711", "--as-of", "now"])
+        assert main.main() == 2
+        assert capsys.readouterr().err.strip() == "invalid input or configuration"
+    assert server.seen == []
+
+
+@pytest.mark.parametrize("reclaim", [False, True])
+@pytest.mark.parametrize("fallback", [False, True])
+@pytest.mark.parametrize("close_error", [False, True])
+def test_unexpected_dry_claim_is_closed_before_refusal(monkeypatch, reclaim, fallback, close_error):
+    server = Server(monkeypatch, claim=202 if reclaim else 201, dry=True)
+    server.open_dry = None if fallback else True
+    server.close_error = close_error
+    server.status_elapsed = [rt.CONFIG["budget_seconds"] + 120] if reclaim else []
+    with pytest.raises(rt.ApiError, match="^Server dryRun differs from requested value$"):
+        rt.execute(server.client, {"key": 4711}, None, dry_run=False)
+    assert len(server.opens) == 1 + int(reclaim)
+    assert sum(path.endswith("/close") for path, _, _ in server.seen) == 1
+    assert not any(path.endswith(("/evaluate", "/perform")) for path, _, _ in server.seen)
+
+
+@pytest.mark.parametrize("opened_dry", [False, True])
+def test_error_cleanup_uses_open_policy_when_status_disagrees(monkeypatch, opened_dry):
+    server = Server(monkeypatch, dry=not opened_dry)
+    server.open_dry = opened_dry
+    with pytest.raises(rt.ApiError, match="^Server dryRun differs from requested value$"):
+        rt.execute(server.client, {"key": 4711}, None, dry_run=opened_dry)
+    assert sum(path.endswith("/close") for path, _, _ in server.seen) == int(opened_dry)
+    assert not any(path.endswith("/perform") for path, _, _ in server.seen)
+
+
+@pytest.mark.parametrize("key", [{"order_no": 1}, 4711])
+def test_perform_rejects_caller_key_as_input_before_request(monkeypatch, key):
+    server = Server(monkeypatch)
+    action = server.client.open({"key": 4711}).actions.release
+    with pytest.raises(ValueError, match="key columns differ"):
+        action.perform([{"order_number": 4711}, key])
+    assert not any(path.endswith("/perform") for path, _, _ in server.seen)
+
+
+@pytest.mark.parametrize("entry", [None, {}, {"key": 4711}, {"key": {"order_no": 1}}])
+def test_any_returned_performed_entry_requires_real_error_cleanup(monkeypatch, entry):
+    server = Server(monkeypatch, dry=False)
+    server.perform_responses["release"] = {"performed": [entry], "skipped": []}
+    with pytest.raises(rt.ApiError, match="perform effects differ|Server returned a malformed key"):
+        rt.execute(server.client, {"key": 4711}, None, dry_run=False)
+    assert sum(path.endswith("/close") for path, _, _ in server.seen) == 1
+
+
+def test_help_explains_real_run_clock_literal_requirement(monkeypatch, capsys):
+    monkeypatch.setattr(main.sys, "argv", ["client", "--help"])
+    with pytest.raises(SystemExit) as result:
+        main.main()
+    assert result.value.code == 0
+    assert "A real run of a run-clock program takes `now`; a literal instant needs a debug deployment." in " ".join(capsys.readouterr().out.split())

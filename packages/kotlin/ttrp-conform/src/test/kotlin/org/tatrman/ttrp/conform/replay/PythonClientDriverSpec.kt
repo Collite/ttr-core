@@ -40,7 +40,7 @@ class PythonClientDriverSpec :
             held: Boolean = false,
             shared: Boolean = false,
             overlap: Boolean = false,
-            debug: Boolean = false,
+            dryOnly: Boolean = true,
         ): java.nio.file.Path {
             val graph =
                 RecipeGraph(
@@ -74,8 +74,8 @@ class PythonClientDriverSpec :
                         "1",
                         "automation_decider",
                         "recipe",
-                        true,
-                        debug,
+                        dryOnly,
+                        false,
                         emptyMap(),
                     ),
                     Roles("candidates", emptyList(), "decision", if (overlap) "overlapping" else "exclusive"),
@@ -325,7 +325,7 @@ class PythonClientDriverSpec :
                             PythonClientDriver(
                                 server.url,
                                 "test-token",
-                                listOf(export("batch", debug = !dry), export("on_event", debug = !dry)),
+                                listOf(export("batch", dryOnly = dry), export("on_event", dryOnly = dry)),
                                 dryRun = dry,
                             )
                         val report =

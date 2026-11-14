@@ -30,7 +30,15 @@ def require(text, literal):
         raise SystemExit(f"Server fixture changed: {literal}")
 
 
-column = re.search(r'fun key\(order: String\) = buildJsonObject \{ put\("([^"]+)", order\) }', source).group(1)
+def capture(pattern, text):
+    match = re.search(pattern, text)
+    if not match:
+        raise SystemExit(f"Server fixture changed: {pattern}")
+    return match
+
+
+require(source, "r.copy(seq = i + 1)")
+column = capture(r'fun key\(order: String\) = buildJsonObject \{ put\("([^"]+)", order\) }', source).group(1)
 dry_name, dry = case("R254-E: perform answers per key")
 require(dry, 'answer.performed shouldBe emptyList()')
 require(dry, 'hold("4711").map { it.copy(group = key("4711")) } + hold("4712")')
@@ -41,19 +49,20 @@ if len(skipped) != 2:
 real_name, real = case("S2.3 T3: perform {keys}")
 require(real, 'first.skipped shouldBe emptyList()')
 require(real, 'actions = listOf(listOf(2, 3), listOf(4, 5))')
+indices = [int(index) for index in capture(r'actions = listOf\(listOf\((\d+, \d+)\)', real).group(1).split(", ")]
 require(real, 'perform.perform(id, "hold", PerformRequest(keys = listOf(key("4711"))), identity.caller) shouldBe first')
-key = re.search(r'first.performed.map \{ it.key } shouldBe listOf\(key\("([^"]+)"\)\)', real).group(1)
-sealed = re.search(r'}.code shouldBe ErrorCode.(\w+)', real).group(1)
+key = capture(r'first.performed.map \{ it.key } shouldBe listOf\(key\("([^"]+)"\)\)', real).group(1)
+sealed = capture(r'}.code shouldBe ErrorCode.(\w+)', real).group(1)
 out_name, out = case("S2.3 T3: outcome appends")
-count = int(re.search(r'\)\["outcomes"\] shouldBe JsonPrimitive\((\d+)\)', out).group(1))
-item = re.search(r'OutcomeItem\(key\("([^"]+)"\), "([^"]+)", "([^"]+)"\)', out)
+count = int(capture(r'\)\["outcomes"\] shouldBe JsonPrimitive\((\d+)\)', out).group(1))
+item = capture(r'OutcomeItem\(key\("([^"]+)"\), "([^"]+)", "([^"]+)"\)', out)
 fixture = {
     "provenance": {"repository": "Collite/ttr-server", "sha": SHA, "file": SOURCE,
                    "sha256": hashlib.sha256(source.encode()).hexdigest(),
                    "cases": [dry_name, real_name, out_name],
                    "method": "source fixture inputs/assertions; not a live HTTP recording"},
     "dry": {"performed": [], "skipped": skipped},
-    "real": {"performed": [{"key": {column: key}, "batchRows": [3, 4]}], "skipped": []},
+    "real": {"performed": [{"key": {column: key}, "batchRows": [index + 1 for index in indices]}], "skipped": []},
     "outcome": {"request": {"outcomes": [{"key": {column: item[1]}, "status": item[2], "at": item[3]}]},
                 "response": {"outcomes": count}, "sealed_error": sealed},
 }

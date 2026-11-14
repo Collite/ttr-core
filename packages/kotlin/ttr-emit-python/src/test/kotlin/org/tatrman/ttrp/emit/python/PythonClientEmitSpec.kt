@@ -109,7 +109,12 @@ class PythonClientEmitSpec :
                         render().files.getValue("python-client.json").decodeToString(),
                     ).jsonObject
             config["abandonment_seconds"] shouldBe JsonPrimitive(180)
-            config.containsKey("dry_run") shouldBe false
+            config["dry_run"] shouldBe JsonPrimitive(graph.deployment.dryRun)
+            val realAllowed = render(graph.copy(deployment = graph.deployment.copy(dryRun = false)))
+            Json
+                .parseToJsonElement(
+                    realAllowed.files.getValue("python-client.json").decodeToString(),
+                ).jsonObject["dry_run"] shouldBe JsonPrimitive(false)
             render().files.getValue("python-client.json").decodeToString() shouldNotContain "\"budget\":"
         }
         "the client requires the contracted perform and outcome endpoints" {
@@ -120,6 +125,10 @@ class PythonClientEmitSpec :
         "README and manual pin the contracted hold, answers, cleanup and stranded-key sentences" {
             val sentences =
                 listOf(
+                    "a batch row carries an approval `group` only for an action with `approval: required` on a native `transition`/`writer`/`obligation` sink; a route-level approval (D-145's user task) marks no batch row.",
+                    "the client does **not** close; the run stays for inspection and perform is idempotent per key, so an operator re-drives it or the abandonment clock ends it.",
+                    "On a dry-run-only deployment the client refuses a real run; pass `--dry-run` (typed API: `dry_run=True`).",
+                    "A real run of a run-clock program takes `now`; a literal instant needs a debug deployment.",
                     "An entry sharing a deduplicated grouped row with a held entry is held too.",
                     "Nothing is applied; the client closes a dry run after its evidence is read.",
                     "Perform applies ahead of close and is idempotent per key; close never resends a performed row.",
@@ -178,7 +187,7 @@ class PythonClientEmitSpec :
                         .start()
                 process.waitFor(120, TimeUnit.SECONDS) shouldBe true
                 io.kotest.assertions.withClue(Files.readString(log)) { process.exitValue() shouldBe 0 }
-                Files.readString(log) shouldContain "83 passed"
+                Files.readString(log) shouldContain "105 passed"
             } finally {
                 dir.toFile().deleteRecursively()
             }

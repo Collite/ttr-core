@@ -12,6 +12,7 @@ From worker/: `uv run python -m release_order_client.main --key 4711 --as-of 202
 or selects all with no argument. The chosen port must match the exported program.
 `--as-of` accepts `now` or an ISO instant with offset. An event program sends the literal clock in
 port.at; a real event run uses that event clock without an asOf override.
+A real run of a run-clock program takes `now`; a literal instant needs a debug deployment.
 The typed API defaults to dry_run=True; pass dry_run=False for a real run.
 The CLI uses `--dry-run` for previews; omit it for a real run.
 `Run.actions.<action>.perform(keys)` sends object keys once per action; `outcome(items)` records
@@ -29,6 +30,12 @@ Only run trusted generated packages, like other executable conformance artifacts
 
 `POST /automation/runs/{id}/actions/{a}/perform { keys: [ { keyColumn: value, … } ], group? }` — keys are always objects, one call per action. Answer `200 { performed: [{ key, batchRows }], skipped: [{ key, reason }] }`; `performed[].key` and `skipped[].key` are the same objects as sent. **Hold is decided per preview entry (⚑R254-J, 2026-11-14):** the request sends each key once; the answer carries one `(key, reason)` per **preview entry** of that action (one key can have two entries — non-exclusive routes × wirings); an entry is `held` iff any of its own `batchRows` carries an approval `group` (`GET …/batch` rows, `batchRows` on the status preview action, are the wire for it). An entry sharing a deduplicated grouped row with a held entry is held too. The export's `held_actions` list is a cross-check only.
 
+On a dry-run-only deployment the client refuses a real run; pass `--dry-run` (typed API: `dry_run=True`).
+
+Hold marks: a batch row carries an approval `group` only for an action with `approval: required` on a native `transition`/`writer`/`obligation` sink; a route-level approval (D-145's user task) marks no batch row.
+
+A lost perform response on a real run: the client does **not** close; the run stays for inspection and perform is idempotent per key, so an operator re-drives it or the abandonment clock ends it.
+
 Dry run: `performed: []`; every held key `skipped {reason: "held"}` (held precedes dry-run); every other selected key `skipped {reason: "dry-run"}`. Nothing is applied; the client closes a dry run after its evidence is read.
 
 Real run: an unheld key answers `performed`, or `skipped {reason: "failed"}` (its row failed in Apply) or `skipped {reason: "not-applied"}` (still staged). These are **legal results for the caller**, reported with their reason — not client errors, and the run continues and closes normally. Perform applies ahead of close and is idempotent per key; close never resends a performed row.
@@ -42,7 +49,7 @@ Abandonment clock: today `Ledger.abandonExpiredRuns` compares every run against 
 === conformance.json ===
 {}
 === python-client.json ===
-{"module":"release_order_client","recipe":"release_order","program":"release_on_placement","deployment":"release_py","mode":"on-event","port":"key","clock":"event","granularity":"recipe","key":["order_number"],"parts":["candidates","stock","decision"],"islands":["input","decision"],"routes":["release","hold"],"actions":["notify","release"],"held_actions":["release"],"abandonment_seconds":180,"base_path":"/automation","calls":{"batch":"/runs/{id}/batch","close":"/runs/{id}/close","detail":"/runs/{id}/routes/{route}/details/{context}","evaluate":"/runs/{id}/evaluate","island":"/runs/{id}/islands/{island}","open":"/recipes/{recipe}/runs","outcome":"/runs/{id}/actions/{action}/outcome","part":"/runs/{id}/parts/{part}","perform":"/runs/{id}/actions/{action}/perform","route":"/runs/{id}/routes/{route}","status":"/runs/{id}"},"callPlan":[{"name":"open","path":"/recipes/{recipe}/runs"},{"name":"part","path":"/runs/{id}/parts/{part}"},{"name":"island","path":"/runs/{id}/islands/{island}"},{"name":"evaluate","path":"/runs/{id}/evaluate"},{"name":"status","path":"/runs/{id}"},{"name":"route","path":"/runs/{id}/routes/{route}"},{"name":"detail","path":"/runs/{id}/routes/{route}/details/{context}"},{"name":"perform","path":"/runs/{id}/actions/{action}/perform"},{"name":"outcome","path":"/runs/{id}/actions/{action}/outcome"},{"name":"batch","path":"/runs/{id}/batch"},{"name":"close","path":"/runs/{id}/close"}],"fingerprints":{"deployment":"deployment-fp","program":"program-fp","text":"text-fp","values":"values-fp"},"budget_seconds":60,"parameters":[]}
+{"module":"release_order_client","recipe":"release_order","program":"release_on_placement","deployment":"release_py","dry_run":true,"mode":"on-event","port":"key","clock":"event","granularity":"recipe","key":["order_number"],"parts":["candidates","stock","decision"],"islands":["input","decision"],"routes":["release","hold"],"actions":["notify","release"],"held_actions":["release"],"abandonment_seconds":180,"base_path":"/automation","calls":{"batch":"/runs/{id}/batch","close":"/runs/{id}/close","detail":"/runs/{id}/routes/{route}/details/{context}","evaluate":"/runs/{id}/evaluate","island":"/runs/{id}/islands/{island}","open":"/recipes/{recipe}/runs","outcome":"/runs/{id}/actions/{action}/outcome","part":"/runs/{id}/parts/{part}","perform":"/runs/{id}/actions/{action}/perform","route":"/runs/{id}/routes/{route}","status":"/runs/{id}"},"callPlan":[{"name":"open","path":"/recipes/{recipe}/runs"},{"name":"part","path":"/runs/{id}/parts/{part}"},{"name":"island","path":"/runs/{id}/islands/{island}"},{"name":"evaluate","path":"/runs/{id}/evaluate"},{"name":"status","path":"/runs/{id}"},{"name":"route","path":"/runs/{id}/routes/{route}"},{"name":"detail","path":"/runs/{id}/routes/{route}/details/{context}"},{"name":"perform","path":"/runs/{id}/actions/{action}/perform"},{"name":"outcome","path":"/runs/{id}/actions/{action}/outcome"},{"name":"batch","path":"/runs/{id}/batch"},{"name":"close","path":"/runs/{id}/close"}],"fingerprints":{"deployment":"deployment-fp","program":"program-fp","text":"text-fp","values":"values-fp"},"budget_seconds":60,"parameters":[]}
 
 === worker/.python-version ===
 3.13.9
@@ -122,6 +129,7 @@ class Client(BaseClient):
     "recipe": "release_order",
     "program": "release_on_placement",
     "deployment": "release_py",
+    "dry_run": true,
     "mode": "on-event",
     "port": "key",
     "clock": "event",
@@ -233,7 +241,7 @@ def main() -> int:
     port = parser.add_mutually_exclusive_group(required=True)
     port.add_argument("--key", help="JSON scalar, key array or composite key object")
     port.add_argument("--batch", nargs="?", const="all", help="optional JSON keys array; no argument selects all")
-    parser.add_argument("--as-of", required=True, help="now or ISO instant with offset")
+    parser.add_argument("--as-of", required=True, help="now or ISO instant with offset. A real run of a run-clock program takes `now`; a literal instant needs a debug deployment.")
     parser.add_argument("--dry-run", action="store_true", help="preview without applying writes; omit for a real run")
     args = parser.parse_args()
     try:
@@ -413,6 +421,8 @@ class BaseClient:
     def open(self, port: dict[str, Any], as_of: str | None = None, *, dry_run: bool = True, idempotency_key: str | None = None) -> BaseRun:
         if type(dry_run) is not bool:
             raise ValueError("dry_run requires a boolean")
+        if CONFIG["dry_run"] and dry_run is False:
+            raise ValueError("deployment is dry-run only; use --dry-run")
         kind = CONFIG["port"].replace("on_event", "event")
         # Replay may replace batch `none` with explicit `keys`, as the native dry driver does.
         accepted = {"none", "keys"} if CONFIG["mode"] == "batch" else {kind}
@@ -445,6 +455,11 @@ class BaseClient:
             policy = data if "dryRun" in data else run.status()
             run.dry_run = policy.get("dryRun") is True
             if type(policy.get("dryRun")) is not bool or policy["dryRun"] != body["dryRun"]:
+                if run.dry_run:
+                    try:
+                        run.close()
+                    except Exception:
+                        pass
                 raise ApiError("Server dryRun differs from requested value")
         return run
 
@@ -517,20 +532,24 @@ class Action:
         self.run, self.name = run, name
 
     def perform(self, keys: list[dict[str, Any]]) -> dict[str, Any]:
-        unique = {canonical_key(key): key_object(key) for key in keys}
+        validated = [key_object(key) for key in keys]
+        unique = {_canonical(key): key for key in validated}
         effect = self.run.request("POST", "perform", {"keys": list(unique.values())}, action=self.name)[1]
         # Record evidence of an applied entry before validating the rest of the answer.
-        if isinstance(effect.get("performed"), list):
-            if any(isinstance(entry, dict) and isinstance(entry.get("key"), dict) for entry in effect["performed"]):
-                self.run.performed_any = True
+        if isinstance(effect.get("performed"), list) and effect["performed"]:
+            self.run.performed_any = True
         return effect
 
     def outcome(self, outcomes: list[dict[str, Any]]) -> dict[str, Any]:
         return self.run.request("POST", "outcome", {"outcomes": [dict(item, key=key_object(item["key"])) for item in outcomes]}, action=self.name)[1]
 
 
+def _canonical(key: dict[str, Any]) -> str:
+    return dumps(dict(sorted(key.items())))
+
+
 def canonical_key(key: Any) -> str:
-    return dumps({name: value for name, value in sorted(response_key(key).items())})
+    return _canonical(response_key(key))
 
 
 def perform_expectations(previews: list[dict[str, Any]], rows: list[dict[str, Any]], dry_run: bool) -> dict[str, Counter]:
@@ -703,8 +722,7 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
                 raise ApiError("run did not close")
         return {"verdicts": verdicts, "actions": actions, "details": details, "detail_counts": counts, "effects": rows, "perform_effects": perform_effects}
     except Exception:
-        is_dry_run = status.get("dryRun") is True if status is not None else run.dry_run
-        if run.claim == 201 and (is_dry_run or run.performed_any):
+        if run.claim == 201 and (run.dry_run or run.performed_any):
             try:
                 run.close()
             except Exception:
