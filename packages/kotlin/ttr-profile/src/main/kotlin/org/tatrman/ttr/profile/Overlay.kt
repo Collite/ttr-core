@@ -110,7 +110,9 @@ object OverlayLoader {
         val overlay = profile.overlay ?: return emptyList()
         if (overlay is JsonObject) {
             return entries(overlay, "/overlay") { path, key ->
-                profile.locations[path] ?: profile.locations.getValue("/overlay")
+                (if (key) profile.keyLocations[path] else null)
+                    ?: profile.locations[path]
+                    ?: profile.locations.getValue("/overlay")
             }
         }
         val at = profile.locations.getValue("/overlay")

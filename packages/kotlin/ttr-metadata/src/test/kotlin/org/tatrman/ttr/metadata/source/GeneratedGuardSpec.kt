@@ -110,6 +110,8 @@ class GeneratedGuardSpec :
             val at = orphan.first { it.message.startsWith("xm/overlay-orphan") && "dropped" !in it.message }
             at.file shouldEndWith "tree/profiles/overlay-inline.yaml"
             at.line shouldBe 5
+            // At the entry's key (col 3), not its value (S3.6 Found (f), S3.7 T0).
+            at.column shouldBe 3
             at.message shouldContain "demo.er.entity.Zrusena"
         }
 
