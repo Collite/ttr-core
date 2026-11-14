@@ -19,7 +19,22 @@ tasks.test {
     inputs.dir("../ttr-metadata/src/testFixtures/resources/fixtures/xm-world")
     inputs.dir("../ttr-metadata/src/test/resources/xm-goldens")
     inputs.dir("../../../tests/conformance/md-hop")
+    // MW S3.5: the code-catalogue drift scan reads these sources; the CLI specs read the dialect trees.
+    inputs.dir("../ttr-yaml/src/main/kotlin")
+    inputs.dir("../ttr-profile/src/main/kotlin")
+    inputs.dir("../ttr-metadata/src/main/kotlin")
+    inputs.dir("../../../tests/conformance/dialect")
+    inputs.dir("../../../tests/conformance/dialect-negative")
     systemProperty("metadata.expectedVersion", project.version.toString())
+    // MW S3.5 T6: one spec drives the installed distribution.
+    dependsOn(tasks.named("installDist"))
+    systemProperty(
+        "metadata.installedBinary",
+        layout.buildDirectory
+            .file("install/ttr-metadata/bin/ttr-metadata")
+            .get()
+            .asFile.path,
+    )
 }
 
 application {
