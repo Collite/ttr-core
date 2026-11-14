@@ -17,8 +17,9 @@ tasks.test {
     // VL-P0: LayoutResolverSpec reads the shared layout vectors in place (never a copy).
     inputs.dir("../../package-sdk/schemas/layout-vectors")
     // CN-P2 S2.5: the cn specs load conformance fixtures 75–84 in place.
-    inputs.dir("../../../tests/conformance/fixtures")
-    inputs.dir("../../../tests/conformance/md-hop")
+    // MW S3.7 T2 (§26 (c)): the whole conformance tree — the dialect, guard and fixture specs read beyond fixtures/
+    // and md-hop/, and an undeclared fixture edit left `test` UP-TO-DATE (stale green).
+    inputs.dir("../../../tests/conformance")
 }
 
 dependencies {

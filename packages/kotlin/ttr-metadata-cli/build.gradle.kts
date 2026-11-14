@@ -21,13 +21,12 @@ tasks.test {
     inputs.dir("../ttr-metadata/src/test/resources/md-hop")
     inputs.dir("../ttr-metadata/src/testFixtures/resources/fixtures/xm-world")
     inputs.dir("../ttr-metadata/src/test/resources/xm-goldens")
-    inputs.dir("../../../tests/conformance/md-hop")
+    // MW S3.7 T2 (§26 (c)): the whole conformance tree (dialect, guard, the DONE 1 index, md-hop).
+    inputs.dir("../../../tests/conformance")
     // MW S3.5: the code-catalogue drift scan reads these sources; the CLI specs read the dialect trees.
     inputs.dir("../ttr-yaml/src/main/kotlin")
     inputs.dir("../ttr-profile/src/main/kotlin")
     inputs.dir("../ttr-metadata/src/main/kotlin")
-    inputs.dir("../../../tests/conformance/dialect")
-    inputs.dir("../../../tests/conformance/dialect-negative")
     systemProperty("metadata.expectedVersion", project.version.toString())
     // MW S3.5 T6: one spec drives the installed distribution.
     dependsOn(tasks.named("installDist"))
