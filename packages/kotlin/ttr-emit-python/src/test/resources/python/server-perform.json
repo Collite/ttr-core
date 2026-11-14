@@ -1,0 +1,62 @@
+{
+  "provenance": {
+    "repository": "Collite/ttr-server",
+    "sha": "c2f2f049d4c623ef06bd47d6879427d5ee7e95cf",
+    "file": "services/automation/src/componentTest/kotlin/org/tatrman/automation/writer/ApplyComponentSpec.kt",
+    "sha256": "c00c62a1a85a72b0e8882695ca2f1967c3af274ba6e998ad309d0cf67b2593bc",
+    "cases": [
+      "R254-E: perform answers per key \u2014 a grouped key is held on a dry run too; the rest dry-run; nothing sent",
+      "S2.3 T3: perform {keys} applies only those keys' rows of the action; an identical call answers the first",
+      "S2.3 T3: outcome appends the engine's per-key outcomes to the actions section; bad keys/status refuse"
+    ],
+    "method": "source fixture inputs/assertions; not a live HTTP recording"
+  },
+  "dry": {
+    "performed": [],
+    "skipped": [
+      {
+        "key": {
+          "order_number": "4711"
+        },
+        "reason": "held"
+      },
+      {
+        "key": {
+          "order_number": "4712"
+        },
+        "reason": "dry-run"
+      }
+    ]
+  },
+  "real": {
+    "performed": [
+      {
+        "key": {
+          "order_number": "4711"
+        },
+        "batchRows": [
+          3,
+          4
+        ]
+      }
+    ],
+    "skipped": []
+  },
+  "outcome": {
+    "request": {
+      "outcomes": [
+        {
+          "key": {
+            "order_number": "4711"
+          },
+          "status": "delivered",
+          "at": "2026-11-11T10:05:00Z"
+        }
+      ]
+    },
+    "response": {
+      "outcomes": 1
+    },
+    "sealed_error": "RUN_CLOSED"
+  }
+}

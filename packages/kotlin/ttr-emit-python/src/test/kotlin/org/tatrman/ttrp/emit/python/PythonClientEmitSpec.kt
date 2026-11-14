@@ -47,13 +47,13 @@ class PythonClientEmitSpec :
             client shouldContain "def release(self)"
             client shouldContain "def hold(self)"
             client shouldContain "def candidates(self)"
-            client shouldNotContain "class Actions"
+            client shouldContain "class Actions"
             val packageText = files.values.joinToString { it.decodeToString() }
-            packageText shouldNotContain "/perform"
-            packageText shouldNotContain "/outcome"
-            packageText shouldNotContain "def perform"
-            packageText shouldNotContain "def outcome"
-            packageText shouldNotContain "held_actions"
+            packageText shouldContain "/perform"
+            packageText shouldContain "/outcome"
+            packageText shouldContain "def perform"
+            packageText shouldContain "def outcome"
+            packageText shouldContain "held_actions"
             files
                 .getValue("worker/tests/test_routes.py")
                 .decodeToString()
@@ -61,7 +61,7 @@ class PythonClientEmitSpec :
                 .size shouldBe 3
             files.values.joinToString { it.decodeToString() } shouldNotContain "SELECT "
             files.getValue("worker/pyproject.toml").decodeToString() shouldContain "pytest==8.3.5"
-            files.getValue("README.md").decodeToString() shouldContain "f28120e1"
+            files.getValue("README.md").decodeToString() shouldContain "c2f2f049"
         }
         "H-6 determinism covers all granularities, route order and runApi projection" {
             val variants =
@@ -103,21 +103,45 @@ class PythonClientEmitSpec :
                 JsonPrimitive(600)
             seconds(graph) shouldBe JsonPrimitive(60)
             seconds(graph.copy(program = graph.program.copy(mode = "batch"))) shouldBe JsonPrimitive(1800)
+            val config =
+                Json
+                    .parseToJsonElement(
+                        render().files.getValue("python-client.json").decodeToString(),
+                    ).jsonObject
+            config["abandonment_seconds"] shouldBe JsonPrimitive(180)
+            config.containsKey("dry_run") shouldBe false
             render().files.getValue("python-client.json").decodeToString() shouldNotContain "\"budget\":"
         }
-        "the dry client does not require execution endpoints in the runApi projection" {
-            val dryGraph =
-                graph.copy(
-                    runApi =
-                        graph.runApi.copy(
-                            calls =
-                                graph.runApi.calls - setOf("perform", "outcome"),
-                        ),
-                )
-            render(dryGraph).files.mapValues { it.value.decodeToString() } shouldBe
-                render().files.mapValues { it.value.decodeToString() }
+        "the client requires the contracted perform and outcome endpoints" {
+            io.kotest.assertions.throwables.shouldThrow<IllegalArgumentException> {
+                render(graph.copy(runApi = graph.runApi.copy(calls = graph.runApi.calls - "perform")))
+            }
         }
-        "synthetic dry-evidence package matches its complete golden (real H-1 is covered by the CLI)" {
+        "README and manual pin the contracted hold, answers, cleanup and stranded-key sentences" {
+            val sentences =
+                listOf(
+                    "An entry sharing a deduplicated grouped row with a held entry is held too.",
+                    "Nothing is applied; the client closes a dry run after its evidence is read.",
+                    "Perform applies ahead of close and is idempotent per key; close never resends a performed row.",
+                    "Once at least one perform returned a `performed` entry, the client closes the run (best effort) before re-raising, so the batch stays consistent with what was applied.",
+                    "An Open that answers a foreign claim (`200` non-terminal or `202 + Location`) is polled inside the client's own window (its budget + 2 min).",
+                    "A stranded real run blocks its key until the Server abandons it.",
+                    "so an on-event run is abandoned after `budget_batch` + 2 min (~32 min by default).",
+                    "`performed: []`; every held key `skipped {reason: \"held\"}` (held precedes dry-run); every other selected key `skipped {reason: \"dry-run\"}`.",
+                    "an unheld key answers `performed`, or `skipped {reason: \"failed\"}` (its row failed in Apply) or `skipped {reason: \"not-applied\"}` (still staged).",
+                    "A client that rejects evidence or fails mid-run does **not** close a real run while nothing has been performed on it (the run stays for inspection; the Server's abandonment ends it).",
+                    "When the window ends the client POSTs the same Open **once** more; a `201` is a fresh claim, a `202` or a non-terminal `200` raises a distinct retryable error that carries the run id (\"key held by run <id>; retry later\") for the event system to redeliver.",
+                    "**Contract:** a run whose program `mode` is on-event abandons by **`budget_sync` + 2 min**; a batch run by `budget_batch` + 2 min.",
+                )
+            val docs =
+                listOf(
+                    render().files.getValue("README.md").decodeToString(),
+                    Files.readString(Path.of("README.md")),
+                    Files.readString(Path.of("../../../docs/manual/en/19-automation.md")),
+                )
+            docs.forEach { text -> sentences.forEach { text shouldContain it } }
+        }
+        "synthetic perform-capable package matches its complete golden (real H-1 is covered by the CLI)" {
             val golden = Path.of("src/test/resources/goldens/synthetic_client.txt")
             val text =
                 render().files.entries.joinToString(
@@ -141,6 +165,9 @@ class PythonClientEmitSpec :
                 requireNotNull(javaClass.getResourceAsStream("/python/test_runtime.py")).use {
                     Files.copy(it, dir.resolve("worker/tests/test_runtime.py"))
                 }
+                requireNotNull(javaClass.getResourceAsStream("/python/server-perform.json")).use {
+                    Files.copy(it, dir.resolve("worker/tests/server-perform.json"))
+                }
                 val log = dir.resolve("pytest-output.txt")
                 val process =
                     ProcessBuilder("uv", "run", "--python", "3.13.9", "--group", "dev", "pytest", "-q")
@@ -151,7 +178,7 @@ class PythonClientEmitSpec :
                         .start()
                 process.waitFor(120, TimeUnit.SECONDS) shouldBe true
                 io.kotest.assertions.withClue(Files.readString(log)) { process.exitValue() shouldBe 0 }
-                Files.readString(log) shouldContain "48 passed"
+                Files.readString(log) shouldContain "83 passed"
             } finally {
                 dir.toFile().deleteRecursively()
             }

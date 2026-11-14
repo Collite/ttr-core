@@ -40,6 +40,7 @@ class PythonClientDriverSpec :
             held: Boolean = false,
             shared: Boolean = false,
             overlap: Boolean = false,
+            debug: Boolean = false,
         ): java.nio.file.Path {
             val graph =
                 RecipeGraph(
@@ -74,7 +75,7 @@ class PythonClientDriverSpec :
                         "automation_decider",
                         "recipe",
                         true,
-                        false,
+                        debug,
                         emptyMap(),
                     ),
                     Roles("candidates", emptyList(), "decision", if (overlap) "overlapping" else "exclusive"),
@@ -187,7 +188,7 @@ class PythonClientDriverSpec :
                         )
                     },
             )
-        "generated service replays dry evidence per key and batch, including async evaluate, paging and details" {
+        "generated service replays dry perform per key and batch with polling, paging and details" {
             ContractServer().use { server ->
                 val starts = Files.createTempFile("python-starts-", ".txt").also { dirs.add(it) }
                 val wrapper = Files.createTempFile("python-uv-", ".sh").also { dirs.add(it) }
@@ -212,12 +213,12 @@ class PythonClientDriverSpec :
                     it["dryRun"] shouldBe
                         JsonPrimitive(true)
                 }
-                server.requests.none { "/actions/" in it } shouldBe true
+                server.performBodies.size shouldBe 3
                 Files.readAllLines(starts).size shouldBe 2
                 server.requests.count { it.endsWith("/close") } shouldBe 3
             }
         }
-        "dry replay accepts a marked key with no rows and an unmarked key sharing a held row" {
+        "perform replay accepts a marked key with no rows and an unmarked key sharing a held row" {
             ContractServer().use { server ->
                 server.asyncOnce = false
                 server.heldRelease = true
@@ -228,11 +229,11 @@ class PythonClientDriverSpec :
                 val sharedFixture = withNotify(fixture.copy(finalStates = states(4711)), 4711)
                 val accepted = ReplayRunner.run(sharedFixture, listOf("python-client.batch")) { driver }
                 io.kotest.assertions.withClue(accepted.summary()) { accepted.exitCode shouldBe 0 }
-                server.requests.none { "/actions/" in it } shouldBe true
+                server.performBodies.size shouldBe 2
                 server.requests.count { it.endsWith("/batch") } shouldBe 1
             }
         }
-        "overlapping routes retain repeated action previews in dry evidence" {
+        "overlapping routes compare held and dry-run answers per entry" {
             ContractServer().use { server ->
                 server.asyncOnce = false
                 server.heldRelease = true
@@ -264,7 +265,17 @@ class PythonClientDriverSpec :
                     )
                 val accepted = ReplayRunner.run(overlapping, listOf("python-client.batch")) { driver }
                 io.kotest.assertions.withClue(accepted.summary()) { accepted.exitCode shouldBe 0 }
-                server.requests.none { "/actions/" in it } shouldBe true
+                server.performBodies.size shouldBe 1
+                server.secondRefs = listOf(1, 2)
+                val bothHeld = ReplayRunner.run(overlapping, listOf("python-client.batch")) { driver }
+                io.kotest.assertions.withClue(bothHeld.summary()) { bothHeld.exitCode shouldBe 0 }
+                server.performBodies.forEach {
+                    it
+                        .getValue("keys")
+                        .jsonArray
+                        .distinct()
+                        .size shouldBe 2
+                }
             }
         }
         "dry batch evidence preserves dense seqs and explicit null groups" {
@@ -287,6 +298,60 @@ class PythonClientDriverSpec :
                 rows.drop(1).forEach { it.jsonObject["group"] shouldBe JsonNull }
             }
         }
+        "the regenerated Server fixture templates replay dry and real batches and per-key runs" {
+            val seam =
+                Json
+                    .parseToJsonElement(
+                        requireNotNull(
+                            javaClass.getResourceAsStream("/replay/server-perform.json"),
+                        ).bufferedReader().use {
+                            it.readText()
+                        },
+                    ).jsonObject
+            seam.getValue("provenance").jsonObject["sha"] shouldBe
+                JsonPrimitive("c2f2f049d4c623ef06bd47d6879427d5ee7e95cf")
+            seam
+                .getValue("outcome")
+                .jsonObject
+                .getValue("response")
+                .jsonObject["outcomes"] shouldBe JsonPrimitive(1)
+            for (dry in listOf(true, false)) {
+                for (reason in listOf<String?>(null, "failed", "not-applied")) {
+                    if (dry && reason != null) continue
+                    ContractServer().use { server ->
+                        server.asyncOnce = false
+                        server.performFault = reason
+                        val driver =
+                            PythonClientDriver(
+                                server.url,
+                                "test-token",
+                                listOf(export("batch", debug = !dry), export("on_event", debug = !dry)),
+                                dryRun = dry,
+                            )
+                        val report =
+                            ReplayRunner.run(
+                                fixture,
+                                listOf("python-client.batch", "python-client.on-event"),
+                            ) { driver }
+                        io.kotest.assertions.withClue(report.summary()) { report.exitCode shouldBe 0 }
+                        server.opens.forEach { it["dryRun"] shouldBe JsonPrimitive(dry) }
+                        server.performBodies.size shouldBe 3
+                    }
+                }
+            }
+        }
+        "the perform multiset refuses an omitted entry or an incorrect reason" {
+            for (fault in listOf("omits", "reason")) {
+                ContractServer().use { server ->
+                    server.asyncOnce = false
+                    server.performFault = fault
+                    val driver = PythonClientDriver(server.url, "test-token", listOf(export("batch")))
+                    val report = ReplayRunner.run(fixture, listOf("python-client.batch")) { driver }
+                    report.exitCode shouldBe 2
+                    report.summary() shouldContain "perform effects differ"
+                }
+            }
+        }
         "fixture timeout sums each request budget, including one re-open and uv startup" {
             pythonServiceTimeoutSeconds(listOf(60)) shouldBe 420L
             pythonServiceTimeoutSeconds(List(12) { 60L }) shouldBe 4380L
@@ -302,7 +367,7 @@ class PythonClientDriverSpec :
                 report.exitCode shouldBe 2
                 report.summary() shouldContain "release_order key 4711: POST open: HTTP 400"
                 server.opens.size shouldBe 2
-                server.requests.none { "/actions/" in it } shouldBe true
+                server.performBodies.size shouldBe 1
             }
         }
         "startup failures retain the exit code and Python traceback tail" {

@@ -9,6 +9,8 @@ import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.string.shouldMatch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import org.tatrman.ttr.metadata.source.FileBasedSource
 import org.tatrman.ttr.metadata.source.LocalFsStorage
 import org.tatrman.ttrp.cli.EmitCommand
@@ -524,7 +526,7 @@ class RecipeExportSpec :
             val folder = out.resolve("release_py.python_client.export")
             val manifest = Json.parseToJsonElement(Files.readString(folder.resolve("manifest.json"))).jsonObject
             val config = Json.parseToJsonElement(Files.readString(folder.resolve("python-client.json"))).jsonObject
-            config.containsKey("held_actions") shouldBe false
+            config.getValue("held_actions").jsonArray shouldBe JsonArray(emptyList())
             manifest["calls"] shouldBe config["callPlan"]
             config.getValue("fingerprints").jsonObject shouldBe manifest.getValue("fingerprints").jsonObject
             val client = Files.readString(folder.resolve("worker/release_order_client/client.py"))
@@ -537,7 +539,7 @@ class RecipeExportSpec :
                 "=== README.md ===\n${readme.trimEnd()}\n=== client.py ===\n${client.trimEnd()}",
             )
             client shouldContain "def release(self)"
-            client shouldNotContain "class Actions"
+            client shouldContain "class Actions"
             val secondOut = temporaryDirectory("python-real-h1-repeat")
             val second = emit(secondOut)
             io.kotest.assertions.withClue(second.output) { second.statusCode shouldBe 0 }
@@ -621,7 +623,7 @@ class RecipeExportSpec :
                     .parseToJsonElement(
                         Files.readString(out.resolve("release_py.python_client.export/python-client.json")),
                     ).jsonObject
-            config.containsKey("held_actions") shouldBe false
+            config.getValue("held_actions").jsonArray shouldBe JsonArray(listOf(JsonPrimitive("release")))
         }
         "D-142: batch n8n export uses an external webhook without an embedded schedule" {
             val bundle = build("release_order")

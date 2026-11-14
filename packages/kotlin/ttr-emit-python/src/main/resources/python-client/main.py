@@ -6,16 +6,14 @@ from .runtime import ApiError, dumps, execute, loads, port_key
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Read dry evidence through the Server HTTP API")
+    parser = argparse.ArgumentParser(description="Run a recipe through the Server HTTP API")
     port = parser.add_mutually_exclusive_group(required=True)
-    port.add_argument("--key", help="JSON scalar or composite key object")
+    port.add_argument("--key", help="JSON scalar, key array or composite key object")
     port.add_argument("--batch", nargs="?", const="all", help="optional JSON keys array; no argument selects all")
     parser.add_argument("--as-of", required=True, help="now or ISO instant with offset")
-    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--dry-run", action="store_true", help="preview without applying writes; omit for a real run")
     args = parser.parse_args()
     try:
-        if not args.dry_run:
-            raise ApiError("real runs arrive with S2.1b")
         if args.key is not None:
             selected = {"key": port_key(loads(args.key))}
         elif args.batch == "all":

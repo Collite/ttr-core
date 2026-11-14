@@ -14,10 +14,11 @@ def run(clients, request):
             clients[module] = import_module(module + ".client").Client()
         return runtime.execute(clients[module], request["port"], request.get("as_of"),
                                dry_run=request.get("dry_run", True), parameters=request.get("parameters"))
-    except ValueError:
-        return {"error": "invalid input or replay parameter"}
     except Exception as error:
-        # Only our API errors have messages that exclude values and response bodies.
+        if runtime is not None and isinstance(error, runtime.KeyHeldError):
+            return {"error": str(error), "retryable": True, "runId": error.run_id, "retryAfter": error.retry_after}
+        if isinstance(error, ValueError):
+            return {"error": "invalid input or replay parameter"}
         return {"error": str(error) if runtime is not None and isinstance(error, runtime.ApiError) else "generated service failed"}
 
 

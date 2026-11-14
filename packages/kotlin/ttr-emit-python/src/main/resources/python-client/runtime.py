@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 import os
 import re
 import time
@@ -52,18 +53,9 @@ def port_key(key: Any) -> Any:
 def key_object(key: Any) -> dict[str, Any]:
     """Validate preview key objects; Open's port may still carry a scalar."""
     names = CONFIG["key"]
-    if isinstance(key, dict):
-        if set(key) != set(names):
-            raise ValueError("key columns differ")
-        result = key
-    elif isinstance(key, list):
-        if len(key) != len(names):
-            raise ValueError("composite key arity")
-        result = dict(zip(names, key))
-    else:
-        if len(names) != 1:
-            raise ValueError("composite key arity")
-        result = {names[0]: key}
+    if not isinstance(key, dict) or set(key) != set(names):
+        raise ValueError("key columns differ")
+    result = key
     if any(value is None for value in result.values()):
         raise ValueError("missing key value")
     return result
@@ -81,6 +73,13 @@ def response_key(value: Any, *, row: bool = False) -> Any:
 
 class ApiError(RuntimeError):
     pass
+
+
+class KeyHeldError(ApiError):
+    def __init__(self, run_id: str) -> None:
+        super().__init__(f"key held by run {run_id}; retry later")
+        self.run_id = run_id
+        self.retry_after = CONFIG["abandonment_seconds"]
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -149,8 +148,8 @@ class BaseClient:
         return deadline - time.monotonic() <= 1
 
     def open(self, port: dict[str, Any], as_of: str | None = None, *, dry_run: bool = True, idempotency_key: str | None = None) -> BaseRun:
-        if dry_run is not True:
-            raise ApiError("real runs arrive with S2.1b")
+        if type(dry_run) is not bool:
+            raise ValueError("dry_run requires a boolean")
         kind = CONFIG["port"].replace("on_event", "event")
         # Replay may replace batch `none` with explicit `keys`, as the native dry driver does.
         accepted = {"none", "keys"} if CONFIG["mode"] == "batch" else {kind}
@@ -164,9 +163,9 @@ class BaseClient:
             if kind in ("key", "keys", "event"):
                 port = dict(port, at=as_of)
         fps = CONFIG["fingerprints"]
-        body = {"deployment": CONFIG["deployment"], "port": port, "dryRun": True, "origin": "driver"}
+        body = {"deployment": CONFIG["deployment"], "port": port, "dryRun": dry_run, "origin": "driver"}
         event_clock = CONFIG["clock"] == "event" and kind in ("key", "keys", "event")
-        if as_of is not None and (not literal_clock or not event_clock or body["dryRun"]):
+        if as_of is not None and (body["dryRun"] or (literal_clock and not event_clock)):
             body["asOf"] = as_of
         for field, dimension in (("recipeFingerprint", "text"), ("recipeValuesFingerprint", "values"), ("programFingerprint", "program"), ("deploymentFingerprint", "deployment")):
             if dimension in fps:
@@ -178,7 +177,13 @@ class BaseClient:
     def _claim(self, body: dict[str, Any]) -> BaseRun:
         started_at = time.monotonic()
         code, data, headers = self.request("POST", "open", body, recipe=CONFIG["recipe"])
-        return self.run_type(self, data["runId"], code, started_at=started_at, headers=headers, open_body=body, dry_run=data.get("dryRun", body["dryRun"]) is True)
+        run = self.run_type(self, data["runId"], code, started_at=started_at, headers=headers, open_body=body, dry_run=body["dryRun"])
+        if code == 201:
+            policy = data if "dryRun" in data else run.status()
+            run.dry_run = policy.get("dryRun") is True
+            if type(policy.get("dryRun")) is not bool or policy["dryRun"] != body["dryRun"]:
+                raise ApiError("Server dryRun differs from requested value")
+        return run
 
 
 class BaseRun:
@@ -189,6 +194,7 @@ class BaseRun:
         self.dry_run = dry_run
         self.headers = headers or {}
         self.open_body = open_body
+        self.performed_any = False
 
     def renew_window(self, *, started_at: float | None = None) -> None:
         self.deadline = (time.monotonic() if started_at is None else started_at) + CONFIG["budget_seconds"] + 120
@@ -243,6 +249,61 @@ class BaseRun:
         return self.request("POST", "close", {})[1]
 
 
+class Action:
+    def __init__(self, run: BaseRun, name: str) -> None:
+        self.run, self.name = run, name
+
+    def perform(self, keys: list[dict[str, Any]]) -> dict[str, Any]:
+        unique = {canonical_key(key): key_object(key) for key in keys}
+        effect = self.run.request("POST", "perform", {"keys": list(unique.values())}, action=self.name)[1]
+        # Record evidence of an applied entry before validating the rest of the answer.
+        if isinstance(effect.get("performed"), list):
+            if any(isinstance(entry, dict) and isinstance(entry.get("key"), dict) for entry in effect["performed"]):
+                self.run.performed_any = True
+        return effect
+
+    def outcome(self, outcomes: list[dict[str, Any]]) -> dict[str, Any]:
+        return self.run.request("POST", "outcome", {"outcomes": [dict(item, key=key_object(item["key"])) for item in outcomes]}, action=self.name)[1]
+
+
+def canonical_key(key: Any) -> str:
+    return dumps({name: value for name, value in sorted(response_key(key).items())})
+
+
+def perform_expectations(previews: list[dict[str, Any]], rows: list[dict[str, Any]], dry_run: bool) -> dict[str, Counter]:
+    grouped = {row["seq"] for row in rows if row.get("group") is not None}
+    marked_owners = set()
+    expected: dict[str, Counter] = {}
+    for entry in previews:
+        held_rows = set(entry["batchRows"]) & grouped
+        name = entry["action"]
+        if name in CONFIG["held_actions"]:
+            marked_owners.update(held_rows)
+        reason = "held" if held_rows else "dry-run" if dry_run else "real"
+        expected.setdefault(name, Counter())[(canonical_key(entry["key"]), reason)] += 1
+    if grouped - marked_owners:
+        raise ApiError("perform effects differ")
+    return expected
+
+
+def verify_perform(effect: dict[str, Any], expected: Counter) -> None:
+    performed, skipped = effect.get("performed"), effect.get("skipped")
+    if not isinstance(performed, list) or not isinstance(skipped, list):
+        raise ApiError("perform effects differ")
+    seen = Counter()
+    for entries, performed_entry in ((performed, True), (skipped, False)):
+        for entry in entries:
+            if not isinstance(entry, dict):
+                raise ApiError("perform effects differ")
+            reason = "performed" if performed_entry else entry.get("reason")
+            if reason not in ("performed", "held", "dry-run", "failed", "not-applied") or (not performed_entry and reason == "performed"):
+                raise ApiError("perform effects differ")
+            kind = "real" if reason in ("performed", "failed", "not-applied") else reason
+            seen[(canonical_key(entry.get("key")), kind)] += 1
+    if seen != expected:
+        raise ApiError("perform effects differ")
+
+
 def normalize_arguments(value: Any) -> Any:
     if not isinstance(value, dict):
         raise ApiError("malformed action arguments")
@@ -280,23 +341,39 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
             if not equal:
                 raise ValueError("replay parameter differs")
     run = client.open(port, as_of, dry_run=dry_run)
-    # Observe another executor's claim; reclaim a dropped handle only once.
+    # Observe foreign work inside our own window; attempt one fresh claim on expiry/drop.
     status = None
     if run.claim != 201:
         open_headers = run.headers
         status = run.status()
+        expired = False
         while status["status"] in ("open", "running", "evaluated"):
-            run.pause(run.headers if any(key.lower() == "retry-after" for key in run.headers) else open_headers)
-            status = run.status()
-        if status["status"] in ("failed", "abandoned"):
+            if run._last_poll or time.monotonic() >= run.deadline:
+                remaining = run.deadline - time.monotonic()
+                if remaining > 0:
+                    time.sleep(remaining)
+                expired = True
+                break
+            try:
+                run.pause(run.headers if any(key.lower() == "retry-after" for key in run.headers) else open_headers)
+                status = run.status()
+            except ApiError:
+                if time.monotonic() < run.deadline:
+                    raise
+                expired = True
+                break
+        if expired or status["status"] in ("failed", "abandoned"):
             run = client._claim(run.open_body)
             status = None
             if run.claim != 201:
-                raise ApiError("second live handle")
+                status = run.status() if run.claim == 200 else None
+                if status is None or status.get("status") in ("open", "running", "evaluated"):
+                    raise KeyHeldError(run.id)
+                if status.get("status") not in ("closed", "waiting"):
+                    raise ApiError("existing run did not complete")
         elif status["status"] not in ("closed", "waiting"):
             raise ApiError("existing run did not complete")
-        else:
-            # Observing completion and collecting its pages are separate bounded windows.
+        if run.claim != 201:
             run.renew_window()
     try:
         if run.claim == 201:
@@ -308,8 +385,8 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
                     run.request("POST", "island", island=name)
             run.evaluate()
             status = run.status()
-        if status.get("dryRun") is not True:
-            raise ApiError("Server did not confirm dryRun")
+        if type(status.get("dryRun")) is not bool or status["dryRun"] != dry_run:
+            raise ApiError("Server dryRun differs from requested value")
         summaries = status["verdict"]["routes"]
         if set(summaries) - set(CONFIG["routes"]):
             raise ApiError("Server returned an undeclared route")
@@ -350,14 +427,21 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
             refs = preview.get("batchRows")
             if not isinstance(refs, list) or any(type(seq) is not int or seq not in seqs for seq in refs):
                 raise ApiError("malformed batch evidence")
+        perform_effects = []
         if run.claim == 201:
+            expected = perform_expectations(previews, rows, run.dry_run)
+            for name, answers in expected.items():
+                keys = {canonical_key(entry["key"]): entry["key"] for entry in previews if entry["action"] == name}
+                effect = Action(run, name).perform(list(keys.values()))
+                verify_perform(effect, answers)
+                perform_effects.append({"action": name, **effect})
             closed = run.close()
             if closed.get("status") not in ("closed", "waiting"):
                 raise ApiError("run did not close")
-        return {"verdicts": verdicts, "actions": actions, "details": details, "detail_counts": counts, "effects": rows}
+        return {"verdicts": verdicts, "actions": actions, "details": details, "detail_counts": counts, "effects": rows, "perform_effects": perform_effects}
     except Exception:
         is_dry_run = status.get("dryRun") is True if status is not None else run.dry_run
-        if run.claim == 201 and is_dry_run:
+        if run.claim == 201 and (is_dry_run or run.performed_any):
             try:
                 run.close()
             except Exception:
