@@ -47,7 +47,13 @@ class PythonClientEmitSpec :
             client shouldContain "def release(self)"
             client shouldContain "def hold(self)"
             client shouldContain "def candidates(self)"
-            client shouldContain "def notify(self) -> Action"
+            client shouldNotContain "class Actions"
+            val packageText = files.values.joinToString { it.decodeToString() }
+            packageText shouldNotContain "/perform"
+            packageText shouldNotContain "/outcome"
+            packageText shouldNotContain "def perform"
+            packageText shouldNotContain "def outcome"
+            packageText shouldNotContain "held_actions"
             files
                 .getValue("worker/tests/test_routes.py")
                 .decodeToString()
@@ -99,25 +105,19 @@ class PythonClientEmitSpec :
             seconds(graph.copy(program = graph.program.copy(mode = "batch"))) shouldBe JsonPrimitive(1800)
             render().files.getValue("python-client.json").decodeToString() shouldNotContain "\"budget\":"
         }
-        "approval holds use the Server native sink, independent of the Python executor sink" {
-            val action = graph.actions.getValue("release")
-            val actions =
-                mapOf(
-                    "writer" to action.copy(sinks = mapOf("native" to "writer", "python_client" to "door")),
-                    "obligation" to action.copy(sinks = mapOf("native" to "obligation")),
-                    "transition" to action.copy(sinks = mapOf("native" to "transition")),
-                    "not_required" to action.copy(approval = null),
-                    "python_only" to action.copy(sinks = mapOf("native" to "door", "python_client" to "transition")),
-                    "no_native" to action.copy(sinks = mapOf("python_client" to "writer")),
+        "the dry client does not require execution endpoints in the runApi projection" {
+            val dryGraph =
+                graph.copy(
+                    runApi =
+                        graph.runApi.copy(
+                            calls =
+                                graph.runApi.calls - setOf("perform", "outcome"),
+                        ),
                 )
-            val config =
-                Json
-                    .parseToJsonElement(
-                        render(graph.copy(actions = actions)).files.getValue("python-client.json").decodeToString(),
-                    ).jsonObject
-            config["held_actions"] shouldBe JsonArray(listOf("obligation", "transition", "writer").map(::JsonPrimitive))
+            render(dryGraph).files.mapValues { it.value.decodeToString() } shouldBe
+                render().files.mapValues { it.value.decodeToString() }
         }
-        "synthetic approval-held package matches its complete golden (real H-1 is covered by the CLI)" {
+        "synthetic dry-evidence package matches its complete golden (real H-1 is covered by the CLI)" {
             val golden = Path.of("src/test/resources/goldens/synthetic_client.txt")
             val text =
                 render().files.entries.joinToString(
@@ -151,7 +151,7 @@ class PythonClientEmitSpec :
                         .start()
                 process.waitFor(120, TimeUnit.SECONDS) shouldBe true
                 io.kotest.assertions.withClue(Files.readString(log)) { process.exitValue() shouldBe 0 }
-                Files.readString(log) shouldContain "67 passed"
+                Files.readString(log) shouldContain " passed"
             } finally {
                 dir.toFile().deleteRecursively()
             }

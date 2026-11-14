@@ -31,8 +31,6 @@ internal class PythonClientRenderer(
                 "route",
                 "detail",
                 "batch",
-                "perform",
-                "outcome",
                 "close",
             )
         require(calls.all { graph.runApi.calls[it]?.startsWith('/') == true }) { "python-client: incomplete runApi" }
@@ -55,23 +53,12 @@ internal class PythonClientRenderer(
                 put("islands", strings(graph.islandWaves.flatten()))
                 put("routes", strings(graph.routes.map { it.name }))
                 put("actions", strings(graph.actions.keys.sorted()))
-                // D-142: Server ApplyPlanner uses the native sink, not the Python executor's sink.
-                put(
-                    "held_actions",
-                    strings(
-                        graph.actions
-                            .filterValues {
-                                it.approval == "required" &&
-                                    it.sinks["native"] in setOf("transition", "writer", "obligation")
-                            }.keys
-                            .sorted(),
-                    ),
-                )
                 put("base_path", graph.runApi.basePath)
                 put(
                     "calls",
                     JsonObject(
                         graph.runApi.calls
+                            .filterKeys { it in calls }
                             .toSortedMap()
                             .mapValues { JsonPrimitive(it.value) },
                     ),
@@ -171,25 +158,21 @@ internal class PythonClientRenderer(
                 .joinToString("\n") + "\n\n" +
                 """
                 Python client for `${graph.recipe.name}` (`${graph.deployment.name}`). HTTP run API,
-                ttr-server contracts §1 (⚑AU-EXP-3, ✅R254-A/B/E/F). Open baseline: f28120e1; action wire: #391 @ e13c74d5.
-                The baseline has no perform route; real-Server acceptance remains P1C / #366.
+                ttr-server contracts §1 (⚑AU-EXP-3). Open baseline: f28120e1.
+                Real-Server acceptance remains P1C / #366.
                 Python 3.13.9; standard library runtime; pytest 8.3.5. No gRPC or proto wheel.
 
                 Set TTR_SERVER to the Server origin and TTR_BEARER to your authorized bearer.
-                From worker/: `uv run python -m $module.main --key 4711 --as-of 2026-11-02T08:00:00Z`.
+                From worker/: `uv run python -m $module.main --key 4711 --as-of 2026-11-02T08:00:00Z --dry-run`.
                 `--key` is JSON (an object for composite keys); `--batch` accepts an optional JSON keys array,
                 or selects all with no argument. The chosen port must match the exported program.
                 `--as-of` accepts `now` or an ISO instant with offset. An event program sends the literal clock in
-                port.at; a run-clock program needs a dry/debug run for a literal override. `--dry-run` strengthens policy.
-                On-event redeliveries need the same caller-supplied clock to deduplicate.
-                The Server owns action eligibility and execution; this package has no waits, asks or processes.
-                Read the batch before perform: each preview entry is held iff its batchRows reference a grouped row;
-                other entries must be skipped dry-run (dry) or performed (wet). Send distinct keys per action; overlapping
-                routes retain one answer per preview entry. held_actions cross-checks marked owners on owned runs:
-                grouped rows need an approval-required native transition/writer/obligation owner. Marked keys may have
-                no rows; unmarked entries can share a grouped row. Completed foreign claims get a fresh evidence-read budget.
-                On a real-run error, leave the run for Server abandonment at its deadline; a retry waits and reopens once.
-                Only dry runs receive a best-effort close after an error.
+                port.at. This dry-evidence client always sends dryRun true, reads routes/details/action previews/batch,
+                then closes its owned dry run. On-event redeliveries need the same caller-supplied clock to deduplicate.
+                The CLI requires `--dry-run`; the typed API defaults to dry_run=True and refuses dry_run=False
+                with "real runs arrive with S2.1b". Action execution arrives in S2.1b.
+                Completed foreign claims get a fresh evidence-read budget. Errors on owned dry runs receive a
+                best-effort close, using the Open response/body policy if status has not yet been read.
                 `service.py` accepts `{"requests": [...]}` on stdin and emits `{"results": [...]}` in order,
                 with errors per request;
                 `conform --replay` uses it in a subprocess with dryRun true. Replays never override parameters.
@@ -205,12 +188,11 @@ internal class PythonClientRenderer(
     private fun client(): String =
         buildString {
             append(
-                "from __future__ import annotations\nfrom typing import Any\nfrom .runtime import BaseClient, BaseRun, Action\n\n",
+                "from __future__ import annotations\nfrom typing import Any\nfrom .runtime import BaseClient, BaseRun\n\n",
             )
             for ((name, values) in listOf(
                 "Parts" to parts,
                 "Routes" to graph.routes.map { it.name },
-                "Actions" to graph.actions.keys.sorted(),
             )) {
                 require(
                     values.map(::identifier).distinct().size == values.size,
@@ -229,16 +211,12 @@ internal class PythonClientRenderer(
                             append(
                                 "\n    def $method(self) -> list[dict[str, Any]]:\n        return self._run.route($literal)\n",
                             )
-                        else ->
-                            append(
-                                "\n    @property\n    def $method(self) -> Action:\n        return Action(self._run, $literal)\n",
-                            )
                     }
                 }
                 append("\n\n")
             }
             append(
-                "class Run(BaseRun):\n    def __init__(self, *args: Any, **kwargs: Any) -> None:\n        super().__init__(*args, **kwargs)\n        self.parts = Parts(self)\n        self.routes = Routes(self)\n        self.actions = Actions(self)\n\n\nclass Client(BaseClient):\n    run_type = Run\n\n    def open(self, port: dict[str, Any], as_of: str | None = None, *, dry_run: bool = False, idempotency_key: str | None = None) -> Run:\n        return super().open(port, as_of, dry_run=dry_run, idempotency_key=idempotency_key)\n",
+                "class Run(BaseRun):\n    def __init__(self, *args: Any, **kwargs: Any) -> None:\n        super().__init__(*args, **kwargs)\n        self.parts = Parts(self)\n        self.routes = Routes(self)\n\n\nclass Client(BaseClient):\n    run_type = Run\n\n    def open(self, port: dict[str, Any], as_of: str | None = None, *, dry_run: bool = True, idempotency_key: str | None = None) -> Run:\n        return super().open(port, as_of, dry_run=dry_run, idempotency_key=idempotency_key)\n",
             )
         }
 

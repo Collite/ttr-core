@@ -9,7 +9,6 @@ import kotlinx.serialization.json.*
 import org.tatrman.ttrp.emit.python.PythonClientEmitPlugin
 import org.tatrman.ttrp.emit.spi.*
 import java.nio.file.Files
-import java.util.concurrent.TimeUnit
 import io.kotest.assertions.throwables.shouldThrow
 
 /** The existing contract HTTP fixture is not a real Server recording; P1C owns that acceptance. */
@@ -188,7 +187,7 @@ class PythonClientDriverSpec :
                         )
                     },
             )
-        "generated service replays per key and batch, including async evaluate, paging, details and actual perform" {
+        "generated service replays dry evidence per key and batch, including async evaluate, paging and details" {
             ContractServer().use { server ->
                 val starts = Files.createTempFile("python-starts-", ".txt").also { dirs.add(it) }
                 val wrapper = Files.createTempFile("python-uv-", ".sh").also { dirs.add(it) }
@@ -213,25 +212,9 @@ class PythonClientDriverSpec :
                     it["dryRun"] shouldBe
                         JsonPrimitive(true)
                 }
-                server.requests.count { it.endsWith("/perform") } shouldBe 3
-                server.performBodies.map { it.getValue("keys").jsonArray.size } shouldBe listOf(1, 1, 2)
-                server.performBodies.flatMap { it.getValue("keys").jsonArray }.forEach {
-                    it.jsonObject.keys shouldBe setOf("order_number")
-                }
+                server.requests.none { "/actions/" in it } shouldBe true
                 Files.readAllLines(starts).size shouldBe 2
                 server.requests.count { it.endsWith("/close") } shouldBe 3
-            }
-        }
-        "dry-run perform refuses performed rows, wrong skip reasons and omitted keys" {
-            ContractServer().use { server ->
-                server.asyncOnce = false
-                val driver = PythonClientDriver(server.url, "test-token", listOf(export("batch")))
-                for (fault in listOf("performs", "reason", "omits", "key")) {
-                    server.performFault = fault
-                    val report = ReplayRunner.run(fixture, listOf("python-client.batch")) { driver }
-                    report.exitCode shouldBe 2
-                    report.summary() shouldContain "perform effects differ"
-                }
             }
         }
         "dry replay accepts a marked key with no rows and an unmarked key sharing a held row" {
@@ -245,52 +228,11 @@ class PythonClientDriverSpec :
                 val sharedFixture = withNotify(fixture.copy(finalStates = states(4711)), 4711)
                 val accepted = ReplayRunner.run(sharedFixture, listOf("python-client.batch")) { driver }
                 io.kotest.assertions.withClue(accepted.summary()) { accepted.exitCode shouldBe 0 }
-                server.performBodies.map { it.getValue("keys").jsonArray.size } shouldBe listOf(2, 1)
+                server.requests.none { "/actions/" in it } shouldBe true
                 server.requests.count { it.endsWith("/batch") } shouldBe 1
-                (
-                    server.requests.indexOfFirst { it.endsWith("/batch") } <
-                        server.requests.indexOfFirst { it.endsWith("/perform") }
-                ) shouldBe
-                    true
             }
         }
-        "per-entry perform rejects held for a marked empty key and dry-run for an unmarked shared entry" {
-            for (fault in listOf("empty-held", "shared-dry", "orphan-group")) {
-                ContractServer().use { server ->
-                    server.asyncOnce = false
-                    server.heldRelease = true
-                    server.emptyReleaseKey = if (fault == "empty-held") 4712 else null
-                    server.sharedAction = fault == "shared-dry"
-                    server.performFault =
-                        when (fault) {
-                            "empty-held" -> "held"
-                            "shared-dry" -> "dry-run"
-                            else -> null
-                        }
-                    server.performFaultAction = if (fault == "shared-dry") "notify" else "release"
-                    server.performFaultKey = if (fault == "empty-held") 4712 else null
-                    val driver =
-                        PythonClientDriver(
-                            server.url,
-                            "test-token",
-                            listOf(
-                                export("batch", held = fault != "orphan-group", shared = server.sharedAction),
-                            ),
-                        )
-                    val expected =
-                        when (fault) {
-                            "empty-held" -> fixture.copy(finalStates = states(4711))
-                            "shared-dry" -> withNotify(fixture, 4711, 4712)
-                            else -> fixture
-                        }
-                    val report = ReplayRunner.run(expected, listOf("python-client.batch")) { driver }
-                    io.kotest.assertions.withClue(fault + ": " + report.summary()) { report.exitCode shouldBe 2 }
-                    report.summary() shouldContain "perform effects differ"
-                    if (fault == "orphan-group") server.performBodies.size shouldBe 0
-                }
-            }
-        }
-        "overlapping routes keep both entry answers and request each action key once" {
+        "overlapping routes retain repeated action previews in dry evidence" {
             ContractServer().use { server ->
                 server.asyncOnce = false
                 server.heldRelease = true
@@ -322,20 +264,10 @@ class PythonClientDriverSpec :
                     )
                 val accepted = ReplayRunner.run(overlapping, listOf("python-client.batch")) { driver }
                 io.kotest.assertions.withClue(accepted.summary()) { accepted.exitCode shouldBe 0 }
-                val sent =
-                    server.performBodies
-                        .single()
-                        .getValue("keys")
-                        .jsonArray
-                sent.size shouldBe 2
-                sent.distinct().size shouldBe 2
-                server.performFault = "omits"
-                val missing = ReplayRunner.run(overlapping, listOf("python-client.batch")) { driver }
-                missing.exitCode shouldBe 2
-                missing.summary() shouldContain "perform effects differ"
+                server.requests.none { "/actions/" in it } shouldBe true
             }
         }
-        "the fake holds by entry rows and emits dense seqs with explicit null groups" {
+        "dry batch evidence preserves dense seqs and explicit null groups" {
             ContractServer().use { server ->
                 server.asyncOnce = false
                 server.heldRelease = true
@@ -361,53 +293,6 @@ class PythonClientDriverSpec :
             pythonServiceTimeoutSeconds(listOf(1800)) shouldBe 3900L
             pythonServiceTimeoutSeconds(listOf(60, 600)) shouldBe 1860L
         }
-        "typed Action perform without keys uses all rows and the strict Server error shapes" {
-            ContractServer().use { server ->
-                server.asyncOnce = false
-                server.heldRelease = true
-                val folder = export("batch", held = true)
-                val script =
-                    """
-                    from release_order_client.client import Client
-                    from release_order_client.runtime import Action, ApiError
-                    run = Client().open({"none": True}, dry_run=True)
-                    run.evaluate()
-                    effect = run.actions.release.perform()
-                    assert effect["performed"] == []
-                    assert effect["skipped"] == [
-                        {"key": {"order_number": k}, "reason": "held"} for k in [4711, 4712]]
-                    assert run.actions.release.perform([9999])["skipped"] == [
-                        {"key": {"order_number": 9999}, "reason": "not-a-key"}]
-                    empty = Client().open({"keys": []}, dry_run=True)
-                    for invoke in [lambda: Action(run, "absent").perform(),
-                                   lambda: empty.actions.release.perform(),
-                                   lambda: run.request("POST", "perform", {"keys": [4711]}, action="release")]:
-                        try:
-                            invoke()
-                        except ApiError as error:
-                            assert "HTTP 400" in str(error)
-                        else:
-                            raise AssertionError("Server accepted an invalid perform")
-                    """.trimIndent()
-                val log = folder.resolve("typed-perform.txt")
-                val process =
-                    ProcessBuilder("uv", "run", "--no-dev", "--python", "3.13.9", "python", "-c", script)
-                        .directory(folder.resolve("worker").toFile())
-                        .redirectErrorStream(true)
-                        .redirectOutput(log.toFile())
-                        .apply {
-                            environment()["TTR_SERVER"] = server.url
-                            environment()["TTR_BEARER"] = "test-token"
-                        }.start()
-                try {
-                    process.waitFor(120, TimeUnit.SECONDS) shouldBe true
-                    io.kotest.assertions.withClue(Files.readString(log)) { process.exitValue() shouldBe 0 }
-                    server.performBodies.first() shouldBe buildJsonObject { }
-                } finally {
-                    if (process.isAlive) process.destroyForcibly().waitFor()
-                }
-            }
-        }
         "a failed key is labelled and does not stop later requests in the same process" {
             ContractServer().use { server ->
                 server.asyncOnce = false
@@ -417,7 +302,7 @@ class PythonClientDriverSpec :
                 report.exitCode shouldBe 2
                 report.summary() shouldContain "release_order key 4711: POST open: HTTP 400"
                 server.opens.size shouldBe 2
-                server.requests.count { it.endsWith("/perform") } shouldBe 1
+                server.requests.none { "/actions/" in it } shouldBe true
             }
         }
         "startup failures retain the exit code and Python traceback tail" {

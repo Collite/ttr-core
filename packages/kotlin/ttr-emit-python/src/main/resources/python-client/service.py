@@ -13,7 +13,7 @@ def run(clients, request):
         if module not in clients:
             clients[module] = import_module(module + ".client").Client()
         return runtime.execute(clients[module], request["port"], request.get("as_of"),
-                               dry_run=request.get("dry_run", False), parameters=request.get("parameters"))
+                               dry_run=request.get("dry_run", True), parameters=request.get("parameters"))
     except ValueError:
         return {"error": "invalid input or replay parameter"}
     except Exception as error:

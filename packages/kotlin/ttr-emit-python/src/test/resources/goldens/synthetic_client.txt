@@ -2,25 +2,21 @@
 
 
 Python client for `release_order` (`release_py`). HTTP run API,
-ttr-server contracts §1 (⚑AU-EXP-3, ✅R254-A/B/E/F). Open baseline: f28120e1; action wire: #391 @ e13c74d5.
-The baseline has no perform route; real-Server acceptance remains P1C / #366.
+ttr-server contracts §1 (⚑AU-EXP-3). Open baseline: f28120e1.
+Real-Server acceptance remains P1C / #366.
 Python 3.13.9; standard library runtime; pytest 8.3.5. No gRPC or proto wheel.
 
 Set TTR_SERVER to the Server origin and TTR_BEARER to your authorized bearer.
-From worker/: `uv run python -m release_order_client.main --key 4711 --as-of 2026-11-02T08:00:00Z`.
+From worker/: `uv run python -m release_order_client.main --key 4711 --as-of 2026-11-02T08:00:00Z --dry-run`.
 `--key` is JSON (an object for composite keys); `--batch` accepts an optional JSON keys array,
 or selects all with no argument. The chosen port must match the exported program.
 `--as-of` accepts `now` or an ISO instant with offset. An event program sends the literal clock in
-port.at; a run-clock program needs a dry/debug run for a literal override. `--dry-run` strengthens policy.
-On-event redeliveries need the same caller-supplied clock to deduplicate.
-The Server owns action eligibility and execution; this package has no waits, asks or processes.
-Read the batch before perform: each preview entry is held iff its batchRows reference a grouped row;
-other entries must be skipped dry-run (dry) or performed (wet). Send distinct keys per action; overlapping
-routes retain one answer per preview entry. held_actions cross-checks marked owners on owned runs:
-grouped rows need an approval-required native transition/writer/obligation owner. Marked keys may have
-no rows; unmarked entries can share a grouped row. Completed foreign claims get a fresh evidence-read budget.
-On a real-run error, leave the run for Server abandonment at its deadline; a retry waits and reopens once.
-Only dry runs receive a best-effort close after an error.
+port.at. This dry-evidence client always sends dryRun true, reads routes/details/action previews/batch,
+then closes its owned dry run. On-event redeliveries need the same caller-supplied clock to deduplicate.
+The CLI requires `--dry-run`; the typed API defaults to dry_run=True and refuses dry_run=False
+with "real runs arrive with S2.1b". Action execution arrives in S2.1b.
+Completed foreign claims get a fresh evidence-read budget. Errors on owned dry runs receive a
+best-effort close, using the Open response/body policy if status has not yet been read.
 `service.py` accepts `{"requests": [...]}` on stdin and emits `{"results": [...]}` in order,
 with errors per request;
 `conform --replay` uses it in a subprocess with dryRun true. Replays never override parameters.
@@ -31,7 +27,7 @@ Only run trusted generated packages, like other executable conformance artifacts
 === conformance.json ===
 {}
 === python-client.json ===
-{"module":"release_order_client","recipe":"release_order","program":"release_on_placement","deployment":"release_py","mode":"on-event","port":"key","clock":"event","dry_run":true,"granularity":"recipe","key":["order_number"],"parts":["candidates","stock","decision"],"islands":["input","decision"],"routes":["release","hold"],"actions":["notify","release"],"held_actions":["release"],"base_path":"/automation","calls":{"batch":"/runs/{id}/batch","close":"/runs/{id}/close","detail":"/runs/{id}/routes/{route}/details/{context}","evaluate":"/runs/{id}/evaluate","island":"/runs/{id}/islands/{island}","open":"/recipes/{recipe}/runs","outcome":"/runs/{id}/actions/{action}/outcome","part":"/runs/{id}/parts/{part}","perform":"/runs/{id}/actions/{action}/perform","route":"/runs/{id}/routes/{route}","status":"/runs/{id}"},"callPlan":[{"name":"open","path":"/recipes/{recipe}/runs"},{"name":"part","path":"/runs/{id}/parts/{part}"},{"name":"island","path":"/runs/{id}/islands/{island}"},{"name":"evaluate","path":"/runs/{id}/evaluate"},{"name":"status","path":"/runs/{id}"},{"name":"route","path":"/runs/{id}/routes/{route}"},{"name":"detail","path":"/runs/{id}/routes/{route}/details/{context}"},{"name":"batch","path":"/runs/{id}/batch"},{"name":"perform","path":"/runs/{id}/actions/{action}/perform"},{"name":"outcome","path":"/runs/{id}/actions/{action}/outcome"},{"name":"close","path":"/runs/{id}/close"}],"fingerprints":{"deployment":"deployment-fp","program":"program-fp","text":"text-fp","values":"values-fp"},"budget_seconds":60,"parameters":[]}
+{"module":"release_order_client","recipe":"release_order","program":"release_on_placement","deployment":"release_py","mode":"on-event","port":"key","clock":"event","dry_run":true,"granularity":"recipe","key":["order_number"],"parts":["candidates","stock","decision"],"islands":["input","decision"],"routes":["release","hold"],"actions":["notify","release"],"base_path":"/automation","calls":{"batch":"/runs/{id}/batch","close":"/runs/{id}/close","detail":"/runs/{id}/routes/{route}/details/{context}","evaluate":"/runs/{id}/evaluate","island":"/runs/{id}/islands/{island}","open":"/recipes/{recipe}/runs","part":"/runs/{id}/parts/{part}","route":"/runs/{id}/routes/{route}","status":"/runs/{id}"},"callPlan":[{"name":"open","path":"/recipes/{recipe}/runs"},{"name":"part","path":"/runs/{id}/parts/{part}"},{"name":"island","path":"/runs/{id}/islands/{island}"},{"name":"evaluate","path":"/runs/{id}/evaluate"},{"name":"status","path":"/runs/{id}"},{"name":"route","path":"/runs/{id}/routes/{route}"},{"name":"detail","path":"/runs/{id}/routes/{route}/details/{context}"},{"name":"batch","path":"/runs/{id}/batch"},{"name":"close","path":"/runs/{id}/close"}],"fingerprints":{"deployment":"deployment-fp","program":"program-fp","text":"text-fp","values":"values-fp"},"budget_seconds":60,"parameters":[]}
 
 === worker/.python-version ===
 3.13.9
@@ -58,7 +54,7 @@ __all__ = ["Client", "Run"]
 === worker/release_order_client/client.py ===
 from __future__ import annotations
 from typing import Any
-from .runtime import BaseClient, BaseRun, Action
+from .runtime import BaseClient, BaseRun
 
 class Parts:
     def __init__(self, run: BaseRun) -> None:
@@ -85,31 +81,17 @@ class Routes:
         return self._run.route("hold")
 
 
-class Actions:
-    def __init__(self, run: BaseRun) -> None:
-        self._run = run
-
-    @property
-    def notify(self) -> Action:
-        return Action(self._run, "notify")
-
-    @property
-    def release(self) -> Action:
-        return Action(self._run, "release")
-
-
 class Run(BaseRun):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.parts = Parts(self)
         self.routes = Routes(self)
-        self.actions = Actions(self)
 
 
 class Client(BaseClient):
     run_type = Run
 
-    def open(self, port: dict[str, Any], as_of: str | None = None, *, dry_run: bool = False, idempotency_key: str | None = None) -> Run:
+    def open(self, port: dict[str, Any], as_of: str | None = None, *, dry_run: bool = True, idempotency_key: str | None = None) -> Run:
         return super().open(port, as_of, dry_run=dry_run, idempotency_key=idempotency_key)
 
 === worker/release_order_client/config.json ===
@@ -143,9 +125,6 @@ class Client(BaseClient):
         "notify",
         "release"
     ],
-    "held_actions": [
-        "release"
-    ],
     "base_path": "/automation",
     "calls": {
         "batch": "/runs/{id}/batch",
@@ -154,9 +133,7 @@ class Client(BaseClient):
         "evaluate": "/runs/{id}/evaluate",
         "island": "/runs/{id}/islands/{island}",
         "open": "/recipes/{recipe}/runs",
-        "outcome": "/runs/{id}/actions/{action}/outcome",
         "part": "/runs/{id}/parts/{part}",
-        "perform": "/runs/{id}/actions/{action}/perform",
         "route": "/runs/{id}/routes/{route}",
         "status": "/runs/{id}"
     },
@@ -194,14 +171,6 @@ class Client(BaseClient):
             "path": "/runs/{id}/batch"
         },
         {
-            "name": "perform",
-            "path": "/runs/{id}/actions/{action}/perform"
-        },
-        {
-            "name": "outcome",
-            "path": "/runs/{id}/actions/{action}/outcome"
-        },
-        {
             "name": "close",
             "path": "/runs/{id}/close"
         }
@@ -225,7 +194,7 @@ from .runtime import ApiError, dumps, execute, loads, port_key
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run the exported program through the Server HTTP API")
+    parser = argparse.ArgumentParser(description="Read dry evidence through the Server HTTP API")
     port = parser.add_mutually_exclusive_group(required=True)
     port.add_argument("--key", help="JSON scalar or composite key object")
     port.add_argument("--batch", nargs="?", const="all", help="optional JSON keys array; no argument selects all")
@@ -233,6 +202,8 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     try:
+        if not args.dry_run:
+            raise ApiError("real runs arrive with S2.1b")
         if args.key is not None:
             selected = {"key": port_key(loads(args.key))}
         elif args.batch == "all":
@@ -265,7 +236,6 @@ import json
 import os
 import re
 import time
-from collections import Counter
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -310,7 +280,7 @@ def port_key(key: Any) -> Any:
 
 
 def key_object(key: Any) -> dict[str, Any]:
-    """Action keys are objects; Open's port may still carry a scalar."""
+    """Validate preview key objects; Open's port may still carry a scalar."""
     names = CONFIG["key"]
     if isinstance(key, dict):
         if set(key) != set(names):
@@ -337,23 +307,6 @@ def response_key(value: Any, *, row: bool = False) -> Any:
         return key_of(value) if row else key_object(value)
     except (ValueError, KeyError, TypeError):
         raise ApiError("Server returned a malformed key") from None
-
-
-def canonical_key(key: Any) -> Any:
-    def canonical(value: Any) -> Any:
-        if isinstance(value, dict):
-            return tuple((k, canonical(v)) for k, v in sorted(value.items()))
-        if isinstance(value, list):
-            return tuple(canonical(v) for v in value)
-        if isinstance(value, (int, float, Decimal)) and not isinstance(value, bool):
-            return ("number", Decimal(str(value)))
-        return (type(value).__name__, value)
-    if not isinstance(key, dict):
-        raise ApiError("perform returned a non-object key")
-    try:
-        return canonical(key_object(key))
-    except ValueError:
-        raise ApiError("perform effects differ from selected actions") from None
 
 
 class ApiError(RuntimeError):
@@ -425,7 +378,9 @@ class BaseClient:
         # Permit one final status read, then refuse another polling iteration.
         return deadline - time.monotonic() <= 1
 
-    def open(self, port: dict[str, Any], as_of: str | None = None, *, dry_run: bool = False, idempotency_key: str | None = None) -> BaseRun:
+    def open(self, port: dict[str, Any], as_of: str | None = None, *, dry_run: bool = True, idempotency_key: str | None = None) -> BaseRun:
+        if dry_run is not True:
+            raise ApiError("real runs arrive with S2.1b")
         kind = CONFIG["port"].replace("on_event", "event")
         # Replay may replace batch `none` with explicit `keys`, as the native dry driver does.
         accepted = {"none", "keys"} if CONFIG["mode"] == "batch" else {kind}
@@ -439,7 +394,7 @@ class BaseClient:
             if kind in ("key", "keys", "event"):
                 port = dict(port, at=as_of)
         fps = CONFIG["fingerprints"]
-        body = {"deployment": CONFIG["deployment"], "port": port, "dryRun": CONFIG["dry_run"] or dry_run, "origin": "driver"}
+        body = {"deployment": CONFIG["deployment"], "port": port, "dryRun": True, "origin": "driver"}
         event_clock = CONFIG["clock"] == "event" and kind in ("key", "keys", "event")
         if as_of is not None and (not literal_clock or not event_clock or body["dryRun"]):
             body["asOf"] = as_of
@@ -453,17 +408,15 @@ class BaseClient:
     def _claim(self, body: dict[str, Any]) -> BaseRun:
         started_at = time.monotonic()
         code, data, headers = self.request("POST", "open", body, recipe=CONFIG["recipe"])
-        return self.run_type(self, data["runId"], code, started_at=started_at, headers=headers, open_body=body)
+        return self.run_type(self, data["runId"], code, started_at=started_at, headers=headers, open_body=body, dry_run=data.get("dryRun", body["dryRun"]) is True)
 
 
 class BaseRun:
-    def __init__(self, client: BaseClient, run_id: str, claim: int, *, deadline: float | None = None,
-                 headers: dict[str, str] | None = None, open_body: dict[str, Any] | None = None,
-                 started_at: float | None = None) -> None:
+    def __init__(self, client: BaseClient, run_id: str, claim: int, *, headers: dict[str, str] | None = None, open_body: dict[str, Any] | None = None,
+                 started_at: float | None = None, dry_run: bool = True) -> None:
         self.client, self.id, self.claim = client, run_id, claim
         self.renew_window(started_at=started_at)
-        if deadline is not None:
-            self.deadline = deadline
+        self.dry_run = dry_run
         self.headers = headers or {}
         self.open_body = open_body
 
@@ -520,17 +473,6 @@ class BaseRun:
         return self.request("POST", "close", {})[1]
 
 
-class Action:
-    def __init__(self, run: BaseRun, name: str) -> None:
-        self.run, self.name = run, name
-
-    def perform(self, keys: list[Any] | None = None) -> dict[str, Any]:
-        return self.run.request("POST", "perform", {} if keys is None else {"keys": [key_object(key) for key in keys]}, action=self.name)[1]
-
-    def outcome(self, outcomes: list[dict[str, Any]]) -> dict[str, Any]:
-        return self.run.request("POST", "outcome", {"outcomes": [dict(outcome, key=key_object(outcome["key"])) for outcome in outcomes]}, action=self.name)[1]
-
-
 def normalize_arguments(value: Any) -> Any:
     if not isinstance(value, dict):
         raise ApiError("malformed action arguments")
@@ -549,59 +491,7 @@ def normalize_arguments(value: Any) -> Any:
     return result
 
 
-def perform_expectations(previews: list[tuple[str, Any, Any]], batch: dict[str, Any], dry_run: bool) -> dict[str, Counter]:
-    """R254-E: holds follow each preview entry's own rows; overlapping routes keep their multiplicity."""
-    def malformed() -> None:
-        raise ApiError("perform effects differ from selected actions")
-
-    rows = batch.get("rows")
-    if not isinstance(rows, list):
-        malformed()
-    by_seq = {}
-    for row in rows:
-        if not isinstance(row, dict) or type(row.get("seq")) is not int or row["seq"] in by_seq:
-            malformed()
-        by_seq[row["seq"]] = row
-    grouped = {seq for seq, row in by_seq.items() if row.get("group") is not None}
-    marked_owners = set()
-    expected: dict[str, Counter] = {}
-    for name, key, refs in previews:
-        if not isinstance(refs, list) or any(type(seq) is not int or seq not in by_seq for seq in refs):
-            malformed()
-        held_rows = set(refs) & grouped
-        if name in CONFIG["held_actions"]:
-            if refs and not held_rows:
-                malformed()
-            marked_owners.update(held_rows)
-        reason = "held" if held_rows else "dry-run" if dry_run else "performed"
-        expected.setdefault(name, Counter())[(key, reason)] += 1
-    if grouped - marked_owners:
-        malformed()
-    return expected
-
-
-def verify_perform(effect: dict[str, Any], expected: Counter) -> None:
-    performed, skipped = effect.get("performed"), effect.get("skipped")
-    if not isinstance(performed, list) or not isinstance(skipped, list):
-        raise ApiError("perform effects differ from selected actions")
-    seen = Counter()
-    for row in performed:
-        if not isinstance(row, dict):
-            raise ApiError("perform effects differ from selected actions")
-        key = canonical_key(row.get("key"))
-        seen[(key, "performed")] += 1
-    for row in skipped:
-        if not isinstance(row, dict):
-            raise ApiError("perform effects differ from selected actions")
-        key = canonical_key(row.get("key"))
-        if row.get("reason") not in ("held", "dry-run"):
-            raise ApiError("perform effects differ from selected actions")
-        seen[(key, row["reason"])] += 1
-    if seen != expected:
-        raise ApiError("perform effects differ from selected actions")
-
-
-def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_run: bool = False, parameters: dict[str, Any] | None = None) -> dict[str, Any]:
+def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_run: bool = True, parameters: dict[str, Any] | None = None) -> dict[str, Any]:
     if parameters:
         declared = {p["name"]: p for p in CONFIG["parameters"]}
         for name, value in parameters.items():
@@ -630,6 +520,7 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
             status = run.status()
         if status["status"] in ("failed", "abandoned"):
             run = client._claim(run.open_body)
+            status = None
             if run.claim != 201:
                 raise ApiError("second live handle")
         elif status["status"] not in ("closed", "waiting"):
@@ -647,7 +538,7 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
                     run.request("POST", "island", island=name)
             run.evaluate()
             status = run.status()
-        if (dry_run or CONFIG["dry_run"]) and status.get("dryRun") is not True:
+        if status.get("dryRun") is not True:
             raise ApiError("Server did not confirm dryRun")
         summaries = status["verdict"]["routes"]
         if set(summaries) - set(CONFIG["routes"]):
@@ -668,8 +559,6 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
         previews = status.get("actions")
         if not isinstance(previews, list):
             raise ApiError("status omitted preview actions")
-        selected: dict[str, dict[Any, dict[str, Any]]] = {}
-        entries = []
         for preview in previews:
             if not isinstance(preview, dict):
                 raise ApiError("malformed preview action")
@@ -677,25 +566,15 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
             if name not in CONFIG["actions"]:
                 raise ApiError("Server returned an undeclared action")
             obj = response_key(preview.get("key"))
-            key = canonical_key(obj)
-            selected.setdefault(name, {})[key] = obj
-            entries.append((name, key, preview.get("batchRows")))
             actions.append({"key": key_of(obj), "action": name, "columns": normalize_arguments(preview["arguments"])})
         batch = run.request("GET", "batch")[1]
-        perform_effects = []
-        if run.claim == 201:
-            expected = perform_expectations(entries, batch, status.get("dryRun") is True)
-            for name, keys in selected.items():
-                effect = Action(run, name).perform(list(keys.values()))
-                verify_perform(effect, expected[name])
-                perform_effects.append({"action": name, **effect})
         if run.claim == 201:
             closed = run.close()
             if closed.get("status") not in ("closed", "waiting"):
                 raise ApiError("run did not close")
-        return {"verdicts": verdicts, "actions": actions, "details": details, "detail_counts": counts, "effects": batch.get("rows", []), "perform_effects": perform_effects}
+        return {"verdicts": verdicts, "actions": actions, "details": details, "detail_counts": counts, "effects": batch.get("rows", [])}
     except Exception:
-        is_dry_run = status.get("dryRun") is True if status is not None else dry_run or CONFIG["dry_run"]
+        is_dry_run = status.get("dryRun") is True if status is not None else run.dry_run
         if run.claim == 201 and is_dry_run:
             try:
                 run.close()
@@ -719,7 +598,7 @@ def run(clients, request):
         if module not in clients:
             clients[module] = import_module(module + ".client").Client()
         return runtime.execute(clients[module], request["port"], request.get("as_of"),
-                               dry_run=request.get("dry_run", False), parameters=request.get("parameters"))
+                               dry_run=request.get("dry_run", True), parameters=request.get("parameters"))
     except ValueError:
         return {"error": "invalid input or replay parameter"}
     except Exception as error:

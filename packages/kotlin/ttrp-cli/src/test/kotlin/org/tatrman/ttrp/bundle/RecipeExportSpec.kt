@@ -9,8 +9,6 @@ import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.string.shouldMatch
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
 import org.tatrman.ttr.metadata.source.FileBasedSource
 import org.tatrman.ttr.metadata.source.LocalFsStorage
 import org.tatrman.ttrp.cli.EmitCommand
@@ -526,7 +524,7 @@ class RecipeExportSpec :
             val folder = out.resolve("release_py.python_client.export")
             val manifest = Json.parseToJsonElement(Files.readString(folder.resolve("manifest.json"))).jsonObject
             val config = Json.parseToJsonElement(Files.readString(folder.resolve("python-client.json"))).jsonObject
-            config["held_actions"] shouldBe JsonArray(emptyList())
+            config.containsKey("held_actions") shouldBe false
             manifest["calls"] shouldBe config["callPlan"]
             config.getValue("fingerprints").jsonObject shouldBe manifest.getValue("fingerprints").jsonObject
             val client = Files.readString(folder.resolve("worker/release_order_client/client.py"))
@@ -539,7 +537,7 @@ class RecipeExportSpec :
                 "=== README.md ===\n${readme.trimEnd()}\n=== client.py ===\n${client.trimEnd()}",
             )
             client shouldContain "def release(self)"
-            client shouldContain "def ask(self)"
+            client shouldNotContain "class Actions"
             val secondOut = temporaryDirectory("python-real-h1-repeat")
             val second = emit(secondOut)
             io.kotest.assertions.withClue(second.output) { second.statusCode shouldBe 0 }
@@ -573,7 +571,7 @@ class RecipeExportSpec :
             (refused.statusCode != 0) shouldBe true
             refused.output shouldContain "world fingerprint differs"
         }
-        "Python holds are projected from a compiled world with a required native transition" {
+        "Python dry evidence emits from a compiled world with a required native transition" {
             val project = exportProject()
             val models = temporaryDirectory("python-required-models")
             root.toFile().copyRecursively(models.toFile(), overwrite = true)
@@ -623,7 +621,7 @@ class RecipeExportSpec :
                     .parseToJsonElement(
                         Files.readString(out.resolve("release_py.python_client.export/python-client.json")),
                     ).jsonObject
-            config["held_actions"] shouldBe JsonArray(listOf(JsonPrimitive("release")))
+            config.containsKey("held_actions") shouldBe false
         }
         "D-142: batch n8n export uses an external webhook without an embedded schedule" {
             val bundle = build("release_order")
