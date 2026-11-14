@@ -161,7 +161,7 @@ internal class CanonicalBuilder(
     private val children = mutableMapOf<Record, MutableMap<String, MutableList<Record>>>()
 
     /** The dialect trees by label, built once: relocation looks a span's file up for every emitted document (F9). */
-    private val trees by lazy { plans.associate { it.tree.label to it.tree } }
+    private val trees = plans.associate { it.tree.label to it.tree }
     private val origins = mutableMapOf<Record, MutableMap<String, ProfileSpan>>()
     private val imports = mutableMapOf<DocumentKey, MutableSet<String>>()
 
@@ -338,7 +338,10 @@ internal class CanonicalBuilder(
 
             /**
              * A block written from a dialect value sits at the same relative path under its nearest written ancestor;
-             * the dialect scalar there must hold exactly the block (review-260 F8).
+             * the dialect scalar there must hold exactly the block (review-260 F8). A block an overlay sets has no
+             * dialect scalar: its nearest written ancestor is the overlay value, outside the dialect trees, so it keeps
+             * the generated span, line starts and indent, one coordinate system (re-review RR1-5). No climb past it:
+             * the record's dialect scalar at that relative path never holds the overlay's text.
              */
             override fun block(
                 pointer: String,

@@ -75,7 +75,7 @@ class PerFileEmissionSpec :
                 else -> emptyList()
             }
 
-        test("review-260 F7: an overlay value takes its record's authored span, never generated coordinates") {
+        test("review-260 F7: an overlay scalar takes its record's authored span, never generated coordinates") {
             val root = Files.createTempDirectory("r260-f7").toRealPath()
             val text = "entity:\n  A: {}\n  B: {}\n"
             Files.writeString(
@@ -97,7 +97,8 @@ class PerFileEmissionSpec :
                     .single { it.name == "B" } as EntityDef
             val role = b.roles.single()
             role.toString() shouldContain "fact"
-            // The overlay value is written for B, whose record is the mapping on line 3 of the dialect file.
+            // The overlay value is written for B, whose record is the mapping on line 3 of the dialect file. (A block an
+            // overlay sets is the exception: it keeps generated coordinates, RR1-5.)
             withClue(role.source) {
                 role.source.file shouldBe label
                 role.source.line shouldBe 3
@@ -133,14 +134,52 @@ class PerFileEmissionSpec :
                     .single() as QueryDef
             val block = query.sourceTextBlock as TaggedBlockValue
             block.value shouldBe "SELECT a\n  FROM t"
-            // Line 2 of the block, `  FROM t`, is line 7 of the dialect file: `FROM` at column 10, offset below.
             withClue(block) {
                 block.valueSource.file shouldBe label
                 block.valueSource.line shouldBe 6
                 block.valueSource.offsetStart shouldBe text.indexOf("SELECT a")
                 block.indentWidth shouldBe 8
-                (block.valueSource.line + 1) shouldBe 7
-                (block.indentWidth + 2) shouldBe text.indexOf("FROM") - (text.indexOf("\n          FROM") + 1)
+                // Map every block line the way a consumer does (line `valueSource.line + k`, columns after
+                // `indentWidth`): each lands on its own text in the dialect file, `  FROM t` on line 7 (RR1-7).
+                block.value.lines().forEachIndexed { k, logical ->
+                    text.lines()[block.valueSource.line - 1 + k].substring(block.indentWidth) shouldBe logical
+                }
+            }
+        }
+
+        test("re-review RR1-5: a block an overlay sets keeps the generated span, line starts and indent together") {
+            val root = Files.createTempDirectory("rr1-5").toRealPath()
+            val text = "dotazy:\n  Q:\n    sql:\n      tag: sql\n      block: |\n        SELECT a\n"
+            Files.writeString(
+                root.resolve("d.yaml"),
+                "profile: d/1\ngrammar: '>=0.22 <1.0'\noperations:\n" +
+                    "  - {op: package, mapping: {}, default: demo}\n" +
+                    "  - {op: kinds, at: /dotazy, mapping: {d: query}}\n" +
+                    "  - {op: nest, in: query, at: /sql, to: {kind: query, path: [sourceText]}}\n" +
+                    "overlay:\n  Q: {sourceText: {tag: sql, block: \"SELECT b\\n  FROM z\"}}\n",
+            )
+            val label = root.resolve("q.yaml").toString()
+            val chain = ProfileResolver(root, emptyMap()).resolve("./d.yaml", root.resolve("ttr.yaml"))
+            val document =
+                ProfileEngine
+                    .apply(listOf(ForeignTree.read(text, "q.yaml", label)), chain, root, perFile = true)
+                    .documents
+                    .single()
+            val block =
+                (
+                    document.canonical.ast.definitions
+                        .single() as QueryDef
+                ).sourceTextBlock as TaggedBlockValue
+            block.value shouldBe "SELECT b\n  FROM z"
+            // The overlay's text is in no dialect scalar, so the block's span and indent stay the generated ones, together:
+            // the engine's generated document is one line, and a quoted scalar's indent is its column there. The tag
+            // and the value's own span climb to the record, the mapping under `Q:` on line 3 (F7).
+            withClue(block) {
+                block.valueSource.file shouldBe label
+                block.valueSource.line shouldBe 1
+                block.indentWidth shouldBe block.valueSource.column
+                block.tagSource.line shouldBe 3
+                block.source.line shouldBe 3
             }
         }
     })

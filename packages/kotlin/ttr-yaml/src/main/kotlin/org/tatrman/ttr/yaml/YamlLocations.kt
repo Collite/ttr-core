@@ -26,6 +26,17 @@ internal class YamlLocations(
         key: Boolean = false,
     ): SourceLocation = relocation?.source(path) ?: nodes.source(path, key)
 
+    /**
+     * A block's text span, line starts and indent from one file (review-260 F8): the authored scalar when the
+     * relocation holds the block, else all three from the generated text.
+     */
+    private fun block(
+        pointer: String,
+        text: String,
+    ): BlockSpan =
+        relocation?.block(pointer, text)
+            ?: nodes.content(pointer, text).let { BlockSpan(it.source, it.lines, it.indent) }
+
     private fun path(
         start: Int,
         end: Int,
@@ -96,14 +107,16 @@ internal class YamlLocations(
                     if (entry !=
                         null
                     ) {
+                        // One coordinate system for span and indent, as for a parsed block (re-review RR1-2).
+                        val block = block("$pointer/block", syntax.string("block"))
                         return TaggedBlockValue(
                             tag,
                             entry.language,
                             entry.dialect,
                             syntax.string("block"),
                             located("$pointer/tag"),
-                            located("$pointer/block"),
-                            0,
+                            block.source,
+                            block.indentWidth,
                             source,
                         )
                     }
@@ -130,13 +143,11 @@ internal class YamlLocations(
         if (value is TaggedBlockValue) {
             literal(value.source)?.let { (pointer, syntax) ->
                 if ("block" in syntax) {
-                    val content = nodes.content("$pointer/block", syntax.string("block"))
-                    // Text span and indent from one file: the authored scalar when it holds the block, else generated.
-                    val block = relocation?.block("$pointer/block", syntax.string("block"))
+                    val block = block("$pointer/block", syntax.string("block"))
                     return value.copy(
                         source = span(value.source),
-                        valueSource = block?.source ?: content.source,
-                        indentWidth = block?.indentWidth ?: content.indent,
+                        valueSource = block.source,
+                        indentWidth = block.indentWidth,
                         tagSource = located("$pointer/tag"),
                     )
                 }
@@ -145,8 +156,7 @@ internal class YamlLocations(
         if (value is EmbeddedBlock) {
             literal(value.source)?.let { (pointer, syntax) ->
                 val contentKey = if ("triple" in syntax) "triple" else "block"
-                val content = nodes.content("$pointer/$contentKey", syntax.string(contentKey))
-                val block = relocation?.block("$pointer/$contentKey", syntax.string(contentKey))
+                val block = block("$pointer/$contentKey", syntax.string(contentKey))
                 val form = if ("tag" in syntax) "tagged" else syntax["form"]?.jsonPrimitive?.content ?: "tripleString"
                 return value.copy(
                     text = syntax.string(contentKey),
@@ -154,9 +164,9 @@ internal class YamlLocations(
                     language =
                         syntax["tag"]?.jsonPrimitive?.content ?: "pl",
                     source = span(value.source),
-                    textSource = block?.source ?: content.source,
-                    lineOffsets = block?.lineOffsets ?: content.lines,
-                    indentWidth = block?.indentWidth ?: content.indent,
+                    textSource = block.source,
+                    lineOffsets = block.lineOffsets,
+                    indentWidth = block.indentWidth,
                     escapes = emptyList(),
                 )
             }
