@@ -9,7 +9,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
 
 /**
@@ -29,10 +28,8 @@ class FileSnapshotSource(
 ) : SnapshotSource {
     override val name: String = path.name.substringBeforeLast('.')
 
+    /** The capture checks the path first (a missing export is usage, review-277 F9); a read failure is refused here. */
     override fun fetch(): ForeignTree {
-        if (!path.isRegularFile()) {
-            throw ProfileException("ys/profile-not-found", ProfileSpan("$path", 1, 1, 1, 1, ""), "No export file $path")
-        }
         val text =
             try {
                 Files.readString(path)
@@ -48,48 +45,47 @@ class FileSnapshotSource(
 }
 
 /**
- * The profile's `ignore` at capture time: the JSON pointers (as [ForeignNode.path] spells them) the profile ignores in
- * [tree], or `""` when it ignores the whole file. Only record discovery (`kinds`) and `ignore` run: a capture never
- * fails on a key the profile does not know yet — `apply` reports that. An ignore that would cover a record is left in
- * place, as `apply` refuses it (`ys/profile-conflict`).
+ * What the profile says about one export at capture time (contracts §6): [records] — the JSON pointers of every record
+ * `kinds` discovers, as [ForeignNode.path] spells them, which [Sanitise] never renames or drops (review-277 F2); and
+ * [ignored] — the pointers the profile's `ignore` removes, or `""` when it ignores the whole file. An ignore that
+ * would cover a record is left in place, as `apply` refuses it (`ys/profile-conflict`).
+ */
+class CapturePlan(
+    val records: Set<String>,
+    val ignored: List<String>,
+)
+
+/**
+ * The profile's record discovery and `ignore` at capture time. Only `kinds` and `ignore` run, on **one lenient**
+ * [RecordPlan] (S3.7 T0, review-277 N1): a capture never fails on a key or record the profile does not know yet — a
+ * source discovery would refuse is not a record, and its key is name-matched by [Sanitise]. `apply` reports it.
  */
 object CaptureFilter {
-    fun ignored(
+    fun plan(
         tree: ForeignTree,
         profile: List<ProfileDefinition>,
-    ): List<String> {
+    ): CapturePlan {
         val ops = profile.flatMap { it.operations }.map(::PlannedOp).filter { it.matches(tree) }
+        val plan = RecordPlan(tree, ops, lenient = true)
+        val records = plan.records.map { it.source.path }.toSet()
         val ignores = ops.filter { it.name == "ignore" }
-        if (ignores.any { it.scope == null && "at" !in it.value }) return listOf("")
-        if (ignores.isEmpty()) return emptyList()
-        val plan = RecordPlan(tree, ops)
-        return ignores
-            .flatMap { op ->
-                val contexts =
-                    if (op.scope ==
-                        null
-                    ) {
-                        listOf(tree.root)
-                    } else {
-                        plan.records.filter { it.kind == op.scope }.map { it.source }
-                    }
-                contexts.mapNotNull { op.at.resolve(it, includeNull = true) }
-            }.filter { node ->
-                plan.records.none { it.source.path == node.path || it.source.path.startsWith("${node.path}/") }
-            }.map { it.path }
-            .distinct()
-    }
-
-    /**
-     * The JSON pointers of every record the profile discovers in [tree] (`kinds` only), as [ForeignNode.path] spells
-     * them: the capture never renames or drops a record's own key ([Sanitise], review-277 F2).
-     */
-    fun records(
-        tree: ForeignTree,
-        profile: List<ProfileDefinition>,
-    ): Set<String> {
-        val ops = profile.flatMap { it.operations }.map(::PlannedOp).filter { it.matches(tree) }
-        return RecordPlan(tree, ops).records.map { it.source.path }.toSet()
+        if (ignores.any { it.scope == null && "at" !in it.value }) return CapturePlan(records, listOf(""))
+        val ignored =
+            ignores
+                .flatMap { op ->
+                    val contexts =
+                        if (op.scope ==
+                            null
+                        ) {
+                            listOf(tree.root)
+                        } else {
+                            plan.records.filter { it.kind == op.scope }.map { it.source }
+                        }
+                    contexts.mapNotNull { op.at.resolve(it, includeNull = true) }
+                }.filter { node -> records.none { it == node.path || it.startsWith("${node.path}/") } }
+                .map { it.path }
+                .distinct()
+        return CapturePlan(records, ignored)
     }
 
     /** [element] without the values at [paths] (pointers rooted at [element], as [ignored] returns them). */
@@ -124,7 +120,7 @@ object CaptureFilter {
  * Snapshot hygiene (XM D-15) as pure functions over a foreign tree: principal names give way to role names, usage
  * counters are dropped. Keys match case-insensitively with `_` and `-` ignored (`created_by` = `createdBy`).
  *
- * A key whose pointer is a record's source path, or an ancestor of one ([CaptureFilter.records]), is never renamed or
+ * A key whose pointer is a record's source path, or an ancestor of one ([CapturePlan.records]), is never renamed or
  * dropped: a column named `owner` or `votes` is content (review-277 F2); its own properties are still sanitised. A key
  * the profile does not discover as a record is matched by name. Profile-driven lists are P5's.
  */

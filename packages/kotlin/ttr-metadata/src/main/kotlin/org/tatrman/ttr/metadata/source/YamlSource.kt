@@ -293,8 +293,7 @@ internal class YamlTreeReader(
                 path == "ttr.yaml" -> declarationFile = file
                 path == "model.ignore" -> ignoreFile = file
                 file.extension() in setOf("yaml", "yml") &&
-                    segments.none { it.startsWith(".") } &&
-                    segments.first() != "agents" &&
+                    TreeContent.includes(segments) &&
                     path !in CONTROL_FILES -> candidates += file
             }
         }

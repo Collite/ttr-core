@@ -87,9 +87,9 @@ object SnapshotCapture {
                     ?: ProfileResolver(top, catalog).resolve(reference, top.resolve("snapshot"))
             val tree = source.fetch()
             // Hygiene runs on the export as fetched, so record pointers hold; then the ignore prunes (review-277 F2).
-            val records = CaptureFilter.records(tree, chain)
-            val clean = Sanitise.counters(Sanitise.principals(tree.root.value, records), records)
-            val text = yaml(CaptureFilter.prune(clean, CaptureFilter.ignored(tree, chain)))
+            val plan = CaptureFilter.plan(tree, chain)
+            val clean = Sanitise.counters(Sanitise.principals(tree.root.value, plan.records), plan.records)
+            val text = yaml(CaptureFilter.prune(clean, plan.ignored))
             val size = text.toByteArray(Charsets.UTF_8).size.toLong()
             if (size > LIMIT && !large) {
                 return Captured.Refused(

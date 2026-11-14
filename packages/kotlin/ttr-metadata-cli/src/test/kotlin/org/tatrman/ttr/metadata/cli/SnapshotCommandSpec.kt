@@ -150,6 +150,37 @@ class SnapshotCommandSpec :
             bare.resolve("s/.gitattributes").exists() shouldBe true
         }
 
+        test("an --out that is a git work-tree root is refused, nothing written (review-277 N4 (b))") {
+            val work = work(1)
+            ProcessBuilder("git", "init", "-q").directory(work.toFile()).start().waitFor() shouldBe 0
+            val root = exec(work, "snapshot", "--from", "file:export.json", "--profile", "cap/1", "--out", ".")
+            root.exitCode shouldBe 2
+            root.stderr shouldBe
+                "ttr-metadata: --out . is a git work-tree root; snapshots go to a directory of their own\n"
+            work.resolve(".gitattributes").exists() shouldBe false
+            work.resolve("export.yaml").exists() shouldBe false
+        }
+
+        test("an export the profile does not fully know is captured, its unknown records kept (review-277 N1)") {
+            val work = work(1)
+            work.resolve("profiles/typed.yaml").writeText(
+                """
+                profile: typed/1
+                grammar: '>=0.22 <1.0'
+                operations:
+                  - {op: package, mapping: {}, default: demo}
+                  - {op: kinds, at: /entity, kind: /typ, mapping: {tabulka: entity}}
+                """.trimIndent() + "\n",
+            )
+            work.resolve("typed.json").writeText(
+                "{\"entity\": {\"T\": {\"typ\": \"tabulka\"}, \"V\": {\"typ\": \"pohled\", \"owner\": \"${people[0]}\"}}}\n",
+            )
+            val out = exec(work, "snapshot", "--from", "file:typed.json", "--profile", "typed/1", "--out", "s")
+            out.exitCode shouldBe 0
+            work.resolve("s/typed.yaml").readText() shouldBe
+                "entity:\n  T:\n    typ: tabulka\n  V:\n    typ: pohled\n    owner: owner\n"
+        }
+
         test("usage: an unknown adapter, a missing profile or export; --profile is required") {
             val work = work(1)
             exec(work, "snapshot", "--from", "openmetadata:x", "--profile", "cap/1", "--out", "s").exitCode shouldBe 2

@@ -14,7 +14,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.tatrman.ttr.metadata.export.GeneratedHeader
-import org.tatrman.ttr.metadata.export.GeneratedInput
+import org.tatrman.ttr.metadata.export.GeneratedInputs
 import org.tatrman.ttr.metadata.export.Hashes
 import org.tatrman.ttr.profile.ProfileDefinition
 import org.tatrman.ttr.profile.SourceEntry
@@ -22,7 +22,6 @@ import org.tatrman.ttr.profile.SourcesJsonWriter
 import org.tatrman.ttr.yaml.CanonicalDocument
 import org.tatrman.ttr.yaml.CanonicalYaml
 import org.tatrman.ttr.yaml.CanonicalYamlException
-import java.nio.file.Files
 import java.nio.file.Path
 import java.util.SortedMap
 import java.util.TreeMap
@@ -45,6 +44,11 @@ class ProfileApplyResult(
     val planned: List<LoadWarning> = emptyList(),
     /** Each generated document's chain identity (`<name>/<major>`, as its header names it), by output path. */
     val generatedBy: Map<String, String> = emptyMap(),
+    /**
+     * The identity (`<name>/<major>`) of every chain the tree's declarations resolved, known even when a run then fails
+     * (review-277 N3): the guard tells an override's document from a broken tree's by it.
+     */
+    val declared: Set<String> = emptySet(),
 )
 
 /**
@@ -113,15 +117,17 @@ object ProfileApply {
         val generatedFrom = TreeMap<String, String>()
 
         /**
-         * [from] are the storage paths of the files the document comes from, sorted (review-269 F4). [inputs] are a
-         * generated document's header inputs; null for a canonical input file, which is not generated.
+         * [from] are the storage paths of the files the document comes from, sorted (review-269 F4). [profile] is a
+         * generated document's chain identity, null for a canonical input file, which is not generated; [inputs] its
+         * header inputs when a header is written.
          */
         fun write(
             value: JsonObject,
             text: String,
             from: List<String>,
             at: String? = null,
-            inputs: Inputs? = null,
+            profile: String? = null,
+            inputs: GeneratedInputs? = null,
             document: CanonicalDocument? = null,
         ) {
             val pkg = (value["package"] as? JsonPrimitive)?.content.orEmpty()
@@ -142,14 +148,13 @@ object ProfileApply {
                     )
                 return
             }
-            val head = header?.let { options -> inputs?.header(options.out.resolve(path).parent, options.generator) }
-            files[path] = head?.line(GeneratedHeader.Form.YAML).orEmpty() + text
+            files[path] = inputs?.header(path)?.line(GeneratedHeader.Form.YAML).orEmpty() + text
             if (document != null) generated[path] = document
-            if (inputs != null) generatedBy[path] = inputs.profile
+            if (profile != null) generatedBy[path] = profile
             if (pkg.isNotEmpty()) {
                 sources.getOrPut(pkg) { mutableListOf() }
-                if (header != null && inputs != null && pkg !in generatedFrom) {
-                    generatedFrom[pkg] = inputs.header(header.out, header.generator).text
+                if (inputs != null && pkg !in generatedFrom) {
+                    generatedFrom[pkg] = inputs.header("$pkg.sources.json").text
                 }
             }
             documents +=
@@ -179,7 +184,18 @@ object ProfileApply {
             val (result, _) =
                 reader.run(root, chain, inputs, plan.problems, perFile = false)
                     ?: return@forEach
-            val headerInputs = Inputs.of(root, rootSha, chain)
+            val identity = identity(chain)
+            val headerInputs =
+                header?.let {
+                    GeneratedInputs(
+                        root.toAbsolutePath().normalize(),
+                        overlay(root, chain),
+                        identity,
+                        it.generator,
+                        it.out,
+                        rootSha,
+                    )
+                }
             result.sources.forEach { sources.getOrPut(it.pkg) { mutableListOf() } += it }
             // In a grouped run a document has no single file: its writers are the dialect files its records came from.
             val paths = inputs.map { it.first.path }.toSet()
@@ -194,6 +210,7 @@ object ProfileApply {
                     document.value,
                     document.write(),
                     from.ifEmpty { listOf(inputs.first().first.path) },
+                    profile = identity,
                     inputs = headerInputs,
                     document = document.canonical,
                 )
@@ -244,53 +261,28 @@ object ProfileApply {
             generated,
             plan.problems.errors.take(planned),
             generatedBy,
+            plan.dialect.map { identity(it.first) }.toSet(),
         )
     }
+
+    /** A chain's identity, `<name>/<major>` of its last profile, as a generated header names it. */
+    private fun identity(chain: List<ProfileDefinition>): String = chain.last().let { "${it.name}/${it.major}" }
 
     /**
-     * A dialect chain's header inputs: the tree it read (the snapshot), the overlay of the nearest profile that declares
-     * one (an inline overlay is its profile file; every overlay lies inside the root, ✅R260-B) and the chain's own
-     * identity, `<name>/<major>` of its last profile.
+     * A chain's overlay input: the overlay of the nearest profile that declares one (an inline overlay is its profile
+     * file; every overlay lies inside the root, ✅R260-B); null when none does.
      */
-    private class Inputs(
-        val snapshot: Path,
-        private val snapshotSha: Lazy<String>,
-        val overlay: Path?,
-        val profile: String,
-    ) {
-        /** The overlay is read and hashed once per chain, not once per document (review-277 F8). */
-        private val overlaySha = lazy { overlay?.let { Hashes.bytes(Files.readAllBytes(it)) } }
-
-        fun header(
-            directory: Path,
-            generator: String,
-        ) = GeneratedHeader(
-            GeneratedInput(GeneratedHeader.relative(directory, snapshot), snapshotSha.value),
-            overlay?.let { GeneratedInput(GeneratedHeader.relative(directory, it), requireNotNull(overlaySha.value)) },
-            profile,
-            generator,
-        )
-
-        companion object {
-            fun of(
-                root: Path,
-                rootSha: Lazy<String>,
-                chain: List<ProfileDefinition>,
-            ): Inputs {
-                val owner = chain.lastOrNull { it.overlay != null }
-                val overlay =
-                    owner?.let { profile ->
-                        val file = Path.of(profile.file).let { if (it.isAbsolute) it else root.resolve(it) }
-                        when (val value = profile.overlay) {
-                            is JsonPrimitive -> file.resolveSibling(value.content).normalize()
-                            else -> file
-                        }
-                    }
-                val last = chain.last()
-                return Inputs(root.toAbsolutePath().normalize(), rootSha, overlay, "${last.name}/${last.major}")
+    private fun overlay(
+        root: Path,
+        chain: List<ProfileDefinition>,
+    ): Path? =
+        chain.lastOrNull { it.overlay != null }?.let { profile ->
+            val file = Path.of(profile.file).let { if (it.isAbsolute) it else root.resolve(it) }
+            when (val value = profile.overlay) {
+                is JsonPrimitive -> file.resolveSibling(value.content).normalize()
+                else -> file
             }
         }
-    }
 
     private fun array(items: List<JsonElement>) = buildJsonArray { items.forEach { add(it) } }
 

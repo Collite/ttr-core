@@ -3,6 +3,7 @@ package org.tatrman.ttr.metadata.source
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldEndWith
@@ -183,6 +184,30 @@ class GeneratedGuardSpec :
                 listOf("xm/generated-edited: generated with profile demo-my/1")
         }
 
+        test("override over a tree whose own declarations fail: the ✅R277-A message still at the head (N3)") {
+            val at = Files.createTempDirectory("s37-n3").resolve("tree")
+            val rename = "  - {op: rename, in: entity, at: /popis, to: {kind: entity, property: description}}\n"
+            val model =
+                applied(
+                    at,
+                    mapOf(
+                        "profiles/x.yaml" to profile("demo-x/1", "px") + rename,
+                        "profiles/y.yaml" to profile("demo-y/1", "py"),
+                        "ttr.yaml" to "profile: ./profiles/y.yaml\ngrammar: '>=0.22 <1.0'\n",
+                        "model.ignore" to "profiles/\n",
+                        "a.yaml" to "entity:\n  A: {popis: x}\n",
+                    ),
+                    profile = "demo-x/1",
+                )
+            val issues = GeneratedGuard.check(model, "t")
+            val head = issues.filter { it.file.endsWith("/model/px/er.yaml") }
+            head.map { Triple(it.line, it.column, it.message.substringBefore(",")) } shouldBe
+                listOf(Triple(1, 1, "xm/generated-edited: generated with profile demo-x/1"))
+            // The tree's own error is still reported where it arises.
+            issues.filter { it.file.endsWith("/tree/a.yaml") }.map { it.message } shouldContain
+                "ys/unknown-key: Unconsumed key popis"
+        }
+
         test("a tree path with a space is header-safe: apply from 'My Tree', then the guard is green (F3)") {
             val pristine = case("pristine").resolve("tree")
             val spaced = Files.createTempDirectory("s36-space").resolve("My Tree")
@@ -201,6 +226,21 @@ class GeneratedGuardSpec :
             val pristine = case("pristine")
             pristine.resolve("tree/agents/foo.yaml").also { it.parent.createDirectories() }.writeText("name: a\n")
             guard(pristine).shouldBeEmpty()
+        }
+
+        test(
+            "one content rule (N4 (d)): a file the loader reads under build/ is in the hash; agents/ and dot-dirs are not",
+        ) {
+            TreeContent.includes(listOf("build", "x.yaml")) shouldBe true
+            TreeContent.includes(listOf("node_modules", "x.yaml")) shouldBe true
+            TreeContent.includes(listOf("a", "agents", "x.yaml")) shouldBe true
+            TreeContent.includes(listOf("agents", "x.yaml")) shouldBe false
+            TreeContent.includes(listOf("a", ".git", "x")) shouldBe false
+            val built = case("pristine")
+            built.resolve("tree/.cache/x.yaml").also { it.parent.createDirectories() }.writeText("a: 1\n")
+            guard(built).shouldBeEmpty()
+            built.resolve("tree/build/x.yaml").also { it.parent.createDirectories() }.writeText("a: 1\n")
+            codes(guard(built)).toSet() shouldContain "xm/generated-stale"
         }
 
         test("agents/ is never read, however a file there claims to be generated (✅MW-44)") {

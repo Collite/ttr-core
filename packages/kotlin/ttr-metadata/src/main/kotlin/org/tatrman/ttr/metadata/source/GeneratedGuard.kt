@@ -63,15 +63,18 @@ object GeneratedGuard {
             stale.forEach { issues += issue("xm/generated-stale: $it") }
             if (!snapshot.isDirectory()) continue
             val run = runs.getOrPut(snapshot) { Regeneration.of(snapshot, sourceId) }
-            if (stale.isNotEmpty() || run.failed) continue
+            if (stale.isNotEmpty()) continue
+
+            fun overridden() = issue(overridden(header.profile))
+            // Before the failed-run skip (review-277 N3): when the tree's own chains fail, an override's document
+            // still gets its message; the run's errors are reported where they arise.
+            if (header.profile !in run.declared) {
+                issues += overridden()
+                continue
+            }
+            if (run.failed) continue
             when (val expected = run.expected(file, text, header.profile)) {
-                Expected.Overridden ->
-                    issues +=
-                        issue(
-                            "xm/generated-edited: generated with profile ${header.profile}, which the tree's own " +
-                                "declarations do not give this document; an apply --profile override cannot be " +
-                                "re-checked — declare it in ttr.yaml or the file's ttr: header",
-                        )
+                Expected.Overridden -> issues += overridden()
                 Expected.Missing ->
                     issues += issue("xm/generated-edited: its inputs generate no document with this package and model")
                 is Expected.Body ->
@@ -85,16 +88,18 @@ object GeneratedGuard {
         return issues
     }
 
-    /** `.ttrm`, `.yaml` and `.yml` below [root]; hidden, `build`, `node_modules` and a top-level `agents/` skipped. */
+    /** ✅R277-A: the document [profile] generated is not one the tree's own declarations give it. */
+    private fun overridden(profile: String) =
+        "xm/generated-edited: generated with profile $profile, which the tree's own declarations do not give this " +
+            "document; an apply --profile override cannot be re-checked — declare it in ttr.yaml or the file's ttr: header"
+
+    /** `.ttrm`, `.yaml` and `.yml` below [root] that are tree content ([TreeContent]). */
     private fun files(root: Path): List<Path> =
         Files.walk(root).use { paths ->
             paths
                 .filter { it.isRegularFile() && GeneratedHeader.Form.of(it.name) != null }
-                .filter { file ->
-                    val segments = root.relativize(file).map { it.name }
-                    segments.none { it.startsWith(".") || it == "build" || it == "node_modules" } &&
-                        segments.first() != "agents"
-                }.sorted()
+                .filter { file -> TreeContent.includes(root.relativize(file).map { it.name }) }
+                .sorted()
                 .toList()
         }
 
@@ -117,6 +122,8 @@ object GeneratedGuard {
         private val generated: Map<String, CanonicalDocument>,
         private val generatedBy: Map<String, String>,
         val problems: List<LoadWarning>,
+        /** Every chain identity the tree's declarations resolved, even when its run failed (review-277 N3). */
+        val declared: Set<String>,
     ) {
         val failed get() = problems.isNotEmpty()
 
@@ -181,6 +188,7 @@ object GeneratedGuard {
                     result.generated,
                     result.generatedBy,
                     result.planned + result.problems + result.conflicts,
+                    result.declared,
                 )
             }
         }

@@ -14,6 +14,7 @@ import org.tatrman.ttr.metadata.source.ProfileCatalog
 import org.tatrman.ttr.metadata.source.ProfileSession
 import org.tatrman.ttr.metadata.source.SourceKind
 import org.tatrman.ttr.metadata.source.YamlFileSource
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
@@ -234,13 +235,26 @@ object LintCli {
         val (result, loaded) = MetadataLoadCli.load(session.source(), target.layout, target.manifestIssues)
         val applied = session.apply(out?.let { HeaderOptions(it.toAbsolutePath().normalize(), MetadataVersion.value) })
         val directory = out?.toAbsolutePath()?.normalize()
-        if (directory != null) refusal(target.modelRoot, directory, applied.files.keys)?.let { return usage(it) }
+        val output =
+            directory?.let {
+                try {
+                    Output.of(it)
+                } catch (e: IOException) {
+                    return usage("--out $it: cannot create the directory (${e.javaClass.simpleName} ${e.message})")
+                }
+            }
+        if (output != null) {
+            refusal(target.modelRoot, output, applied.files.keys)?.let {
+                output.discard()
+                return usage(it)
+            }
+        }
         val report = merge(loaded, applied)
         val failed = result.model == null || report.issues.any { it.severity == LoadIssue.Severity.ERROR }
         val outcome = outcome(target.project, report, failed, format)
-        if (directory == null || failed) return outcome
+        if (output == null || failed) return outcome.also { output?.discard() }
         applied.files.forEach { (path, text) ->
-            val file = directory.resolve(path)
+            val file = output.real.resolve(path)
             Files.createDirectories(file.parent)
             Files.writeString(file, text)
         }
@@ -248,55 +262,81 @@ object LintCli {
     }
 
     /**
-     * Why apply may not write [paths] under [directory]: the directory or any output lies in the model root, compared
-     * on real paths so a symlink cannot hide it (review-269 F2). Null when every output lands outside.
+     * `--out` made real once (✅R277-D): [given] may itself be a symbolic link, or lie under one, and is followed here
+     * and only here. A missing directory is created first; [created] is the topmost directory this run made, removed
+     * again by [discard] when nothing is written.
      */
-    private fun refusal(
-        modelRoot: Path,
-        directory: Path,
-        paths: Collection<String>,
-    ): String? {
-        val root = modelRoot.toRealPath()
-        val resolved = real(directory) ?: return "--out $directory: too many symbolic links"
-        if (resolved.startsWith(root)) return "--out must be outside the model root $modelRoot"
-        val inside =
-            paths.filter {
-                // An unresolvable chain is refused like a path inside the root: nothing proves it lands outside.
-                real(directory.resolve(it).normalize())?.startsWith(root) ?: true
+    internal class Output private constructor(
+        val given: Path,
+        val real: Path,
+        private val created: Path?,
+    ) {
+        fun discard() {
+            created ?: return
+            Files.walk(created).use { paths -> paths.sorted(Comparator.reverseOrder()).toList() }.forEach(Files::delete)
+        }
+
+        companion object {
+            fun of(given: Path): Output {
+                var missing: Path? = null
+                var existing: Path? = given
+                while (existing != null && !Files.exists(existing, LinkOption.NOFOLLOW_LINKS)) {
+                    missing = existing
+                    existing = existing.parent
+                }
+                Files.createDirectories(given)
+                return Output(given, given.toRealPath(), missing)
             }
-        if (inside.isEmpty()) return null
-        return "--out $directory would write ${inside.joinToString(", ")} into the model root $modelRoot"
+        }
     }
 
     /**
-     * [path] with its nearest existing ancestor made real; the part that does not exist yet appended as it is. A dangling
-     * symbolic link exists too: a write through it lands at its target, so the target, read against the link's real
-     * directory, is followed in its place (review-269 N1, review-277 F6). Null past [MAX_HOPS] links.
+     * Why apply may not write [paths] under [output] (✅R277-D, review-269 F2): the real `--out` lies in the model root;
+     * a path apply would write goes through a symbolic link at or below `--out` — dangling or not, pointing anywhere,
+     * nothing is written through a link; or an output lands in the model root (an `--out` that contains the root).
+     * Null when every output is a plain path outside the root.
      */
-    internal fun real(
-        path: Path,
-        hops: Int = 0,
-    ): Path? {
-        if (hops > MAX_HOPS) return null
-        var existing: Path? = path
-        while (existing != null && !Files.exists(existing, LinkOption.NOFOLLOW_LINKS)) existing = existing.parent
-        existing ?: return path
-        val rest = existing.relativize(path)
-        if (Files.isSymbolicLink(existing) && !Files.exists(existing)) {
-            // A relative target is relative to the link's real directory: through a symlinked parent, `..` is the
-            // OS's, not the lexical one (review-277 F6). An absolute target is kept as it is.
-            val target =
-                existing
-                    .toAbsolutePath()
-                    .parent
-                    .toRealPath()
-                    .resolve(Files.readSymbolicLink(existing))
-            return real(target.resolve(rest).normalize(), hops + 1)
+    private fun refusal(
+        modelRoot: Path,
+        output: Output,
+        paths: Collection<String>,
+    ): String? {
+        val root = modelRoot.toRealPath()
+        if (output.real.startsWith(root)) return "--out must be outside the model root $modelRoot"
+        paths.sorted().forEach { path ->
+            link(output.real, path)?.let { at ->
+                return "--out ${output.given} contains a symbolic link at $at; apply does not write through links"
+            }
         }
-        return existing.toRealPath().resolve(rest)
+        val inside =
+            paths.filter {
+                output.real
+                    .resolve(it)
+                    .normalize()
+                    .startsWith(root)
+            }
+        if (inside.isEmpty()) return null
+        return "--out ${output.given} would write ${inside.joinToString(", ")} into the model root $modelRoot"
     }
 
-    private const val MAX_HOPS = 40
+    /**
+     * The first component of [path] under [real] that is a symbolic link (`lstat`, no link followed), relative to
+     * [real]; null when there is none. A path that leaves [real] lexically is refused as if it were a link.
+     */
+    internal fun link(
+        real: Path,
+        path: String,
+    ): String? {
+        val target = real.resolve(path).normalize()
+        if (!target.startsWith(real)) return path
+        var at = real
+        for (segment in real.relativize(target)) {
+            at = at.resolve(segment)
+            if (Files.isSymbolicLink(at)) return real.relativize(at).joinToString("/")
+            if (!Files.exists(at, LinkOption.NOFOLLOW_LINKS)) return null
+        }
+        return null
+    }
 
     /**
      * The profile commands' report: the load's, plus apply's conflicts and the files only the grouped run dropped. A

@@ -3,6 +3,7 @@ package org.tatrman.ttr.metadata.export
 
 import java.nio.file.Files
 import java.nio.file.Path
+import org.tatrman.ttr.metadata.source.TreeContent
 import java.security.MessageDigest
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
@@ -117,8 +118,12 @@ data class GeneratedHeader(
             while (i < token.length) {
                 val c = token[i]
                 if (c == '%') {
-                    val byte = token.substring(i + 1, minOf(i + 3, token.length)).takeIf { it.length == 2 }
-                    out.write(byte?.toIntOrNull(16) ?: return null)
+                    // Exactly two hex digits: toInt(16) alone would take a sign, `%+9` or `%-1` (review-277 N4 (a)).
+                    val byte =
+                        token.substring(i + 1, minOf(i + 3, token.length)).takeIf { digits ->
+                            digits.length == 2 && digits.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
+                        }
+                    out.write(byte?.toInt(16) ?: return null)
                     i += 3
                 } else {
                     val end = if (Character.isHighSurrogate(c) && i + 1 < token.length) i + 2 else i + 1
@@ -167,7 +172,27 @@ data class GeneratedInputs(
     val generator: String,
     val out: Path,
 ) {
-    private val snapshotSha by lazy { requireNotNull(Hashes.of(snapshot)) { "no snapshot $snapshot" } }
+    /** A snapshot hash the caller already holds (one `profile apply` run hashes its tree once, review-277 F8). */
+    private var known: Lazy<String>? = null
+
+    /**
+     * As above, with the snapshot's hash computed by the caller: `profile apply` shares one tree hash across its
+     * chains. One builder for the `.ttrm` export and the YAML apply headers, so they cannot drift (S3.7 T0, N4 (c)).
+     */
+    internal constructor(
+        snapshot: Path,
+        overlay: Path?,
+        profile: String,
+        generator: String,
+        out: Path,
+        snapshotSha: Lazy<String>,
+    ) : this(snapshot, overlay, profile, generator, out) {
+        known = snapshotSha
+    }
+
+    private val snapshotSha by lazy {
+        known?.value ?: requireNotNull(Hashes.of(snapshot)) { "no snapshot $snapshot" }
+    }
     private val overlaySha by lazy { overlay?.let { requireNotNull(Hashes.of(it)) { "no overlay $it" } } }
 
     /** The header of the bundle file at [file] (relative to [out], `/`-separated). */
@@ -200,20 +225,17 @@ object Hashes {
         }
 
     /**
-     * A tree: SHA-256 over `<relative path>\n<sha256 of its bytes>\n` for every regular file below [root], in bytewise
-     * path order, never entering a hidden directory, `build` or `node_modules` (the sidecar walk's exclusions), nor a
-     * top-level `agents/` (✅MW-44: never read, so an agent edit never makes a generated file stale; review-277 F4).
+     * A tree: SHA-256 over `<relative path>\n<sha256 of its bytes>\n` for every content file below [root] (the loader's
+     * walk, [TreeContent]: no dot-segment, no top-level `agents/` — ✅MW-44, so an agent edit never makes a generated
+     * file stale, review-277 F4), in bytewise path order.
      */
     fun tree(root: Path): String {
         val files =
             Files.walk(root).use { paths ->
                 paths
                     .filter { it.isRegularFile() }
-                    .filter { file ->
-                        val segments = root.relativize(file).map { it.name }
-                        segments.none { it.startsWith(".") || it == "build" || it == "node_modules" } &&
-                            segments.first() != "agents"
-                    }.toList()
+                    .filter { file -> TreeContent.includes(root.relativize(file).map { it.name }) }
+                    .toList()
             }
         val lines =
             files

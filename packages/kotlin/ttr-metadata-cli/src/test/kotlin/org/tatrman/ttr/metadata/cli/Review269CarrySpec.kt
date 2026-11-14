@@ -50,53 +50,8 @@ class Review269CarrySpec :
             return CliOutcome(process.waitFor(), stdout, stderr)
         }
 
-        test("N1: a dangling symlink at an output path is followed: into the root refused, outside written through") {
-            val work = Files.createTempDirectory("r269-n1")
-            copy(links, work.resolve("tree"))
-            work.resolve("out/demo").createDirectories()
-            Files.createSymbolicLink(work.resolve("out/demo/er.yaml"), work.resolve("tree/planted.yaml"))
-            val refused = exec(work, "profile", "apply", "--root", "tree", "--out", "out")
-            refused.exitCode shouldBe 2
-            refused.stderr shouldContain "into the model root"
-            work.resolve("tree/planted.yaml").exists() shouldBe false
-            // A chain of dangling links is followed hop by hop to the same refusal.
-            Files.delete(work.resolve("out/demo/er.yaml"))
-            Files.createSymbolicLink(work.resolve("hop"), work.resolve("tree/planted.yaml"))
-            Files.createSymbolicLink(work.resolve("out/demo/er.yaml"), work.resolve("hop"))
-            exec(work, "profile", "apply", "--root", "tree", "--out", "out").exitCode shouldBe 2
-            work.resolve("tree/planted.yaml").exists() shouldBe false
-            // A dangling link that points outside the root is an ordinary output: written through.
-            Files.delete(work.resolve("out/demo/er.yaml"))
-            val elsewhere = Files.createTempDirectory("r269-n1-elsewhere").resolve("er.yaml")
-            Files.createSymbolicLink(work.resolve("out/demo/er.yaml"), elsewhere)
-            exec(work, "profile", "apply", "--root", "tree", "--out", "out").exitCode shouldBe 0
-            elsewhere.isRegularFile() shouldBe true
-        }
-
-        test("N1 (review-277 F6): a relative dangling link under a symlinked --out resolves from its real directory") {
-            val tmp = Files.createTempDirectory("r277-f6")
-            copy(links, tmp.resolve("repo/model"))
-            tmp.resolve("repo/outside/sub").createDirectories()
-            tmp.resolve("w").createDirectories()
-            Files.createSymbolicLink(tmp.resolve("w/o"), tmp.resolve("repo/outside/sub"))
-            // Lexically w/o/../../model/gen is <tmp>/model/gen; the OS goes through repo/outside/sub to the root.
-            Files.createSymbolicLink(tmp.resolve("repo/outside/sub/report.json"), Path.of("../../model/gen"))
-            val refused = exec(tmp, "profile", "apply", "--root", "repo/model", "--out", "w/o")
-            refused.exitCode shouldBe 2
-            refused.stderr shouldContain "into the model root"
-            tmp.resolve("repo/model/gen").exists() shouldBe false
-        }
-
-        test("N1: a link cycle at an output path is refused, not followed for ever") {
-            val work = Files.createTempDirectory("r269-n1-cycle")
-            copy(links, work.resolve("tree"))
-            work.resolve("out/demo").createDirectories()
-            Files.createSymbolicLink(work.resolve("a"), work.resolve("b"))
-            Files.createSymbolicLink(work.resolve("b"), work.resolve("a"))
-            Files.createSymbolicLink(work.resolve("out/demo/er.yaml"), work.resolve("a"))
-            LintCli.real(work.resolve("out/demo/er.yaml")) shouldBe null
-            exec(work, "profile", "apply", "--root", "tree", "--out", "out").exitCode shouldBe 2
-        }
+        // N1's "a dangling link outside the root is written through" became "refused" under ✅R277-D (S3.7 T0); its
+        // layouts, review-277 F6's and the link cycle live in Review277CarrySpec.
 
         test("N2: a duplicated identity no run names is left out of the catalog with one warning naming both files") {
             val tree = copy(links, Files.createTempDirectory("r269-n2"))
