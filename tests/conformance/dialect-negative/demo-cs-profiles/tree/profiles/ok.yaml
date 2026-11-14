@@ -1,0 +1,6 @@
+profile: demo-ok/1
+grammar: '>=0.22 <1.0'
+operations:
+  - {op: package, mapping: {}, default: demo}
+  - {op: kinds, at: /entity, mapping: {entita: entity}}
+  - {op: values, in: entity, at: /druh, to: {kind: entity, property: description}, mapping: {objednavka: Objednávka}}

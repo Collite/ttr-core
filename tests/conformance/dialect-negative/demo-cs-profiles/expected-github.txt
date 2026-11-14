@@ -1,0 +1,10 @@
+::warning file=profiles/dup-1.yaml,line=1,col=1::ys/profile-duplicate profiles profiles/dup-1.yaml and profiles/dup-2.yaml both declare demo-dup/1; left out of the catalog
+::error file=profiles/cycle-b.yaml,line=3,col=10::ys/profile-cycle Profile cycle through ./cycle-a.yaml
+::error file=cycle.yaml,line=3,col=10::ys/profile-cycle dropped: Profile cycle through ./cycle-a.yaml
+::error file=profiles/invalid.yaml,line=4,col=6::ys/profile-invalid /operations/0/op: does not have a value in the enumeration ["kinds", "package", "rename", "shape", "nest", "unnest", "ignore", "codes", "link", "values"]
+::error file=invalid.yaml,line=4,col=6::ys/profile-invalid dropped: /operations/0/op: does not have a value in the enumeration ["kinds", "package", "rename", "shape", "nest", "unnest", "ignore", "codes", "link", "values"]
+::error file=profiles/old.yaml,line=2,col=10::ys/profile-grammar-mismatch >=0.1 <0.2 excludes running grammar 0.22
+::error file=mismatch.yaml,line=2,col=10::ys/profile-grammar-mismatch dropped: >=0.1 <0.2 excludes running grammar 0.22
+::error file=not-found.yaml,line=1,col=16::ys/profile-not-found Profile not found: ./profiles/missing.yaml
+::error file=canonical-bad.yaml,line=4,col=7::ys/canonical-invalid /defs: number found, array expected
+::error file=unmapped.yaml,line=2,col=7::ys/value-unmapped Unmapped value faktura

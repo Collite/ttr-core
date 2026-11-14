@@ -1,0 +1,4 @@
+profile: demo-invalid/1
+grammar: '>=0.22 <1.0'
+operations:
+  - {op: frobnicate, at: /x}

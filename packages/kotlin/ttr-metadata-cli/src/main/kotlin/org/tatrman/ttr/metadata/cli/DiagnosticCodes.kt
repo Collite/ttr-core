@@ -17,7 +17,7 @@ data class DiagnosticCode(
 }
 
 /**
- * MW S3.5 T5 — the `ys/…` and `xm/…` codes the profile engine, the canonical codec and the `yaml` source raise. This list
+ * MW S3.5 T5 — the `ys/…` and `xm/…` codes the profile engine, the canonical codec, the `yaml` source and the CLI raise. This list
  * is the source of the generated resource `diagnostic-codes.json` (`lint --codes`); a test fails when a code is raised
  * that it lacks, or when the resource drifts from it. Codes reserved for a later stage say so in `raisedBy`.
  */
@@ -61,6 +61,11 @@ object DiagnosticCodes {
                 "ys/value-unmapped",
                 "A selected value (a package key, a value map) has no mapping and no default",
                 "ttr-profile StructuralOps, ValueOps",
+            ),
+            DiagnosticCode(
+                "ys/profile-duplicate",
+                "Two catalogue profiles declare one identity: left out of the catalog (a warning); usage for a run naming it",
+                "ttr-metadata-cli lint, profile check|apply (the catalog read)",
             ),
             DiagnosticCode(
                 "ys/twin-missing",

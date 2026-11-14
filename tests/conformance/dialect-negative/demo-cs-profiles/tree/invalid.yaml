@@ -1,0 +1,3 @@
+ttr: {profile: ./profiles/invalid.yaml, grammar: '>=0.22 <1.0'}
+entity:
+  A: {}

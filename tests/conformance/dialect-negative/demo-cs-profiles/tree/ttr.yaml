@@ -1,0 +1,2 @@
+profile: ./profiles/ok.yaml
+grammar: '>=0.22 <1.0'

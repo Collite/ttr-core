@@ -107,7 +107,8 @@ internal class Target(
                         1,
                         "profile-duplicate",
                         LoadIssue.Severity.WARNING,
-                        "${duplicate(name, paths)}; left out of the catalog",
+                        // A catalogued ys/ code since S3.7 T1 (S3.6 Found (h)): github and the drift scan see it.
+                        "ys/profile-duplicate: ${duplicate(name, paths)}; left out of the catalog",
                         1,
                     )
                 }

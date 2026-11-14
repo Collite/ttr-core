@@ -25,15 +25,19 @@ class DiagnosticCodesSpec :
             DiagnosticCodes.resource() shouldBe DiagnosticCodes.render()
         }
 
-        test("every ys/ and xm/ code the engine, the codec and the yaml source raise is catalogued") {
+        test("every ys/ and xm/ code the engine, the codec, the yaml source and the CLI raise is catalogued") {
             val code = Regex(""""((?:ys|xm)/[a-z0-9-]+)""")
             val raised =
-                listOf("ttr-yaml", "ttr-profile", "ttr-metadata")
+                listOf("ttr-yaml", "ttr-profile", "ttr-metadata", "ttr-metadata-cli")
                     .flatMap { module ->
                         Files.walk(Path.of("../$module/src/main/kotlin")).use { paths ->
                             paths.filter { it.isRegularFile() && it.extension == "kt" }.toList()
                         }
-                    }.flatMap { file -> code.findAll(file.readText()).map { it.groupValues[1] } }
+                    }
+                    // The list itself is not a raise site. `export` is XM's projection surface (its xm/format-* and
+                    // xm/since-unknown are the XM design's), outside this catalogue — S3.7 T1 Found (h).
+                    .filterNot { it.endsWith("DiagnosticCodes.kt") || it.endsWith("ExportCommand.kt") }
+                    .flatMap { file -> code.findAll(file.readText()).map { it.groupValues[1] } }
                     .toSortedSet()
             check(raised.size > 10) { "the source scan found only $raised" }
             (raised - DiagnosticCodes.all.map { it.code }.toSet()).shouldBeEmpty()
@@ -45,7 +49,7 @@ class DiagnosticCodesSpec :
             val entries = Json.parseToJsonElement(out.stdout).jsonArray.map { it.jsonObject }
             entries.map { it.keys }.toSet() shouldBe setOf(setOf("code", "family", "meaning", "raisedBy"))
             entries.map { it.getValue("family").jsonPrimitive.content }.toSet() shouldBe setOf("ys", "xm")
-            // Contracts §5's list, plus the codec's ys/canonical-invalid.
+            // Contracts §5's list, plus the codec's ys/canonical-invalid and the CLI's ys/profile-duplicate (S3.7 T1).
             entries.map { it.getValue("code").jsonPrimitive.content }.toSet() shouldBe
                 setOf(
                     "ys/profile-invalid",
@@ -56,6 +60,7 @@ class DiagnosticCodesSpec :
                     "ys/unknown-kind",
                     "ys/profile-conflict",
                     "ys/value-unmapped",
+                    "ys/profile-duplicate",
                     "ys/twin-missing",
                     "ys/record-id-missing",
                     "ys/canonical-invalid",
