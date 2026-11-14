@@ -2,6 +2,7 @@
 package org.tatrman.ttr.metadata.source
 
 import org.tatrman.ttr.parser.loader.ParseResult
+import org.tatrman.ttr.profile.ApplyResult
 import org.tatrman.ttr.profile.DeclarationReader
 import org.tatrman.ttr.profile.FileHeader
 import org.tatrman.ttr.profile.FileSelector
@@ -115,7 +116,7 @@ internal class YamlTreeReader(
         val issue: LoadWarning,
     ) : RuntimeException(issue.message)
 
-    private class Problems(
+    internal class Problems(
         val sourceId: String,
     ) {
         val errors = mutableListOf<LoadWarning>()
@@ -200,16 +201,41 @@ internal class YamlTreeReader(
         }
     }
 
+    /** The tree as the walk and the declarations see it: canonical files, and dialect files by profile chain. */
+    internal class Plan(
+        val root: Path?,
+        val canonical: List<Pair<StorageFile, String>>,
+        val dialect: List<Pair<List<ProfileDefinition>, List<Pair<StorageFile, String>>>>,
+        val problems: Problems,
+    )
+
     override fun read(
         listed: List<StorageFile>,
         storage: ModelStorage,
         sourceId: String,
     ): ReadFiles {
+        val plan = plan(listed, storage, sourceId)
+        val problems = plan.problems
+        val parsed = plan.canonical.mapNotNull { (file, text) -> canonical(file, text, problems) }.toMutableList()
+        // A dialect chain exists only once a resolver did, and a resolver only over an on-disk root.
+        plan.dialect.forEach { (chain, files) ->
+            parsed +=
+                apply(requireNotNull(plan.root), chain, files, problems)
+        }
+        return ReadFiles(parsed.sortedBy { it.file.path }, problems.errors, dropped = problems.dropped)
+    }
+
+    /** The walk (C-4) and each content file's declaration; files that fail either are dropped into the problems. */
+    internal fun plan(
+        listed: List<StorageFile>,
+        storage: ModelStorage,
+        sourceId: String,
+    ): Plan {
         val problems = Problems(sourceId)
         var declarationFile: StorageFile? = null
         var ignoreFile: StorageFile? = null
         val candidates = mutableListOf<StorageFile>()
-        for (file in listed) {
+        for (file in listed.sortedBy { it.path }) {
             val path = file.underRoot()
             val segments = path.split('/')
             when {
@@ -222,20 +248,20 @@ internal class YamlTreeReader(
             }
         }
         val storageRoot = listed.firstNotNullOfOrNull { it.rootPath }
+        val profiles = Profiles(storageRoot?.toAbsolutePath(), catalog, problems)
         val ignore =
             ignoreFile?.let { modelIgnore(it, storage, problems) }?.getOrElse { e ->
                 // Fail closed (review-260 F4): without the ignore list no file is known to be content.
                 candidates.forEach { problems.drop(it, (e as Recorded).issue) }
-                return ReadFiles(emptyList(), problems.errors, dropped = problems.dropped)
+                return Plan(profiles.root, emptyList(), emptyList(), problems)
             }
         val content = candidates.filter { ignore?.matches(it.underRoot()) != true }
-        val profiles = Profiles(storageRoot?.toAbsolutePath(), catalog, problems)
         // Resolved on the first file that falls back to it, so a tree without such a file raises nothing (RR1-1).
         val tree by lazy {
             val name = declarationFile?.path ?: storageRoot?.resolve("ttr.yaml")?.toString() ?: "ttr.yaml"
             treeDeclaration(declarationFile, name, storage, profiles, problems)
         }
-        val parsed = mutableListOf<ParsedFile>()
+        val canonical = mutableListOf<Pair<StorageFile, String>>()
         val dialect = linkedMapOf<List<String>, Pair<List<ProfileDefinition>, MutableList<Pair<StorageFile, String>>>>()
         for (file in content) {
             val text = storage.read(file)
@@ -256,17 +282,12 @@ internal class YamlTreeReader(
                     continue
                 }
             if (chain == null || chain.all { it.operations.isEmpty() && it.overlay == null }) {
-                canonical(file, text, problems)?.let { parsed += it }
+                canonical += file to text
             } else {
                 dialect.getOrPut(chain.map { it.file }) { chain to mutableListOf() }.second += file to text
             }
         }
-        // A dialect chain exists only once a resolver did, and a resolver only over an on-disk root.
-        dialect.values.forEach { (chain, files) ->
-            parsed +=
-                apply(requireNotNull(profiles.root), chain, files, problems)
-        }
-        return ReadFiles(parsed.sortedBy { it.file.path }, problems.errors, dropped = problems.dropped)
+        return Plan(profiles.root, canonical, dialect.values.toList(), problems)
     }
 
     private fun modelIgnore(
@@ -318,7 +339,7 @@ internal class YamlTreeReader(
         }
     }
 
-    private fun canonical(
+    internal fun canonical(
         file: StorageFile,
         text: String,
         problems: Problems,
@@ -332,14 +353,16 @@ internal class YamlTreeReader(
 
     /**
      * One run per profile chain, so links resolve across its files. A profile error naming one of them drops it and
-     * the run repeats without it; one naming anything else (the profile, an overlay, a sidecar) drops them all.
+     * the run repeats without it; one naming anything else (the profile, an overlay, a sidecar) drops them all. Null
+     * when no file survives; else the result and the files it kept.
      */
-    private fun apply(
+    internal fun run(
         root: Path,
         chain: List<ProfileDefinition>,
         files: List<Pair<StorageFile, String>>,
         problems: Problems,
-    ): List<ParsedFile> {
+        perFile: Boolean,
+    ): Pair<ApplyResult, List<Pair<StorageFile, ForeignTree>>>? {
         val trees = linkedMapOf<String, Pair<StorageFile, ForeignTree>>()
         for ((file, text) in files) {
             try {
@@ -351,7 +374,7 @@ internal class YamlTreeReader(
         while (trees.isNotEmpty()) {
             val result =
                 try {
-                    ProfileEngine.apply(trees.values.map { it.second }, chain, root, perFile = true)
+                    ProfileEngine.apply(trees.values.map { it.second }, chain, root, perFile)
                 } catch (e: ProfileException) {
                     val issue = problems.profile(e)
                     // Spans name a tree by its label (the storage path); the root-relative name is a second guard,
@@ -369,19 +392,29 @@ internal class YamlTreeReader(
                     }
                     continue
                 }
-            val byFile = trees.values.associate { (file, tree) -> tree.file to file }
-            return result.documents.groupBy { requireNotNull(it.file) }.flatMap { (relative, documents) ->
-                val file = byFile.getValue(relative)
-                documents.mapIndexed { i, document ->
-                    val ast = document.canonical.ast
-                    // Downstream keys a document by its path (symbol table, reference pass), so a file's second model
-                    // takes `<path>#<model>`; each keeps its own directive, so every qname is the canonical twin's.
-                    val path = if (i == 0) file.path else "${file.path}#${ast.modelDirective?.modelCode ?: i}"
-                    ParsedFile(file.copy(path = path), ast)
-                }
+            return result to trees.values.toList()
+        }
+        return null
+    }
+
+    private fun apply(
+        root: Path,
+        chain: List<ProfileDefinition>,
+        files: List<Pair<StorageFile, String>>,
+        problems: Problems,
+    ): List<ParsedFile> {
+        val (result, kept) = run(root, chain, files, problems, perFile = true) ?: return emptyList()
+        val byFile = kept.associate { (file, tree) -> tree.file to file }
+        return result.documents.groupBy { requireNotNull(it.file) }.flatMap { (relative, documents) ->
+            val file = byFile.getValue(relative)
+            documents.mapIndexed { i, document ->
+                val ast = document.canonical.ast
+                // Downstream keys a document by its path (symbol table, reference pass), so a file's second model
+                // takes `<path>#<model>`; each keeps its own directive, so every qname is the canonical twin's.
+                val path = if (i == 0) file.path else "${file.path}#${ast.modelDirective?.modelCode ?: i}"
+                ParsedFile(file.copy(path = path), ast)
             }
         }
-        return emptyList()
     }
 
     /**
