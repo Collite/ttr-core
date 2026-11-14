@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.profile
 
+import org.tatrman.ttr.yaml.MAX_YAML_CODE_POINTS
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -99,7 +100,7 @@ class ProfileReview225Spec :
             val source =
                 buildString {
                     append("entity:\n")
-                    repeat(70_000) { append("  E$it: {}\n") }
+                    repeat(140_000) { append("  E$it: {}\n") }
                 }
             failure(
                 source,
@@ -107,7 +108,7 @@ class ProfileReview225Spec :
                 "ys/profile-invalid",
                 2,
                 7,
-                "Canonical document demo/er exceeds 3000000 code points",
+                "Canonical document demo/er exceeds $MAX_YAML_CODE_POINTS code points",
             )
         }
         test("canonical identities use semantics concept kind while retaining package and model separation") {

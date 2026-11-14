@@ -13,7 +13,7 @@ class CanonicalYamlSafetySpec :
         val header = "ttr: '0.22'\nmodel: er\ndefs:\n"
         val properties = header + "  - kind: kind\n    id: Order\n    properties:\n"
         val mergeMessage = "Mapping keys must be strings; merge keys are not supported"
-        val budgetMessage = "The incoming YAML document exceeds the limit: 3000000 code points."
+        val budgetMessage = "The incoming YAML document exceeds the limit: 6000000 code points."
 
         listOf("<<", "!!merge \"<<\"", "\"<<\"").forEach { key ->
             test("block merge key $key is refused before composition with P2 wording") {

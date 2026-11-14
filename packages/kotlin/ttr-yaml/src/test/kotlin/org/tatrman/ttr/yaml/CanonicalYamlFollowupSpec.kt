@@ -105,8 +105,8 @@ class CanonicalYamlFollowupSpec :
                 elapsed[1] shouldBeLessThan 1_000_000_000L
             }
         }
-        test("R204 the three-million-code-point YAML limit remains enforced") {
-            val source = yaml("a: \"" + "x".repeat(3_000_001) + "\"", "automation", "program")
+        test("R204 the code-point YAML limit remains enforced (6 000 000 since ✅D-MW-75)") {
+            val source = yaml("a: \"" + "x".repeat(MAX_YAML_CODE_POINTS + 1) + "\"", "automation", "program")
             val error = shouldThrow<CanonicalYamlException> { CanonicalYaml.read(source, "limit.yaml") }
             error.file shouldBe "limit.yaml"
             error.detail shouldContain "limit"

@@ -7,6 +7,7 @@ import org.tatrman.ttr.parser.model.SourceLocation
 import org.tatrman.ttr.yaml.BlockSpan
 import org.tatrman.ttr.yaml.CanonicalYaml
 import org.tatrman.ttr.yaml.CanonicalYamlException
+import org.tatrman.ttr.yaml.MAX_YAML_CODE_POINTS
 import org.tatrman.ttr.yaml.Relocation
 import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
@@ -436,11 +437,11 @@ internal class CanonicalBuilder(
                         }
                     }
                 }
-            if (json.codePointCount(0, json.length) > 3_000_000) {
+            if (json.codePointCount(0, json.length) > MAX_YAML_CODE_POINTS) {
                 throw ProfileException(
                     "ys/profile-invalid",
                     records.first().source.span(),
-                    "Canonical document ${group.pkg}/${group.model} exceeds 3000000 code points",
+                    "Canonical document ${group.pkg}/${group.model} exceeds $MAX_YAML_CODE_POINTS code points",
                 )
             }
             val tree = records.first().source.tree

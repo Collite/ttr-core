@@ -32,8 +32,8 @@ class SnapshotCommandSpec :
             records: Int,
             padding: Int = 0,
         ): Path {
-            // A large export stays inside the reader's budget (P2: 3 000 000 code points) while its bytes pass the
-            // 5 MiB guard: each description is lengthened by three-byte characters (U+2026).
+            // A large export passes the 5 MiB guard in bytes with few code points: each description is lengthened by
+            // three-byte characters (U+2026).
             val pad = if (padding == 0) "" else " " + "\u2026".repeat(padding)
             val work = Files.createTempDirectory("s36-snapshot")
             work.resolve("profiles").createDirectories()
@@ -119,6 +119,16 @@ class SnapshotCommandSpec :
             (text.toByteArray().size > 5 * 1024 * 1024) shouldBe true
             // The grep test: no principal name survives, nor the ignored note or a counter.
             (people + listOf("interní", "usageCount", "lastAccessed")).forEach { (it in text) shouldBe false }
+        }
+
+        test("an export over P2's 3 000 000 code points is read and captured: the §1 budget is 6 000 000 (✅D-MW-75)") {
+            val work = work(1)
+            val long = "x".repeat(3_200_000)
+            work.resolve("long.json").writeText("{\"entity\": {\"T\": {\"popis\": \"$long\"}}}\n")
+            work.resolve("long.json").readText().let { it.codePointCount(0, it.length) > 3_000_000 } shouldBe true
+            val out = exec(work, "snapshot", "--from", "file:long.json", "--profile", "cap/1", "--out", "s")
+            out.exitCode shouldBe 0
+            work.resolve("s/long.yaml").readText() shouldBe "entity:\n  T:\n    popis: $long\n"
         }
 
         test("<out>/.gitattributes marks the snapshot directory generated wherever --out is, once (✅R277-B)") {
