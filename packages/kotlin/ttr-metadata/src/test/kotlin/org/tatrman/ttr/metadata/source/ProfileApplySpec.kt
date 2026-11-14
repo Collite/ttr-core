@@ -147,4 +147,42 @@ class ProfileApplySpec :
                 apply(tree).files shouldBe apply(tree).files
             }
         }
+        test("a profile session reads each file once for its load and its apply, with the separate runs' results") {
+            listOf("demo-cs", "demo-cs-links").forEach { case ->
+                val tree = dialect.resolve("$case/tree")
+                val reads = mutableMapOf<String, Int>()
+                val inner = LocalFsStorage("t", tree)
+                val counting =
+                    object : ModelStorage by inner {
+                        override fun read(file: StorageFile): String {
+                            reads.merge(file.path, 1, Int::plus)
+                            return inner.read(file)
+                        }
+                    }
+                val session = ProfileSession(counting, null, emptyMap(), "t")
+                val loaded = MetadataLoader(listOf(session.source())).load(LoadOptions(strict = true))
+                val applied = session.apply()
+                withClue(case) {
+                    reads.filterValues { it > 1 } shouldBe emptyMap()
+                    val separate =
+                        MetadataLoader(
+                            listOf(SourceKind.YAML.source("t", 100, inner)),
+                        ).load(LoadOptions(strict = true))
+                    loaded.report shouldBe separate.report
+                    applied.files shouldBe ProfileApply.run(inner, sourceId = "t").files
+                    applied.problems shouldBe ProfileApply.run(inner, sourceId = "t").problems
+                }
+            }
+        }
+        test("every run over a session's plan starts from the plan's own problems, never another run's") {
+            val negative = Path.of("../../../tests/conformance/dialect-negative/demo-cs/tree")
+            val session = ProfileSession(LocalFsStorage("t", negative), null, emptyMap(), "t")
+            val separate = ProfileApply.run(LocalFsStorage("t", negative), sourceId = "t")
+            (separate.problems + separate.planned).isNotEmpty() shouldBe true
+            repeat(3) {
+                val again = session.apply()
+                again.planned shouldBe separate.planned
+                again.problems shouldBe separate.problems
+            }
+        }
     })

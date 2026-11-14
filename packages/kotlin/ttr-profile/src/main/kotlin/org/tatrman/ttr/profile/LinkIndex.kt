@@ -172,6 +172,54 @@ internal object SourcesJsonReader {
 }
 
 /**
+ * MW S3.6 T4 — writes `<package>.sources.json` (contracts §6): `{"generated-from": <header text>, "entries": [{qname,
+ * kind, foreignId, sourceName, locator}]}`, entries in bytewise qname order (then kind), no timestamps; an absent
+ * value is left out. [SourcesJsonReader] reads back exactly the entries written. A bare-DB import names its
+ * tables and columns by `sourceName` only ([sourceNameOnly]).
+ */
+object SourcesJsonWriter {
+    fun write(
+        generatedFrom: String?,
+        entries: List<SourceEntry>,
+        sourceNameOnly: Boolean = false,
+    ): String {
+        val sorted =
+            entries
+                .distinct()
+                .sortedWith(compareBy<SourceEntry, String>(Bytewise) { it.qname }.thenBy(Bytewise) { it.kind })
+        val lines =
+            sorted.map { entry ->
+                buildJsonObject {
+                    put("qname", entry.qname)
+                    put("kind", entry.kind)
+                    if (!sourceNameOnly) entry.foreignId?.let { put("foreignId", it) }
+                    entry.sourceName?.let { put("sourceName", it) }
+                    if (!sourceNameOnly) entry.locator?.let { put("locator", it) }
+                }.toString()
+            }
+        val head = generatedFrom?.let { "  \"generated-from\": ${JsonPrimitive(it)},\n" }.orEmpty()
+        val body = if (lines.isEmpty()) "[]" else lines.joinToString(",\n", "[\n", "\n  ]") { "    $it" }
+        return "{\n$head  \"entries\": $body\n}\n"
+    }
+
+    /** Bytewise (UTF-8) order, as the exporter sorts qnames. */
+    private object Bytewise : Comparator<String> {
+        override fun compare(
+            a: String,
+            b: String,
+        ): Int {
+            val x = a.toByteArray(Charsets.UTF_8)
+            val y = b.toByteArray(Charsets.UTF_8)
+            for (i in 0 until minOf(x.size, y.size)) {
+                val c = (x[i].toInt() and 0xff) - (y[i].toInt() and 0xff)
+                if (c != 0) return c
+            }
+            return x.size - y.size
+        }
+    }
+}
+
+/**
  * Every record of the run plus the root's sidecars; S3.6 writes the sidecar from the same entries. The sidecar part is
  * read on the first [resolve] only (✅R251-C): a run with no `link` and no sourceName overlay key never walks the root.
  */
@@ -200,6 +248,10 @@ internal class LinkIndex(
             .orEmpty()
             .filter { kind == null || it.kind == kind }
             .distinctBy { it.qname }
+
+    /** The run's records as sidecar entries; never reads the sidecars (MW S3.6 T4). */
+    fun sources(): List<SourceEntry> =
+        run.map { SourceEntry(it.qname, it.kind, it.pkg, it.iri, it.sourceName, it.path) }
 
     /** The run records with this qname; never reads the sidecars. */
     fun qname(value: String): List<LinkEntry> = byQname[value].orEmpty()

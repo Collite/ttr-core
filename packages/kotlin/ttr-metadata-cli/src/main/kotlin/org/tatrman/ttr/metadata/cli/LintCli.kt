@@ -5,10 +5,13 @@ import org.tatrman.ttr.metadata.LoadIssue
 import org.tatrman.ttr.metadata.LoadReport
 import org.tatrman.ttr.metadata.LoadReportIssue
 import org.tatrman.ttr.metadata.PackageLayout
+import org.tatrman.ttr.metadata.source.GeneratedGuard
+import org.tatrman.ttr.metadata.source.HeaderOptions
 import org.tatrman.ttr.metadata.source.LoadWarning
 import org.tatrman.ttr.metadata.source.LocalFsStorage
-import org.tatrman.ttr.metadata.source.ProfileApply
 import org.tatrman.ttr.metadata.source.ProfileApplyResult
+import org.tatrman.ttr.metadata.source.ProfileCatalog
+import org.tatrman.ttr.metadata.source.ProfileSession
 import org.tatrman.ttr.metadata.source.SourceKind
 import org.tatrman.ttr.metadata.source.YamlFileSource
 import java.nio.file.Files
@@ -17,7 +20,6 @@ import java.nio.file.Path
 import kotlin.io.path.extension
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
-import kotlin.io.path.readText
 
 /** `lint`'s output formats (contracts §5). */
 enum class LintFormat { TEXT, JSON, GITHUB }
@@ -92,7 +94,7 @@ internal class Target(
                 val layout = if (checkout) manifestLayout else PackageLayout.Flexible
                 return Resolved.Ok(Target(project, modelRoot, SourceKind.TTR, layout, issues, null, emptyMap()))
             }
-            val read = catalog(modelRoot)
+            val read = ProfileCatalog.read(modelRoot)
             // review-269 N2: a duplicated identity is a usage error only for the run that names it; otherwise it is
             // left out of the catalog with one warning, and a lookup of it fails where it is made.
             profile?.let { name -> read.duplicates[name]?.let { return Resolved.Usage(duplicate(name, it)) } }
@@ -162,33 +164,6 @@ internal class Target(
             name: String,
             paths: List<Path>,
         ) = "profiles ${paths.joinToString(" and ") { it.joinToString("/") }} both declare $name"
-
-        /** The catalog's unique identities, and each identity two or more files declare (root-relative, sorted). */
-        private class Catalog(
-            val entries: Map<String, Path>,
-            val duplicates: Map<String, List<Path>>,
-        )
-
-        /** `<root>/profiles/<file>.yaml` by the identity it declares (`profile: <name>/<major>`); unreadable files skip. */
-        private fun catalog(root: Path): Catalog {
-            val directory = root.resolve("profiles")
-            if (!Files.isDirectory(directory)) return Catalog(emptyMap(), emptyMap())
-            val identity = Regex("""^profile:\s*['"]?([^'"\s#]+)""", RegexOption.MULTILINE)
-            val declared =
-                files(directory)
-                    .filter { it.extension == "yaml" || it.extension == "yml" }
-                    .sorted()
-                    .mapNotNull { file ->
-                        runCatching { identity.find(file.readText())?.groupValues?.get(1) }.getOrNull()?.let {
-                            it to root.relativize(file)
-                        }
-                    }.groupBy({ it.first }, { it.second })
-            val (unique, duplicated) = declared.entries.partition { it.value.size == 1 }
-            return Catalog(
-                unique.associate { it.key to it.value.single() },
-                duplicated.associate { it.key to it.value },
-            )
-        }
     }
 }
 
@@ -213,7 +188,8 @@ object LintCli {
             is Resolved.NoModel -> outcome(resolved.project, resolved.report, failed = true, format)
             is Resolved.Ok -> {
                 val target = resolved.target
-                val (result, report) = MetadataLoadCli.load(target.source(), target.layout, target.manifestIssues)
+                val (result, loaded) = MetadataLoadCli.load(target.source(), target.layout, target.manifestIssues)
+                val report = guarded(target, loaded)
                 outcome(target.project, report, result.model == null || (strict && !report.ok), format)
             }
         }
@@ -247,14 +223,16 @@ object LintCli {
         if (target.kind != SourceKind.YAML) {
             return usage("profile commands need a yaml tree; ${target.modelRoot} holds .ttrm")
         }
-        val (result, loaded) = MetadataLoadCli.load(target.source(), target.layout, target.manifestIssues)
-        val applied =
-            ProfileApply.run(
+        // One pass over the tree for both (S3.6): the load and the apply run share the session's plan.
+        val session =
+            ProfileSession(
                 LocalFsStorage(MetadataLoadCli.CHECKOUT_SOURCE, target.modelRoot),
                 target.profile,
                 target.catalog,
                 MetadataLoadCli.CHECKOUT_SOURCE,
             )
+        val (result, loaded) = MetadataLoadCli.load(session.source(), target.layout, target.manifestIssues)
+        val applied = session.apply(out?.let { HeaderOptions(it.toAbsolutePath().normalize(), MetadataVersion.value) })
         val directory = out?.toAbsolutePath()?.normalize()
         if (directory != null) refusal(target.modelRoot, directory, applied.files.keys)?.let { return usage(it) }
         val report = merge(loaded, applied)
@@ -324,6 +302,33 @@ object LintCli {
         val known = loaded.issues.map { it.file to it.message }.toSet()
         val extra = applied.problems.filter { (it.file to it.message) !in known } + applied.conflicts
         return loaded.copy(issues = loaded.issues + extra.map(::error))
+    }
+
+    /**
+     * [loaded] plus the generated-file guard over the model root (S3.6 T3): `xm/generated-stale` and
+     * `xm/generated-edited` on a file whose header no longer matches its inputs, as errors. A tree without generated
+     * files is reported exactly as `load` reports it.
+     */
+    private fun guarded(
+        target: Target,
+        loaded: LoadReport,
+    ): LoadReport {
+        val guard = GeneratedGuard.check(target.modelRoot, MetadataLoadCli.CHECKOUT_SOURCE)
+        if (guard.isEmpty()) return loaded
+        return loaded.copy(
+            issues =
+                loaded.issues +
+                    guard.map {
+                        LoadReportIssue(
+                            it.file,
+                            it.line,
+                            "generated-file",
+                            LoadIssue.Severity.ERROR,
+                            it.message,
+                            it.column,
+                        )
+                    },
+        )
     }
 
     /** The diagnostic-code catalogue (`lint --codes`). */

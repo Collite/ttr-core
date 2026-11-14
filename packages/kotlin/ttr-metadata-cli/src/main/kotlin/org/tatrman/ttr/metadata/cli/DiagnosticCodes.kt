@@ -94,11 +94,19 @@ object DiagnosticCodes {
             ),
             DiagnosticCode(
                 "xm/generated-stale",
-                "A generated file is older than its source",
-                "reserved for MW-P3 S3.6",
+                "An input a generated file's header names changed since generation, or is not found",
+                "ttr-metadata GeneratedGuard (lint)",
             ),
-            DiagnosticCode("xm/generated-edited", "A generated file was edited by hand", "reserved for MW-P3 S3.6"),
-            DiagnosticCode("xm/snapshot-size", "A snapshot exceeds its size limit", "reserved for MW-P3 S3.6"),
+            DiagnosticCode(
+                "xm/generated-edited",
+                "A generated file's body differs from a fresh generation of its inputs, or its header is malformed",
+                "ttr-metadata GeneratedGuard (lint)",
+            ),
+            DiagnosticCode(
+                "xm/snapshot-size",
+                "A captured snapshot exceeds 5 MiB and --large was not given",
+                "ttr-metadata SnapshotCapture (snapshot)",
+            ),
         )
 
     /** The resource's text: deterministic, one entry per line. */

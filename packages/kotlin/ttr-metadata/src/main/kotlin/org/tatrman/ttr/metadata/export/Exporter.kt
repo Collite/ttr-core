@@ -16,6 +16,8 @@ data class ExportRequest(
     val previousIds: Set<String>? = null,
     val renames: List<Rename> = emptyList(),
     val connections: List<ConnectionDescriptor> = emptyList(),
+    /** MW S3.6 T2: with a header, each `ttr` file is a generated file and starts with the header's `//` line. */
+    val generatedHeader: GeneratedHeader? = null,
 )
 
 sealed interface ExportResult {
@@ -127,17 +129,19 @@ class Exporter {
                             .Single(
                                 file,
                                 "text/plain; charset=utf-8",
-                                TtrRenderer
-                                    .renderFile(
-                                        layer,
-                                        first.fileNamespace,
-                                        defs.map {
-                                            it.def
-                                        },
-                                        first.pkg.takeIf { it.isNotEmpty() },
-                                        first.imports,
-                                        first.locale,
-                                    ).toByteArray(Charsets.UTF_8),
+                                (
+                                    request.generatedHeader?.line(GeneratedHeader.Form.TTRM).orEmpty() +
+                                        TtrRenderer.renderFile(
+                                            layer,
+                                            first.fileNamespace,
+                                            defs.map {
+                                                it.def
+                                            },
+                                            first.pkg.takeIf { it.isNotEmpty() },
+                                            first.imports,
+                                            first.locale,
+                                        )
+                                ).toByteArray(Charsets.UTF_8),
                             )
                     }
                 ExportResult.Bundle(files)

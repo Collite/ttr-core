@@ -1,0 +1,7 @@
+{
+  "generated-from": "generated-from: ../tree@7d811807497a7c9819818e56ccf9e46208c5f5f9d0b6fea1b6c6b82e61e06834 overlay ../tree/profiles/overlay-inline.yaml@e753bd1e2e53efc6591f374e942022e6f1fcb1af8d18b4c1a184fe640e79732b profile demo-overlay-inline/1 generator 0.0.1-LOCAL — do not edit",
+  "entries": [
+    {"qname":"prodej.er.entity.Zakaznik","kind":"entity","sourceName":"Zakaznik","locator":"Zakaznik"},
+    {"qname":"prodej.er.entity.Zakaznik.kod","kind":"attribute","sourceName":"kod","locator":"Zakaznik/kod"}
+  ]
+}

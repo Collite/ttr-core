@@ -186,6 +186,6 @@ internal object StructuralExecutor {
             plan.consumption.check(plan.tree.root)
         }
         val overridden = OverlayApplier.apply(overlay, index, builder, root)
-        return ApplyResult(builder.documents(), ignored.distinct(), ApplyReport(codes, overridden))
+        return ApplyResult(builder.documents(), ignored.distinct(), ApplyReport(codes, overridden), index.sources())
     }
 }

@@ -1,0 +1,7 @@
+profile: demo-overlay-inline/1
+grammar: '>=0.22 <1.0'
+extends: ./values.yaml
+overlay:
+  demo.er.entity.Objednavka: {description: Objednávka (overlay)}
+  Zakaznik: {description: {cs: Zákazník (overlay), en: Customer}}
+operations: []

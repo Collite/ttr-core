@@ -67,12 +67,15 @@ class LintCommandSpec :
             val written = files(first)
             written.keys shouldBe appliedLinks
             written shouldBe files(second)
-            Json
-                .parseToJsonElement(
-                    written.getValue("demo.sources.json"),
-                ).jsonObject["entries"]!!
-                .jsonArray.size shouldBe
-                0
+            // S3.6 T4 fills the sidecar: the run's records in qname order, under the generated-from header.
+            val sidecar = Json.parseToJsonElement(written.getValue("demo.sources.json")).jsonObject
+            sidecar.keys shouldBe setOf("generated-from", "entries")
+            sidecar["entries"]!!.jsonArray.map { (it.jsonObject["qname"] as JsonPrimitive).content } shouldBe
+                listOf(
+                    "demo.binding.er2db_attribute.ZakaznikKod",
+                    "demo.er.entity.Objednavka",
+                    "demo.er.relation.ObjednavkaZakaznika",
+                )
             val report = Json.parseToJsonElement(written.getValue("report.json")).jsonObject
             report.keys shouldBe setOf("documents", "ignored", "overridden")
             report["documents"]!!.jsonArray.map { (it as JsonObject)["model"].toString() } shouldBe

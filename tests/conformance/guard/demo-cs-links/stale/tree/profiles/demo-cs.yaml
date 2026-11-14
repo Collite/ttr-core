@@ -1,0 +1,8 @@
+profile: demo-cs/1
+grammar: '>=0.22 <1.0'
+extends: ./middle.yaml
+operations:
+  - {op: rename, in: er2db_entity, at: /entita, to: {kind: er2db_entity, property: entity}}
+  - {op: rename, in: er2db_entity, at: /cil, to: {kind: er2db_entity, property: target}}
+  - {op: rename, in: entity, at: /popis2, to: {kind: entity, property: description}}
+  - {op: codes, mapping: {E_SAME: ys/value-unmapped}}

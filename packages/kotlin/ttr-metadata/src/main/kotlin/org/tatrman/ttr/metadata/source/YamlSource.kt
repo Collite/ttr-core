@@ -68,6 +68,18 @@ class YamlFileSource(
     private val layouts: Boolean = false,
     private val allMdHopIssues: Boolean = false,
 ) : ModelSource {
+    /** A [ProfileSession]'s reader, shared with its apply run; null builds a fresh one per load. */
+    private var shared: YamlTreeReader? = null
+
+    internal constructor(
+        sourceId: String,
+        priority: Int,
+        storage: ModelStorage,
+        reader: YamlTreeReader,
+    ) : this(sourceId, priority, storage) {
+        shared = reader
+    }
+
     override fun load(): SourceSnapshot =
         FileBasedSource(
             sourceId,
@@ -75,7 +87,7 @@ class YamlFileSource(
             storage,
             layouts,
             allMdHopIssues,
-            YamlTreeReader(profile, catalog),
+            shared ?: YamlTreeReader(profile, catalog),
         ).load()
 
     companion object {
@@ -133,6 +145,13 @@ internal class YamlTreeReader(
             column: Int,
             message: String,
         ) = LoadWarning(sourceId, file, line, column, message).also { errors += it }
+
+        /** Another run's own record of the same plan: what the plan raised, and nothing a run added. */
+        fun copy() =
+            Problems(sourceId).also {
+                it.errors += errors
+                it.dropped += dropped
+            }
 
         /** The issue names where the problem is; the dropped entry names the dialect file it removes. */
         fun drop(
@@ -215,7 +234,7 @@ internal class YamlTreeReader(
     }
 
     /** The tree as the walk and the declarations see it: canonical files, and dialect files by profile chain. */
-    internal class Plan(
+    internal data class Plan(
         val root: Path?,
         val canonical: List<Pair<StorageFile, String>>,
         val dialect: List<Pair<List<ProfileDefinition>, List<Pair<StorageFile, String>>>>,
@@ -240,6 +259,25 @@ internal class YamlTreeReader(
 
     /** The walk (C-4) and each content file's declaration; files that fail either are dropped into the problems. */
     internal fun plan(
+        listed: List<StorageFile>,
+        storage: ModelStorage,
+        sourceId: String,
+    ): Plan {
+        // One reader serves a profile command's load and its apply run (S3.6, from S3.5 review-269 F8): the walk, the
+        // reads and the declarations are planned once per listing; each run records its own problems on a copy.
+        // The loader lists `.ttrm` too; the key holds only what the plan reads, so its listing and apply's agree.
+        val planned = listed.filter { file -> (listOf("yaml") + extensions).any { file.path.endsWith(".$it") } }
+        val key = Triple(storage, sourceId, planned.sortedBy { it.path }.map { it.path to it.sizeBytes })
+        memo?.takeIf { it.first == key }?.second?.let { return it.copy(problems = it.problems.copy()) }
+        return planned(listed, storage, sourceId).also { memo = key to it.copy(problems = it.problems.copy()) }
+    }
+
+    private var memo: Pair<Triple<ModelStorage, String, List<Pair<String, Long>>>, Plan>? = null
+
+    /** Parsed dialect files by storage path, for every run over one plan: a [ForeignTree] is immutable. */
+    private val trees = mutableMapOf<String, Result<ForeignTree>>()
+
+    private fun planned(
         listed: List<StorageFile>,
         storage: ModelStorage,
         sourceId: String,
@@ -386,11 +424,16 @@ internal class YamlTreeReader(
     ): Pair<ApplyResult, List<Pair<StorageFile, ForeignTree>>>? {
         val trees = linkedMapOf<String, Pair<StorageFile, ForeignTree>>()
         for ((file, text) in files) {
-            try {
-                trees[file.path] = file to ForeignTree.read(text, file.underRoot(), file.path)
-            } catch (e: ProfileException) {
-                problems.drop(file, problems.profile(e))
-            }
+            val tree =
+                this.trees.getOrPut("${file.path}\u0000${text.hashCode()}") {
+                    runCatching { ForeignTree.read(text, file.underRoot(), file.path) }
+                }
+            tree
+                .onSuccess { trees[file.path] = file to it }
+                .onFailure { e ->
+                    if (e !is ProfileException) throw e
+                    problems.drop(file, problems.profile(e))
+                }
         }
         while (trees.isNotEmpty()) {
             val result =
