@@ -78,13 +78,7 @@ class ProfileResolver(
             at: ProfileSpan,
             depth: Int,
         ) {
-            val bundled =
-                ref == "canonical" ||
-                    (
-                        versionedReference.matches(ref) &&
-                            ref.substringBeforeLast('/') == "canonical" &&
-                            ref.substringAfterLast('/').toBigInteger() == java.math.BigInteger.ONE
-                    )
+            val bundled = isBundled(ref)
             val path = if (bundled) null else confined(ref, from, at)
             if (path != null && !visiting.add(path)) {
                 throw ProfileException("ys/profile-cycle", at, "Profile cycle through $ref")
@@ -158,6 +152,33 @@ class ProfileResolver(
 
     companion object {
         private val versionedReference = Regex("^.+/[0-9]+$")
+
+        /** `canonical` and `canonical/1` name the bundled identity profile, whatever a catalog says. */
+        fun isBundled(reference: String): Boolean =
+            reference == "canonical" ||
+                (
+                    versionedReference.matches(reference) &&
+                        reference.substringBeforeLast('/') == "canonical" &&
+                        reference.substringAfterLast('/').toBigInteger() == java.math.BigInteger.ONE
+                )
+
+        /**
+         * The chain of a declaration naming the bundled identity, with its grammar range checked as [resolve] does;
+         * null for any other profile. The identity needs no root and reads no file (re-review RR1-1).
+         */
+        fun bundled(declaration: ProfileDeclaration): List<ProfileDefinition>? {
+            if (!isBundled(declaration.profile)) return null
+            checkRange(declaration.grammarRange, declaration.grammarLocation)
+            return bundled(declaration.profile)
+        }
+
+        /** The chain of a bundled [reference] (the identity), as [resolve] would give it; null for any other. */
+        fun bundled(reference: String): List<ProfileDefinition>? {
+            if (!isBundled(reference)) return null
+            checkRange(canonicalProfile.grammarRange, canonicalProfile.locations.getValue("/grammar"))
+            return listOf(canonicalProfile)
+        }
+
         private val canonicalProfile: ProfileDefinition by lazy {
             ProfileReader.read(
                 requireNotNull(ProfileResolver::class.java.getResourceAsStream("/profiles/canonical.yaml")) {
@@ -167,17 +188,17 @@ class ProfileResolver(
             )
         }
     }
+}
 
-    private fun checkRange(
-        range: GrammarRange,
-        at: ProfileSpan,
-    ) {
-        if (!range.admits()) {
-            throw ProfileException(
-                "ys/profile-grammar-mismatch",
-                at,
-                "${range.text} excludes running grammar ${GrammarRange.runningGrammar}",
-            )
-        }
+private fun checkRange(
+    range: GrammarRange,
+    at: ProfileSpan,
+) {
+    if (!range.admits()) {
+        throw ProfileException(
+            "ys/profile-grammar-mismatch",
+            at,
+            "${range.text} excludes running grammar ${GrammarRange.runningGrammar}",
+        )
     }
 }

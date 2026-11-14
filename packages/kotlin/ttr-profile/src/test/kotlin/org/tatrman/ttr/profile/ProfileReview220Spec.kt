@@ -30,7 +30,9 @@ class ProfileReview220Spec :
             val tree = DeclarationReader.readTree("profile: demo-cs/1\ngrammar: '>=0.18'\n")
             val sugar = Path.of("../../../tests/conformance/yaml-migration/pl-sugar.yaml").readText()
             DeclarationReader.readFile(sugar, "pl-sugar.yaml") shouldBe null
-            DeclarationReader.select(sugar, "pl-sugar.yaml", tree) shouldBe tree
+            // §4 (c), S3.5 T0: its canonical version header makes it canonical, so the tree's profile never applies.
+            DeclarationReader.header(sugar, "pl-sugar.yaml") shouldBe FileHeader.Canonical("0.22")
+            DeclarationReader.select(sugar, "pl-sugar.yaml", tree) shouldBe null
         }
 
         test("header tag scope permits model sugar with a header and refuses sugar in declarations") {

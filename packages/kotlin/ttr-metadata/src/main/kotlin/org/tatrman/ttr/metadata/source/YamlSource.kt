@@ -3,6 +3,7 @@ package org.tatrman.ttr.metadata.source
 
 import org.tatrman.ttr.parser.loader.ParseResult
 import org.tatrman.ttr.profile.DeclarationReader
+import org.tatrman.ttr.profile.FileHeader
 import org.tatrman.ttr.profile.FileSelector
 import org.tatrman.ttr.profile.ForeignTree
 import org.tatrman.ttr.profile.ProfileDeclaration
@@ -136,14 +137,26 @@ internal class YamlTreeReader(
             if (issue.file != file.path) errors += issue.copy(file = file.path, message = "dropped: ${issue.message}")
         }
 
-        fun profile(e: ProfileException) =
-            error(e.location.file, e.location.line, e.location.column, "${e.code}: ${e.detail}")
+        /**
+         * The resolver sees a declaring file by its absolute path; [named] maps that label back to the storage name,
+         * so an issue and the file's drop name it one way (re-review RR1-4).
+         */
+        fun profile(
+            e: ProfileException,
+            named: Pair<String, String>? = null,
+        ) = error(
+            e.location.file.takeUnless { it == named?.first } ?: named!!.second,
+            e.location.line,
+            e.location.column,
+            "${e.code}: ${e.detail}",
+        )
     }
 
     /**
      * Profile resolution reads profile files, path overlays and sidecars from the filesystem under the storage root
      * (contracts §4, ✅R260-B), so it is built only when a file needs a profile, and a root that is not a directory on
-     * disk fails it once with `ys/profile-not-found`; canonical files load regardless.
+     * disk fails it once with `ys/profile-not-found`; canonical files load regardless. The bundled identity
+     * (`canonical/1`) reads no file, so it never needs the resolver (re-review RR1-1).
      */
     private class Profiles(
         val root: Path?,
@@ -152,7 +165,20 @@ internal class YamlTreeReader(
     ) {
         private var resolver: Result<ProfileResolver>? = null
 
-        fun resolver(at: String): ProfileResolver = (resolver ?: create(at).also { resolver = it }).getOrThrow()
+        /** [at] names the file that needs the resolver, for the one issue its absence raises. */
+        private fun resolver(at: String): ProfileResolver = (resolver ?: create(at).also { resolver = it }).getOrThrow()
+
+        fun resolve(
+            declaration: ProfileDeclaration,
+            at: String,
+        ): List<ProfileDefinition> = ProfileResolver.bundled(declaration) ?: resolver(at).resolve(declaration)
+
+        fun resolve(
+            reference: String,
+            declaringFile: String,
+            at: String,
+        ): List<ProfileDefinition> =
+            ProfileResolver.bundled(reference) ?: resolver(at).resolve(reference, Path.of(declaringFile))
 
         private fun create(at: String): Result<ProfileResolver> {
             fun failure(): Result<ProfileResolver> {
@@ -180,43 +206,53 @@ internal class YamlTreeReader(
         sourceId: String,
     ): ReadFiles {
         val problems = Problems(sourceId)
-        val control = listed.associateBy { it.underRoot() }
-        val root = listed.firstNotNullOfOrNull { it.rootPath }?.toAbsolutePath()
-        val candidates =
-            listed.filter { file ->
-                val path = file.underRoot()
-                val segments = path.split('/')
+        var declarationFile: StorageFile? = null
+        var ignoreFile: StorageFile? = null
+        val candidates = mutableListOf<StorageFile>()
+        for (file in listed) {
+            val path = file.underRoot()
+            val segments = path.split('/')
+            when {
+                path == "ttr.yaml" -> declarationFile = file
+                path == "model.ignore" -> ignoreFile = file
                 file.extension() in setOf("yaml", "yml") &&
                     segments.none { it.startsWith(".") } &&
                     segments.first() != "agents" &&
-                    path !in CONTROL_FILES
+                    path !in CONTROL_FILES -> candidates += file
             }
+        }
+        val storageRoot = listed.firstNotNullOfOrNull { it.rootPath }
         val ignore =
-            control["model.ignore"]?.let { modelIgnore(it, storage, problems) }?.getOrElse { e ->
+            ignoreFile?.let { modelIgnore(it, storage, problems) }?.getOrElse { e ->
                 // Fail closed (review-260 F4): without the ignore list no file is known to be content.
                 candidates.forEach { problems.drop(it, (e as Recorded).issue) }
                 return ReadFiles(emptyList(), problems.errors, dropped = problems.dropped)
             }
         val content = candidates.filter { ignore?.matches(it.underRoot()) != true }
-        val profiles = Profiles(root, catalog, problems)
-        val tree = treeDeclaration(control["ttr.yaml"], storage, profiles, problems)
+        val profiles = Profiles(storageRoot?.toAbsolutePath(), catalog, problems)
+        // Resolved on the first file that falls back to it, so a tree without such a file raises nothing (RR1-1).
+        val tree by lazy {
+            val name = declarationFile?.path ?: storageRoot?.resolve("ttr.yaml")?.toString() ?: "ttr.yaml"
+            treeDeclaration(declarationFile, name, storage, profiles, problems)
+        }
         val parsed = mutableListOf<ParsedFile>()
         val dialect = linkedMapOf<List<String>, Pair<List<ProfileDefinition>, MutableList<Pair<StorageFile, String>>>>()
         for (file in content) {
             val text = storage.read(file)
+            val absolute = file.absolute()
             val chain =
                 try {
-                    val declaration = DeclarationReader.readFile(text, file.absolute())
-                    when {
-                        declaration != null -> profiles.resolver(file.path).resolve(declaration)
-                        tree != null -> tree.getOrThrow()
-                        else -> null
+                    when (val header = DeclarationReader.header(text, absolute)) {
+                        is FileHeader.Declared -> profiles.resolve(header.declaration, file.path)
+                        // §4 (c): a canonical version header is canonical whatever the tree declares.
+                        is FileHeader.Canonical -> null
+                        FileHeader.Absent -> tree?.getOrThrow()
                     }
                 } catch (e: Recorded) {
                     problems.drop(file, e.issue)
                     continue
                 } catch (e: ProfileException) {
-                    problems.drop(file, problems.profile(e))
+                    problems.drop(file, problems.profile(e, absolute to file.path))
                     continue
                 }
             if (chain == null || chain.all { it.operations.isEmpty() && it.overlay == null }) {
@@ -248,35 +284,37 @@ internal class YamlTreeReader(
         }
 
     /**
-     * The override, else `<root>/ttr.yaml`, else none (canonical). A failure is recorded once and fails every file it
-     * would declare with that same issue.
+     * The override, else `<root>/ttr.yaml`, else none (canonical). A failure is recorded once, under [name] (the
+     * storage's name for `ttr.yaml`), and fails every file it would declare with that same issue.
      */
     private fun treeDeclaration(
         declarationFile: StorageFile?,
+        name: String,
         storage: ModelStorage,
         profiles: Profiles,
         problems: Problems,
     ): Result<List<ProfileDefinition>>? {
-        val label = declarationFile?.absolute() ?: profiles.root?.resolve("ttr.yaml")?.toString() ?: "ttr.yaml"
+        // The resolver bases relative references on the declaring file, so it sees the absolute path; issues do not.
+        val label = absolute(name)
         return try {
             when {
-                profile != null -> Result.success(profiles.resolver(label).resolve(profile, Path.of(label)))
+                profile != null -> Result.success(profiles.resolve(profile, label, name))
                 declarationFile != null -> {
                     val text =
                         try {
                             storage.read(declarationFile)
                         } catch (e: IOException) {
-                            throw Recorded(problems.error(label, 1, 1, "ys/profile-not-found: ttr.yaml is unreadable"))
+                            throw Recorded(problems.error(name, 1, 1, "ys/profile-not-found: ttr.yaml is unreadable"))
                         }
                     val declaration: ProfileDeclaration = DeclarationReader.readTree(text, label)
-                    Result.success(profiles.resolver(label).resolve(declaration))
+                    Result.success(profiles.resolve(declaration, name))
                 }
                 else -> null
             }
         } catch (e: Recorded) {
             Result.failure(e)
         } catch (e: ProfileException) {
-            Result.failure(Recorded(problems.profile(e)))
+            Result.failure(Recorded(problems.profile(e, label to name)))
         }
     }
 
@@ -346,8 +384,13 @@ internal class YamlTreeReader(
         return emptyList()
     }
 
-    /** The resolver bases a relative declaring file on its own root, so a storage with a relative root passes this. */
-    private fun StorageFile.absolute(): String =
+    /**
+     * The resolver bases a relative declaring file on its own root, so a storage with a relative root passes this to
+     * the resolver only; issues keep the storage's name ([Problems.profile]).
+     */
+    private fun StorageFile.absolute(): String = absolute(path)
+
+    private fun absolute(path: String): String =
         try {
             Path.of(path).toAbsolutePath().toString()
         } catch (e: java.nio.file.InvalidPathException) {

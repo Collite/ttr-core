@@ -231,8 +231,8 @@ class YamlSourceSpec :
                         "ys/profile-not-found: profiles need a filesystem-backed storage (root /synthetic-r260-root)",
                 )
             strict.issues.none { "load failed" in it.message } shouldBe true
-            strict.report!!.droppedFiles shouldContainExactly
-                listOf("/synthetic-r260-root/a.yaml", "/synthetic-r260-root/b.yaml")
+            // a.yaml's canonical version header keeps it canonical inside the declared tree (§4 (c), S3.5 T0).
+            strict.report!!.droppedFiles shouldContainExactly listOf("/synthetic-r260-root/b.yaml")
             // Without ttr.yaml only the file whose header names a profile is dropped; the canonical file loads.
             val mixed =
                 memory(canonical, "h.yaml" to "ttr: {profile: ./d.yaml, grammar: '>=0.22 <1.0'}\nentity:\n  H: {}\n")
@@ -385,5 +385,71 @@ class YamlSourceSpec :
             result.errors.filter { it.category != LoadIssue.Category.PACKAGE_MISMATCH }.map {
                 "${it.file} ${it.message}"
             } shouldContainExactly listOf("$x ys/value-unmapped: Unmapped package key x")
+        }
+
+        test("§4 (c): a file with a canonical version header loads as canonical inside a dialect tree") {
+            val root = declaredTree("profile: ./p/d.yaml\ngrammar: '>=0.22 <1.0'\n")
+            root.resolve("c.yaml").writeText(entity.format("Canon"))
+            messages(root) shouldBe emptyList()
+            names(yaml(root)) shouldContainExactly listOf("A", "B", "Canon")
+        }
+
+        test(
+            "re-review RR1-1: the identity profile needs no on-disk root; a tree no file falls back to raises nothing",
+        ) {
+            // (a) A canonical estate on a storage without a root, declared canonical/1 by its ttr.yaml.
+            val identity =
+                memory(
+                    "ttr.yaml" to "profile: canonical/1\ngrammar: '>=0.22 <1.0'\n",
+                    "a.yaml" to entity.format("A"),
+                )
+            val loaded = MetadataLoader.of(SourceKind.YAML, identity).load(LoadOptions(strict = true))
+            loaded.errors shouldBe emptyList()
+            loaded.model!!
+                .objectByQname()
+                .keys
+                .map { it.name } shouldContain "A"
+            // A file without a header falls back to the tree: the identity reaches the codec, which judges the file
+            // (canonical YAML requires `ttr`), never "profiles need a filesystem-backed storage".
+            val headerless =
+                memory(
+                    "ttr.yaml" to "profile: canonical/1\ngrammar: '>=0.22 <1.0'\n",
+                    "a.yaml" to entity.format("A"),
+                    "h.yaml" to entity.format("H").substringAfter('\n'),
+                )
+            val judged = MetadataLoader.of(SourceKind.YAML, headerless).load(LoadOptions(strict = true))
+            judged.report!!.droppedFiles shouldContainExactly listOf("/synthetic-r260-root/h.yaml")
+            judged.issues.filter { "dropped" !in it.message }.map {
+                it.message.substringBefore(
+                    ':',
+                )
+            } shouldContainExactly
+                listOf("ys/canonical-invalid")
+            // (b) No content, or all content ignored: the override is never resolved, so no issue.
+            val empty = tree("README.md" to "x\n")
+            MetadataLoader(listOf(BuiltinStockSource(), yaml(empty, profile = "./p/missing.yaml")))
+                .load()
+                .errors shouldBe emptyList()
+            val ignored = tree("model.ignore" to "*.yaml\n", "a.yaml" to "entity:\n  A: {}\n")
+            MetadataLoader(listOf(BuiltinStockSource(), yaml(ignored, profile = "./p/missing.yaml")))
+                .load()
+                .errors shouldBe emptyList()
+        }
+
+        test("re-review RR1-4: under a relative storage root a file's issue and its drop name it one way") {
+            val relative = Path.of("build", "rr1-4-${System.nanoTime()}")
+            relative.resolve("a.yaml").also { it.parent.createDirectories() }.writeText(
+                "ttr: {profile: ./p/missing.yaml, grammar: '>=0.22 <1.0'}\nentity:\n  A: {}\n",
+            )
+            try {
+                val result =
+                    MetadataLoader(
+                        listOf(BuiltinStockSource(), YamlFileSource("t", 100, LocalFsStorage("t", relative))),
+                    ).load()
+                result.errors.map { "${it.file} ${it.message}" } shouldContainExactly
+                    listOf("$relative/a.yaml ys/profile-not-found: Profile not found: ./p/missing.yaml")
+            } finally {
+                relative.toFile().deleteRecursively()
+            }
         }
     })

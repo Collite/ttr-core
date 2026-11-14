@@ -184,10 +184,12 @@ interface ModelStorage {
     /**
      * The version of what a load of the files with [extensions] reads. A storage whose version covers every
      * file (a git commit, an archive id) ignores [extensions]; one that hashes files ([LocalFsStorage]) hashes
-     * only those, so a file nobody loads (a designer's `.ttrl` write) never makes a new version.
+     * only those, so a file nobody loads (a designer's `.ttrl` write) never makes a new version. An extension
+     * matches by suffix (`endsWith(".$ext")`), so a dotted one such as `sources.json` names `<x>.sources.json` only.
      */
     fun fetchVersion(extensions: List<String>): String = fetchVersion()
 
+    /** Files whose name ends in `.<ext>` for one of [extensions] (a suffix match, dotted extensions included). */
     fun listFiles(
         extensions: List<String>,
         prefixes: List<String> = emptyList(),
