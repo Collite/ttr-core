@@ -13,7 +13,9 @@ name: Publish Kotlin artifacts
 #                        ttr-semantics + ttr-yaml + ttr-profile + ttr-metadata + ttr-metadata-git + ttr-snapshot +
 #                        ttr-md-resolver + ttr-lexicon + ttr-lexicon-compile + ttr-lexicon-cli + ttr-metadata-cli + ttr-report + ttr-report-cli.
 #                        the TTR-P toolchain (AG-14) + ttr-concept (cn, CN-P3 S3.1 — A-CN-1).
-#                        One `api` closure, one version, one tag.
+#                        One `api` closure, one version, one tag. Its GitHub release carries
+#                        ttr-metadata-cli-<v>.jar + .sha256 (MW S3.7); the root `grammarBundleClosure`
+#                        check (./gradlew build) keeps MODULES = the closure of what it publishes.
 #                        (was kotlin/v*; absorbed the metadata bundle 2026-07-30)
 #   ttr-parser/v<x.y.z>  ttr-parser only                                  (was kotlin-parser/v*)
 #   ttr-semantics/v<x.y.z> ttr-semantics only                             (was kotlin-semantics/v*)
@@ -61,6 +63,10 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # MW S3.7 T3: a grammar tag attaches the CLI jar to its GitHub release (contents: write); packages as above.
+    permissions:
+      contents: write
+      packages: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -223,6 +229,35 @@ jobs:
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # MW S3.7 T3 (contracts §7) — the self-contained CLI jar ai-models pins like model-validator.jar
+      # (`java -jar ttr-metadata-cli-<v>.jar lint …`), attached to the tag's GitHub release with its SHA-256
+      # (`sha256sum` format). After the registry publish, so a failed publish leaves no release asset. The release
+      # is created when the tag has none; an internal cut (no -RELEASE marker) is marked prerelease.
+      - name: Build ttr-metadata-cli jar
+        if: startsWith(github.ref_name, 'grammar/v')
+        run: ./gradlew --no-configuration-cache -Pversion=${{ steps.ver.outputs.version }} :packages:kotlin:ttr-metadata-cli:cliJar
+
+      - name: Attach ttr-metadata-cli jar to the GitHub release
+        if: startsWith(github.ref_name, 'grammar/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ steps.ver.outputs.version }}
+          PUBLIC: ${{ steps.ver.outputs.public }}
+        run: |
+          dir=packages/kotlin/ttr-metadata-cli/build/cli-jar
+          jar="ttr-metadata-cli-${VERSION}.jar"
+          (cd "$dir" && sha256sum -c "$jar.sha256")
+          # The asset must run alone and say nothing on stderr.
+          java -jar "$dir/$jar" lint --codes > /dev/null 2> "$RUNNER_TEMP/cli-stderr"
+          if [ -s "$RUNNER_TEMP/cli-stderr" ]; then cat "$RUNNER_TEMP/cli-stderr"; echo "::error::$jar writes to stderr"; exit 1; fi
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            PRE=""; [ "$PUBLIC" = "true" ] || PRE="--prerelease"
+            gh release create "$TAG" --verify-tag --title "$TAG" $PRE \
+              --notes "Grammar-family cut ${VERSION}. Asset: ${jar} (java -jar) with ${jar}.sha256."
+          fi
+          gh release upload "$TAG" "$dir/$jar" "$dir/$jar.sha256" --clobber
 
       - name: Render Enterprise Architect MDG Technology
         if: startsWith(github.ref_name, 'grammar/v')
