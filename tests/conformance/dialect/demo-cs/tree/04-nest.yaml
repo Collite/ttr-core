@@ -1,2 +1,4 @@
 entity:
-  Order: {role: customer}
+  Order:
+    sloupce:
+      platny: {role: valid_flag}

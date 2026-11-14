@@ -47,8 +47,8 @@ class LintCommandSpec :
             return to
         }
 
-        // review-269 ✅R269-A: apply fails on any error, so the positive vector is demo-cs-links (warnings only); the demo-cs
-        // tree holds two strict errors (S3.7 T0).
+        // review-269 ✅R269-A: apply fails on any error. demo-cs-links is the apply vector (warnings only); the demo-cs tree
+        // and its twin are lint --strict clean since S3.7 T0 (S3.5 Found (b)).
         val appliedLinks =
             setOf(
                 "demo/binding.yaml",
@@ -83,9 +83,8 @@ class LintCommandSpec :
         }
 
         test("apply of a canonical tree with canonical/1 is byte-identical to the input files") {
-            // demo-cs's twin carries the same two strict errors as its tree, so the CLI identity runs on demo-cs-links;
-            // ProfileApplySpec pins the identity of both twins at the library.
-            listOf("demo-cs-links").forEach { case ->
+            // Both twins are strict-clean since S3.7 T0, so the CLI identity runs on both, as ProfileApplySpec does.
+            listOf("demo-cs", "demo-cs-links").forEach { case ->
                 val canonical = conformance.resolve("dialect/$case/canonical")
                 val out = Files.createTempDirectory("s35-identity").resolve("out")
                 run(
@@ -125,16 +124,13 @@ class LintCommandSpec :
             val shown = if (tree.startsWith(cwd)) cwd.relativize(tree).joinToString("/") else "$tree"
             github.stdout shouldBe negative.resolve("expected-github.txt").readText().replace("file=", "file=$shown/")
             run("lint", "--root", "$links", "--strict", "--format", "github").exitCode shouldBe 0
-            // A fan-out file's second document (`<file>#<model>`) is annotated on the file itself, once per issue.
-            val fanOut =
-                run(
-                    "lint",
-                    "--root",
-                    "$positive",
-                    "--format",
-                    "github",
-                ).stdout.lines().filter { it.isNotEmpty() }
-            fanOut.any { "03-mixed.yaml::ttr/unimported-reference" in it } shouldBe true
+            // S3.5 Found (b) → S3.7 T0: the demo-cs tree and its canonical twin are strict-clean with their own profile.
+            run("lint", "--root", "$positive", "--strict").exitCode shouldBe 0
+            run("lint", "--root", "${positive.resolveSibling("canonical")}", "--strict").exitCode shouldBe 0
+            // A fan-out file's second document (`<file>#<model>`) is annotated on the file itself, once per issue: the
+            // negative tree's unimported.yaml is the deliberately broken vector.
+            val fanOut = github.stdout.lines().filter { it.isNotEmpty() }
+            fanOut.any { "unimported.yaml::ttr/unimported-reference" in it } shouldBe true
             fanOut.none { '#' in it.removePrefix("::").substringBefore("::") } shouldBe true
             fanOut shouldBe fanOut.distinct()
             val json = Json.parseToJsonElement(run("lint", "--root", "$tree", "--format", "json").stdout).jsonObject

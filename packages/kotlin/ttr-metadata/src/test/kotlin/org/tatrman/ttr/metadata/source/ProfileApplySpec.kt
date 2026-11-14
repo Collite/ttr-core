@@ -39,10 +39,8 @@ class ProfileApplySpec :
         // could not reach is reachable in the grouped document.
         val grouped =
             mapOf(
-                "demo-cs" to
-                    listOf(
-                        "ERROR UNIMPORTED_REFERENCE ttr/unimported-reference: 'Supplier' is not reachable from this file's imports",
-                    ),
+                // S3.7 T0: 03-mixed's binding names its entity qualified, so no file needs the grouped imports.
+                "demo-cs" to emptyList<String>(),
                 "demo-cs-links" to emptyList(),
             )
 
