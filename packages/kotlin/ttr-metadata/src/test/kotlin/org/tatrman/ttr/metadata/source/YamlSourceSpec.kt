@@ -263,6 +263,27 @@ class YamlSourceSpec :
                 listOf("/synthetic-r260-root/a.yaml", "/synthetic-r260-root/b.yaml")
         }
 
+        test("review-269 N3: a ttr.yaml that needs no resolver (bundled, or overridden) is not the shared reason") {
+            fun reported(
+                storage: ModelStorage,
+                profile: String? = null,
+            ) = MetadataLoader
+                .of(SourceKind.YAML, storage, profile)
+                .load(LoadOptions(strict = true))
+                .issues
+                .filter { "ys/profile-not-found" in it.message && "dropped" !in it.message }
+                .map { it.file }
+            val own = "ttr: {profile: ./p/e.yaml, grammar: '>=0.22 <1.0'}\nentity:\n  A: {}\n"
+            // The tree resolves bundled: only a.yaml's own header needs the resolver, so a.yaml is the reason.
+            reported(memory("ttr.yaml" to "profile: canonical/1\ngrammar: '>=0.22 <1.0'\n", "a.yaml" to own)) shouldBe
+                listOf("/synthetic-r260-root/a.yaml")
+            // --profile overrides the tree: its ttr.yaml is never read, so it is not the reason either.
+            reported(
+                memory("ttr.yaml" to "profile: ./p/d.yaml\ngrammar: '>=0.22 <1.0'\n", "a.yaml" to own),
+                profile = "canonical/1",
+            ) shouldBe listOf("/synthetic-r260-root/a.yaml")
+        }
+
         test("review-260 F5: the source version moves with model.ignore and sidecars, never with other .json") {
             val root = tree("a.yaml" to "entity: {}\n", "model.ignore" to "p/\n", "demo.sources.json" to "{}")
             val storage = LocalFsStorage("t", root)

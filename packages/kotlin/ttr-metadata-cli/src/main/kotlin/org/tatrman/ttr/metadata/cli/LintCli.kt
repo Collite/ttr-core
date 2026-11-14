@@ -12,6 +12,7 @@ import org.tatrman.ttr.metadata.source.ProfileApplyResult
 import org.tatrman.ttr.metadata.source.SourceKind
 import org.tatrman.ttr.metadata.source.YamlFileSource
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.Path
 import kotlin.io.path.extension
 import kotlin.io.path.isRegularFile
@@ -91,10 +92,21 @@ internal class Target(
                 val layout = if (checkout) manifestLayout else PackageLayout.Flexible
                 return Resolved.Ok(Target(project, modelRoot, SourceKind.TTR, layout, issues, null, emptyMap()))
             }
-            val catalog =
-                when (val read = catalog(modelRoot)) {
-                    is Catalog.Duplicate -> return Resolved.Usage(read.message)
-                    is Catalog.Read -> read.entries
+            val read = catalog(modelRoot)
+            // review-269 N2: a duplicated identity is a usage error only for the run that names it; otherwise it is
+            // left out of the catalog with one warning, and a lookup of it fails where it is made.
+            profile?.let { name -> read.duplicates[name]?.let { return Resolved.Usage(duplicate(name, it)) } }
+            val catalog = read.entries
+            val warnings =
+                read.duplicates.map { (name, paths) ->
+                    LoadReportIssue(
+                        "${modelRoot.resolve(paths.first())}",
+                        1,
+                        "profile-duplicate",
+                        LoadIssue.Severity.WARNING,
+                        "${duplicate(name, paths)}; left out of the catalog",
+                        1,
+                    )
                 }
             val reference =
                 when {
@@ -107,7 +119,15 @@ internal class Target(
                     }
                 }
             return Resolved.Ok(
-                Target(project, modelRoot, SourceKind.YAML, PackageLayout.Off, issues, reference, catalog),
+                Target(
+                    project,
+                    modelRoot,
+                    SourceKind.YAML,
+                    PackageLayout.Off,
+                    yamlLayout(issues) + warnings,
+                    reference,
+                    catalog,
+                ),
             )
         }
 
@@ -122,23 +142,37 @@ internal class Target(
                     }.toList()
             }
 
-        private sealed interface Catalog {
-            class Read(
-                val entries: Map<String, Path>,
-            ) : Catalog
+        /** A yaml tree is served with layout `off` (review-269 F6), so the manifest's fallback does not apply (N3). */
+        private fun yamlLayout(issues: List<LoadReportIssue>) =
+            issues.map {
+                if (it.code != "manifest-package-layout") {
+                    it
+                } else {
+                    it.copy(
+                        message =
+                            it.message.replace(
+                                "Falling back to flexible.",
+                                "A yaml tree is served with layout off.",
+                            ),
+                    )
+                }
+            }
 
-            class Duplicate(
-                val message: String,
-            ) : Catalog
-        }
+        private fun duplicate(
+            name: String,
+            paths: List<Path>,
+        ) = "profiles ${paths.joinToString(" and ") { it.joinToString("/") }} both declare $name"
 
-        /**
-         * `<root>/profiles/<file>.yaml` by the identity it declares (`profile: <name>/<major>`); unreadable files skip.
-         * Two files declaring one identity are a usage error naming both (review-269 F8).
-         */
+        /** The catalog's unique identities, and each identity two or more files declare (root-relative, sorted). */
+        private class Catalog(
+            val entries: Map<String, Path>,
+            val duplicates: Map<String, List<Path>>,
+        )
+
+        /** `<root>/profiles/<file>.yaml` by the identity it declares (`profile: <name>/<major>`); unreadable files skip. */
         private fun catalog(root: Path): Catalog {
             val directory = root.resolve("profiles")
-            if (!Files.isDirectory(directory)) return Catalog.Read(emptyMap())
+            if (!Files.isDirectory(directory)) return Catalog(emptyMap(), emptyMap())
             val identity = Regex("""^profile:\s*['"]?([^'"\s#]+)""", RegexOption.MULTILINE)
             val declared =
                 files(directory)
@@ -149,12 +183,11 @@ internal class Target(
                             it to root.relativize(file)
                         }
                     }.groupBy({ it.first }, { it.second })
-            declared.entries.firstOrNull { it.value.size > 1 }?.let { (name, paths) ->
-                return Catalog.Duplicate(
-                    "profiles ${paths.joinToString(" and ") { it.joinToString("/") }} both declare $name",
-                )
-            }
-            return Catalog.Read(declared.mapValues { it.value.single() })
+            val (unique, duplicated) = declared.entries.partition { it.value.size == 1 }
+            return Catalog(
+                unique.associate { it.key to it.value.single() },
+                duplicated.associate { it.key to it.value },
+            )
         }
     }
 }
@@ -246,19 +279,39 @@ object LintCli {
         paths: Collection<String>,
     ): String? {
         val root = modelRoot.toRealPath()
-        if (real(directory).startsWith(root)) return "--out must be outside the model root $modelRoot"
-        val inside = paths.filter { real(directory.resolve(it).normalize()).startsWith(root) }
+        val resolved = real(directory) ?: return "--out $directory: too many symbolic links"
+        if (resolved.startsWith(root)) return "--out must be outside the model root $modelRoot"
+        val inside =
+            paths.filter {
+                // An unresolvable chain is refused like a path inside the root: nothing proves it lands outside.
+                real(directory.resolve(it).normalize())?.startsWith(root) ?: true
+            }
         if (inside.isEmpty()) return null
         return "--out $directory would write ${inside.joinToString(", ")} into the model root $modelRoot"
     }
 
-    /** [path] with its nearest existing ancestor made real; the part that does not exist yet appended as it is. */
-    private fun real(path: Path): Path {
+    /**
+     * [path] with its nearest existing ancestor made real; the part that does not exist yet appended as it is. A dangling
+     * symbolic link exists too: a write through it lands at its target, so the target is followed in its place
+     * (review-269 N1). Null past [MAX_HOPS] links.
+     */
+    internal fun real(
+        path: Path,
+        hops: Int = 0,
+    ): Path? {
+        if (hops > MAX_HOPS) return null
         var existing: Path? = path
-        while (existing != null && !Files.exists(existing)) existing = existing.parent
+        while (existing != null && !Files.exists(existing, LinkOption.NOFOLLOW_LINKS)) existing = existing.parent
         existing ?: return path
-        return existing.toRealPath().resolve(existing.relativize(path))
+        val rest = existing.relativize(path)
+        if (Files.isSymbolicLink(existing) && !Files.exists(existing)) {
+            val target = existing.resolveSibling(Files.readSymbolicLink(existing))
+            return real(target.resolve(rest).normalize(), hops + 1)
+        }
+        return existing.toRealPath().resolve(rest)
     }
+
+    private const val MAX_HOPS = 40
 
     /**
      * The profile commands' report: the load's, plus apply's conflicts and the files only the grouped run dropped. A

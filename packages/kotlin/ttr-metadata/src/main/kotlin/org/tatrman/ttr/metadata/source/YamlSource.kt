@@ -168,8 +168,11 @@ internal class YamlTreeReader(
         val root: Path?,
         private val catalog: Map<String, Path>,
         private val problems: Problems,
-        /** The tree declaration's storage name when the tree declares a profile (review-269 F8). */
-        private val tree: String?,
+        /**
+         * The tree declaration's storage name when the tree's own `ttr.yaml` needs the resolver (review-269 F8, N3):
+         * asked only when the resolver cannot be built, so a tree that never needs one never reads its declaration.
+         */
+        private val tree: () -> String?,
     ) {
         private var resolver: Result<ProfileResolver>? = null
 
@@ -195,7 +198,7 @@ internal class YamlTreeReader(
             fun failure(): Result<ProfileResolver> {
                 val issue =
                     problems.error(
-                        tree ?: at,
+                        tree() ?: at,
                         1,
                         1,
                         "ys/profile-not-found: profiles need a filesystem-backed storage (root ${root ?: "none"})",
@@ -259,8 +262,17 @@ internal class YamlTreeReader(
         }
         val storageRoot = listed.firstNotNullOfOrNull { it.rootPath }
         val treeName = declarationFile?.path ?: storageRoot?.resolve("ttr.yaml")?.toString() ?: "ttr.yaml"
-        val declares = profile != null || declarationFile != null
-        val profiles = Profiles(storageRoot?.toAbsolutePath(), catalog, problems, treeName.takeIf { declares })
+        // Only a ttr.yaml the resolver must read is the shared reason: not an override, not the bundled identity (N3).
+        val declares = {
+            profile == null &&
+                declarationFile != null &&
+                runCatching {
+                    ProfileResolver.bundled(
+                        DeclarationReader.readTree(storage.read(declarationFile), absolute(treeName)),
+                    )
+                }.getOrNull() == null
+        }
+        val profiles = Profiles(storageRoot?.toAbsolutePath(), catalog, problems) { treeName.takeIf { declares() } }
         val ignore =
             ignoreFile?.let { modelIgnore(it, storage, problems) }?.getOrElse { e ->
                 // Fail closed (review-260 F4): without the ignore list no file is known to be content.
