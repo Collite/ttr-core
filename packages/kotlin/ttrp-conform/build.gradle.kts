@@ -39,6 +39,7 @@ dependencies {
     testImplementation(project(":packages:kotlin:ttr-emit-kestra"))
     // PL-P5.S4 — the Airflow 3 plugin (native binding) is certified by the same kit (must PASS).
     testImplementation(project(":packages:kotlin:ttr-emit-airflow3"))
+    testImplementation(project(":packages:kotlin:ttr-emit-python"))
     // RJ-P0 divergence spike only (tag `Spike`, off by default): JDBC to the live ttrp-pg +
     // YAML corpus loader. Test scope — never leaks into the published conform artifact.
     testImplementation(libs.postgresql)

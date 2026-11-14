@@ -6,6 +6,23 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — Python client recipe exporter (AU-export P2 S2.1)
+
+- `python_client` emits a typed HTTP run-API package, CLI, subprocess service and per-route pytest suite,
+  with pinned Python 3.13.9 and pytest 8.3.5. Paths and recipe/action names come from SPI v2; exports contain no SQL.
+- `ttrp conform --replay --cells python-client.on-event --export <export>` runs that package under uv,
+  forces dry-run/fixture clocks, and compares exact verdicts, actions, details and transition effects.
+  `--driver python-client` selects the on-event cell. The wire is the Server HTTP contract (⚑AU-EXP-3).
+- S2.1 is the dry-evidence client: every Open sends `dryRun: true`; the CLI requires `--dry-run`, and the
+  typed API rejects `dry_run=False` with "real runs arrive with S2.1b". Action execution is removed for S2.1b.
+  The client reads routes/details/action previews/batch and closes its owned dry run after evidence collection.
+  Replay uses one service process per fixture. Authored budgets become seconds, deadlines belong to each run,
+  dropped claims reopen once, and polling honors Retry-After. Re-claims reset status; error cleanup uses the
+  Open response/body dry policy until fresh status is read. Startup failures retain bounded stderr diagnostics;
+  action detail normalization matches the Kotlin column shape. Fixture timeouts sum each request's exported
+  budget plus one re-open; completed foreign claims' evidence reads get fresh windows. Polling allows one final
+  status read without spinning; malformed response keys are API errors. Unexpected exception messages are suppressed.
+
 ### Added — the `yaml` source kind (MW P3 S3.4)
 
 - `ttr-metadata` reads a model root of canonical YAML, or of dialect YAML plus a profile, through `YamlFileSource` (`SourceKind.YAML`; `MetadataLoader.of(kind, storage, profile)`). It produces the same `LoadedFile`s and definitions as the `.ttrm` path, so the registry, graph, search, export and cn builders see no difference. `FileBasedSource`'s `.ttrm` behaviour is unchanged.

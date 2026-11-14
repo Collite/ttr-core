@@ -46,4 +46,36 @@ class ReplayConformCliSpec :
             r.statusCode shouldBe 2
             r.output shouldContain "as_of"
         }
+        "Python driver shorthand selects the on-event cell and the pinned replay reaches the Python driver" {
+            val f = Files.createTempFile("python-replay", ".yaml")
+            try {
+                Files.writeString(f, "recipe: release_order\nas_of: \"2026-11-02\"\nexpected: {verdicts: []}\n")
+                val seed =
+                    TtrpCommand()
+                        .subcommands(
+                            ConformCommand(),
+                        ).test(listOf("conform", "--replay", f.toString(), "--driver", "python-client"))
+                seed.statusCode shouldBe 0
+                seed.output shouldContain "python-client.on-event: seed"
+                Files.writeString(f, Files.readString(f) + "pinned_from: {run: prior, at: now, by: test}\n")
+                val output = mutableListOf<String>()
+                ReplayConformCli.run(
+                    f.toString(),
+                    listOf("python-client.on-event"),
+                    "http://127.0.0.1",
+                    "TOKEN",
+                    null,
+                    null,
+                    env =
+                        mapOf(
+                            "TOKEN" to "test-token",
+                        ),
+                    echo = output::add,
+                ) shouldBe
+                    2
+                output.single() shouldContain "Python replay requires --export"
+            } finally {
+                Files.deleteIfExists(f)
+            }
+        }
     })

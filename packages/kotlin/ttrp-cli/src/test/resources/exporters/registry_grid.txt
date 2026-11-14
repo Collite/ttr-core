@@ -7,6 +7,6 @@ release_bpmn|release_on_placement|camunda_8|on_event|true
 release_event|release_on_placement|process_engine|on_event|true
 release_morning|morning_release|process_engine|batch|true
 release_n8n|release_on_placement|n8n_l1|on_event|true
-release_py|release_on_placement|python_client|on_event|false
+release_py|release_on_placement|python_client|on_event|true
 settle_batch|settle_daily|process_engine|batch|true
 settle_event|settle_on_document|process_engine|on_event|true

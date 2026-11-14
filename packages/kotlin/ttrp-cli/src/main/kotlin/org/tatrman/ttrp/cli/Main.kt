@@ -276,10 +276,11 @@ class ConformCommand : CliktCommand(name = "conform") {
     ).multiple()
     private val server by option("--server")
     private val tokenEnv by option("--token-env")
+    private val replayDriver by option("--driver", help = "python-client: shorthand for --cells python-client.on-event")
     private val world by option("--world")
     private val replayExports by option(
         "--export",
-        help = "rendered export directory for n8n dry replay; repeat per recipe/mode",
+        help = "rendered export directory for n8n, Python or BPMN replay; repeat per recipe/mode",
     ).multiple()
     private val reportOut by option("--out", help = "replay JSON report")
     private val tolerance by option("--tolerance", help = "per-column float64 tolerance, <col>=<eps>").multiple()
@@ -301,12 +302,29 @@ class ConformCommand : CliktCommand(name = "conform") {
 
     override fun run() {
         if (replay != null) {
+            if (replayDriver != null && replayDriver != "python-client") {
+                echo("ttrp conform: unsupported replay driver", err = true)
+                throw ProgramResult(2)
+            }
+            val selectedCells = cells.flatMap { it.split(',') } + files
+            if (replayDriver != null &&
+                selectedCells.any { it.substringBefore('.').replace('_', '-') != "python-client" }
+            ) {
+                echo("ttrp conform: --driver conflicts with --cells", err = true)
+                throw ProgramResult(2)
+            }
             throw ProgramResult(
                 ReplayConformCli.run(
                     replay!!,
-                    cells.flatMap {
-                        it.split(',')
-                    } + files,
+                    selectedCells.ifEmpty {
+                        if (replayDriver !=
+                            null
+                        ) {
+                            listOf("python-client.on-event")
+                        } else {
+                            emptyList()
+                        }
+                    },
                     server,
                     tokenEnv,
                     world,

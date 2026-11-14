@@ -109,6 +109,10 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.9.27'
+          python-version: '3.13.9'
       # XM KindListSpec compares export decisions with the generated grammar inventory.
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4

@@ -33,7 +33,7 @@ def action hold {
 }
 def action notify {
     columns:    [def column who { type: role }, def column detail { type: rows }, def column template { type: text, optional: true }]
-    sinks:      { n8n: "n8n-nodes-base.emailSend", camunda: "send task", hebe: message }
+    sinks:      { python_client: door, n8n: "n8n-nodes-base.emailSend", camunda: "send task", hebe: message }
     deliverable: true
     approval:   none
     dry_run:    { en: "would notify {who} with {detail.count} rows" }
@@ -46,7 +46,7 @@ def action notify_customer {
 }
 def action ask {
     columns:    [def column who { type: role }, def column about { type: text }, def column action { type: action }, def column detail { type: rows, optional: true }]
-    sinks:      { hebe: task, camunda: "user task", n8n: door }                  // n8n: perform ask, then Wait (D-109)
+    sinks:      { python_client: door, hebe: task, camunda: "user task", n8n: door } // L1 clients call the governed door
     approval:   required
     by:         role.process_owner
     due:        2 working_days                                                  // program/action default (D-98)

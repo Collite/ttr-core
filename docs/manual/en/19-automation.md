@@ -175,7 +175,32 @@ one qualified name defined in two roots, refuses the export before anything is w
 An export becomes stale when its recipe text, parameter values, labels, program, deployment, world,
 toolchain or target version differs from the served bundle. Rebuild and export again after such a change.
 Executor manifests are plugin-owned TTR-M resources. All seven target manifests ship with the toolchain;
-the process engine, n8n L1 and Camunda render recipes; Python rendering remains in its planned exporter Stage.
+the process engine, n8n L1, Camunda and `python_client` render recipes; `python_offline` remains manifest-only.
+
+## Python client exports
+
+`ttrp emit --deployment release_py --out exports` writes `release_py.python_client.export/worker/`:
+a typed dry-evidence client with `Run.parts.<name>()`, `Run.routes.<route>()` and `Run.close()`,
+a command-line entry point, a stdin/stdout service and route tests.
+Declare the action's Python sink explicitly (`python_client: door`) when it has no native fallback.
+All HTTP paths come from the SPI run-API projection. The Server executes the recipe and enforces grants,
+fingerprints and dry-run policy; the package contains no SQL, waits or process engine. The wire is the HTTP
+run API (⚑AU-EXP-3), with no gRPC service or proto wheel.
+
+From the generated `worker/`, set `TTR_SERVER` to the Server origin and `TTR_BEARER` to the authorized bearer:
+
+```sh
+uv run python -m release_order_client.main --key 4711 --as-of 2026-11-02T08:00:00Z --dry-run
+uv run --group dev pytest
+```
+
+Python is pinned to 3.13.9, pytest to 8.3.5; the runtime uses only the standard library. `--key` accepts JSON;
+composite keys are objects. For a batch program, `--batch '[4711,4712]'` selects keys and `--batch` selects all.
+The port must match the exported program. On-event redeliveries reuse the caller's explicit clock in `port.at`;
+the dry client also sends it as an `asOf` override. Use `--as-of now` for the Server's current clock.
+Every Open sends `dryRun: true`. The CLI requires `--dry-run`; the typed API defaults to `dry_run=True`
+and rejects `dry_run=False` with "real runs arrive with S2.1b". The client returns routes, details, action
+previews and batch evidence, then closes its owned dry run. Action execution arrives in S2.1b.
 
 ## Deploying to the process engine
 
@@ -367,6 +392,19 @@ are cross-checked against the Server's action selection multiset. Dropped/wrong 
 orchestration and dry evidence parity; committed writes, actual SMTP, human timing and a deployed n8n engine
 remain live certification. Use trusted generated exports; arbitrary Code-node workflows are executable artifacts. Process lifecycle
 replay and event-body fixtures remain separate from the H-1 key-based dry replay.
+
+Python replay runs the generated package itself in a uv/Python subprocess, using `--cells python-client.on-event`
+(or `--driver python-client`) plus `--export release_py.python_client.export`. Batch exports use
+`--cells python-client.batch`. One service process handles the fixture's ordered per-key requests (or one batch
+request), retaining errors per key. The service forces dryRun and the fixture clock, reads complete route/detail
+pages and the dry batch, preserving action previews without executing them. Declared budgets apply
+separately to each run, including a re-opened run and a completed foreign claim's evidence reads; the fixture's
+process timeout sums those budgets with allowance for one re-open per request. Live handles poll using
+Retry-After (15 seconds by default), allowing one final status read before timing out. Malformed Server keys, HTTP failures,
+truncated details and missing exports are driver errors. `python-client` remains an HTTP run-API consumer.
+Errors on owned dry runs receive a best-effort close. A re-claim resets status; until status is read,
+cleanup uses the Open response/body dry flag.
+Live Python certification belongs to the P2 certification stage.
 
 Golden YAML uses `recipe`, `world`, `as_of`, `parameters`, `keys`, `expected`, and optional `pinned_from`
 (`run`, `at`, `by`). A multi-recipe replay uses `recipes: [release_order, settle]` and stores each collection

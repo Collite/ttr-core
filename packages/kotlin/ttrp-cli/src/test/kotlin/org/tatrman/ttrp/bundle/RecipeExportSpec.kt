@@ -6,6 +6,7 @@ import com.github.ajalt.clikt.testing.test
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.string.shouldMatch
 import kotlinx.serialization.json.Json
 import org.tatrman.ttr.metadata.source.FileBasedSource
@@ -248,17 +249,8 @@ class RecipeExportSpec :
                 "registry_grid",
                 grid.joinToString("\n") { "${it.deployment}|${it.program}|${it.type}|${it.mode}|${it.ok}" },
             )
-            // D-142: `ask` and `notify` lost their native sinks. The Server records them as action rows; python_client
-            // inherited them through the native fallback and now refuses until the actions name a python sink.
-            grid.filterNot { it.ok }.map {
-                "${it.deployment}: ${it.diagnostics.joinToString { d ->
-                    d.message
-                }}"
-            } shouldBe
-                listOf(
-                    "release_py: release_py: action ask sink no not supported by python_client, " +
-                        "release_py: action notify sink no not supported by python_client",
-                )
+            // S2.1 declares the Python door on H-1's engine-only actions; no native sink is inferred.
+            grid.filterNot { it.ok } shouldBe emptyList()
         }
 
         fun exportProject(): Path {
@@ -504,6 +496,132 @@ class RecipeExportSpec :
             Files.readString(folder.resolve("workflow.json")) shouldContain "programFingerprint"
             Files.readString(folder.resolve("README.md")) shouldContain "tatrman-automation"
             Files.readString(folder.resolve("README.md")) shouldContain "Stale when"
+        }
+        "Python CLI exports H-1 deterministically with explicit door sinks and refuses a stale bundle" {
+            val project = exportProject()
+            val bundle = build("release_order")
+
+            fun emit(out: Path) =
+                TtrpCommand()
+                    .subcommands(
+                        EmitCommand(),
+                    ).test(
+                        listOf(
+                            "emit",
+                            "--deployment",
+                            "release_py",
+                            "--project",
+                            project.toString(),
+                            "--bundle",
+                            bundle.dir.toString(),
+                            "--out",
+                            out.toString(),
+                        ),
+                    )
+            val out = temporaryDirectory("python-real-h1")
+            val first = emit(out)
+            io.kotest.assertions.withClue(first.output) { first.statusCode shouldBe 0 }
+            val folder = out.resolve("release_py.python_client.export")
+            val manifest = Json.parseToJsonElement(Files.readString(folder.resolve("manifest.json"))).jsonObject
+            val config = Json.parseToJsonElement(Files.readString(folder.resolve("python-client.json"))).jsonObject
+            config.containsKey("held_actions") shouldBe false
+            manifest["calls"] shouldBe config["callPlan"]
+            config.getValue("fingerprints").jsonObject shouldBe manifest.getValue("fingerprints").jsonObject
+            val client = Files.readString(folder.resolve("worker/release_order_client/client.py"))
+            val readme = Files.readString(folder.resolve("README.md"))
+            readme shouldNotContain "Native deployment"
+            readme shouldNotContain "No client-side run API calls"
+            readme shouldContain "Stale when"
+            golden(
+                "release_py_client",
+                "=== README.md ===\n${readme.trimEnd()}\n=== client.py ===\n${client.trimEnd()}",
+            )
+            client shouldContain "def release(self)"
+            client shouldNotContain "class Actions"
+            val secondOut = temporaryDirectory("python-real-h1-repeat")
+            val second = emit(secondOut)
+            io.kotest.assertions.withClue(second.output) { second.statusCode shouldBe 0 }
+            Files.walk(folder).use { paths ->
+                paths.filter(Files::isRegularFile).forEach { path ->
+                    Files.readAllBytes(path).toList() shouldBe
+                        Files
+                            .readAllBytes(
+                                secondOut.resolve("release_py.python_client.export").resolve(folder.relativize(path)),
+                            ).toList()
+                }
+            }
+            val pytestLog = out.resolve("generated-pytest.txt")
+            val pytest =
+                ProcessBuilder("uv", "run", "--python", "3.13.9", "--group", "dev", "pytest", "-q")
+                    .directory(
+                        folder.resolve("worker").toFile(),
+                    ).redirectErrorStream(true)
+                    .redirectOutput(pytestLog.toFile())
+                    .start()
+            try {
+                pytest.waitFor(120, java.util.concurrent.TimeUnit.SECONDS) shouldBe true
+                io.kotest.assertions.withClue(Files.readString(pytestLog)) { pytest.exitValue() shouldBe 0 }
+                Files.readString(pytestLog) shouldContain "${config.getValue("routes").jsonArray.size} passed"
+            } finally {
+                if (pytest.isAlive) pytest.destroyForcibly().waitFor()
+            }
+            val stale = bundle.manifest.copy(world = bundle.manifest.world.copy(fingerprint = "stale-world"))
+            Files.writeString(bundle.dir.resolve("manifest.json"), stale.toJson())
+            val refused = emit(temporaryDirectory("python-stale-h1"))
+            (refused.statusCode != 0) shouldBe true
+            refused.output shouldContain "world fingerprint differs"
+        }
+        "Python dry evidence emits from a compiled world with a required native transition" {
+            val project = exportProject()
+            val models = temporaryDirectory("python-required-models")
+            root.toFile().copyRecursively(models.toFile(), overwrite = true)
+            val actionFile = models.resolve("hartland/automation/automation.ttrm")
+            val text = Files.readString(actionFile)
+            val release = text.substringAfter("def action release {").substringBefore("def action hold {")
+            release shouldContain "approval:   none"
+            val required =
+                text.replace(
+                    release,
+                    release.replace("approval:   none", "approval:   required\n    by: role.sales_manager"),
+                )
+            Files.writeString(actionFile, required)
+            Files.writeString(project.resolve("models/hartland/automation/automation.ttrm"), required)
+            val source = locate("packages/kotlin/ttrp-frontend/src/test/resources/recipes/release_order.ttrp")
+            val bundle =
+                BundleAssembler("test").build(
+                    source = Files.readString(source),
+                    fileName = source.toString(),
+                    recipeDir = source.parent,
+                    pipelineManifest =
+                        org.tatrman.ttrp.project.TtrpManifest(
+                            world = "hartland.worlds.demo",
+                            manifestDir = project,
+                        ),
+                    modelsRoot = models,
+                    outDir = temporaryDirectory("python-required-bundle"),
+                )
+            val out = temporaryDirectory("python-required-export")
+            val result =
+                TtrpCommand().subcommands(EmitCommand()).test(
+                    listOf(
+                        "emit",
+                        "--deployment",
+                        "release_py",
+                        "--project",
+                        project.toString(),
+                        "--bundle",
+                        bundle.dir.toString(),
+                        "--out",
+                        out.toString(),
+                    ),
+                )
+            io.kotest.assertions.withClue(result.output) { result.statusCode shouldBe 0 }
+            val config =
+                Json
+                    .parseToJsonElement(
+                        Files.readString(out.resolve("release_py.python_client.export/python-client.json")),
+                    ).jsonObject
+            config.containsKey("held_actions") shouldBe false
         }
         "D-142: batch n8n export uses an external webhook without an embedded schedule" {
             val bundle = build("release_order")
