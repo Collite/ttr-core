@@ -397,7 +397,8 @@ class ModelReconciler(
                     AUTOMATION_VALIDATOR_ID,
                     d.source.file,
                     d.source.line,
-                    d.source.column,
+                    org.tatrman.ttr.metadata.source
+                        .oneBased(d.source.column),
                     "${d.code}: ${d.message}",
                 )
             when (d.severity) {

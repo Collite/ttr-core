@@ -145,6 +145,25 @@ object ProfileReader {
         }
 }
 
+/** A content file's `ttr` header (contracts §4). */
+sealed interface FileHeader {
+    /** No `ttr` key, or a null one: the tree's declaration applies. */
+    data object Absent : FileHeader
+
+    /**
+     * A scalar `ttr`, the canonical document's version header: the file is canonical whatever the tree's profile says,
+     * never profiled (§4 (c)); the codec judges the version.
+     */
+    data class Canonical(
+        val version: String,
+    ) : FileHeader
+
+    /** A `{profile, grammar}` header: this profile for this file, whatever the tree declares. */
+    data class Declared(
+        val declaration: ProfileDeclaration,
+    ) : FileHeader
+}
+
 object DeclarationReader {
     /** @param file absolute, or relative to the resolver's root; this label is also the base for relative references. */
     fun readTree(
@@ -157,17 +176,28 @@ object DeclarationReader {
         }
 
     /**
-     * A scalar ttr (including null or the canonical version) deliberately means no profile header.
+     * The declaration a `{profile, grammar}` header makes; null for any other header ([header] tells a canonical
+     * version from none).
      * @param file absolute, or relative to the resolver's root; this label is also the base for relative references.
      */
     fun readFile(
         source: String,
         file: String = "<yaml>",
-    ): ProfileDeclaration? =
+    ): ProfileDeclaration? = (header(source, file) as? FileHeader.Declared)?.declaration
+
+    /**
+     * The file's `ttr` header: none (or null), a canonical version (a scalar), or a profile declaration.
+     * @param file absolute, or relative to the resolver's root; this label is also the base for relative references.
+     */
+    fun header(
+        source: String,
+        file: String = "<yaml>",
+    ): FileHeader =
         profileRead {
             val data = YamlData.read(source, file, tagScope = "/ttr")
             val header = data.value["ttr"]
-            if (header is JsonPrimitive || header == null) return@profileRead null
+            if (header == null || header is JsonNull) return@profileRead FileHeader.Absent
+            if (header is JsonPrimitive) return@profileRead FileHeader.Canonical(header.content)
             if (data.value.keys.first() != "ttr") {
                 throw ProfileException(
                     "ys/profile-invalid",
@@ -182,15 +212,23 @@ object DeclarationReader {
                     "ttr header must be a mapping {profile, grammar}",
                 )
             }
-            declaration(data, header, "/ttr")
+            FileHeader.Declared(declaration(data, header, "/ttr"))
         }
 
-    /** @param file absolute, or relative to the resolver's root; this label is also the base for relative references. */
+    /**
+     * The declaration that applies to the file: its own header, else none for a canonical version, else [tree].
+     * @param file absolute, or relative to the resolver's root; this label is also the base for relative references.
+     */
     fun select(
         source: String,
         file: String,
         tree: ProfileDeclaration?,
-    ): ProfileDeclaration? = readFile(source, file) ?: tree
+    ): ProfileDeclaration? =
+        when (val header = header(source, file)) {
+            is FileHeader.Declared -> header.declaration
+            is FileHeader.Canonical -> null
+            FileHeader.Absent -> tree
+        }
 
     private fun declaration(
         data: YamlData,

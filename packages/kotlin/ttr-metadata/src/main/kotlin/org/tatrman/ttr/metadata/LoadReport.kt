@@ -21,6 +21,8 @@ data class LoadReportIssue(
     val code: String,
     val severity: LoadIssue.Severity,
     val message: String,
+    /** 1-based where the issue knows one (MW S3.5, `lint --format github`); -1 otherwise. */
+    val column: Int = -1,
 )
 
 /** A successfully parsed input document. [objects] counts its authored top-level definitions. */
@@ -75,6 +77,7 @@ data class LoadReport(
                         },
                         severity,
                         issue.message,
+                        issue.column,
                     )
                 }
             // A FileBasedSource stores objects in maps, so duplicates within it have already been
@@ -111,6 +114,7 @@ data class LoadReport(
                             "duplicate-qname",
                             LoadIssue.Severity.ERROR,
                             diagnostic.message,
+                            diagnostic.source.column + 1,
                         )
                     }
                 }

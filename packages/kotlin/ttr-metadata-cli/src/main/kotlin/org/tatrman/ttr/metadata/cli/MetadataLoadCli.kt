@@ -53,37 +53,47 @@ object MetadataLoadCli {
         val (packageLayout, manifestIssues) = readManifest(project.resolve("modeler.toml"))
         val modelRoot = project.resolve("model")
         if (!Files.isDirectory(modelRoot)) {
-            return render(
-                project,
-                version,
-                LoadReport(
-                    issues =
-                        manifestIssues +
-                            LoadReportIssue(
-                                modelRoot.toString(),
-                                -1,
-                                "no-model-dir",
-                                LoadIssue.Severity.ERROR,
-                                "no model/ directory in the checkout",
-                            ),
-                ),
-                json,
-                failed = true,
-            )
+            return render(project, version, noModelDir(modelRoot, manifestIssues), json, failed = true)
         }
         // Always collect a report, including in permissive mode; --strict controls the exit status.
-        val result =
-            MetadataLoader(
-                listOf(
-                    BuiltinStockSource(),
-                    FileBasedSource(CHECKOUT_SOURCE, 100, LocalFsStorage(CHECKOUT_SOURCE, modelRoot)),
-                ),
-            ).load(LoadOptions(strict = true, packageLayout = packageLayout))
-        val report = requireNotNull(result.report).let { it.copy(issues = manifestIssues + it.issues) }
+        val (result, report) =
+            load(
+                FileBasedSource(CHECKOUT_SOURCE, 100, LocalFsStorage(CHECKOUT_SOURCE, modelRoot)),
+                packageLayout,
+                manifestIssues,
+            )
         return render(project, version, report, json, result.model == null || (strict && !report.ok))
     }
 
-    private const val CHECKOUT_SOURCE = "checkout"
+    internal const val CHECKOUT_SOURCE = "checkout"
+
+    /** A checkout without `model/`: `load`'s one ERROR, which `lint` reports the same way (review-269 F7). */
+    internal fun noModelDir(
+        modelRoot: Path,
+        manifestIssues: List<LoadReportIssue>,
+    ) = LoadReport(
+        issues =
+            manifestIssues +
+                LoadReportIssue(
+                    modelRoot.toString(),
+                    -1,
+                    "no-model-dir",
+                    LoadIssue.Severity.ERROR,
+                    "no model/ directory in the checkout",
+                ),
+    )
+
+    /** The one strict load `load` and `lint` share: the stock vocabulary plus [source], a report always collected. */
+    internal fun load(
+        source: org.tatrman.ttr.metadata.source.ModelSource,
+        packageLayout: PackageLayout,
+        manifestIssues: List<LoadReportIssue> = emptyList(),
+    ): Pair<org.tatrman.ttr.metadata.LoadResult, LoadReport> {
+        val result =
+            MetadataLoader(listOf(BuiltinStockSource(), source))
+                .load(LoadOptions(strict = true, packageLayout = packageLayout))
+        return result to requireNotNull(result.report).let { it.copy(issues = manifestIssues + it.issues) }
+    }
 
     /**
      * `[packages].layout` of a `modeler.toml` and the manifest's own issues: the one reading of the rule, shared with
@@ -148,57 +158,77 @@ object MetadataLoadCli {
         json: Boolean,
         failed: Boolean,
     ): CliOutcome {
-        fun relative(file: String?): String? = checkoutRelative(project, file)
-        // Existing reconciler messages may also embed source paths (for example duplicate mappings).
-        val sourcePaths =
-            (report.sources.map { it.path } + report.droppedFiles + report.issues.mapNotNull { it.file })
-                .distinct()
-                .sortedByDescending { it.length }
-
-        fun message(text: String): String =
-            sourcePaths.fold(text) { value, path ->
-                value.replace(path, relative(path) ?: path)
-            }
-        val document =
-            buildJsonObject {
-                put("version", version)
-                putJsonArray("sources") {
-                    report.sources.filter { it.sourceId == CHECKOUT_SOURCE }.forEach { source ->
-                        addJsonObject {
-                            put("path", relative(source.path))
-                            put("objects", source.objects)
-                        }
-                    }
-                }
-                putJsonArray("issues") {
-                    report.issues.forEach { issue ->
-                        addJsonObject {
-                            put("file", relative(issue.file))
-                            put("line", issue.line)
-                            put("code", issue.code)
-                            put("severity", issue.severity.name.lowercase())
-                            put("message", message(issue.message))
-                        }
-                    }
-                }
-            }
-        val diagnostics =
-            buildString {
-                report.issues.forEach { issue ->
-                    val location = relative(issue.file) ?: "<loader>"
-                    val detail = message(issue.message)
-                    appendLine("$location:${issue.line}: ${issue.severity.name.lowercase()} ${issue.code}: $detail")
-                }
-                appendLine(
-                    "ttr-metadata $version: ${document["sources"]!!.jsonArray.size} sources, ${report.issues.size} issues",
-                )
-            }
+        val rendered = Rendered(project, version, report)
         return CliOutcome(
             if (failed) 1 else 0,
-            if (json) "$document\n" else "",
-            diagnostics,
+            if (json) "${rendered.document()}\n" else "",
+            rendered.text(),
         )
     }
+}
+
+/**
+ * A load report as the CLI prints it: paths relative to the checkout, also inside messages. `load` and `lint` share it,
+ * so `lint` on a `.ttrm` checkout prints what `load` prints.
+ */
+internal class Rendered(
+    private val project: Path,
+    private val version: String,
+    val report: LoadReport,
+) {
+    fun relative(file: String?): String? = checkoutRelative(project, file)
+
+    // Existing reconciler messages may also embed source paths (for example duplicate mappings).
+    private val sourcePaths =
+        (report.sources.map { it.path } + report.droppedFiles + report.issues.mapNotNull { it.file })
+            .distinct()
+            .sortedByDescending { it.length }
+
+    fun message(text: String): String =
+        sourcePaths.fold(text) { value, path ->
+            value.replace(path, relative(path) ?: path)
+        }
+
+    private fun checkoutSources() = report.sources.filter { it.sourceId == MetadataLoadCli.CHECKOUT_SOURCE }
+
+    /** `load --json`'s document; [columns] adds each issue's column (`lint --format json`). */
+    fun document(columns: Boolean = false): JsonObject =
+        buildJsonObject {
+            put("version", version)
+            putJsonArray("sources") {
+                checkoutSources().forEach { source ->
+                    addJsonObject {
+                        put("path", relative(source.path))
+                        put("objects", source.objects)
+                    }
+                }
+            }
+            putJsonArray("issues") {
+                report.issues.forEach { issue ->
+                    addJsonObject {
+                        put("file", relative(issue.file))
+                        put("line", issue.line)
+                        if (columns) put("column", issue.column)
+                        put("code", issue.code)
+                        put("severity", issue.severity.name.lowercase())
+                        put("message", message(issue.message))
+                    }
+                }
+            }
+        }
+
+    /** `load`'s diagnostics: one line per issue and a summary line. */
+    fun text(): String =
+        buildString {
+            report.issues.forEach { issue ->
+                val location = relative(issue.file) ?: "<loader>"
+                val detail = message(issue.message)
+                appendLine("$location:${issue.line}: ${issue.severity.name.lowercase()} ${issue.code}: $detail")
+            }
+            appendLine(
+                "ttr-metadata $version: ${checkoutSources().size} sources, ${report.issues.size} issues",
+            )
+        }
 }
 
 /** Normalize report paths against their checkout; relative inputs must never depend on the process CWD. */

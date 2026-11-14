@@ -88,6 +88,10 @@ internal class YamlNodes(
         )
     }
 
+    /** The input's lines and the offset each starts at, split once per read (re-review RR1-8). */
+    private val lines by lazy { inputText.split('\n') }
+    private val rawOffsets by lazy { lines.runningFold(0) { offset, line -> offset + line.length + 1 } }
+
     data class Content(
         val source: org.tatrman.ttr.parser.model.SourceLocation,
         val lines: List<Int>,
@@ -101,9 +105,14 @@ internal class YamlNodes(
         val node = locations[path] as? ScalarNode ?: return null
         if (node.value != text) return null
         val style = node.scalarStyle
+        // A plain scalar maps one line to one line only when it is written on one line: a multi-line plain scalar
+        // folds its line breaks into spaces (re-review RR1-3).
+        val oneLine =
+            '\n' !in text &&
+                node.startMark.map { it.line }.orElse(-1) == node.endMark.map { it.line }.orElse(-2)
         val exact =
             style == org.snakeyaml.engine.v2.common.ScalarStyle.LITERAL ||
-                (style == org.snakeyaml.engine.v2.common.ScalarStyle.PLAIN && '\n' !in text)
+                (style == org.snakeyaml.engine.v2.common.ScalarStyle.PLAIN && oneLine)
         return if (exact) content(path, text) else null
     }
 
@@ -113,8 +122,6 @@ internal class YamlNodes(
     ): Content {
         val n = node(path)
         val span = source(path)
-        val lines = inputText.split('\n')
-        val rawOffsets = lines.runningFold(0) { offset, line -> offset + line.length + 1 }
         val literal = n is ScalarNode && n.scalarStyle == org.snakeyaml.engine.v2.common.ScalarStyle.LITERAL
         if (literal) {
             val decodedLines = decoded.split('\n')
