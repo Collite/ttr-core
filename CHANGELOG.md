@@ -13,9 +13,11 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - `ttrp conform --replay --cells python-client.on-event --export <export>` runs that package under uv,
   forces dry-run/fixture clocks, and compares exact verdicts, actions, details and transition effects.
   `--driver python-client` selects the on-event cell. The wire is the Server HTTP contract (⚑AU-EXP-3).
-- review-254 repair: action keys are objects; perform expectations come from each key's actual batch rows (✅R254-E).
+- review-254 repair: action keys are objects; perform expectations come from each preview entry's actual batch rows (✅R254-E).
   Grouped rows require held results, including shared rows; empty row sets are unheld. Exported native approval markers
-  cross-check group ownership. The batch is read once, before perform, and reused for effects.
+  cross-check group ownership on owned runs. The batch is read once, before perform, and reused for effects.
+  Distinct request keys retain every preview entry's answer multiplicity across overlapping routes. On a real-run
+  error the client leaves the run for Server abandonment; only dry runs get a best-effort close (✅R254-F).
   Replay uses one service process per fixture and one perform call per action. Authored budgets become seconds,
   deadlines belong to each run, dropped claims reopen once, and polling honors Retry-After. Startup failures retain
   bounded stderr diagnostics; action detail normalization matches the Kotlin column shape. Fixture timeouts sum each

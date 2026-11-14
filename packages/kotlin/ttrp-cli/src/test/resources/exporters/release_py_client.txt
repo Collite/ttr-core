@@ -2,7 +2,7 @@
 Stale when any model, text, values, labels, program, deployment, world, toolchain or target version fingerprint differs for any step from the served bundle; re-export the deployment.
 
 Python client for `release_order` (`release_py`). HTTP run API,
-ttr-server contracts §1 (⚑AU-EXP-3, ✅R254-A/B/E). Open baseline: f28120e1; action wire: #391.
+ttr-server contracts §1 (⚑AU-EXP-3, ✅R254-A/B/E/F). Open baseline: f28120e1; action wire: #391 @ e13c74d5.
 The baseline has no perform route; real-Server acceptance remains P1C / #366.
 Python 3.13.9; standard library runtime; pytest 8.3.5. No gRPC or proto wheel.
 
@@ -14,10 +14,13 @@ or selects all with no argument. The chosen port must match the exported program
 port.at; a run-clock program needs a dry/debug run for a literal override. `--dry-run` strengthens policy.
 On-event redeliveries need the same caller-supplied clock to deduplicate.
 The Server owns action eligibility and execution; this package has no waits, asks or processes.
-Read the batch before perform: each preview key is held iff its batchRows reference a grouped row;
-other keys must be skipped dry-run (dry) or performed (wet). held_actions cross-checks marked owners:
+Read the batch before perform: each preview entry is held iff its batchRows reference a grouped row;
+other entries must be skipped dry-run (dry) or performed (wet). Send distinct keys per action; overlapping
+routes retain one answer per preview entry. held_actions cross-checks marked owners on owned runs:
 grouped rows need an approval-required native transition/writer/obligation owner. Marked keys may have
-no rows; unmarked keys can share a grouped row. Completed foreign claims get a fresh evidence-read budget.
+no rows; unmarked entries can share a grouped row. Completed foreign claims get a fresh evidence-read budget.
+On a real-run error, leave the run for Server abandonment at its deadline; a retry waits and reopens once.
+Only dry runs receive a best-effort close after an error.
 `service.py` accepts `{"requests": [...]}` on stdin and emits `{"results": [...]}` in order,
 with errors per request;
 `conform --replay` uses it in a subprocess with dryRun true. Replays never override parameters.

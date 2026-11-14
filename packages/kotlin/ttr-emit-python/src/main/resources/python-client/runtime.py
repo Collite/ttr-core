@@ -6,6 +6,7 @@ import json
 import os
 import re
 import time
+from collections import Counter
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -191,18 +192,24 @@ class BaseClient:
         return self._claim(body)
 
     def _claim(self, body: dict[str, Any]) -> BaseRun:
-        deadline = time.monotonic() + CONFIG["budget_seconds"] + 120
+        started_at = time.monotonic()
         code, data, headers = self.request("POST", "open", body, recipe=CONFIG["recipe"])
-        return self.run_type(self, data["runId"], code, deadline=deadline, headers=headers, open_body=body)
+        return self.run_type(self, data["runId"], code, started_at=started_at, headers=headers, open_body=body)
 
 
 class BaseRun:
     def __init__(self, client: BaseClient, run_id: str, claim: int, *, deadline: float | None = None,
-                 headers: dict[str, str] | None = None, open_body: dict[str, Any] | None = None) -> None:
+                 headers: dict[str, str] | None = None, open_body: dict[str, Any] | None = None,
+                 started_at: float | None = None) -> None:
         self.client, self.id, self.claim = client, run_id, claim
-        self.deadline = deadline if deadline is not None else time.monotonic() + CONFIG["budget_seconds"] + 120
+        self.renew_window(started_at=started_at)
+        if deadline is not None:
+            self.deadline = deadline
         self.headers = headers or {}
         self.open_body = open_body
+
+    def renew_window(self, *, started_at: float | None = None) -> None:
+        self.deadline = (time.monotonic() if started_at is None else started_at) + CONFIG["budget_seconds"] + 120
         self._last_poll = False
 
     def request(self, method: str, name: str, body: dict[str, Any] | None = None, **values: Any):
@@ -283,8 +290,8 @@ def normalize_arguments(value: Any) -> Any:
     return result
 
 
-def perform_expectations(previews: list[dict[str, Any]], batch: dict[str, Any], dry_run: bool) -> dict[str, dict[Any, str]]:
-    """R254-E: holds follow each key's actual rows, including shared and empty row sets."""
+def perform_expectations(previews: list[tuple[str, Any, Any]], batch: dict[str, Any], dry_run: bool) -> dict[str, Counter]:
+    """R254-E: holds follow each preview entry's own rows; overlapping routes keep their multiplicity."""
     def malformed() -> None:
         raise ApiError("perform effects differ from selected actions")
 
@@ -298,44 +305,40 @@ def perform_expectations(previews: list[dict[str, Any]], batch: dict[str, Any], 
         by_seq[row["seq"]] = row
     grouped = {seq for seq, row in by_seq.items() if row.get("group") is not None}
     marked_owners = set()
-    expected: dict[str, dict[Any, str]] = {}
-    for preview in previews:
-        refs = preview.get("batchRows")
+    expected: dict[str, Counter] = {}
+    for name, key, refs in previews:
         if not isinstance(refs, list) or any(type(seq) is not int or seq not in by_seq for seq in refs):
             malformed()
         held_rows = set(refs) & grouped
-        name = preview["action"]
         if name in CONFIG["held_actions"]:
             if refs and not held_rows:
                 malformed()
             marked_owners.update(held_rows)
-        key = canonical_key(response_key(preview.get("key")))
-        expected.setdefault(name, {})[key] = "held" if held_rows else "dry-run" if dry_run else "performed"
+        reason = "held" if held_rows else "dry-run" if dry_run else "performed"
+        expected.setdefault(name, Counter())[(key, reason)] += 1
     if grouped - marked_owners:
         malformed()
     return expected
 
 
-def verify_perform(effect: dict[str, Any], expected: dict[Any, str]) -> None:
+def verify_perform(effect: dict[str, Any], expected: Counter) -> None:
     performed, skipped = effect.get("performed"), effect.get("skipped")
     if not isinstance(performed, list) or not isinstance(skipped, list):
         raise ApiError("perform effects differ from selected actions")
-    seen = []
+    seen = Counter()
     for row in performed:
         if not isinstance(row, dict):
             raise ApiError("perform effects differ from selected actions")
         key = canonical_key(row.get("key"))
-        if expected.get(key) != "performed":
-            raise ApiError("perform effects differ from selected actions")
-        seen.append(key)
+        seen[(key, "performed")] += 1
     for row in skipped:
         if not isinstance(row, dict):
             raise ApiError("perform effects differ from selected actions")
         key = canonical_key(row.get("key"))
-        if row.get("reason") not in ("held", "dry-run") or expected.get(key) != row["reason"]:
+        if row.get("reason") not in ("held", "dry-run"):
             raise ApiError("perform effects differ from selected actions")
-        seen.append(key)
-    if len(seen) != len(expected) or set(seen) != set(expected):
+        seen[(key, row["reason"])] += 1
+    if seen != expected:
         raise ApiError("perform effects differ from selected actions")
 
 
@@ -374,8 +377,7 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
             raise ApiError("existing run did not complete")
         else:
             # Observing completion and collecting its pages are separate bounded windows.
-            run.deadline = time.monotonic() + CONFIG["budget_seconds"] + 120
-            run._last_poll = False
+            run.renew_window()
     try:
         if run.claim == 201:
             if CONFIG["granularity"] == "parts":
@@ -407,7 +409,8 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
         previews = status.get("actions")
         if not isinstance(previews, list):
             raise ApiError("status omitted preview actions")
-        selected: dict[str, list[dict[str, Any]]] = {}
+        selected: dict[str, dict[Any, dict[str, Any]]] = {}
+        entries = []
         for preview in previews:
             if not isinstance(preview, dict):
                 raise ApiError("malformed preview action")
@@ -415,14 +418,16 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
             if name not in CONFIG["actions"]:
                 raise ApiError("Server returned an undeclared action")
             obj = response_key(preview.get("key"))
-            selected.setdefault(name, []).append(obj)
-            actions.append({"key": response_key(obj, row=True), "action": name, "columns": normalize_arguments(preview["arguments"])})
+            key = canonical_key(obj)
+            selected.setdefault(name, {})[key] = obj
+            entries.append((name, key, preview.get("batchRows")))
+            actions.append({"key": key_of(obj), "action": name, "columns": normalize_arguments(preview["arguments"])})
         batch = run.request("GET", "batch")[1]
-        expected = perform_expectations(previews, batch, status.get("dryRun") is True)
         perform_effects = []
         if run.claim == 201:
+            expected = perform_expectations(entries, batch, status.get("dryRun") is True)
             for name, keys in selected.items():
-                effect = Action(run, name).perform(keys)
+                effect = Action(run, name).perform(list(keys.values()))
                 verify_perform(effect, expected[name])
                 perform_effects.append({"action": name, **effect})
         if run.claim == 201:
@@ -431,7 +436,8 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
                 raise ApiError("run did not close")
         return {"verdicts": verdicts, "actions": actions, "details": details, "detail_counts": counts, "effects": batch.get("rows", []), "perform_effects": perform_effects}
     except Exception:
-        if run.claim == 201:
+        is_dry_run = status.get("dryRun") is True if status is not None else dry_run or CONFIG["dry_run"]
+        if run.claim == 201 and is_dry_run:
             try:
                 run.close()
             except Exception:

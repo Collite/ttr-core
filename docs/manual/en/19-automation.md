@@ -395,16 +395,19 @@ Python replay runs the generated package itself in a uv/Python subprocess, using
 (or `--driver python-client`) plus `--export release_py.python_client.export`. Batch exports use
 `--cells python-client.batch`. One service process handles the fixture's ordered per-key requests (or one batch
 request), retaining errors per key. The service forces dryRun and the fixture clock, reads complete route/detail
-pages and reads the batch before calling perform once per action with object keys. A key must be `held` iff
-its preview `batchRows` reference any grouped row; other keys must be `dry-run` (dry) or performed (wet).
+pages and reads the batch before calling perform once per action with distinct object keys. Each preview entry
+must be `held` iff its own `batchRows` reference any grouped row; other entries must be `dry-run` (dry) or
+performed (wet). Overlapping routes keep one expected answer per entry, including repeated keys.
 The export's `held_actions` lists approval-required native transition/writer/obligation actions (D-142) as a
-cross-check: every grouped row needs a marked owner, and a marked key with rows must reference a group.
+cross-check on owned runs: every grouped row needs a marked owner, and a marked entry with rows must reference a group.
 A marked key with no rows is unheld; an unmarked key sharing a grouped row is held. Declared budgets apply
 separately to each run, including a re-opened run and a completed foreign claim's evidence reads; the fixture's
 process timeout sums those budgets with allowance for one re-open per request. Live handles poll using
 Retry-After (15 seconds by default), allowing one final status read before timing out. Malformed Server keys, HTTP failures,
 truncated details and missing exports are driver errors. `python-client` remains an HTTP run-API consumer;
-live Python certification belongs to the P2 certification stage.
+On a real-run error the client leaves the run for Server abandonment at its deadline; a retry waits for
+abandonment and reopens once. Only dry runs receive a best-effort close after an error (✅R254-F).
+Live Python certification belongs to the P2 certification stage.
 
 Golden YAML uses `recipe`, `world`, `as_of`, `parameters`, `keys`, `expected`, and optional `pinned_from`
 (`run`, `at`, `by`). A multi-recipe replay uses `recipes: [release_order, settle]` and stores each collection

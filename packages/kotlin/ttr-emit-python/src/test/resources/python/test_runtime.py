@@ -23,6 +23,8 @@ class Response:
 
 class Server:
     """Drive the generated HTTP transport, including request bodies and response keys."""
+    DEFAULT = object()
+
     def __init__(self, monkeypatch, *, claim=201, states=None, reopen=201, dry=True, held=False, marked=None):
         self.claim, self.reopen, self.dry = claim, reopen, dry
         self.states = list(states or ["evaluated"])
@@ -31,10 +33,11 @@ class Server:
         self.open_retry_after = "7"
         self.status_headers, self.status_elapsed = [], []
         self.status_reads, self.status_limit = 0, None
-        self.perform_reason = "held" if held else "dry-run" if dry else None
+        self.perform_reason = self.DEFAULT
+        self.drop_answer = False
         self.perform_reasons = None
         self.response_key = None
-        self.batch_rows = [dict(seq=1, **({"group": {"order_number": 4711}} if held else {}))]
+        self.batch_rows = [{"seq": 1, "group": {"order_number": 4711} if held else None}]
         self.previews = [{"key": {"order_number": 4711}, "action": "release", "arguments": {"order": 4711}, "batchRows": [1]}]
         self.route_rows = [{"order_number": 4711}]
         self.page_size = 1000
@@ -70,11 +73,24 @@ class Server:
         if path.endswith("/perform"):
             action = path.split("/actions/")[1].split("/")[0]
             performed, skipped = [], []
-            for key in body["keys"]:
-                assert isinstance(key, dict) and set(key) == {"order_number"}
+            wanted = body.get("keys")
+            if wanted is not None:
+                assert all(isinstance(key, dict) and set(key) == {"order_number"} for key in wanted)
+                wanted = {rt.canonical_key(key) for key in wanted}
+            grouped = {row["seq"] for row in self.batch_rows if row.get("group") is not None}
+            selected = [entry for entry in self.previews if entry["action"] == action and
+                        (wanted is None or rt.canonical_key(entry["key"]) in wanted)]
+            if self.drop_answer:
+                selected = selected[:-1]
+            for entry in selected:
+                key = entry["key"]
                 row = {"key": key if self.response_key is None else self.response_key}
-                reason = self.perform_reason if self.perform_reasons is None else self.perform_reasons[action][key["order_number"]]
-                (performed if reason is None else skipped).append(dict(row, batchRows=[]) if reason is None else dict(row, reason=reason))
+                reason = "held" if grouped.intersection(entry["batchRows"]) else "dry-run" if self.dry else None
+                if self.perform_reasons is not None:
+                    reason = self.perform_reasons[action][key["order_number"]]
+                elif self.perform_reason is not self.DEFAULT:
+                    reason = self.perform_reason
+                (performed if reason is None else skipped).append(dict(row, batchRows=entry["batchRows"]) if reason is None else dict(row, reason=reason))
             return Response(200, {"performed": performed, "skipped": skipped})
         if path.endswith("/outcome"):
             return Response(200, {})
@@ -224,8 +240,7 @@ def test_reopened_run_gets_its_own_full_budget(monkeypatch):
 
 @pytest.mark.parametrize("dry,marked,grouped,empty,reason,accepted", [
     (True, True, True, False, "held", True),
-    (True, True, True, False, "dry-run", False),
-    (True, False, False, False, "held", False),
+    (True, True, False, True, "held", False),
     (False, True, True, False, "held", True),
     (False, True, True, False, None, False),
     (False, False, False, False, None, True),
@@ -260,6 +275,68 @@ def test_marked_empty_key_and_unmarked_shared_row_both_replay(monkeypatch):
     assert sum(path.endswith("/batch") for path in paths) == 1
     assert next(i for i, path in enumerate(paths) if path.endswith("/batch")) < next(i for i, path in enumerate(paths) if path.endswith("/perform"))
 
+
+
+def test_unmarked_shared_entry_cannot_be_answered_dry_run(monkeypatch):
+    server = Server(monkeypatch, held=True)
+    server.previews.append({"action": "notify", "key": {"order_number": 4711},
+                            "arguments": {"order": 4711}, "batchRows": [1]})
+    server.perform_reasons = {"release": {4711: "held"}, "notify": {4711: "dry-run"}}
+    with pytest.raises(rt.ApiError, match="perform effects differ"):
+        rt.execute(server.client, {"key": 4711}, None)
+    assert sum(path.endswith("/perform") for path, _, _ in server.seen) == 2
+
+
+@pytest.mark.parametrize("second_refs", [[], [1]])
+@pytest.mark.parametrize("drop", [False, True])
+def test_overlapping_previews_keep_answer_multiplicity_but_send_distinct_keys(monkeypatch, second_refs, drop):
+    server = Server(monkeypatch, held=True)
+    server.previews.append(dict(server.previews[0], batchRows=second_refs))
+    server.drop_answer = drop
+    if drop:
+        with pytest.raises(rt.ApiError, match="perform effects differ"):
+            rt.execute(server.client, {"key": 4711}, None)
+    else:
+        result = rt.execute(server.client, {"key": 4711}, None)
+        assert len(result["actions"]) == 2
+        assert [row["reason"] for row in result["perform_effects"][0]["skipped"]] == [
+            "held", "held" if second_refs else "dry-run"]
+    bodies = [body for path, body, _ in server.seen if path.endswith("/perform")]
+    assert bodies == [{"keys": [{"order_number": 4711}]}]
+
+
+@pytest.mark.parametrize("dry", [False, True])
+@pytest.mark.parametrize("before_status", [False, True])
+def test_error_closes_only_owned_dry_run(monkeypatch, dry, before_status):
+    server = Server(monkeypatch, dry=dry, held=True, marked=False)
+    if before_status:
+        server.evaluate_response = Response(200, {"status": "failed"})
+    with pytest.raises(rt.ApiError, match="run evaluation failed" if before_status else "perform effects differ"):
+        rt.execute(server.client, {"key": 4711}, None)
+    assert not any(path.endswith("/perform") for path, _, _ in server.seen)
+    assert sum(path.endswith("/close") for path, _, _ in server.seen) == int(dry)
+
+
+def test_reported_real_run_is_not_closed_even_when_dry_was_requested(monkeypatch):
+    server = Server(monkeypatch, dry=False)
+    with pytest.raises(rt.ApiError, match="Server did not confirm dryRun"):
+        rt.execute(server.client, {"key": 4711}, None, dry_run=True)
+    assert not any(path.endswith("/close") for path, _, _ in server.seen)
+
+
+@pytest.mark.parametrize("claim", [200, 202])
+def test_foreign_closed_claim_returns_orphan_group_evidence_without_perform_cross_check(monkeypatch, claim):
+    server = Server(monkeypatch, claim=claim, states=["closed"], held=True, marked=False)
+    result = rt.execute(server.client, {"key": 4711}, None)
+    assert result["effects"] == server.batch_rows
+    assert result["perform_effects"] == []
+    assert not any(path.endswith(("/evaluate", "/perform", "/close")) for path, _, _ in server.seen)
+
+
+def test_batch_group_may_be_omitted_as_well_as_null(monkeypatch):
+    server = Server(monkeypatch)
+    assert server.batch_rows[0].pop("group") is None
+    rt.execute(server.client, {"key": 4711}, None)
 
 def test_grouped_row_requires_a_marked_owner(monkeypatch):
     server = Server(monkeypatch, held=True, marked=False)

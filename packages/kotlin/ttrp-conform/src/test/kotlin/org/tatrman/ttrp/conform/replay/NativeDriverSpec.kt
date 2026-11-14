@@ -94,8 +94,17 @@ internal class ContractServer(
     val opens = CopyOnWriteArrayList<JsonObject>()
     val requests = CopyOnWriteArrayList<String>()
     val performBodies = CopyOnWriteArrayList<JsonObject>()
+    val batches = CopyOnWriteArrayList<JsonObject>()
 
     @Volatile var performFault: String? = null
+
+    @Volatile var performFaultAction: String? = null
+
+    @Volatile var performFaultKey: Int? = null
+
+    @Volatile var overlapRelease = false
+
+    @Volatile var ownNotifyRows = false
 
     @Volatile var heldRelease = false
 
@@ -155,34 +164,90 @@ internal class ContractServer(
                 "routes",
                 buildJsonObject {
                     put("release", buildJsonObject { put("rowCount", keys(id).size) })
-                    if (includeMail) put("hold", buildJsonObject { put("rowCount", keys(id).size) })
+                    if (includeMail || overlapRelease) put("hold", buildJsonObject { put("rowCount", keys(id).size) })
                 },
             )
         }
 
     private fun batchRows(id: String): List<JsonObject> =
-        keys(id).mapIndexedNotNull { index, key ->
-            if (key == emptyReleaseKey?.let(::JsonPrimitive)) return@mapIndexedNotNull null
-            buildJsonObject {
-                put("seq", index + 1)
+        buildList {
+            fun row(
+                key: JsonElement,
+                op: String,
+                held: Boolean,
+            ) = buildJsonObject {
+                put("seq", size + 1)
                 put("entity", "er.entity.order")
-                put("op", "transition")
-                put("attribute", "state")
-                put("to", "released")
+                put("op", op)
+                if (op == "transition") {
+                    put("attribute", "state")
+                    put("to", "released")
+                } else {
+                    put("set", buildJsonObject { put("notice", "queued") })
+                }
                 put("key", buildJsonObject { put("order_number", key) })
-                if (heldRelease) put("group", buildJsonObject { put("order_number", key) })
+                put("group", if (held) buildJsonObject { put("order_number", key) } else JsonNull)
             }
+            keys(id).filterNot { it == emptyReleaseKey?.let(::JsonPrimitive) }.forEach { key ->
+                add(row(key, "transition", heldRelease))
+            }
+            if (ownNotifyRows) keys(id).forEach { key -> add(row(key, "update", false)) }
         }
 
     private fun actionRows(
         id: String,
         key: JsonElement,
+        op: String = "transition",
     ): JsonArray =
         JsonArray(
-            batchRows(
-                id,
-            ).filter { it["key"] == buildJsonObject { put("order_number", key) } }.map { it.getValue("seq") },
+            batchRows(id)
+                .filter {
+                    it["key"] == buildJsonObject { put("order_number", key) } && it["op"] == JsonPrimitive(op)
+                }.map { it.getValue("seq") },
         )
+
+    private fun previewActions(id: String): List<JsonObject> =
+        keys(id).flatMap { key ->
+            fun entry(
+                action: String,
+                route: String,
+                rows: JsonArray,
+            ) = buildJsonObject {
+                put("key", buildJsonObject { put("order_number", key) })
+                put("action", action)
+                put("route", route)
+                put(
+                    "arguments",
+                    buildJsonObject {
+                        if (action == "release" || sharedAction || ownNotifyRows) {
+                            put("order", key)
+                        } else {
+                            put("who", "role.sales")
+                        }
+                    },
+                )
+                put("batchRows", rows)
+            }
+            listOf(entry("release", "release", actionRows(id, key))) +
+                (if (overlapRelease) listOf(entry("release", "hold", JsonArray(emptyList()))) else emptyList()) +
+                (
+                    if (includeMail || ownNotifyRows || (sharedAction && actionRows(id, key).isNotEmpty())) {
+                        listOf(
+                            entry(
+                                "notify",
+                                if (includeMail) "hold" else "release",
+                                when {
+                                    ownNotifyRows -> actionRows(id, key, "update")
+                                    sharedAction -> actionRows(id, key)
+                                    else -> JsonArray(emptyList())
+                                },
+                            ),
+                        )
+                    } else {
+                        emptyList()
+                    }
+                )
+        }
 
     private suspend fun reply(call: ApplicationCall) {
         val path = call.request.path()
@@ -268,11 +333,9 @@ internal class ContractServer(
                         return
                     }
                     performBodies += body
-                    val eligible = keys(id).map { key -> buildJsonObject { put("order_number", key) } }
                     val action = path.substringAfter("/actions/").substringBefore('/')
-                    if (eligible.isEmpty() ||
-                        (action != "release" && !((includeMail || sharedAction) && action == "notify"))
-                    ) {
+                    val mine = previewActions(id).filter { it["action"] == JsonPrimitive(action) }
+                    if (mine.isEmpty()) {
                         call.respondText(
                             "the run has no rows of action $action",
                             ContentType.Text.Plain,
@@ -280,26 +343,28 @@ internal class ContractServer(
                         )
                         return
                     }
-                    val selected = (requested ?: eligible).distinct()
-                    val performed = if (performFault == "performs") selected.filter { it in eligible } else emptyList()
-                    val skipped =
-                        selected.filterNot { it in performed }.let {
-                            if (performFault ==
-                                "omits"
-                            ) {
-                                it.dropLast(1)
-                            } else {
-                                it
-                            }
+                    val wanted = requested?.jsonArray?.toSet()
+                    val selected = mine.filter { wanted == null || it["key"] in wanted }
+                    val unknown = wanted.orEmpty() - selected.map { it.getValue("key") }.toSet()
+                    val rows = batchRows(id).associateBy { it.getValue("seq") }
+
+                    fun fault(entry: JsonObject): String? =
+                        performFault.takeIf {
+                            val key = entry["key"]?.jsonObject?.get("order_number")
+                            (performFaultAction == null || action == performFaultAction) &&
+                                (performFaultKey == null || key == performFaultKey?.let(::JsonPrimitive))
                         }
+                    val answered = if (performFault == "omits") selected.dropLast(1) else selected
+                    val performed = answered.filter { fault(it) == "performs" }
+                    val skipped = answered - performed.toSet()
                     buildJsonObject {
                         put(
                             "performed",
                             JsonArray(
-                                performed.map { key ->
+                                performed.map { entry ->
                                     buildJsonObject {
-                                        put("key", key)
-                                        put("batchRows", JsonArray(emptyList()))
+                                        put("key", entry.getValue("key"))
+                                        put("batchRows", entry.getValue("batchRows"))
                                     }
                                 },
                             ),
@@ -307,31 +372,39 @@ internal class ContractServer(
                         put(
                             "skipped",
                             JsonArray(
-                                skipped.map { key ->
+                                unknown.map { key ->
                                     buildJsonObject {
-                                        put(
-                                            "key",
-                                            if (performFault ==
-                                                "key"
-                                            ) {
-                                                JsonObject(key.jsonObject + ("extra" to JsonPrimitive(1)))
-                                            } else {
-                                                key
-                                            },
-                                        )
-                                        put(
-                                            "reason",
-                                            when {
-                                                key !in eligible -> "not-a-key"
-                                                performFault == "reason" -> "wrong-reason"
-                                                performFault == "dry-run" -> "dry-run"
-                                                performFault == "held" -> "held"
-                                                batchRows(id).any { it["key"] == key && it["group"] != null } -> "held"
-                                                else -> "dry-run"
-                                            },
-                                        )
+                                        put("key", key)
+                                        put("reason", "not-a-key")
                                     }
-                                },
+                                } +
+                                    skipped.map { entry ->
+                                        buildJsonObject {
+                                            val key = entry.getValue("key")
+                                            put(
+                                                "key",
+                                                if (fault(entry) ==
+                                                    "key"
+                                                ) {
+                                                    JsonObject(key.jsonObject + ("extra" to JsonPrimitive(1)))
+                                                } else {
+                                                    key
+                                                },
+                                            )
+                                            put(
+                                                "reason",
+                                                when {
+                                                    fault(entry) == "reason" -> "wrong-reason"
+                                                    fault(entry) == "dry-run" -> "dry-run"
+                                                    fault(entry) == "held" -> "held"
+                                                    entry.getValue("batchRows").jsonArray.any { seq ->
+                                                        rows[seq]?.get("group")?.let { it != JsonNull } == true
+                                                    } -> "held"
+                                                    else -> "dry-run"
+                                                },
+                                            )
+                                        }
+                                    },
                             ),
                         )
                     }.toString()
@@ -346,7 +419,10 @@ internal class ContractServer(
                     "{}"
                 }
                 path.endsWith("/digests") -> """{"groups":[]}"""
-                path.endsWith("/routes/release") || (includeMail && path.endsWith("/routes/hold")) -> {
+                path.endsWith(
+                    "/routes/release",
+                ) ||
+                    ((includeMail || overlapRelease) && path.endsWith("/routes/hold")) -> {
                     val offset = call.request.queryParameters["offset"]!!.toInt()
                     buildJsonObject {
                         put(
@@ -389,11 +465,8 @@ internal class ContractServer(
                 path.endsWith("/batch") ->
                     buildJsonObject {
                         put("mode", "preview")
-                        put(
-                            "rows",
-                            JsonArray(batchRows(id)),
-                        )
-                    }.toString()
+                        put("rows", JsonArray(batchRows(id)))
+                    }.also { batches += it }.toString()
                 path.endsWith("/close") -> {
                     closed += id
                     """{"status":"closed"}"""
@@ -403,55 +476,7 @@ internal class ContractServer(
                         put("status", if (id in closed) "closed" else "evaluated")
                         put("dryRun", true)
                         put("verdict", verdict(id))
-                        put(
-                            "actions",
-                            JsonArray(
-                                keys(id).flatMap { key ->
-                                    listOf(
-                                        buildJsonObject {
-                                            put("key", buildJsonObject { put("order_number", key) })
-                                            put("action", "release")
-                                            put("arguments", buildJsonObject { put("order", key) })
-                                            put("batchRows", actionRows(id, key))
-                                        },
-                                    ) +
-                                        if (includeMail || (sharedAction && actionRows(id, key).isNotEmpty())) {
-                                            listOf(
-                                                buildJsonObject {
-                                                    put("key", buildJsonObject { put("order_number", key) })
-                                                    put("action", "notify")
-                                                    put(
-                                                        "arguments",
-                                                        buildJsonObject {
-                                                            if (sharedAction) {
-                                                                put(
-                                                                    "order",
-                                                                    key,
-                                                                )
-                                                            } else {
-                                                                put("who", "role.sales")
-                                                            }
-                                                        },
-                                                    )
-                                                    put(
-                                                        "batchRows",
-                                                        if (sharedAction) {
-                                                            actionRows(
-                                                                id,
-                                                                key,
-                                                            )
-                                                        } else {
-                                                            JsonArray(emptyList())
-                                                        },
-                                                    )
-                                                },
-                                            )
-                                        } else {
-                                            emptyList()
-                                        }
-                                },
-                            ),
-                        )
+                        put("actions", JsonArray(previewActions(id)))
                     }.toString()
                 else -> error("unexpected $path")
             }

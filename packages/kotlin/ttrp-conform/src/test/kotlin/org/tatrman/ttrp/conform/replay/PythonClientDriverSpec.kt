@@ -40,6 +40,7 @@ class PythonClientDriverSpec :
             mode: String,
             held: Boolean = false,
             shared: Boolean = false,
+            overlap: Boolean = false,
         ): java.nio.file.Path {
             val graph =
                 RecipeGraph(
@@ -77,8 +78,15 @@ class PythonClientDriverSpec :
                         false,
                         emptyMap(),
                     ),
-                    Roles("candidates", emptyList(), "decision", "exclusive"),
-                    listOf(RouteMeta("release", "ready", emptyList(), false, false, false)),
+                    Roles("candidates", emptyList(), "decision", if (overlap) "overlapping" else "exclusive"),
+                    listOf(RouteMeta("release", "ready", emptyList(), false, false, false)) +
+                        if (overlap) {
+                            listOf(
+                                RouteMeta("hold", "ready", emptyList(), false, false, false),
+                            )
+                        } else {
+                            emptyList()
+                        },
                     emptyList(),
                     mapOf(
                         "release" to
@@ -148,6 +156,38 @@ class PythonClientDriverSpec :
             )
             return dir
         }
+
+        fun states(vararg keys: Int): JsonObject =
+            buildJsonObject {
+                put("entity", "er.entity.order")
+                put(
+                    "attr",
+                    buildJsonObject {
+                        put("state", buildJsonObject { keys.forEach { put(it.toString(), "released") } })
+                    },
+                )
+            }
+
+        fun withNotify(
+            base: ReplayFixture,
+            vararg keys: Int,
+        ): ReplayFixture =
+            base.copy(
+                expected =
+                    base.expected.mapValues { (_, expected) ->
+                        expected.copy(
+                            actions =
+                                expected.actions.orEmpty() +
+                                    keys.map { key ->
+                                        buildJsonObject {
+                                            put("key", key)
+                                            put("action", "notify")
+                                            put("columns", buildJsonObject { put("order", key) })
+                                        }
+                                    },
+                        )
+                    },
+            )
         "generated service replays per key and batch, including async evaluate, paging, details and actual perform" {
             ContractServer().use { server ->
                 val starts = Files.createTempFile("python-starts-", ".txt").also { dirs.add(it) }
@@ -202,22 +242,7 @@ class PythonClientDriverSpec :
                 server.sharedAction = true
                 val driver =
                     PythonClientDriver(server.url, "test-token", listOf(export("batch", held = true, shared = true)))
-                val sharedFixture =
-                    fixture.copy(
-                        expected =
-                            fixture.expected.mapValues { (_, expected) ->
-                                expected.copy(
-                                    actions =
-                                        expected.actions.orEmpty() +
-                                            buildJsonObject {
-                                                put("key", 4711)
-                                                put("action", "notify")
-                                                put("columns", buildJsonObject { put("order", 4711) })
-                                            },
-                                )
-                            },
-                        finalStates = null,
-                    )
+                val sharedFixture = withNotify(fixture.copy(finalStates = states(4711)), 4711)
                 val accepted = ReplayRunner.run(sharedFixture, listOf("python-client.batch")) { driver }
                 io.kotest.assertions.withClue(accepted.summary()) { accepted.exitCode shouldBe 0 }
                 server.performBodies.map { it.getValue("keys").jsonArray.size } shouldBe listOf(2, 1)
@@ -229,34 +254,105 @@ class PythonClientDriverSpec :
                     true
             }
         }
-        "per-key perform rejects forged reasons and grouped rows without a marked owner" {
-            for (fault in listOf("held-without-group", "dry-run-for-group", "orphan-group")) {
+        "per-entry perform rejects held for a marked empty key and dry-run for an unmarked shared entry" {
+            for (fault in listOf("empty-held", "shared-dry", "orphan-group")) {
                 ContractServer().use { server ->
                     server.asyncOnce = false
-                    server.heldRelease = fault != "held-without-group"
+                    server.heldRelease = true
+                    server.emptyReleaseKey = if (fault == "empty-held") 4712 else null
+                    server.sharedAction = fault == "shared-dry"
                     server.performFault =
                         when (fault) {
-                            "held-without-group" -> "held"
-                            "dry-run-for-group" -> "dry-run"
+                            "empty-held" -> "held"
+                            "shared-dry" -> "dry-run"
                             else -> null
                         }
+                    server.performFaultAction = if (fault == "shared-dry") "notify" else "release"
+                    server.performFaultKey = if (fault == "empty-held") 4712 else null
                     val driver =
                         PythonClientDriver(
                             server.url,
                             "test-token",
                             listOf(
-                                export(
-                                    "batch",
-                                    held =
-                                        fault == "dry-run-for-group",
-                                ),
+                                export("batch", held = fault != "orphan-group", shared = server.sharedAction),
                             ),
                         )
-                    val report = ReplayRunner.run(fixture, listOf("python-client.batch")) { driver }
-                    report.exitCode shouldBe 2
+                    val expected =
+                        when (fault) {
+                            "empty-held" -> fixture.copy(finalStates = states(4711))
+                            "shared-dry" -> withNotify(fixture, 4711, 4712)
+                            else -> fixture
+                        }
+                    val report = ReplayRunner.run(expected, listOf("python-client.batch")) { driver }
+                    io.kotest.assertions.withClue(fault + ": " + report.summary()) { report.exitCode shouldBe 2 }
                     report.summary() shouldContain "perform effects differ"
                     if (fault == "orphan-group") server.performBodies.size shouldBe 0
                 }
+            }
+        }
+        "overlapping routes keep both entry answers and request each action key once" {
+            ContractServer().use { server ->
+                server.asyncOnce = false
+                server.heldRelease = true
+                server.overlapRelease = true
+                val driver =
+                    PythonClientDriver(server.url, "test-token", listOf(export("batch", held = true, overlap = true)))
+                val overlapping =
+                    fixture.copy(
+                        expected =
+                            fixture.expected.mapValues { (_, expected) ->
+                                expected.copy(
+                                    verdicts =
+                                        expected.verdicts.orEmpty() +
+                                            expected.verdicts.orEmpty().map {
+                                                JsonObject(it + ("route" to JsonPrimitive("hold")))
+                                            },
+                                    actions = expected.actions.orEmpty() + expected.actions.orEmpty(),
+                                    detailCounts =
+                                        buildJsonObject {
+                                            for (key in listOf(
+                                                4711,
+                                                4712,
+                                            )) {
+                                                put(key.toString(), buildJsonObject { put("stock", 2) })
+                                            }
+                                        },
+                                )
+                            },
+                    )
+                val accepted = ReplayRunner.run(overlapping, listOf("python-client.batch")) { driver }
+                io.kotest.assertions.withClue(accepted.summary()) { accepted.exitCode shouldBe 0 }
+                val sent =
+                    server.performBodies
+                        .single()
+                        .getValue("keys")
+                        .jsonArray
+                sent.size shouldBe 2
+                sent.distinct().size shouldBe 2
+                server.performFault = "omits"
+                val missing = ReplayRunner.run(overlapping, listOf("python-client.batch")) { driver }
+                missing.exitCode shouldBe 2
+                missing.summary() shouldContain "perform effects differ"
+            }
+        }
+        "the fake holds by entry rows and emits dense seqs with explicit null groups" {
+            ContractServer().use { server ->
+                server.asyncOnce = false
+                server.heldRelease = true
+                server.emptyReleaseKey = 4711
+                server.ownNotifyRows = true
+                val driver =
+                    PythonClientDriver(server.url, "test-token", listOf(export("batch", held = true, shared = true)))
+                val expected = withNotify(fixture.copy(finalStates = states(4712)), 4711, 4712)
+                val report = ReplayRunner.run(expected, listOf("python-client.batch")) { driver }
+                io.kotest.assertions.withClue(report.summary()) { report.exitCode shouldBe 0 }
+                val rows =
+                    server.batches
+                        .single()
+                        .getValue("rows")
+                        .jsonArray
+                rows.map { it.jsonObject.getValue("seq") } shouldBe listOf(1, 2, 3).map(::JsonPrimitive)
+                rows.drop(1).forEach { it.jsonObject["group"] shouldBe JsonNull }
             }
         }
         "fixture timeout sums each request budget, including one re-open and uv startup" {
