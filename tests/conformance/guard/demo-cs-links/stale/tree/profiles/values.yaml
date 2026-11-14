@@ -1,0 +1,19 @@
+profile: demo-values/1
+grammar: '>=0.22 <1.0'
+extends: ./demo-cs.yaml
+operations:
+  # S3.3 values · shape · link on 08-values / 09-patterns / the l*-files and the link negatives.
+  - {op: kinds, at: /entity, mapping: {entita: entity}, files: [08-values.yaml, l1-prodej.yaml, l2-objednavky.yaml, link-unresolved.yaml, link-ambiguous.yaml]}
+  - {op: kinds, at: /vztahy, mapping: {vztah: relation}, files: [08-values.yaml, l2-objednavky.yaml, link-unresolved.yaml, link-ambiguous.yaml]}
+  - {op: kinds, at: /mapovani, mapping: {mapovani: er2db_attribute}, files: [l2-objednavky.yaml]}
+  - {op: kinds, at: /dotazy, mapping: {dotaz: query}, files: [09-patterns.yaml]}
+  - {op: values, in: attribute, at: /typ, to: {kind: attribute, property: type}, mapping: {číslo: integer, text: string}, default: string, files: [08-values.yaml]}
+  - {op: values, in: entity, at: /druh, to: {kind: entity, property: description}, mapping: {objednavka: {cs: Objednávka, en: Order}, zakaznik: {cs: Zákazník, en: Customer}}, files: [08-values.yaml]}
+  - {op: values, in: attribute, at: /domena, to: {kind: attribute, property: domain}, mapping: {mena: demo.md.domain.Mena}, files: [08-values.yaml]}
+  - {op: link, in: attribute, at: /sloupec, to: {kind: attribute, path: [binding, target, column]}, by: sourceName, files: [08-values.yaml]}
+  - {op: rename, in: attribute, at: /sloupec_holy, to: {kind: attribute, property: binding}, files: [08-values.yaml]}
+  - {op: link, in: relation, at: /od, to: {kind: relation, property: from}, by: sourceName}
+  - {op: link, in: relation, at: /do, to: {kind: relation, property: to}, by: sourceName}
+  - {op: link, in: relation, at: /cizi_klic, to: {kind: relation, path: [binding, fk]}, by: sourceName, files: [08-values.yaml]}
+  - {op: link, in: er2db_attribute, at: /atribut, to: {kind: er2db_attribute, property: attribute}, by: path}
+  - {op: shape, in: query, at: '', to: {kind: query, path: [search, patterns]}, template: [{input: /vzor}, {input: /vzor_alt}]}

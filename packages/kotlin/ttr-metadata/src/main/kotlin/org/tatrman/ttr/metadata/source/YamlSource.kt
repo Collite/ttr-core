@@ -68,6 +68,18 @@ class YamlFileSource(
     private val layouts: Boolean = false,
     private val allMdHopIssues: Boolean = false,
 ) : ModelSource {
+    /** A [ProfileSession]'s reader, shared with its apply run; null builds a fresh one per load. */
+    private var shared: YamlTreeReader? = null
+
+    internal constructor(
+        sourceId: String,
+        priority: Int,
+        storage: ModelStorage,
+        reader: YamlTreeReader,
+    ) : this(sourceId, priority, storage) {
+        shared = reader
+    }
+
     override fun load(): SourceSnapshot =
         FileBasedSource(
             sourceId,
@@ -75,7 +87,7 @@ class YamlFileSource(
             storage,
             layouts,
             allMdHopIssues,
-            YamlTreeReader(profile, catalog),
+            shared ?: YamlTreeReader(profile, catalog),
         ).load()
 
     companion object {
@@ -134,6 +146,13 @@ internal class YamlTreeReader(
             message: String,
         ) = LoadWarning(sourceId, file, line, column, message).also { errors += it }
 
+        /** Another run's own record of the same plan: what the plan raised, and nothing a run added. */
+        fun copy() =
+            Problems(sourceId).also {
+                it.errors += errors
+                it.dropped += dropped
+            }
+
         /** The issue names where the problem is; the dropped entry names the dialect file it removes. */
         fun drop(
             file: StorageFile,
@@ -168,8 +187,11 @@ internal class YamlTreeReader(
         val root: Path?,
         private val catalog: Map<String, Path>,
         private val problems: Problems,
-        /** The tree declaration's storage name when the tree declares a profile (review-269 F8). */
-        private val tree: String?,
+        /**
+         * The tree declaration's storage name when the tree's own `ttr.yaml` needs the resolver (review-269 F8, N3):
+         * asked only when the resolver cannot be built, so a tree that never needs one never reads its declaration.
+         */
+        private val tree: () -> String?,
     ) {
         private var resolver: Result<ProfileResolver>? = null
 
@@ -195,7 +217,7 @@ internal class YamlTreeReader(
             fun failure(): Result<ProfileResolver> {
                 val issue =
                     problems.error(
-                        tree ?: at,
+                        tree() ?: at,
                         1,
                         1,
                         "ys/profile-not-found: profiles need a filesystem-backed storage (root ${root ?: "none"})",
@@ -212,7 +234,7 @@ internal class YamlTreeReader(
     }
 
     /** The tree as the walk and the declarations see it: canonical files, and dialect files by profile chain. */
-    internal class Plan(
+    internal data class Plan(
         val root: Path?,
         val canonical: List<Pair<StorageFile, String>>,
         val dialect: List<Pair<List<ProfileDefinition>, List<Pair<StorageFile, String>>>>,
@@ -241,6 +263,25 @@ internal class YamlTreeReader(
         storage: ModelStorage,
         sourceId: String,
     ): Plan {
+        // One reader serves a profile command's load and its apply run (S3.6, from S3.5 review-269 F8): the walk, the
+        // reads and the declarations are planned once per listing; each run records its own problems on a copy.
+        // The loader lists `.ttrm` too; the key holds only what the plan reads, so its listing and apply's agree.
+        val planned = listed.filter { file -> (listOf("yaml") + extensions).any { file.path.endsWith(".$it") } }
+        val key = Triple(storage, sourceId, planned.sortedBy { it.path }.map { it.path to it.sizeBytes })
+        memo?.takeIf { it.first == key }?.second?.let { return it.copy(problems = it.problems.copy()) }
+        return planned(listed, storage, sourceId).also { memo = key to it.copy(problems = it.problems.copy()) }
+    }
+
+    private var memo: Pair<Triple<ModelStorage, String, List<Pair<String, Long>>>, Plan>? = null
+
+    /** Parsed dialect files by storage path, for every run over one plan: a [ForeignTree] is immutable. */
+    private val trees = mutableMapOf<String, Result<ForeignTree>>()
+
+    private fun planned(
+        listed: List<StorageFile>,
+        storage: ModelStorage,
+        sourceId: String,
+    ): Plan {
         val problems = Problems(sourceId)
         var declarationFile: StorageFile? = null
         var ignoreFile: StorageFile? = null
@@ -259,8 +300,17 @@ internal class YamlTreeReader(
         }
         val storageRoot = listed.firstNotNullOfOrNull { it.rootPath }
         val treeName = declarationFile?.path ?: storageRoot?.resolve("ttr.yaml")?.toString() ?: "ttr.yaml"
-        val declares = profile != null || declarationFile != null
-        val profiles = Profiles(storageRoot?.toAbsolutePath(), catalog, problems, treeName.takeIf { declares })
+        // Only a ttr.yaml the resolver must read is the shared reason: not an override, not the bundled identity (N3).
+        val declares = {
+            profile == null &&
+                declarationFile != null &&
+                runCatching {
+                    ProfileResolver.bundled(
+                        DeclarationReader.readTree(storage.read(declarationFile), absolute(treeName)),
+                    )
+                }.getOrNull() == null
+        }
+        val profiles = Profiles(storageRoot?.toAbsolutePath(), catalog, problems) { treeName.takeIf { declares() } }
         val ignore =
             ignoreFile?.let { modelIgnore(it, storage, problems) }?.getOrElse { e ->
                 // Fail closed (review-260 F4): without the ignore list no file is known to be content.
@@ -374,11 +424,16 @@ internal class YamlTreeReader(
     ): Pair<ApplyResult, List<Pair<StorageFile, ForeignTree>>>? {
         val trees = linkedMapOf<String, Pair<StorageFile, ForeignTree>>()
         for ((file, text) in files) {
-            try {
-                trees[file.path] = file to ForeignTree.read(text, file.underRoot(), file.path)
-            } catch (e: ProfileException) {
-                problems.drop(file, problems.profile(e))
-            }
+            val tree =
+                this.trees.getOrPut("${file.path}\u0000${text.hashCode()}") {
+                    runCatching { ForeignTree.read(text, file.underRoot(), file.path) }
+                }
+            tree
+                .onSuccess { trees[file.path] = file to it }
+                .onFailure { e ->
+                    if (e !is ProfileException) throw e
+                    problems.drop(file, problems.profile(e))
+                }
         }
         while (trees.isNotEmpty()) {
             val result =

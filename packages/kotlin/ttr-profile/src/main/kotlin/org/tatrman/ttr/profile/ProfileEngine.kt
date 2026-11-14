@@ -34,10 +34,25 @@ data class ApplyReport(
     val overridden: List<Overridden> = emptyList(),
 )
 
+/**
+ * One `<package>.sources.json` entry (contracts §6, XM D-9): a record of the run by its [qname], with the foreign names
+ * the link index matches — [sourceName] (`by: sourceName`), [foreignId] (`by: iri`) and [locator] (`by: path`).
+ */
+data class SourceEntry(
+    val qname: String,
+    val kind: String,
+    val pkg: String,
+    val foreignId: String?,
+    val sourceName: String?,
+    val locator: String?,
+)
+
+/** [sources] are the run's records as sidecar entries (MW S3.6 T4), in record order. */
 data class ApplyResult(
     val documents: List<EmittedDocument>,
     val ignored: List<Ignored>,
     val report: ApplyReport,
+    val sources: List<SourceEntry> = emptyList(),
 ) {
     /** The PR-body report: `documents[]` (package, model, imports, defs), `ignored[]` and `overridden[]`. */
     fun reportJson(): JsonObject =

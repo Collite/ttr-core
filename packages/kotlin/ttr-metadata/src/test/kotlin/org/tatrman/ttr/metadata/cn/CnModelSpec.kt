@@ -132,6 +132,19 @@ class CnModelSpec :
             } shouldBe true
         }
 
+        "review-269 N3: a cn load error's column is 1-based (the definition's first character)" {
+            val durative = concepts.result.errors.filter { it.message.startsWith("cn/durative-event") }
+            durative.size shouldBe 3
+            durative.forEach { issue ->
+                val line =
+                    java.nio.file.Path
+                        .of(issue.file)
+                        .toFile()
+                        .readLines()[issue.line - 1]
+                issue.column shouldBe line.indexOfFirst { !it.isWhitespace() } + 1
+            }
+        }
+
         "a source with no cn content gets an empty cn tier" {
             val root = Files.createTempDirectory("no-cn")
             Files.createDirectories(root.resolve("shop"))

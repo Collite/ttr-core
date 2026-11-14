@@ -16,6 +16,11 @@ data class ExportRequest(
     val previousIds: Set<String>? = null,
     val renames: List<Rename> = emptyList(),
     val connections: List<ConnectionDescriptor> = emptyList(),
+    /**
+     * MW S3.6 T2: with inputs, each `ttr` file is a generated file and starts with its own `//` header line, the input
+     * paths relative to that file's directory (review-277 F7).
+     */
+    val generatedFrom: GeneratedInputs? = null,
 )
 
 sealed interface ExportResult {
@@ -127,17 +132,22 @@ class Exporter {
                             .Single(
                                 file,
                                 "text/plain; charset=utf-8",
-                                TtrRenderer
-                                    .renderFile(
-                                        layer,
-                                        first.fileNamespace,
-                                        defs.map {
-                                            it.def
-                                        },
-                                        first.pkg.takeIf { it.isNotEmpty() },
-                                        first.imports,
-                                        first.locale,
-                                    ).toByteArray(Charsets.UTF_8),
+                                (
+                                    request.generatedFrom
+                                        ?.header(file)
+                                        ?.line(GeneratedHeader.Form.TTRM)
+                                        .orEmpty() +
+                                        TtrRenderer.renderFile(
+                                            layer,
+                                            first.fileNamespace,
+                                            defs.map {
+                                                it.def
+                                            },
+                                            first.pkg.takeIf { it.isNotEmpty() },
+                                            first.imports,
+                                            first.locale,
+                                        )
+                                ).toByteArray(Charsets.UTF_8),
                             )
                     }
                 ExportResult.Bundle(files)

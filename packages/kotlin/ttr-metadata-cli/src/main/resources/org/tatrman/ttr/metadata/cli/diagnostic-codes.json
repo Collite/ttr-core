@@ -13,7 +13,7 @@
   {"code":"xm/link-unresolved","family":"xm","meaning":"A link names nothing in the run or its sidecars","raisedBy":"ttr-profile ValueOps (link)"},
   {"code":"xm/link-ambiguous","family":"xm","meaning":"A link names more than one target","raisedBy":"ttr-profile ValueOps (link), Overlay"},
   {"code":"xm/overlay-orphan","family":"xm","meaning":"An overlay entry names no emitted definition (its suggestion may carry a rename)","raisedBy":"ttr-profile Overlay"},
-  {"code":"xm/generated-stale","family":"xm","meaning":"A generated file is older than its source","raisedBy":"reserved for MW-P3 S3.6"},
-  {"code":"xm/generated-edited","family":"xm","meaning":"A generated file was edited by hand","raisedBy":"reserved for MW-P3 S3.6"},
-  {"code":"xm/snapshot-size","family":"xm","meaning":"A snapshot exceeds its size limit","raisedBy":"reserved for MW-P3 S3.6"}
+  {"code":"xm/generated-stale","family":"xm","meaning":"An input a generated file's header names changed since generation, or is not found","raisedBy":"ttr-metadata GeneratedGuard (lint)"},
+  {"code":"xm/generated-edited","family":"xm","meaning":"A generated file's body differs from a fresh generation of its inputs, or its header is malformed","raisedBy":"ttr-metadata GeneratedGuard (lint)"},
+  {"code":"xm/snapshot-size","family":"xm","meaning":"A captured snapshot exceeds 5 MiB and --large was not given","raisedBy":"ttr-metadata SnapshotCapture (snapshot)"}
 ]

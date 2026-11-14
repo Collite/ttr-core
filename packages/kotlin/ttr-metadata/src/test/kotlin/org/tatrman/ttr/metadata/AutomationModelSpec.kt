@@ -309,6 +309,37 @@ class AutomationModelSpec :
                 3
         }
 
+        "review-269 N3: a world member's drop and a validator error carry 1-based columns" {
+            val world =
+                project(
+                    automationFile,
+                    "acme/worlds/w.ttrm" to
+                        """
+                        package acme.worlds
+                        model world
+                        def world w {
+                            def executor x { extends: n8n_l1 }
+                            def deployment off  { program: p, target: x, run_as: caller, enabled: "false" }
+                        }
+                        """,
+                )
+            // Source.kt's world site: `def deployment` is indented four, so it starts in column 5.
+            world.errors.single { it.message.startsWith("ttr/automation-deployment-dropped") }.column shouldBe 5
+            val validated =
+                project(
+                    automationFile,
+                    "acme/automation/b.ttrm" to
+                        """
+                        package acme.automation
+                        model automation
+                        def schema s { columns: [def column a { type: text }] }
+                        def service q { request: nope, response: s }
+                        """,
+                )
+            // ModelReconciler's validator site: the reference `nope`.
+            validated.errors.single().column shouldBe "def service q { request: nope".indexOf("nope") + 1
+        }
+
         "M4: automation validation errors are load errors" {
             val r =
                 project(

@@ -5,18 +5,21 @@ import org.tatrman.ttr.metadata.LoadIssue
 import org.tatrman.ttr.metadata.LoadReport
 import org.tatrman.ttr.metadata.LoadReportIssue
 import org.tatrman.ttr.metadata.PackageLayout
+import org.tatrman.ttr.metadata.source.GeneratedGuard
+import org.tatrman.ttr.metadata.source.HeaderOptions
 import org.tatrman.ttr.metadata.source.LoadWarning
 import org.tatrman.ttr.metadata.source.LocalFsStorage
-import org.tatrman.ttr.metadata.source.ProfileApply
 import org.tatrman.ttr.metadata.source.ProfileApplyResult
+import org.tatrman.ttr.metadata.source.ProfileCatalog
+import org.tatrman.ttr.metadata.source.ProfileSession
 import org.tatrman.ttr.metadata.source.SourceKind
 import org.tatrman.ttr.metadata.source.YamlFileSource
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.Path
 import kotlin.io.path.extension
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
-import kotlin.io.path.readText
 
 /** `lint`'s output formats (contracts §5). */
 enum class LintFormat { TEXT, JSON, GITHUB }
@@ -91,10 +94,21 @@ internal class Target(
                 val layout = if (checkout) manifestLayout else PackageLayout.Flexible
                 return Resolved.Ok(Target(project, modelRoot, SourceKind.TTR, layout, issues, null, emptyMap()))
             }
-            val catalog =
-                when (val read = catalog(modelRoot)) {
-                    is Catalog.Duplicate -> return Resolved.Usage(read.message)
-                    is Catalog.Read -> read.entries
+            val read = ProfileCatalog.read(modelRoot)
+            // review-269 N2: a duplicated identity is a usage error only for the run that names it; otherwise it is
+            // left out of the catalog with one warning, and a lookup of it fails where it is made.
+            profile?.let { name -> read.duplicates[name]?.let { return Resolved.Usage(duplicate(name, it)) } }
+            val catalog = read.entries
+            val warnings =
+                read.duplicates.map { (name, paths) ->
+                    LoadReportIssue(
+                        "${modelRoot.resolve(paths.first())}",
+                        1,
+                        "profile-duplicate",
+                        LoadIssue.Severity.WARNING,
+                        "${duplicate(name, paths)}; left out of the catalog",
+                        1,
+                    )
                 }
             val reference =
                 when {
@@ -107,7 +121,15 @@ internal class Target(
                     }
                 }
             return Resolved.Ok(
-                Target(project, modelRoot, SourceKind.YAML, PackageLayout.Off, issues, reference, catalog),
+                Target(
+                    project,
+                    modelRoot,
+                    SourceKind.YAML,
+                    PackageLayout.Off,
+                    yamlLayout(issues) + warnings,
+                    reference,
+                    catalog,
+                ),
             )
         }
 
@@ -122,40 +144,26 @@ internal class Target(
                     }.toList()
             }
 
-        private sealed interface Catalog {
-            class Read(
-                val entries: Map<String, Path>,
-            ) : Catalog
-
-            class Duplicate(
-                val message: String,
-            ) : Catalog
-        }
-
-        /**
-         * `<root>/profiles/<file>.yaml` by the identity it declares (`profile: <name>/<major>`); unreadable files skip.
-         * Two files declaring one identity are a usage error naming both (review-269 F8).
-         */
-        private fun catalog(root: Path): Catalog {
-            val directory = root.resolve("profiles")
-            if (!Files.isDirectory(directory)) return Catalog.Read(emptyMap())
-            val identity = Regex("""^profile:\s*['"]?([^'"\s#]+)""", RegexOption.MULTILINE)
-            val declared =
-                files(directory)
-                    .filter { it.extension == "yaml" || it.extension == "yml" }
-                    .sorted()
-                    .mapNotNull { file ->
-                        runCatching { identity.find(file.readText())?.groupValues?.get(1) }.getOrNull()?.let {
-                            it to root.relativize(file)
-                        }
-                    }.groupBy({ it.first }, { it.second })
-            declared.entries.firstOrNull { it.value.size > 1 }?.let { (name, paths) ->
-                return Catalog.Duplicate(
-                    "profiles ${paths.joinToString(" and ") { it.joinToString("/") }} both declare $name",
-                )
+        /** A yaml tree is served with layout `off` (review-269 F6), so the manifest's fallback does not apply (N3). */
+        private fun yamlLayout(issues: List<LoadReportIssue>) =
+            issues.map {
+                if (it.code != "manifest-package-layout") {
+                    it
+                } else {
+                    it.copy(
+                        message =
+                            it.message.replace(
+                                "Falling back to flexible.",
+                                "A yaml tree is served with layout off.",
+                            ),
+                    )
+                }
             }
-            return Catalog.Read(declared.mapValues { it.value.single() })
-        }
+
+        private fun duplicate(
+            name: String,
+            paths: List<Path>,
+        ) = "profiles ${paths.joinToString(" and ") { it.joinToString("/") }} both declare $name"
     }
 }
 
@@ -180,7 +188,8 @@ object LintCli {
             is Resolved.NoModel -> outcome(resolved.project, resolved.report, failed = true, format)
             is Resolved.Ok -> {
                 val target = resolved.target
-                val (result, report) = MetadataLoadCli.load(target.source(), target.layout, target.manifestIssues)
+                val (result, loaded) = MetadataLoadCli.load(target.source(), target.layout, target.manifestIssues)
+                val report = guarded(target, loaded)
                 outcome(target.project, report, result.model == null || (strict && !report.ok), format)
             }
         }
@@ -214,14 +223,16 @@ object LintCli {
         if (target.kind != SourceKind.YAML) {
             return usage("profile commands need a yaml tree; ${target.modelRoot} holds .ttrm")
         }
-        val (result, loaded) = MetadataLoadCli.load(target.source(), target.layout, target.manifestIssues)
-        val applied =
-            ProfileApply.run(
+        // One pass over the tree for both (S3.6): the load and the apply run share the session's plan.
+        val session =
+            ProfileSession(
                 LocalFsStorage(MetadataLoadCli.CHECKOUT_SOURCE, target.modelRoot),
                 target.profile,
                 target.catalog,
                 MetadataLoadCli.CHECKOUT_SOURCE,
             )
+        val (result, loaded) = MetadataLoadCli.load(session.source(), target.layout, target.manifestIssues)
+        val applied = session.apply(out?.let { HeaderOptions(it.toAbsolutePath().normalize(), MetadataVersion.value) })
         val directory = out?.toAbsolutePath()?.normalize()
         if (directory != null) refusal(target.modelRoot, directory, applied.files.keys)?.let { return usage(it) }
         val report = merge(loaded, applied)
@@ -246,19 +257,46 @@ object LintCli {
         paths: Collection<String>,
     ): String? {
         val root = modelRoot.toRealPath()
-        if (real(directory).startsWith(root)) return "--out must be outside the model root $modelRoot"
-        val inside = paths.filter { real(directory.resolve(it).normalize()).startsWith(root) }
+        val resolved = real(directory) ?: return "--out $directory: too many symbolic links"
+        if (resolved.startsWith(root)) return "--out must be outside the model root $modelRoot"
+        val inside =
+            paths.filter {
+                // An unresolvable chain is refused like a path inside the root: nothing proves it lands outside.
+                real(directory.resolve(it).normalize())?.startsWith(root) ?: true
+            }
         if (inside.isEmpty()) return null
         return "--out $directory would write ${inside.joinToString(", ")} into the model root $modelRoot"
     }
 
-    /** [path] with its nearest existing ancestor made real; the part that does not exist yet appended as it is. */
-    private fun real(path: Path): Path {
+    /**
+     * [path] with its nearest existing ancestor made real; the part that does not exist yet appended as it is. A dangling
+     * symbolic link exists too: a write through it lands at its target, so the target, read against the link's real
+     * directory, is followed in its place (review-269 N1, review-277 F6). Null past [MAX_HOPS] links.
+     */
+    internal fun real(
+        path: Path,
+        hops: Int = 0,
+    ): Path? {
+        if (hops > MAX_HOPS) return null
         var existing: Path? = path
-        while (existing != null && !Files.exists(existing)) existing = existing.parent
+        while (existing != null && !Files.exists(existing, LinkOption.NOFOLLOW_LINKS)) existing = existing.parent
         existing ?: return path
-        return existing.toRealPath().resolve(existing.relativize(path))
+        val rest = existing.relativize(path)
+        if (Files.isSymbolicLink(existing) && !Files.exists(existing)) {
+            // A relative target is relative to the link's real directory: through a symlinked parent, `..` is the
+            // OS's, not the lexical one (review-277 F6). An absolute target is kept as it is.
+            val target =
+                existing
+                    .toAbsolutePath()
+                    .parent
+                    .toRealPath()
+                    .resolve(Files.readSymbolicLink(existing))
+            return real(target.resolve(rest).normalize(), hops + 1)
+        }
+        return existing.toRealPath().resolve(rest)
     }
+
+    private const val MAX_HOPS = 40
 
     /**
      * The profile commands' report: the load's, plus apply's conflicts and the files only the grouped run dropped. A
@@ -271,6 +309,33 @@ object LintCli {
         val known = loaded.issues.map { it.file to it.message }.toSet()
         val extra = applied.problems.filter { (it.file to it.message) !in known } + applied.conflicts
         return loaded.copy(issues = loaded.issues + extra.map(::error))
+    }
+
+    /**
+     * [loaded] plus the generated-file guard over the model root (S3.6 T3): `xm/generated-stale` and
+     * `xm/generated-edited` on a file whose header no longer matches its inputs, as errors. A tree without generated
+     * files is reported exactly as `load` reports it.
+     */
+    private fun guarded(
+        target: Target,
+        loaded: LoadReport,
+    ): LoadReport {
+        val guard = GeneratedGuard.check(target.modelRoot, MetadataLoadCli.CHECKOUT_SOURCE)
+        if (guard.isEmpty()) return loaded
+        return loaded.copy(
+            issues =
+                loaded.issues +
+                    guard.map {
+                        LoadReportIssue(
+                            it.file,
+                            it.line,
+                            "generated-file",
+                            LoadIssue.Severity.ERROR,
+                            it.message,
+                            it.column,
+                        )
+                    },
+        )
     }
 
     /** The diagnostic-code catalogue (`lint --codes`). */

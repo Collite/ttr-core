@@ -1,0 +1,6 @@
+entity:
+  Objednavka: {popis: Objednávka}
+vztahy:
+  ObjednavkaZakaznika: {od: Objednavka, do: Zakaznik}
+mapovani:
+  ZakaznikKod: {atribut: Zakaznik/kod}

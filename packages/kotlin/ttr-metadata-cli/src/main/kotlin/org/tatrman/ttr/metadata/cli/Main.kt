@@ -35,9 +35,10 @@ fun runMetadataCommand(args: List<String>): CliOutcome {
             mdCommand(),
             LintCommand { outcome = it },
             ProfileCommand().subcommands(ProfileApplyCommand { outcome = it }, ProfileCheckCommand { outcome = it }),
+            SnapshotCommand { outcome = it },
         )
     // MW S3.5: `lint` and `profile` exit 2 on usage (contracts §5); the older commands keep 64.
-    val usage = if (args.firstOrNull { !it.startsWith("-") } in setOf("lint", "profile")) 2 else 64
+    val usage = if (args.firstOrNull { !it.startsWith("-") } in setOf("lint", "profile", "snapshot")) 2 else 64
     return try {
         command.parse(args)
         outcome
@@ -119,6 +120,21 @@ class ProfileCheckCommand(
         .default(LintFormat.TEXT)
 
     override fun run() = output(LintCli.check(Path.of(root), profile, format))
+}
+
+/** MW S3.6 T5 — `snapshot`: the capture seam (contracts §6); P3's only adapter is `file:`. */
+class SnapshotCommand(
+    private val output: (CliOutcome) -> Unit,
+) : CliktCommand(name = "snapshot") {
+    override fun help(context: Context) =
+        "Capture a foreign export through a profile: ignored keys, principal names and usage counters removed."
+
+    private val from by option("--from", help = "The source: file:<path> (an existing export)").required()
+    private val profile by option("--profile", help = PROFILE_HELP).required()
+    private val out by option("--out", help = "Output directory; <out>/<name>.yaml").required()
+    private val large by option("--large", help = "Write a snapshot over 5 MiB").flag()
+
+    override fun run() = output(SnapshotCli.run(from, profile, Path.of(out), large))
 }
 
 class MetadataCommand : CliktCommand(name = "ttr-metadata") {

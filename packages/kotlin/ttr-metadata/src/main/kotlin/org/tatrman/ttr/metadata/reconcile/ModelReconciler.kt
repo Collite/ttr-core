@@ -17,6 +17,7 @@ import org.tatrman.ttr.metadata.model.SchemaCode
 import org.tatrman.ttr.metadata.resolve.ReferenceResolutionPass
 import org.tatrman.ttr.metadata.source.LoadWarning
 import org.tatrman.ttr.metadata.source.SourceSnapshot
+import org.tatrman.ttr.metadata.source.oneBased
 import java.time.Instant
 import java.security.MessageDigest
 
@@ -397,8 +398,7 @@ class ModelReconciler(
                     AUTOMATION_VALIDATOR_ID,
                     d.source.file,
                     d.source.line,
-                    org.tatrman.ttr.metadata.source
-                        .oneBased(d.source.column),
+                    oneBased(d.source.column),
                     "${d.code}: ${d.message}",
                 )
             when (d.severity) {
