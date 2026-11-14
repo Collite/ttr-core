@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.metadata.cli
 
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
+import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.io.path.createDirectories
+import kotlin.io.path.isRegularFile
+import kotlin.io.path.readText
+import kotlin.io.path.writeText
 
 /** MW S3.6 DONE — `lint` on the four guard fixtures (`tests/conformance/guard/demo-cs-links`). */
 class GeneratedFixturesSpec :
@@ -52,5 +58,37 @@ class GeneratedFixturesSpec :
                 it[0] == "tree/profiles/overlay-inline.yaml" && it[1] == "5" && it[3] == "xm/overlay-orphan"
             } shouldBe
                 true
+        }
+
+        test("red → green: re-applying a stale or edited case's tree over its model makes lint green (S3.7 T2)") {
+            listOf("stale", "edited").forEach { case ->
+                val work = Files.createTempDirectory("s37-red-green-$case")
+                val from = fixtures.resolve(case)
+                Files.walk(from).use { paths -> paths.filter { it.isRegularFile() }.toList() }.forEach {
+                    work
+                        .resolve(from.relativize(it).toString())
+                        .also { file -> file.parent.createDirectories() }
+                        .writeText(it.readText())
+                }
+
+                fun lint() = runMetadataCommand(listOf("lint", "--root", "${work.resolve("model")}", "--strict"))
+                withClue("$case before") { lint().exitCode shouldBe 1 }
+                runMetadataCommand(
+                    listOf(
+                        "profile",
+                        "apply",
+                        "--root",
+                        "${work.resolve("tree")}",
+                        "--out",
+                        "${work.resolve("model")}",
+                    ),
+                ).exitCode shouldBe 0
+                val after = lint()
+                // The fixture's own ttr/ warnings stay; no error, no xm/generated-* left.
+                withClue("$case after: ${after.stdout}") {
+                    after.exitCode shouldBe 0
+                    after.stdout.lines().none { ": error " in it || "xm/generated-" in it } shouldBe true
+                }
+            }
         }
     })
