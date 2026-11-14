@@ -36,6 +36,9 @@ class GeneratedFixturesSpec :
                             listOf("model/demo/binding.yaml", "1", "1", "xm/generated-stale"),
                             listOf("model/demo/er.yaml", "1", "1", "xm/generated-stale"),
                             listOf("model/prodej/er.yaml", "1", "1", "xm/generated-stale"),
+                            // The sidecars are guarded too since S3.7 T0 (S3.6 Found (g)).
+                            listOf("model/demo.sources.json", "1", "1", "xm/generated-stale"),
+                            listOf("model/prodej.sources.json", "1", "1", "xm/generated-stale"),
                         )
                 )
             errors("edited") shouldBe (1 to setOf(listOf("model/demo/er.yaml", "1", "1", "xm/generated-edited")))

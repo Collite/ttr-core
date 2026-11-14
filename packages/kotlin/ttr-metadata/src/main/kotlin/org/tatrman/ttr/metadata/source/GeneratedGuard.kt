@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.metadata.source
 
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import org.tatrman.ttr.metadata.export.GeneratedHeader
 import org.tatrman.ttr.metadata.export.Hashes
@@ -17,7 +19,9 @@ import kotlin.io.path.readText
 
 /**
  * MW S3.6 T3 — the generated-file guard (contracts §6, XM D-10): every `.ttrm` / YAML file below a model root whose
- * first line is a `generated-from:` header is checked against the inputs it names.
+ * first line is a `generated-from:` header is checked against the inputs it names, and so is every
+ * `<package>.sources.json` sidecar whose `generated-from` names them (S3.7 T0): its header is checked as a file's, its
+ * entries against the fresh run's sidecar.
  *
  * - `xm/generated-stale`: an input's recomputed SHA-256 differs from the header's, or the input is not found.
  * - `xm/generated-edited`: the header is malformed, or the body differs from a fresh generation of the named inputs
@@ -40,10 +44,12 @@ object GeneratedGuard {
         val hashes = mutableMapOf<Path, String?>()
         for (file in files(root)) {
             val text = file.readText()
-            if (!GeneratedHeader.claimed(text)) continue
+            val sidecar = file.name.endsWith(SIDECAR)
+            val sidecarHeader = if (sidecar) Sidecar.header(text) else null
+            if (if (sidecar) sidecarHeader == null else !GeneratedHeader.claimed(text)) continue
 
             fun issue(message: String) = LoadWarning(sourceId, "$file", 1, 1, message)
-            val header = GeneratedHeader.read(text)
+            val header = if (sidecar) GeneratedHeader.parse("# $sidecarHeader") else GeneratedHeader.read(text)
             if (header == null) {
                 issues += issue("xm/generated-edited: the generated-from header is not one ttr-core writes")
                 continue
@@ -73,6 +79,18 @@ object GeneratedGuard {
                 continue
             }
             if (run.failed) continue
+            if (sidecar) {
+                // The header is the file's own, already checked; the entries are the fresh run's (S3.7 T0).
+                val fresh = run.sidecar(file.name)
+                when {
+                    fresh == null ->
+                        issues += issue("xm/generated-edited: its inputs generate no sidecar for this package")
+                    Sidecar.withHeader(fresh, requireNotNull(sidecarHeader)) != text ->
+                        issues +=
+                            issue("xm/generated-edited: the sidecar differs from a fresh generation of its inputs")
+                }
+                continue
+            }
             when (val expected = run.expected(file, text, header.profile)) {
                 Expected.Overridden -> issues += overridden()
                 Expected.Missing ->
@@ -93,12 +111,49 @@ object GeneratedGuard {
         "xm/generated-edited: generated with profile $profile, which the tree's own declarations do not give this " +
             "document; an apply --profile override cannot be re-checked — declare it in ttr.yaml or the file's ttr: header"
 
-    /** `.ttrm`, `.yaml` and `.yml` below [root] that are tree content ([TreeContent]). */
+    private const val SIDECAR = ".sources.json"
+
+    /**
+     * A `<package>.sources.json` sidecar's header (contracts §6, S3.6 Found (g)): the `generated-from` string the writer
+     * puts on the line after `{`, which is [GeneratedHeader.text]. A sidecar without one, or whose `generated-from` is
+     * not a header (a dialect tree's link sidecar), is an input, not generated.
+     */
+    private object Sidecar {
+        private const val KEY = "  \"generated-from\": "
+
+        fun header(text: String): String? {
+            if (!text.startsWith("{\n$KEY")) return null
+            val value = text.removePrefix("{\n$KEY").substringBefore('\n').removeSuffix(",")
+            // Claimed only as a generated file's first line is: the value starts `generated-from: `. A hand-written
+            // provenance note (a fixture's input sidecar) is not a header.
+            if (!value.startsWith("\"${GeneratedHeader.PREFIX}")) return null
+            return try {
+                (Json.parseToJsonElement(value) as? JsonPrimitive)?.takeIf { it.isString }?.content
+            } catch (e: SerializationException) {
+                null
+            } ?: ""
+        }
+
+        /** [fresh] (written without a header) with [header] put back on its line, as `SourcesJsonWriter` writes it. */
+        fun withHeader(
+            fresh: String,
+            header: String,
+        ) = "{\n$KEY${JsonPrimitive(header)},\n" + fresh.removePrefix("{\n")
+    }
+
+    /** `.ttrm`, `.yaml`, `.yml` and `<package>.sources.json` below [root] that are tree content ([TreeContent]). */
     private fun files(root: Path): List<Path> =
         Files.walk(root).use { paths ->
             paths
-                .filter { it.isRegularFile() && GeneratedHeader.Form.of(it.name) != null }
-                .filter { file -> TreeContent.includes(root.relativize(file).map { it.name }) }
+                .filter {
+                    it.isRegularFile() &&
+                        (
+                            GeneratedHeader.Form.of(
+                                it.name,
+                            ) != null ||
+                                it.name.endsWith(SIDECAR)
+                        )
+                }.filter { file -> TreeContent.includes(root.relativize(file).map { it.name }) }
                 .sorted()
                 .toList()
         }
@@ -121,11 +176,15 @@ object GeneratedGuard {
     private class Regeneration(
         private val generated: Map<String, CanonicalDocument>,
         private val generatedBy: Map<String, String>,
+        /** Each sidecar the run writes, by file name, without a header. */
+        private val sidecars: Map<String, String>,
         val problems: List<LoadWarning>,
         /** Every chain identity the tree's declarations resolved, even when its run failed (review-277 N3). */
         val declared: Set<String>,
     ) {
         val failed get() = problems.isNotEmpty()
+
+        fun sidecar(name: String): String? = sidecars[name]
 
         /** What [file] should hold below its header: the document of its own package and model, in its form. */
         fun expected(
@@ -187,6 +246,7 @@ object GeneratedGuard {
                 return Regeneration(
                     result.generated,
                     result.generatedBy,
+                    result.files.filterKeys { it.endsWith(SIDECAR) && '/' !in it },
                     result.planned + result.problems + result.conflicts,
                     result.declared,
                 )

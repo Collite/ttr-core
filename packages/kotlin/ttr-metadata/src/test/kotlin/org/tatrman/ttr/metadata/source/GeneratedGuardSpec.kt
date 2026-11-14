@@ -71,8 +71,10 @@ class GeneratedGuardSpec :
         test("stale: an input's hash moved, at each generated file's head; inputs not found are stale too") {
             val stale = guard(case("stale"))
             codes(stale).toSet() shouldBe setOf("xm/generated-stale")
+            // Sidecars are guarded like generated files since S3.7 T0.
             stale.map { it.file.substringAfter("/model/") }.toSet() shouldBe
-                setOf("demo/binding.yaml", "demo/er.yaml", "prodej/er.yaml")
+                setOf("demo/binding.yaml", "demo/er.yaml", "prodej/er.yaml") +
+                setOf("demo.sources.json", "prodej.sources.json")
             stale.all { it.line == 1 && it.column == 1 } shouldBe true
             val gone = case("pristine")
             Files
@@ -84,6 +86,9 @@ class GeneratedGuardSpec :
                 setOf(
                     "xm/generated-stale: input not found: ../../tree",
                     "xm/generated-stale: input not found: ../../tree/profiles/overlay-inline.yaml",
+                    // The sidecars sit one level higher, at the model root.
+                    "xm/generated-stale: input not found: ../tree",
+                    "xm/generated-stale: input not found: ../tree/profiles/overlay-inline.yaml",
                 )
         }
 
@@ -113,6 +118,34 @@ class GeneratedGuardSpec :
             // At the entry's key (col 3), not its value (S3.6 Found (f), S3.7 T0).
             at.column shouldBe 3
             at.message shouldContain "demo.er.entity.Zrusena"
+        }
+
+        test("a generated sidecar is guarded like a generated file (S3.6 Found (g), S3.7 T0)") {
+            guard(case("pristine")).shouldBeEmpty()
+            val edited = case("pristine")
+            val sidecar = edited.resolve("model/demo.sources.json")
+            sidecar.writeText(sidecar.readText().replace("\"sourceName\":\"", "\"sourceName\":\"x"))
+            guard(edited).map { it.file.substringAfter("/model/") to it.message } shouldBe
+                listOf(
+                    "demo.sources.json" to
+                        "xm/generated-edited: the sidecar differs from a fresh generation of its inputs",
+                )
+            val mangled = case("pristine")
+            val head = mangled.resolve("model/prodej.sources.json")
+            head.writeText(head.readText().replaceFirst(" — do not edit", ""))
+            guard(mangled).map { it.file.substringAfter("/model/") to it.message } shouldBe
+                listOf(
+                    "prodej.sources.json" to
+                        "xm/generated-edited: the generated-from header is not one ttr-core writes",
+                )
+            // A sidecar without a header is an input (a dialect tree's link sidecar), never guarded.
+            val input = case("pristine")
+            input.resolve("model/zdroj.sources.json").writeText("{\n  \"entries\": []\n}\n")
+            input
+                .resolve(
+                    "model/note.sources.json",
+                ).writeText("{\n  \"generated-from\": \"a fixture\",\n  \"entries\": []\n}\n")
+            guard(input).shouldBeEmpty()
         }
 
         test("a generated .ttrm is checked in its own form: the document rendered") {
@@ -163,9 +196,10 @@ class GeneratedGuardSpec :
             val override = Files.createTempDirectory("s36-override").resolve("tree")
             val model = applied(override, files, override.resolve("custom/my.yaml").toString())
             val issues = GeneratedGuard.check(model, "t")
+            // The package's sidecar names the same override, so it gets the same message (S3.7 T0).
             issues.map { Triple(it.file.substringAfter("/model/"), it.line, it.column) } shouldBe
-                listOf(Triple("pm/er.yaml", 1, 1))
-            issues.single().message shouldBe
+                listOf(Triple("pm.sources.json", 1, 1), Triple("pm/er.yaml", 1, 1))
+            issues.map { it.message }.distinct().single() shouldBe
                 "xm/generated-edited: generated with profile demo-my/1, which the tree's own declarations do not " +
                 "give this document; an apply --profile override cannot be re-checked — declare it in ttr.yaml " +
                 "or the file's ttr: header"
@@ -182,7 +216,7 @@ class GeneratedGuardSpec :
                         ("profiles/y.yaml" to profile("demo-y/1", "pm")) + ("model.ignore" to "custom/\nprofiles/\n"),
                     same.resolve("custom/my.yaml").toString(),
                 )
-            GeneratedGuard.check(twin, "t").map { it.message.substringBefore(",") } shouldBe
+            GeneratedGuard.check(twin, "t").map { it.message.substringBefore(",") }.distinct() shouldBe
                 listOf("xm/generated-edited: generated with profile demo-my/1")
         }
 
