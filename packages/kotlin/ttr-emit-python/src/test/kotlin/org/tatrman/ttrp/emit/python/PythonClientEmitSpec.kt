@@ -151,7 +151,7 @@ class PythonClientEmitSpec :
                         .start()
                 process.waitFor(120, TimeUnit.SECONDS) shouldBe true
                 io.kotest.assertions.withClue(Files.readString(log)) { process.exitValue() shouldBe 0 }
-                Files.readString(log) shouldContain " passed"
+                Files.readString(log) shouldContain "48 passed"
             } finally {
                 dir.toFile().deleteRecursively()
             }

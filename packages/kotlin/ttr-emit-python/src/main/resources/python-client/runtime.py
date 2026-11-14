@@ -338,11 +338,23 @@ def execute(client: BaseClient, port: dict[str, Any], as_of: str | None, *, dry_
             obj = response_key(preview.get("key"))
             actions.append({"key": key_of(obj), "action": name, "columns": normalize_arguments(preview["arguments"])})
         batch = run.request("GET", "batch")[1]
+        rows = batch.get("rows")
+        if not isinstance(rows, list):
+            raise ApiError("malformed batch evidence")
+        seqs = set()
+        for row in rows:
+            if not isinstance(row, dict) or type(row.get("seq")) is not int or row["seq"] in seqs:
+                raise ApiError("malformed batch evidence")
+            seqs.add(row["seq"])
+        for preview in previews:
+            refs = preview.get("batchRows")
+            if not isinstance(refs, list) or any(type(seq) is not int or seq not in seqs for seq in refs):
+                raise ApiError("malformed batch evidence")
         if run.claim == 201:
             closed = run.close()
             if closed.get("status") not in ("closed", "waiting"):
                 raise ApiError("run did not close")
-        return {"verdicts": verdicts, "actions": actions, "details": details, "detail_counts": counts, "effects": batch.get("rows", [])}
+        return {"verdicts": verdicts, "actions": actions, "details": details, "detail_counts": counts, "effects": rows}
     except Exception:
         is_dry_run = status.get("dryRun") is True if status is not None else run.dry_run
         if run.claim == 201 and is_dry_run:

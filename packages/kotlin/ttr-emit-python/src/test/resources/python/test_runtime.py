@@ -32,6 +32,7 @@ class Server:
         self.status_headers, self.status_elapsed = [], []
         self.status_reads, self.status_limit = 0, None
         self.open_dry = None
+        self.batch_response = None
         self.batch_rows = [{"seq": 1, "group": {"order_number": 4711} if held else None}]
         self.previews = [{"key": {"order_number": 4711}, "action": "release", "arguments": {"order": 4711}, "batchRows": [1]}]
         self.route_rows = [{"order_number": 4711}]
@@ -69,7 +70,7 @@ class Server:
             return Response(200, {"rows": [{"available": 1}], "rowCount": 1})
         assert "/actions/" not in path, "dry evidence must not execute actions"
         if path.endswith("/batch"):
-            return Response(200, {"rows": self.batch_rows})
+            return Response(200, {"rows": self.batch_rows} if self.batch_response is None else self.batch_response)
         if path.endswith("/close"):
             return Response(200, {"status": "closed"})
         self.status_reads += 1
@@ -253,10 +254,44 @@ def test_foreign_closed_claim_returns_dry_batch_evidence(monkeypatch, claim):
     assert not any(path.endswith(("/evaluate", "/perform", "/close")) for path, _, _ in server.seen)
 
 
-def test_batch_group_may_be_omitted_as_well_as_null(monkeypatch):
-    server = Server(monkeypatch)
-    assert server.batch_rows[0].pop("group") is None
-    rt.execute(server.client, {"key": 4711}, None)
+def test_dry_batch_evidence_shape_and_preview_references(monkeypatch):
+    for group in ("null", "omitted", "empty"):
+        server = Server(monkeypatch)
+        if group == "omitted":
+            assert server.batch_rows[0].pop("group") is None
+        elif group == "empty":
+            server.batch_rows = []
+            server.previews[0]["batchRows"] = []
+        result = rt.execute(server.client, {"key": 4711}, None)
+        assert result["effects"] == server.batch_rows
+
+    invalid = [
+        ({}, [1]),
+        ({"rows": None}, [1]),
+        ({"rows": {}}, [1]),
+        ({"rows": "rows"}, [1]),
+        ({"rows": [None]}, [1]),
+        ({"rows": [{}]}, [1]),
+        ({"rows": [{"seq": True}]}, [1]),
+        ({"rows": [{"seq": "1"}]}, [1]),
+        ({"rows": [{"seq": 1}, {"seq": 1}]}, [1]),
+        ({"rows": [{"seq": 1}]}, None),
+        ({"rows": [{"seq": 1}]}, "not-a-list"),
+        ({"rows": [{"seq": 1}]}, [True]),
+        ({"rows": [{"seq": 1}]}, [999]),
+        ({"rows": []}, [1]),
+    ]
+    for batch, refs in invalid:
+        server = Server(monkeypatch)
+        server.batch_response = batch
+        if refs is None:
+            server.previews[0].pop("batchRows")
+        else:
+            server.previews[0]["batchRows"] = refs
+        result = service.run({rt.__package__: server.client}, {"port": {"key": 4711}})
+        assert result == {"error": "malformed batch evidence"}, (batch, refs)
+        assert sum(path.endswith("/close") for path, _, _ in server.seen) == 1
+
 
 def test_late_foreign_completion_gets_a_fresh_evidence_window(monkeypatch):
     server = Server(monkeypatch, claim=202, states=["open", "closed"])
