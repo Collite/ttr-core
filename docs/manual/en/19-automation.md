@@ -180,11 +180,12 @@ the process engine, n8n L1, Camunda and `python_client` render recipes; `python_
 ## Python client exports
 
 `ttrp emit --deployment release_py --out exports` writes `release_py.python_client.export/worker/`:
-a typed dry-evidence client with `Run.parts.<name>()`, `Run.routes.<route>()` and `Run.close()`,
+a typed client with `Run.parts.<name>()`, `Run.routes.<route>()`, `Run.actions.<action>.perform(keys)`,
+`outcome(items)` and `Run.close()`,
 a command-line entry point, a stdin/stdout service and route tests.
 Declare the action's Python sink explicitly (`python_client: door`) when it has no native fallback.
 All HTTP paths come from the SPI run-API projection. The Server executes the recipe and enforces grants,
-fingerprints and dry-run policy; the package contains no SQL, waits or process engine. The wire is the HTTP
+fingerprints and dry-run policy; the package contains no SQL or process engine. The wire is the HTTP
 run API (⚑AU-EXP-3), with no gRPC service or proto wheel.
 
 From the generated `worker/`, set `TTR_SERVER` to the Server origin and `TTR_BEARER` to the authorized bearer:
@@ -197,10 +198,35 @@ uv run --group dev pytest
 Python is pinned to 3.13.9, pytest to 8.3.5; the runtime uses only the standard library. `--key` accepts JSON;
 composite keys are objects. For a batch program, `--batch '[4711,4712]'` selects keys and `--batch` selects all.
 The port must match the exported program. On-event redeliveries reuse the caller's explicit clock in `port.at`;
-the dry client also sends it as an `asOf` override. Use `--as-of now` for the Server's current clock.
-Every Open sends `dryRun: true`. The CLI requires `--dry-run`; the typed API defaults to `dry_run=True`
-and rejects `dry_run=False` with "real runs arrive with S2.1b". The client returns routes, details, action
-previews and batch evidence, then closes its owned dry run. Action execution arrives in S2.1b.
+dry runs also send it as an `asOf` override. Use `--as-of now` for the Server's current clock.
+A real run of a run-clock program takes `now`; a literal instant needs a debug deployment.
+The typed API defaults to `dry_run=True`; pass `dry_run=False` for real execution. The CLI uses
+`--dry-run` for previews; omit it for a real run. The Open reply's stored `dryRun` must match the
+request; if absent from the 201 body, status is read before parts or evaluate. The client reads
+batch evidence before perform and reports each action's results in `perform_effects`. Perform
+keys are objects; duplicate preview entries stay distinct while the request sends each key once.
+Outcomes use `delivered|failed|skipped`, while the run is open; after seal they refuse with HTTP 409.
+A stranded-key service error includes `retryable: true`, `runId` and `retryAfter` for redelivery.
+
+The contracted perform seam (2026-11-14) governs this behavior:
+
+`POST /automation/runs/{id}/actions/{a}/perform { keys: [ { keyColumn: value, … } ], group? }` — keys are always objects, one call per action. Answer `200 { performed: [{ key, batchRows }], skipped: [{ key, reason }] }`; `performed[].key` and `skipped[].key` are the same objects as sent. **Hold is decided per preview entry (⚑R254-J, 2026-11-14):** the request sends each key once; the answer carries one `(key, reason)` per **preview entry** of that action (one key can have two entries — non-exclusive routes × wirings); an entry is `held` iff any of its own `batchRows` carries an approval `group` (`GET …/batch` rows, `batchRows` on the status preview action, are the wire for it). An entry sharing a deduplicated grouped row with a held entry is held too. The export's `held_actions` list is a cross-check only.
+
+On a dry-run-only deployment the client refuses a real run; pass `--dry-run` (typed API: `dry_run=True`).
+
+Hold marks: a batch row carries an approval `group` only for an action with `approval: required` on a native `transition`/`writer`/`obligation` sink; a route-level approval (D-145's user task) marks no batch row.
+
+A lost perform response on a real run: the client does **not** close; the run stays for inspection and perform is idempotent per key, so an operator re-drives it or the abandonment clock ends it.
+
+Dry run: `performed: []`; every held key `skipped {reason: "held"}` (held precedes dry-run); every other selected key `skipped {reason: "dry-run"}`. Nothing is applied; the client closes a dry run after its evidence is read.
+
+Real run: an unheld key answers `performed`, or `skipped {reason: "failed"}` (its row failed in Apply) or `skipped {reason: "not-applied"}` (still staged). These are **legal results for the caller**, reported with their reason — not client errors, and the run continues and closes normally. Perform applies ahead of close and is idempotent per key; close never resends a performed row.
+
+A client that rejects evidence or fails mid-run does **not** close a real run while nothing has been performed on it (the run stays for inspection; the Server's abandonment ends it). Once at least one perform returned a `performed` entry, the client closes the run (best effort) before re-raising, so the batch stays consistent with what was applied.
+
+An Open that answers a foreign claim (`200` non-terminal or `202 + Location`) is polled inside the client's own window (its budget + 2 min). When the window ends the client POSTs the same Open **once** more; a `201` is a fresh claim, a `202` or a non-terminal `200` raises a distinct retryable error that carries the run id ("key held by run <id>; retry later") for the event system to redeliver. A stranded real run blocks its key until the Server abandons it.
+
+Abandonment clock: today `Ledger.abandonExpiredRuns` compares every run against `COALESCE(budget_batch, budget_sync, default)` and Open always stores `budget_batch`, so an on-event run is abandoned after `budget_batch` + 2 min (~32 min by default). **Contract:** a run whose program `mode` is on-event abandons by **`budget_sync` + 2 min**; a batch run by `budget_batch` + 2 min. The client polls inside its own budget + 2 min. The merged fixture baseline `c2f2f049` includes the mode-aware follow-up. Its `retryAfter` uses the mode's budget + 2 min: 180 seconds for a default on-event run, 1920 seconds for a default batch run.
 
 ## Deploying to the process engine
 

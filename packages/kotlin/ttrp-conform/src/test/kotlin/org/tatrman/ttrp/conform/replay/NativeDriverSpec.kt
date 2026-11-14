@@ -104,6 +104,8 @@ internal class ContractServer(
 
     @Volatile var overlapRelease = false
 
+    @Volatile var secondRefs: List<Int> = emptyList()
+
     @Volatile var ownNotifyRows = false
 
     @Volatile var heldRelease = false
@@ -116,6 +118,39 @@ internal class ContractServer(
     private val closed =
         java.util.concurrent.ConcurrentHashMap
             .newKeySet<String>()
+    private val seam =
+        Json
+            .parseToJsonElement(
+                requireNotNull(
+                    javaClass.getResourceAsStream("/replay/server-perform.json"),
+                ).bufferedReader().use {
+                    it.readText()
+                },
+            ).jsonObject
+    private val heldReason =
+        seam
+            .getValue(
+                "dry",
+            ).jsonObject
+            .getValue("skipped")
+            .jsonArray[0]
+            .jsonObject
+            .getValue("reason")
+    private val dryReason =
+        seam
+            .getValue(
+                "dry",
+            ).jsonObject
+            .getValue("skipped")
+            .jsonArray[1]
+            .jsonObject
+            .getValue("reason")
+    private val performedKeys =
+        seam
+            .getValue("real")
+            .jsonObject
+            .getValue("performed")
+            .jsonArray
     private val bodies = java.util.concurrent.ConcurrentHashMap<String, JsonObject>()
 
     @Volatile var wrongReason = false
@@ -229,7 +264,24 @@ internal class ContractServer(
                 put("batchRows", rows)
             }
             listOf(entry("release", "release", actionRows(id, key))) +
-                (if (overlapRelease) listOf(entry("release", "hold", JsonArray(emptyList()))) else emptyList()) +
+                (
+                    if (overlapRelease) {
+                        listOf(
+                            entry(
+                                "release",
+                                "hold",
+                                JsonArray(
+                                    secondRefs.map(::JsonPrimitive).filter {
+                                        it in
+                                            actionRows(id, key)
+                                    },
+                                ),
+                            ),
+                        )
+                    } else {
+                        emptyList()
+                    }
+                ) +
                 (
                     if (includeMail || ownNotifyRows || (sharedAction && actionRows(id, key).isNotEmpty())) {
                         listOf(
@@ -258,7 +310,7 @@ internal class ContractServer(
             return
         }
         val id = path.substringAfter("/runs/").substringBefore('/')
-        if (path.endsWith("/evaluate") && asyncOnce) {
+        if (path.endsWith("/evaluate") && asyncOnce && bodies.getValue(id).getValue("port").jsonObject["key"] == null) {
             asyncOnce = false
             call.response.headers.append("Retry-After", "0.01")
             call.respondText("{}", ContentType.Application.Json, HttpStatusCode.Accepted)
@@ -276,7 +328,7 @@ internal class ContractServer(
                     """{"recipe":{"key":["order.order_number"],"parameters":[]}}"""
                 path == "/automation/recipes/release_order/runs" -> {
                     val body = Json.parseToJsonElement(call.receiveText()).jsonObject
-                    body["dryRun"] shouldBe JsonPrimitive(true)
+                    require(body["dryRun"] is JsonPrimitive)
                     opens += body
                     val runId = "r${opens.size}"
                     bodies[runId] = body
@@ -287,6 +339,7 @@ internal class ContractServer(
                     buildJsonObject {
                         put("runId", runId)
                         put("status", "open")
+                        put("dryRun", body.getValue("dryRun"))
                     }.toString()
                 }
                 path.endsWith("/evaluate") -> buildJsonObject { put("verdict", verdict(id)) }.toString()
@@ -355,8 +408,29 @@ internal class ContractServer(
                                 (performFaultKey == null || key == performFaultKey?.let(::JsonPrimitive))
                         }
                     val answered = if (performFault == "omits") selected.dropLast(1) else selected
-                    val performed = answered.filter { fault(it) == "performs" }
-                    val skipped = answered - performed.toSet()
+
+                    fun reason(entry: JsonObject): JsonElement =
+                        when {
+                            fault(entry) == "performs" -> JsonPrimitive("performed")
+                            fault(entry) == "reason" -> JsonPrimitive("wrong-reason")
+                            fault(
+                                entry,
+                            ) in setOf("dry-run", "held", "failed", "not-applied") -> JsonPrimitive(fault(entry))
+                            entry.getValue("batchRows").jsonArray.any { seq ->
+                                rows[seq]?.get("group")?.let {
+                                    it !=
+                                        JsonNull
+                                } ==
+                                    true
+                            } -> heldReason
+                            bodies.getValue(id)["dryRun"] == JsonPrimitive(true) -> dryReason
+                            else -> {
+                                check(performedKeys.isNotEmpty())
+                                JsonPrimitive("performed")
+                            }
+                        }
+                    val performed = answered.filter { reason(it) == JsonPrimitive("performed") }
+                    val skipped = answered.filter { reason(it) != JsonPrimitive("performed") }
                     buildJsonObject {
                         put(
                             "performed",
@@ -391,18 +465,7 @@ internal class ContractServer(
                                                     key
                                                 },
                                             )
-                                            put(
-                                                "reason",
-                                                when {
-                                                    fault(entry) == "reason" -> "wrong-reason"
-                                                    fault(entry) == "dry-run" -> "dry-run"
-                                                    fault(entry) == "held" -> "held"
-                                                    entry.getValue("batchRows").jsonArray.any { seq ->
-                                                        rows[seq]?.get("group")?.let { it != JsonNull } == true
-                                                    } -> "held"
-                                                    else -> "dry-run"
-                                                },
-                                            )
+                                            put("reason", reason(entry))
                                         }
                                     },
                             ),
@@ -411,12 +474,38 @@ internal class ContractServer(
                 }
                 path.endsWith("/outcome") -> {
                     val body = Json.parseToJsonElement(call.receiveText()).jsonObject
+                    if (legacyN8nPerform) {
+                        body.getValue("outcomes").jsonArray.forEach { raw ->
+                            val outcome = raw.jsonObject
+                            require(includeMail && outcome["key"] in keys(id)) { "outcome key not in mail preview" }
+                            require(outcome["status"] == JsonPrimitive("delivered"))
+                        }
+                        call.respondText("{}", ContentType.Application.Json)
+                        return
+                    }
+                    if (id in closed) {
+                        check(seam.getValue("outcome").jsonObject["sealed_error"] == JsonPrimitive("RUN_CLOSED"))
+                        call.respondText("{}", ContentType.Application.Json, HttpStatusCode.Conflict)
+                        return
+                    }
                     body.getValue("outcomes").jsonArray.forEach { raw ->
                         val outcome = raw.jsonObject
-                        require(includeMail && outcome["key"] in keys(id)) { "outcome key not in mail preview" }
-                        require(outcome["status"] == JsonPrimitive("delivered"))
+                        val selected = previewActions(id).map { it.getValue("key") }
+                        require(outcome["key"] in selected) { "outcome key not in preview" }
+                        require(outcome["status"] in listOf("delivered", "failed", "skipped").map(::JsonPrimitive))
                     }
-                    "{}"
+                    val outcomeFixture = seam.getValue("outcome").jsonObject
+                    val fixtureCount =
+                        outcomeFixture
+                            .getValue("request")
+                            .jsonObject
+                            .getValue("outcomes")
+                            .jsonArray.size
+                    check(outcomeFixture.getValue("response").jsonObject["outcomes"] == JsonPrimitive(fixtureCount))
+                    JsonObject(
+                        outcomeFixture.getValue("response").jsonObject +
+                            ("outcomes" to JsonPrimitive(body.getValue("outcomes").jsonArray.size)),
+                    ).toString()
                 }
                 path.endsWith("/digests") -> """{"groups":[]}"""
                 path.endsWith(
@@ -474,7 +563,7 @@ internal class ContractServer(
                 path == "/automation/runs/$id" ->
                     buildJsonObject {
                         put("status", if (id in closed) "closed" else "evaluated")
-                        put("dryRun", true)
+                        put("dryRun", bodies.getValue(id).getValue("dryRun"))
                         put("verdict", verdict(id))
                         put("actions", JsonArray(previewActions(id)))
                     }.toString()

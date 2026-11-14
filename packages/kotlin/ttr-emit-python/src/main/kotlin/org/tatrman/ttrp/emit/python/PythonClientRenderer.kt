@@ -30,6 +30,8 @@ internal class PythonClientRenderer(
                 "status",
                 "route",
                 "detail",
+                "perform",
+                "outcome",
                 "batch",
                 "close",
             )
@@ -37,22 +39,38 @@ internal class PythonClientRenderer(
         require(graph.runApi.basePath.startsWith('/') && !graph.runApi.basePath.startsWith("//")) {
             "python-client: invalid runApi base path"
         }
+        val budgetSeconds =
+            graph.program.budget[if (graph.program.mode == "batch") "batch" else "sync"]
+                ?.let(::durationSeconds) ?: if (graph.program.mode == "batch") 1800L else 60L
         val config =
             buildJsonObject {
                 put("module", module)
                 put("recipe", graph.recipe.name)
                 put("program", graph.program.name)
                 put("deployment", graph.deployment.name)
+                put("dry_run", graph.deployment.dryRun)
                 put("mode", requireNotNull(graph.program.mode).replace('_', '-'))
                 put("port", graph.program.port ?: "none")
                 put("clock", graph.program.asOf ?: "run")
-                put("dry_run", graph.deployment.dryRun)
                 put("granularity", graph.deployment.granularity)
                 put("key", strings(graph.recipe.key.map { it.substringAfterLast('.') }))
                 put("parts", strings(parts))
                 put("islands", strings(graph.islandWaves.flatten()))
                 put("routes", strings(graph.routes.map { it.name }))
                 put("actions", strings(graph.actions.keys.sorted()))
+                put(
+                    "held_actions",
+                    strings(
+                        graph.actions
+                            .filter { (_, action) ->
+                                action.approval == "required" &&
+                                    action.sinks["native"] in setOf("transition", "writer", "obligation")
+                            }.keys
+                            .sorted(),
+                    ),
+                )
+                // The merged fixture baseline includes S3.1's mode-aware abandonment clock (D-192).
+                put("abandonment_seconds", budgetSeconds + 120L)
                 put("base_path", graph.runApi.basePath)
                 put(
                     "calls",
@@ -89,8 +107,7 @@ internal class PythonClientRenderer(
                 )
                 put(
                     "budget_seconds",
-                    graph.program.budget[if (graph.program.mode == "batch") "batch" else "sync"]
-                        ?.let(::durationSeconds) ?: if (graph.program.mode == "batch") 1800L else 60L,
+                    budgetSeconds,
                 )
                 put(
                     "parameters",
@@ -158,7 +175,7 @@ internal class PythonClientRenderer(
                 .joinToString("\n") + "\n\n" +
                 """
                 Python client for `${graph.recipe.name}` (`${graph.deployment.name}`). HTTP run API,
-                ttr-server contracts §1 (⚑AU-EXP-3). Open baseline: f28120e1.
+                ttr-server contracts §1 + the 2026-11-14 perform seam. Fixture baseline: c2f2f049.
                 Real-Server acceptance remains P1C / #366.
                 Python 3.13.9; standard library runtime; pytest 8.3.5. No gRPC or proto wheel.
 
@@ -167,19 +184,23 @@ internal class PythonClientRenderer(
                 `--key` is JSON (an object for composite keys); `--batch` accepts an optional JSON keys array,
                 or selects all with no argument. The chosen port must match the exported program.
                 `--as-of` accepts `now` or an ISO instant with offset. An event program sends the literal clock in
-                port.at. This dry-evidence client always sends dryRun true, reads routes/details/action previews/batch,
-                then closes its owned dry run. On-event redeliveries need the same caller-supplied clock to deduplicate.
-                The CLI requires `--dry-run`; the typed API defaults to dry_run=True and refuses dry_run=False
-                with "real runs arrive with S2.1b". Action execution arrives in S2.1b.
-                Completed foreign claims get a fresh evidence-read budget. Errors on owned dry runs receive a
-                best-effort close, using the Open response/body policy if status has not yet been read.
+                port.at; a real event run uses that event clock without an asOf override.
+                A real run of a run-clock program takes `now`; a literal instant needs a debug deployment.
+                The typed API defaults to dry_run=True; pass dry_run=False for a real run.
+                The CLI uses `--dry-run` for previews; omit it for a real run.
+                `Run.actions.<action>.perform(keys)` sends object keys once per action; `outcome(items)` records
+                the caller's delivered/failed/skipped outcomes while the run is open. Outcomes after seal refuse.
+                `execute` reads batch evidence before perform, compares a multiset per preview entry, returns
+                `perform_effects` (including failed/not-applied reasons), then closes normally.
+                Open's echoed dryRun must equal the request; if absent, GET status supplies it before any work.
+                Completed foreign claims get a fresh evidence-read budget and never perform or close here.
                 `service.py` accepts `{"requests": [...]}` on stdin and emits `{"results": [...]}` in order,
-                with errors per request;
+                with errors per request (a stranded key includes retryable: true, runId and retryAfter);
                 `conform --replay` uses it in a subprocess with dryRun true. Replays never override parameters.
                 Run generated route tests: `uv run --group dev pytest`.
                 Re-export after any recipe text/values, program, deployment or world fingerprint change.
                 Only run trusted generated packages, like other executable conformance artifacts.
-                """.trimIndent() + "\n",
+                """.trimIndent() + "\n\n" + template("perform-seam.md"),
         )
         file("conformance.json", request.conformanceJson)
         return EmitResult(files)
@@ -188,7 +209,7 @@ internal class PythonClientRenderer(
     private fun client(): String =
         buildString {
             append(
-                "from __future__ import annotations\nfrom typing import Any\nfrom .runtime import BaseClient, BaseRun\n\n",
+                "from __future__ import annotations\nfrom typing import Any\nfrom .runtime import Action, BaseClient, BaseRun\n\n",
             )
             for ((name, values) in listOf(
                 "Parts" to parts,
@@ -215,8 +236,22 @@ internal class PythonClientRenderer(
                 }
                 append("\n\n")
             }
+            append("class Actions:\n    def __init__(self, run: BaseRun) -> None:\n")
+            if (graph.actions.isEmpty()) append("        pass\n")
+            require(
+                graph.actions.keys
+                    .map(::identifier)
+                    .distinct()
+                    .size == graph.actions.size,
+            ) {
+                "python-client: colliding action names"
+            }
+            for (name in graph.actions.keys.sorted()) {
+                append("        self.${identifier(name)} = Action(run, ${JsonPrimitive(name)})\n")
+            }
+            append("\n\n")
             append(
-                "class Run(BaseRun):\n    def __init__(self, *args: Any, **kwargs: Any) -> None:\n        super().__init__(*args, **kwargs)\n        self.parts = Parts(self)\n        self.routes = Routes(self)\n\n\nclass Client(BaseClient):\n    run_type = Run\n\n    def open(self, port: dict[str, Any], as_of: str | None = None, *, dry_run: bool = True, idempotency_key: str | None = None) -> Run:\n        return super().open(port, as_of, dry_run=dry_run, idempotency_key=idempotency_key)\n",
+                "class Run(BaseRun):\n    def __init__(self, *args: Any, **kwargs: Any) -> None:\n        super().__init__(*args, **kwargs)\n        self.parts = Parts(self)\n        self.routes = Routes(self)\n        self.actions = Actions(self)\n\n\nclass Client(BaseClient):\n    run_type = Run\n\n    def open(self, port: dict[str, Any], as_of: str | None = None, *, dry_run: bool = True, idempotency_key: str | None = None) -> Run:\n        return super().open(port, as_of, dry_run=dry_run, idempotency_key=idempotency_key)\n",
             )
         }
 

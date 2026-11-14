@@ -12,6 +12,7 @@ class PythonClientDriver(
     private val token: String,
     private val exports: List<Path>,
     private val uvCommand: String = "uv",
+    private val dryRun: Boolean = true,
 ) : Driver {
     override fun run(
         fixture: ReplayFixture,
@@ -89,7 +90,7 @@ class PythonClientDriver(
                             },
                         )
                         put("as_of", instant(fixture.asOf))
-                        put("dry_run", true)
+                        put("dry_run", dryRun)
                         put("parameters", fixture.parameters)
                     }
                 labels += recipe to key
