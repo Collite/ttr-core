@@ -270,8 +270,8 @@ object LintCli {
 
     /**
      * [path] with its nearest existing ancestor made real; the part that does not exist yet appended as it is. A dangling
-     * symbolic link exists too: a write through it lands at its target, so the target is followed in its place
-     * (review-269 N1). Null past [MAX_HOPS] links.
+     * symbolic link exists too: a write through it lands at its target, so the target, read against the link's real
+     * directory, is followed in its place (review-269 N1, review-277 F6). Null past [MAX_HOPS] links.
      */
     internal fun real(
         path: Path,
@@ -283,7 +283,14 @@ object LintCli {
         existing ?: return path
         val rest = existing.relativize(path)
         if (Files.isSymbolicLink(existing) && !Files.exists(existing)) {
-            val target = existing.resolveSibling(Files.readSymbolicLink(existing))
+            // A relative target is relative to the link's real directory: through a symlinked parent, `..` is the
+            // OS's, not the lexical one (review-277 F6). An absolute target is kept as it is.
+            val target =
+                existing
+                    .toAbsolutePath()
+                    .parent
+                    .toRealPath()
+                    .resolve(Files.readSymbolicLink(existing))
             return real(target.resolve(rest).normalize(), hops + 1)
         }
         return existing.toRealPath().resolve(rest)

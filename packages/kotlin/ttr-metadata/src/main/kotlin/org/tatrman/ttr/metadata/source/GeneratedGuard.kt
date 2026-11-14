@@ -21,11 +21,13 @@ import kotlin.io.path.readText
  *
  * - `xm/generated-stale`: an input's recomputed SHA-256 differs from the header's, or the input is not found.
  * - `xm/generated-edited`: the header is malformed, or the body differs from a fresh generation of the named inputs
- *   (the snapshot tree applied with the named profile; a `.ttrm` is that document rendered).
+ *   (the snapshot tree applied with its own declarations, never an override; a `.ttrm` is that document rendered), or
+ *   the tree's own declarations do not give the document the header's profile (✅R277-A: a document an `apply
+ *   --profile` override generated cannot be re-checked).
  *
  * Both are errors at the file head (line 1, column 1). Regeneration's own errors (an orphaned overlay key, a dropped
  * input) are reported where they arise, so a broken input is shown at its key. Inputs resolve against the generated
- * file's directory; each snapshot tree is regenerated once per check. `agents/` is never read (✅MW-44).
+ * file's directory; each snapshot tree is hashed and regenerated once per check. `agents/` is never read (✅MW-44).
  */
 object GeneratedGuard {
     fun check(
@@ -33,7 +35,9 @@ object GeneratedGuard {
         sourceId: String,
     ): List<LoadWarning> {
         val issues = mutableListOf<LoadWarning>()
-        val runs = mutableMapOf<Pair<Path, String>, Regeneration>()
+        val runs = mutableMapOf<Path, Regeneration>()
+        // A tree is hashed once per check, however many generated files name it (review-277 F8).
+        val hashes = mutableMapOf<Path, String?>()
         for (file in files(root)) {
             val text = file.readText()
             if (!GeneratedHeader.claimed(text)) continue
@@ -50,7 +54,7 @@ object GeneratedGuard {
             val stale =
                 inputs.mapNotNull { input ->
                     val path = directory.resolve(input.path).normalize()
-                    when (val sha = Hashes.of(path)) {
+                    when (val sha = hashes.getOrPut(path) { Hashes.of(path) }) {
                         null -> "input not found: ${input.path}"
                         input.sha256 -> null
                         else -> "${input.path} changed since generation (sha256 $sha, header ${input.sha256})"
@@ -58,14 +62,22 @@ object GeneratedGuard {
                 }
             stale.forEach { issues += issue("xm/generated-stale: $it") }
             if (!snapshot.isDirectory()) continue
-            val run = runs.getOrPut(snapshot to header.profile) { Regeneration.of(snapshot, header.profile, sourceId) }
+            val run = runs.getOrPut(snapshot) { Regeneration.of(snapshot, sourceId) }
             if (stale.isNotEmpty() || run.failed) continue
-            val expected = run.expected(file, text)
-            when {
-                expected == null ->
+            when (val expected = run.expected(file, text, header.profile)) {
+                Expected.Overridden ->
+                    issues +=
+                        issue(
+                            "xm/generated-edited: generated with profile ${header.profile}, which the tree's own " +
+                                "declarations do not give this document; an apply --profile override cannot be " +
+                                "re-checked — declare it in ttr.yaml or the file's ttr: header",
+                        )
+                Expected.Missing ->
                     issues += issue("xm/generated-edited: its inputs generate no document with this package and model")
-                expected != GeneratedHeader.body(text) ->
-                    issues += issue("xm/generated-edited: the body differs from a fresh generation of its inputs")
+                is Expected.Body ->
+                    if (expected.text != GeneratedHeader.body(text)) {
+                        issues += issue("xm/generated-edited: the body differs from a fresh generation of its inputs")
+                    }
             }
         }
         // A regeneration's own errors once per run, where they arise (an orphaned overlay key, a dropped file).
@@ -86,9 +98,24 @@ object GeneratedGuard {
                 .toList()
         }
 
-    /** One snapshot tree applied with one profile, as `profile apply` would. */
+    /** What a generated file is checked against. */
+    private sealed interface Expected {
+        /** The fresh generation's body, in the file's form. */
+        data class Body(
+            val text: String,
+        ) : Expected
+
+        /** The tree yields the header's profile, but no document with the file's package and model. */
+        data object Missing : Expected
+
+        /** The tree's own declarations do not give this document the header's profile (✅R277-A). */
+        data object Overridden : Expected
+    }
+
+    /** One snapshot tree applied with its own declarations, as `profile apply` without `--profile` would. */
     private class Regeneration(
         private val generated: Map<String, CanonicalDocument>,
+        private val generatedBy: Map<String, String>,
         val problems: List<LoadWarning>,
     ) {
         val failed get() = problems.isNotEmpty()
@@ -97,14 +124,21 @@ object GeneratedGuard {
         fun expected(
             file: Path,
             text: String,
-        ): String? {
-            val (pkg, model) = identity(file, GeneratedHeader.body(text)) ?: return null
+            profile: String,
+        ): Expected {
+            val yielded = profile in generatedBy.values
+            val (pkg, model) =
+                identity(file, GeneratedHeader.body(text))
+                    ?: return if (yielded) Expected.Missing else Expected.Overridden
             val path = listOf(pkg.replace('.', '/'), "$model.yaml").filter { it.isNotEmpty() }.joinToString("/")
-            val document = generated[path] ?: return null
-            return when (GeneratedHeader.Form.of(file.name)) {
-                GeneratedHeader.Form.TTRM -> TtrRenderer.render(document.ast)
-                else -> CanonicalYaml.write(document)
-            }
+            val document = generated[path] ?: return if (yielded) Expected.Missing else Expected.Overridden
+            if (generatedBy[path] != profile) return Expected.Overridden
+            return Expected.Body(
+                when (GeneratedHeader.Form.of(file.name)) {
+                    GeneratedHeader.Form.TTRM -> TtrRenderer.render(document.ast)
+                    else -> CanonicalYaml.write(document)
+                },
+            )
         }
 
         /** The file's own package and model, read as its form reads them; null when it does not parse. */
@@ -137,14 +171,17 @@ object GeneratedGuard {
         companion object {
             fun of(
                 snapshot: Path,
-                profile: String,
                 sourceId: String,
             ): Regeneration {
+                // The tree's own declarations, never an override (✅R277-A): an override replaces only the tree
+                // fallback, so it would regroup files that declare their own profile.
                 val catalog = ProfileCatalog.read(snapshot).entries
-                // The header names an identity; one the tree cannot resolve leaves the tree's own declarations.
-                val reference = profile.takeIf { YamlFileSource.isBundledProfile(it) || it in catalog }
-                val result = ProfileApply.run(LocalFsStorage(sourceId, snapshot), reference, catalog, sourceId)
-                return Regeneration(result.generated, result.planned + result.problems + result.conflicts)
+                val result = ProfileApply.run(LocalFsStorage(sourceId, snapshot), null, catalog, sourceId)
+                return Regeneration(
+                    result.generated,
+                    result.generatedBy,
+                    result.planned + result.problems + result.conflicts,
+                )
             }
         }
     }

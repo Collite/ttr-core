@@ -38,6 +38,29 @@ class GeneratedGuardSpec :
 
         fun guard(case: Path) = GeneratedGuard.check(case.resolve("model"), "t")
 
+        /** A tree of [files] under [at], applied as `profile apply` with [profile] writes it to `<at>/../model`. */
+        fun applied(
+            at: Path,
+            files: Map<String, String>,
+            profile: String? = null,
+        ): Path {
+            files.forEach { (name, text) -> at.resolve(name).also { it.parent.createDirectories() }.writeText(text) }
+            val model = at.resolveSibling("model")
+            val catalog = ProfileCatalog.read(at).entries
+            val result = ProfileApply.run(LocalFsStorage("t", at), profile, catalog, "t", HeaderOptions(model, "1"))
+            result.problems.shouldBeEmpty()
+            result.files.forEach { (name, text) ->
+                model.resolve(name).also { it.parent.createDirectories() }.writeText(text)
+            }
+            return model
+        }
+
+        fun profile(
+            id: String,
+            pkg: String,
+        ) = "profile: $id\ngrammar: '>=0.22 <1.0'\noperations:\n" +
+            "  - {op: package, mapping: {}, default: $pkg}\n  - {op: kinds, at: /entity, mapping: {entita: entity}}\n"
+
         fun codes(issues: List<LoadWarning>) = issues.map { it.message.removePrefix("dropped: ").substringBefore(':') }
 
         test("a pristine generated package raises neither code") {
@@ -104,6 +127,80 @@ class GeneratedGuardSpec :
             )
             guard(ttrm).map { it.message } shouldBe
                 listOf("xm/generated-edited: the body differs from a fresh generation of its inputs")
+        }
+
+        test("mixed declarations: each file's own profile, as apply grouped them, is green (✅R277-A)") {
+            val at = Files.createTempDirectory("s36-mixed").resolve("tree")
+            val model =
+                applied(
+                    at,
+                    mapOf(
+                        "profiles/x.yaml" to profile("demo-x/1", "px"),
+                        "profiles/y.yaml" to profile("demo-y/1", "py"),
+                        "ttr.yaml" to "profile: ./profiles/y.yaml\ngrammar: '>=0.22 <1.0'\n",
+                        "model.ignore" to "profiles/\n",
+                        "a.yaml" to "entity:\n  A: {}\n",
+                        "b.yaml" to "ttr: {profile: ./profiles/x.yaml, grammar: '>=0.22 <1.0'}\nentity:\n  B: {}\n",
+                    ),
+                )
+            model.resolve("px/er.yaml").readText() shouldContain "profile demo-x/1"
+            model.resolve("py/er.yaml").readText() shouldContain "profile demo-y/1"
+            GeneratedGuard.check(model, "t").shouldBeEmpty()
+        }
+
+        test(
+            "an apply --profile override cannot be re-checked: one precise edited at the head; declared, it is green",
+        ) {
+            val files =
+                mapOf(
+                    "custom/my.yaml" to profile("demo-my/1", "pm"),
+                    "model.ignore" to "custom/\n",
+                    "a.yaml" to "entity:\n  A: {}\n",
+                )
+            val override = Files.createTempDirectory("s36-override").resolve("tree")
+            val model = applied(override, files, override.resolve("custom/my.yaml").toString())
+            val issues = GeneratedGuard.check(model, "t")
+            issues.map { Triple(it.file.substringAfter("/model/"), it.line, it.column) } shouldBe
+                listOf(Triple("pm/er.yaml", 1, 1))
+            issues.single().message shouldBe
+                "xm/generated-edited: generated with profile demo-my/1, which the tree's own declarations do not " +
+                "give this document; an apply --profile override cannot be re-checked — declare it in ttr.yaml " +
+                "or the file's ttr: header"
+            val declared = Files.createTempDirectory("s36-declared").resolve("tree")
+            val green =
+                applied(declared, files + ("ttr.yaml" to "profile: ./custom/my.yaml\ngrammar: '>=0.22 <1.0'\n"))
+            GeneratedGuard.check(green, "t").shouldBeEmpty()
+            // The tree yields the same document under its own profile: an equal body is still not that profile's.
+            val same = Files.createTempDirectory("s36-same").resolve("tree")
+            val twin =
+                applied(
+                    same,
+                    files + ("ttr.yaml" to "profile: ./profiles/y.yaml\ngrammar: '>=0.22 <1.0'\n") +
+                        ("profiles/y.yaml" to profile("demo-y/1", "pm")) + ("model.ignore" to "custom/\nprofiles/\n"),
+                    same.resolve("custom/my.yaml").toString(),
+                )
+            GeneratedGuard.check(twin, "t").map { it.message.substringBefore(",") } shouldBe
+                listOf("xm/generated-edited: generated with profile demo-my/1")
+        }
+
+        test("a tree path with a space is header-safe: apply from 'My Tree', then the guard is green (F3)") {
+            val pristine = case("pristine").resolve("tree")
+            val spaced = Files.createTempDirectory("s36-space").resolve("My Tree")
+            Files.walk(pristine).use { paths -> paths.filter { it.isRegularFile() }.toList() }.forEach {
+                spaced
+                    .resolve(pristine.relativize(it).toString())
+                    .also { file -> file.parent.createDirectories() }
+                    .writeText(it.readText())
+            }
+            val model = applied(spaced, emptyMap())
+            model.resolve("demo/er.yaml").readText() shouldContain "My%20Tree@"
+            GeneratedGuard.check(model, "t").shouldBeEmpty()
+        }
+
+        test("agents/ under the tree is outside its hash: an agent edit leaves generated files fresh (F4, ✅MW-44)") {
+            val pristine = case("pristine")
+            pristine.resolve("tree/agents/foo.yaml").also { it.parent.createDirectories() }.writeText("name: a\n")
+            guard(pristine).shouldBeEmpty()
         }
 
         test("agents/ is never read, however a file there claims to be generated (✅MW-44)") {

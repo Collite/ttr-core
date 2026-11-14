@@ -73,6 +73,20 @@ class Review269CarrySpec :
             elsewhere.isRegularFile() shouldBe true
         }
 
+        test("N1 (review-277 F6): a relative dangling link under a symlinked --out resolves from its real directory") {
+            val tmp = Files.createTempDirectory("r277-f6")
+            copy(links, tmp.resolve("repo/model"))
+            tmp.resolve("repo/outside/sub").createDirectories()
+            tmp.resolve("w").createDirectories()
+            Files.createSymbolicLink(tmp.resolve("w/o"), tmp.resolve("repo/outside/sub"))
+            // Lexically w/o/../../model/gen is <tmp>/model/gen; the OS goes through repo/outside/sub to the root.
+            Files.createSymbolicLink(tmp.resolve("repo/outside/sub/report.json"), Path.of("../../model/gen"))
+            val refused = exec(tmp, "profile", "apply", "--root", "repo/model", "--out", "w/o")
+            refused.exitCode shouldBe 2
+            refused.stderr shouldContain "into the model root"
+            tmp.resolve("repo/model/gen").exists() shouldBe false
+        }
+
         test("N1: a link cycle at an output path is refused, not followed for ever") {
             val work = Files.createTempDirectory("r269-n1-cycle")
             copy(links, work.resolve("tree"))

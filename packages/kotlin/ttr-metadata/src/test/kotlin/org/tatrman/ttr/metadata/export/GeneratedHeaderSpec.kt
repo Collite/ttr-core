@@ -62,6 +62,21 @@ class GeneratedHeaderSpec :
             GeneratedHeader.body("${header.line(GeneratedHeader.Form.YAML)}ttr: x\n") shouldBe "ttr: x\n"
         }
 
+        "a path with a space, a percent sign or a Czech letter round-trips; only % and whitespace are encoded (F3)" {
+            val paths = listOf("../My Tree", "../100%", "../Strom ž", "../tab\there")
+            paths.forEach { path ->
+                val header =
+                    GeneratedHeader(GeneratedInput(path, sha), GeneratedInput("$path/o.yaml", other), "p/1", "1")
+                GeneratedHeader.read(header.line(GeneratedHeader.Form.YAML)) shouldBe header
+            }
+            GeneratedHeader(GeneratedInput("../Strom ž", sha), null, "p/1", "1").text shouldStartWith
+                "generated-from: ../Strom%20ž@"
+            GeneratedHeader(GeneratedInput("../100%", sha), null, "p/1", "1").text shouldStartWith
+                "generated-from: ../100%25@"
+            // A % not followed by two hex digits is not a header ttr-core writes.
+            GeneratedHeader.parse("# generated-from: ../a%2@$sha profile p/1 generator 1 — do not edit").shouldBeNull()
+        }
+
         "hash inputs are deterministic: a tree's digest moves with any content byte, never with hidden or build state" {
             val a = copy(links)
             val b = copy(links)
@@ -115,8 +130,18 @@ class GeneratedHeaderSpec :
             val set = xmJsonSet()
 
             fun bundle(request: ExportRequest) = Exporter().export(set, null, request) as ExportResult.Bundle
-            bundle(ExportRequest(format = "ttr", generatedHeader = header)).files.forEach {
-                it.bytes.decodeToString() shouldStartWith "// ${header.text}\n"
+            // Each file's header names the same snapshot from its own directory, at any depth (F7).
+            val snapshot = copy(links)
+            val out = Files.createTempDirectory("s36-bundle").resolve("out")
+            val inputs = GeneratedInputs(snapshot, snapshot.resolve("ttr.yaml"), "p/1", "1", out)
+            val files = bundle(ExportRequest(format = "ttr", generatedFrom = inputs)).files
+            files.map { it.name.count { c -> c == '/' } }.toSet().size shouldBe 2
+            files.forEach {
+                val read = GeneratedHeader.read(it.bytes.decodeToString()).shouldNotBeNull()
+                val directory = out.resolve(it.name).parent
+                directory.resolve(read.snapshot.path).normalize() shouldBe snapshot
+                read.snapshot.sha256 shouldBe Hashes.tree(snapshot)
+                directory.resolve(read.overlay!!.path).normalize() shouldBe snapshot.resolve("ttr.yaml")
             }
             bundle(
                 ExportRequest(format = "ttr"),

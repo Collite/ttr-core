@@ -16,8 +16,11 @@ data class ExportRequest(
     val previousIds: Set<String>? = null,
     val renames: List<Rename> = emptyList(),
     val connections: List<ConnectionDescriptor> = emptyList(),
-    /** MW S3.6 T2: with a header, each `ttr` file is a generated file and starts with the header's `//` line. */
-    val generatedHeader: GeneratedHeader? = null,
+    /**
+     * MW S3.6 T2: with inputs, each `ttr` file is a generated file and starts with its own `//` header line, the input
+     * paths relative to that file's directory (review-277 F7).
+     */
+    val generatedFrom: GeneratedInputs? = null,
 )
 
 sealed interface ExportResult {
@@ -130,7 +133,10 @@ class Exporter {
                                 file,
                                 "text/plain; charset=utf-8",
                                 (
-                                    request.generatedHeader?.line(GeneratedHeader.Form.TTRM).orEmpty() +
+                                    request.generatedFrom
+                                        ?.header(file)
+                                        ?.line(GeneratedHeader.Form.TTRM)
+                                        .orEmpty() +
                                         TtrRenderer.renderFile(
                                             layer,
                                             first.fileNamespace,

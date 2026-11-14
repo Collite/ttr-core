@@ -8,8 +8,9 @@ import java.nio.file.Path
 
 /**
  * MW S3.6 T5 — `snapshot --from file:<path> --profile <p> --out <dir> [--large]` (contracts §6). Writes
- * `<out>/<name>.yaml` and makes sure `.gitattributes` (in the git work tree holding `--out`, else the working directory)
- * marks the snapshots generated (`SnapshotCapture.ATTRIBUTES`). Exit 0 written, 1 refused (`xm/snapshot-size`, a profile error), 2 usage.
+ * `<out>/<name>.yaml` and makes sure `<out>/.gitattributes` marks the snapshots generated (`SnapshotCapture.ATTRIBUTES`,
+ * ✅R277-B). Exit 0 written, 1 refused (`xm/snapshot-size`, a profile error), 2 usage (an unknown adapter, a missing
+ * export or profile file).
  */
 object SnapshotCli {
     fun run(
@@ -27,7 +28,7 @@ object SnapshotCli {
                 val directory = out.toAbsolutePath().normalize()
                 Files.createDirectories(directory)
                 Files.writeString(directory.resolve(captured.name), captured.text)
-                SnapshotCapture.attributes(SnapshotCapture.attributesDirectory(directory, cwd))
+                SnapshotCapture.attributes(directory)
                 CliOutcome(0, "", "ttr-metadata: wrote ${captured.name} to $out\n")
             }
         }

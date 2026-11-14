@@ -126,4 +126,34 @@ class SnapshotHygieneSpec :
             Sanitise.key("Last-Modified_By") shouldBe "lastmodifiedby"
             Sanitise.roles.getValue(Sanitise.key("Last-Modified_By")) shouldBe "editor"
         }
+
+        test("capture: a record whose key is a principal or counter name is content, kept byte-equal (review-277 F2)") {
+            val source =
+                tree(
+                    "entity:\n  Zakaznik:\n    popis: Zákazník\n    owner: alice\n    votes: 3\n    sloupce:\n" +
+                        "      kod: {}\n      owner: {typ: text, createdBy: Karel}\n      created_by: {typ: text}\n" +
+                        "      votes: {typ: integer}\n  owners: {popis: entita jménem owners}\n",
+                )
+            val records = CaptureFilter.records(source, listOf(recordProfile(ops)))
+            records shouldBe
+                setOf(
+                    "/entity/Zakaznik",
+                    "/entity/Zakaznik/sloupce/kod",
+                    "/entity/Zakaznik/sloupce/owner",
+                    "/entity/Zakaznik/sloupce/created_by",
+                    "/entity/Zakaznik/sloupce/votes",
+                    "/entity/owners",
+                )
+            Sanitise.counters(Sanitise.principals(source.root.value, records), records) shouldBe
+                Json.parseToJsonElement(
+                    """
+                    {"entity": {"Zakaznik": {"popis": "Zákazník", "owner": "owner",
+                       "sloupce": {"kod": {}, "owner": {"typ": "text", "createdBy": "author"},
+                                   "created_by": {"typ": "text"}, "votes": {"typ": "integer"}}},
+                     "owners": {"popis": "entita jménem owners"}}}
+                    """.trimIndent(),
+                )
+            // Without the records every such key is matched by name.
+            Sanitise.counters(Sanitise.principals(source.root.value)).toString() shouldNotContain "integer"
+        }
     })

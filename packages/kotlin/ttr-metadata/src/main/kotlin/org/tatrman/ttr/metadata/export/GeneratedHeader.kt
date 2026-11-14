@@ -19,6 +19,8 @@ data class GeneratedInput(
  * <path>@<sha256>] profile <name>/<major> generator <version> — do not edit`, written as the file's first line, a
  * `//` comment in `.ttrm` and a `#` comment in YAML. The snapshot is a file or a tree (a directory, hashed over its
  * content files, [Hashes.tree]); input paths are relative to the generated file's own directory, `/`-separated.
+ * [GeneratedInput.path] is the path itself; [text] percent-encodes `%`, whitespace and control characters in it, so a
+ * path with a space stays one token (review-277 F3), and [parse] decodes them. Every other character is literal.
  */
 data class GeneratedHeader(
     val snapshot: GeneratedInput,
@@ -30,8 +32,8 @@ data class GeneratedHeader(
     val text: String
         get() =
             buildString {
-                append("$PREFIX${snapshot.path}@${snapshot.sha256}")
-                overlay?.let { append(" overlay ${it.path}@${it.sha256}") }
+                append("$PREFIX${encode(snapshot.path)}@${snapshot.sha256}")
+                overlay?.let { append(" overlay ${encode(it.path)}@${it.sha256}") }
                 append(" profile $profile generator $generator $SUFFIX")
             }
 
@@ -80,11 +82,60 @@ data class GeneratedHeader(
             val match = pattern.matchEntire(line) ?: return null
             val (snapshot, snapshotSha, overlay, overlaySha, profile, generator) = match.destructured
             return GeneratedHeader(
-                GeneratedInput(snapshot, snapshotSha),
-                overlay.takeIf { it.isNotEmpty() }?.let { GeneratedInput(it, overlaySha) },
+                GeneratedInput(decode(snapshot) ?: return null, snapshotSha),
+                overlay.takeIf { it.isNotEmpty() }?.let { GeneratedInput(decode(it) ?: return null, overlaySha) },
                 profile,
                 generator,
             )
+        }
+
+        /** `%` and every whitespace or ISO control character as `%XX` of its UTF-8 bytes; the rest literal. */
+        internal fun encode(path: String): String =
+            buildString {
+                var i = 0
+                while (i < path.length) {
+                    val point = path.codePointAt(i)
+                    val char = String(Character.toChars(point))
+                    if (point == '%'.code ||
+                        Character.isWhitespace(point) ||
+                        Character.isISOControl(point) ||
+                        Character.isSpaceChar(point)
+                    ) {
+                        char.toByteArray(Charsets.UTF_8).forEach { append("%%%02X".format(it.toInt() and 0xFF)) }
+                    } else {
+                        append(char)
+                    }
+                    i += Character.charCount(point)
+                }
+            }
+
+        /** [encode] undone; null when a `%` is not followed by two hex digits or the bytes are not UTF-8. */
+        internal fun decode(token: String): String? {
+            if ('%' !in token) return token
+            val out = java.io.ByteArrayOutputStream()
+            var i = 0
+            while (i < token.length) {
+                val c = token[i]
+                if (c == '%') {
+                    val byte = token.substring(i + 1, minOf(i + 3, token.length)).takeIf { it.length == 2 }
+                    out.write(byte?.toIntOrNull(16) ?: return null)
+                    i += 3
+                } else {
+                    val end = if (Character.isHighSurrogate(c) && i + 1 < token.length) i + 2 else i + 1
+                    out.write(token.substring(i, end).toByteArray(Charsets.UTF_8))
+                    i = end
+                }
+            }
+            val decoder =
+                Charsets.UTF_8
+                    .newDecoder()
+                    .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+            return try {
+                decoder.decode(java.nio.ByteBuffer.wrap(out.toByteArray())).toString()
+            } catch (e: java.nio.charset.CharacterCodingException) {
+                null
+            }
         }
 
         /** [text] without its header line. */
@@ -104,6 +155,38 @@ data class GeneratedHeader(
     }
 }
 
+/**
+ * A bundle's header inputs (review-277 F7): the [snapshot] (a file or tree) and [overlay] it was generated from, the
+ * profile identity and generator, and the bundle's output directory [out]. Each file's header names the inputs relative
+ * to its own directory under [out]; the inputs are hashed once.
+ */
+data class GeneratedInputs(
+    val snapshot: Path,
+    val overlay: Path?,
+    val profile: String,
+    val generator: String,
+    val out: Path,
+) {
+    private val snapshotSha by lazy { requireNotNull(Hashes.of(snapshot)) { "no snapshot $snapshot" } }
+    private val overlaySha by lazy { overlay?.let { requireNotNull(Hashes.of(it)) { "no overlay $it" } } }
+
+    /** The header of the bundle file at [file] (relative to [out], `/`-separated). */
+    fun header(file: String): GeneratedHeader {
+        val directory =
+            out
+                .resolve(file)
+                .toAbsolutePath()
+                .normalize()
+                .parent
+        return GeneratedHeader(
+            GeneratedInput(GeneratedHeader.relative(directory, snapshot), snapshotSha),
+            overlay?.let { GeneratedInput(GeneratedHeader.relative(directory, it), requireNotNull(overlaySha)) },
+            profile,
+            generator,
+        )
+    }
+}
+
 /** SHA-256 of an input as the header records it. */
 object Hashes {
     fun bytes(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).toHex()
@@ -118,7 +201,8 @@ object Hashes {
 
     /**
      * A tree: SHA-256 over `<relative path>\n<sha256 of its bytes>\n` for every regular file below [root], in bytewise
-     * path order, never entering a hidden directory, `build` or `node_modules` (the sidecar walk's exclusions).
+     * path order, never entering a hidden directory, `build` or `node_modules` (the sidecar walk's exclusions), nor a
+     * top-level `agents/` (✅MW-44: never read, so an agent edit never makes a generated file stale; review-277 F4).
      */
     fun tree(root: Path): String {
         val files =
@@ -126,11 +210,9 @@ object Hashes {
                 paths
                     .filter { it.isRegularFile() }
                     .filter { file ->
-                        root.relativize(file).none {
-                            it.name.startsWith(".") ||
-                                it.name == "build" ||
-                                it.name == "node_modules"
-                        }
+                        val segments = root.relativize(file).map { it.name }
+                        segments.none { it.startsWith(".") || it == "build" || it == "node_modules" } &&
+                            segments.first() != "agents"
                     }.toList()
             }
         val lines =

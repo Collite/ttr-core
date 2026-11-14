@@ -121,21 +121,33 @@ class SnapshotCommandSpec :
             (people + listOf("interní", "usageCount", "lastAccessed")).forEach { (it in text) shouldBe false }
         }
 
-        test(
-            ".gitattributes gains the sources/** line once, beside existing lines, in the git work tree holding --out",
-        ) {
-            val work = Files.createTempDirectory("s36-git")
-            work.resolve(".git").createDirectories()
-            work.resolve(".gitattributes").writeText("*.png binary")
-            // The working directory is below the work tree's root: the line goes to the root, not here.
-            val deep = work(1).let { Files.move(it, work.resolve("sub")) }
-            repeat(2) {
-                exec(deep, "snapshot", "--from", "file:export.json", "--profile", "cap/1", "--out", "../sources/x")
-                    .exitCode shouldBe 0
-            }
-            work.resolve(".gitattributes").readText() shouldBe
-                "*.png binary\nsources/** linguist-generated=true -diff\n"
-            deep.resolve(".gitattributes").exists() shouldBe false
+        test("<out>/.gitattributes marks the snapshot directory generated wherever --out is, once (✅R277-B)") {
+            val work = work(1)
+            ProcessBuilder("git", "init", "-q").directory(work.toFile()).start().waitFor() shouldBe 0
+            work.resolve(".gitattributes").exists() shouldBe false
+            val attributes = work.resolve("model/sources/.gitattributes")
+            exec(work, "snapshot", "--from", "file:export.json", "--profile", "cap/1", "--out", "model/sources")
+                .exitCode shouldBe 0
+            attributes.readText() shouldBe "* linguist-generated=true -diff\n"
+            exec(work, "snapshot", "--from", "file:export.json", "--profile", "cap/1", "--out", "model/sources")
+                .exitCode shouldBe 0
+            attributes.readText() shouldBe "* linguist-generated=true -diff\n"
+            val check =
+                ProcessBuilder("git", "check-attr", "linguist-generated", "diff", "--", "model/sources/export.yaml")
+                    .directory(work.toFile())
+                    .start()
+            check.inputStream.bufferedReader().readText() shouldBe
+                "model/sources/export.yaml: linguist-generated: true\nmodel/sources/export.yaml: diff: unset\n"
+            check.waitFor() shouldBe 0
+            Files.walk(work).use { paths ->
+                paths.filter { it.fileName.toString() == ".gitattributes" }.toList()
+            } shouldBe
+                listOf(attributes)
+            // Without a work tree the line still goes beside the snapshot, never to the working directory.
+            val bare = work(1)
+            exec(bare, "snapshot", "--from", "file:export.json", "--profile", "cap/1", "--out", "s").exitCode shouldBe 0
+            bare.resolve(".gitattributes").exists() shouldBe false
+            bare.resolve("s/.gitattributes").exists() shouldBe true
         }
 
         test("usage: an unknown adapter, a missing profile or export; --profile is required") {
@@ -153,8 +165,17 @@ class SnapshotCommandSpec :
             ).exitCode shouldBe
                 2
             exec(work, "snapshot", "--from", "file:export.json", "--out", "s").exitCode shouldBe 2
+            // A missing export is usage, on one line (review-277 F9); a malformed one is refused, its location once.
             val missing = exec(work, "snapshot", "--from", "file:gone.json", "--profile", "cap/1", "--out", "s")
-            missing.exitCode shouldBe 1
-            missing.stdout shouldContain "ys/profile-not-found"
+            missing.exitCode shouldBe 2
+            missing.stderr shouldBe "ttr-metadata: --from: no export file ${work.toRealPath().resolve("gone.json")}\n"
+            work.resolve("bad.json").writeText("{\"entity\": [\n")
+            val bad = exec(work, "snapshot", "--from", "file:bad.json", "--profile", "cap/1", "--out", "s")
+            bad.exitCode shouldBe 1
+            bad.stdout.lines().filter { it.isNotEmpty() }.single().let { line ->
+                line shouldContain "bad.json:"
+                line shouldContain ": error ys/"
+                line.split("bad.json").size shouldBe 2
+            }
         }
     })

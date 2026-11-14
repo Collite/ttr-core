@@ -43,6 +43,8 @@ class ProfileApplyResult(
     val generated: Map<String, CanonicalDocument> = emptyMap(),
     /** The plan's errors (the walk and the declarations), which the loader also reports; the guard needs them. */
     val planned: List<LoadWarning> = emptyList(),
+    /** Each generated document's chain identity (`<name>/<major>`, as its header names it), by output path. */
+    val generatedBy: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -106,6 +108,7 @@ object ProfileApply {
         val ignored = mutableListOf<JsonObject>()
         val overridden = mutableListOf<JsonObject>()
         val generated = TreeMap<String, CanonicalDocument>()
+        val generatedBy = TreeMap<String, String>()
         val sources = TreeMap<String, MutableList<SourceEntry>>()
         val generatedFrom = TreeMap<String, String>()
 
@@ -142,10 +145,11 @@ object ProfileApply {
             val head = header?.let { options -> inputs?.header(options.out.resolve(path).parent, options.generator) }
             files[path] = head?.line(GeneratedHeader.Form.YAML).orEmpty() + text
             if (document != null) generated[path] = document
+            if (inputs != null) generatedBy[path] = inputs.profile
             if (pkg.isNotEmpty()) {
                 sources.getOrPut(pkg) { mutableListOf() }
-                if (header != null && inputs != null) {
-                    generatedFrom.putIfAbsent(pkg, inputs.header(header.out, header.generator).text)
+                if (header != null && inputs != null && pkg !in generatedFrom) {
+                    generatedFrom[pkg] = inputs.header(header.out, header.generator).text
                 }
             }
             documents +=
@@ -239,6 +243,7 @@ object ProfileApply {
             plan.problems.errors.drop(planned),
             generated,
             plan.problems.errors.take(planned),
+            generatedBy,
         )
     }
 
@@ -253,17 +258,15 @@ object ProfileApply {
         val overlay: Path?,
         val profile: String,
     ) {
+        /** The overlay is read and hashed once per chain, not once per document (review-277 F8). */
+        private val overlaySha = lazy { overlay?.let { Hashes.bytes(Files.readAllBytes(it)) } }
+
         fun header(
             directory: Path,
             generator: String,
         ) = GeneratedHeader(
             GeneratedInput(GeneratedHeader.relative(directory, snapshot), snapshotSha.value),
-            overlay?.let {
-                GeneratedInput(
-                    GeneratedHeader.relative(directory, it),
-                    Hashes.bytes(Files.readAllBytes(it)),
-                )
-            },
+            overlay?.let { GeneratedInput(GeneratedHeader.relative(directory, it), requireNotNull(overlaySha.value)) },
             profile,
             generator,
         )

@@ -18,6 +18,8 @@ import java.math.BigDecimal
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.exists
+import kotlin.io.path.isReadable
+import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
 
 /** What a capture produced: the snapshot file's name and text, or the error that refused it. */
@@ -51,8 +53,11 @@ sealed interface Captured {
 object SnapshotCapture {
     const val LIMIT: Long = 5L * 1024 * 1024
 
-    /** The line `.gitattributes` gains: captured snapshots are generated and never diffed. */
-    const val ATTRIBUTES = "sources/** linguist-generated=true -diff"
+    /**
+     * The line `<out>/.gitattributes` gains (✅R277-B): everything in the snapshot directory is generated and never
+     * diffed. Git anchors the pattern to the directory of its `.gitattributes`, so it holds wherever `--out` is.
+     */
+    const val ATTRIBUTES = "* linguist-generated=true -diff"
 
     fun capture(
         from: String,
@@ -61,6 +66,10 @@ object SnapshotCapture {
         large: Boolean,
     ): Captured {
         val source = source(from) ?: return Captured.Usage("--from: unknown adapter in '$from' (P3 has file:<path>)")
+        // A missing export is a command-line mistake, as a missing --profile file is (review-277 F9).
+        if (source is FileSnapshotSource && !(source.path.isRegularFile() && source.path.isReadable())) {
+            return Captured.Usage("--from: no export file ${source.path}")
+        }
         val top = root.toRealPath()
         val catalog = ProfileCatalog.read(top).entries
         return try {
@@ -77,8 +86,10 @@ object SnapshotCapture {
                 ProfileResolver.bundled(reference)
                     ?: ProfileResolver(top, catalog).resolve(reference, top.resolve("snapshot"))
             val tree = source.fetch()
-            val kept = CaptureFilter.prune(tree.root.value, CaptureFilter.ignored(tree, chain))
-            val text = yaml(Sanitise.counters(Sanitise.principals(kept)))
+            // Hygiene runs on the export as fetched, so record pointers hold; then the ignore prunes (review-277 F2).
+            val records = CaptureFilter.records(tree, chain)
+            val clean = Sanitise.counters(Sanitise.principals(tree.root.value, records), records)
+            val text = yaml(CaptureFilter.prune(clean, CaptureFilter.ignored(tree, chain)))
             val size = text.toByteArray(Charsets.UTF_8).size.toLong()
             if (size > LIMIT && !large) {
                 return Captured.Refused(
@@ -90,7 +101,8 @@ object SnapshotCapture {
             }
             Captured.Written("${source.name}.yaml", text)
         } catch (e: ProfileException) {
-            Captured.Refused(e.location.file, e.location.line, e.location.column, "${e.code}: ${e.message}")
+            // The location is the Refused's own; the exception's message would print it a second time (F9).
+            Captured.Refused(e.location.file, e.location.line, e.location.column, "${e.code}: ${e.detail}")
         }
     }
 
@@ -114,14 +126,6 @@ object SnapshotCapture {
         Files.writeString(file, "$text$separator$ATTRIBUTES\n")
         return true
     }
-
-    /** Where `.gitattributes` lives for [out]: the nearest ancestor holding `.git`, else [fallback]. */
-    fun attributesDirectory(
-        out: Path,
-        fallback: Path,
-    ): Path =
-        generateSequence(out.toAbsolutePath().normalize()) { it.parent }.firstOrNull { it.resolve(".git").exists() }
-            ?: fallback
 
     private fun yaml(element: JsonElement): String {
         val options =

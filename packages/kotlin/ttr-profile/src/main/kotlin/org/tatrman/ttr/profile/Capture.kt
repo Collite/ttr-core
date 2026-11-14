@@ -25,7 +25,7 @@ interface SnapshotSource {
 
 /** `file:<path>` — one YAML or JSON export on disk. */
 class FileSnapshotSource(
-    private val path: Path,
+    val path: Path,
 ) : SnapshotSource {
     override val name: String = path.name.substringBeforeLast('.')
 
@@ -80,6 +80,18 @@ object CaptureFilter {
             .distinct()
     }
 
+    /**
+     * The JSON pointers of every record the profile discovers in [tree] (`kinds` only), as [ForeignNode.path] spells
+     * them: the capture never renames or drops a record's own key ([Sanitise], review-277 F2).
+     */
+    fun records(
+        tree: ForeignTree,
+        profile: List<ProfileDefinition>,
+    ): Set<String> {
+        val ops = profile.flatMap { it.operations }.map(::PlannedOp).filter { it.matches(tree) }
+        return RecordPlan(tree, ops).records.map { it.source.path }.toSet()
+    }
+
     /** [element] without the values at [paths] (pointers rooted at [element], as [ignored] returns them). */
     fun prune(
         element: JsonElement,
@@ -111,6 +123,10 @@ object CaptureFilter {
 /**
  * Snapshot hygiene (XM D-15) as pure functions over a foreign tree: principal names give way to role names, usage
  * counters are dropped. Keys match case-insensitively with `_` and `-` ignored (`created_by` = `createdBy`).
+ *
+ * A key whose pointer is a record's source path, or an ancestor of one ([CaptureFilter.records]), is never renamed or
+ * dropped: a column named `owner` or `votes` is content (review-277 F2); its own properties are still sanitised. A key
+ * the profile does not discover as a record is matched by name. Profile-driven lists are P5's.
  */
 object Sanitise {
     /** A principal-valued key → the role name that replaces every principal it holds. */
@@ -167,17 +183,34 @@ object Sanitise {
     fun key(name: String) = name.lowercase().replace("_", "").replace("-", "")
 
     /** Every principal under a principal-valued key becomes its role name; a list of principals becomes one role. */
-    fun principals(element: JsonElement): JsonElement =
+    fun principals(
+        element: JsonElement,
+        records: Set<String> = emptySet(),
+    ): JsonElement = principals(element, "", records)
+
+    private fun principals(
+        element: JsonElement,
+        path: String,
+        records: Set<String>,
+    ): JsonElement =
         when (element) {
             is JsonObject ->
                 JsonObject(
                     element.mapValues { (name, value) ->
-                        roles[key(name)]?.let { role -> asRole(value, role) } ?: principals(value)
+                        val at = "$path/${escapePointer(name)}"
+                        roles[key(name)]?.takeUnless { holdsRecord(at, records) }?.let { role -> asRole(value, role) }
+                            ?: principals(value, at, records)
                     },
                 )
-            is JsonArray -> JsonArray(element.map(::principals))
+            is JsonArray -> JsonArray(element.mapIndexed { i, value -> principals(value, "$path/$i", records) })
             else -> element
         }
+
+    /** True when [path] is a record's source path or lies above one. */
+    private fun holdsRecord(
+        path: String,
+        records: Set<String>,
+    ) = records.any { it == path || it.startsWith("$path/") }
 
     private fun asRole(
         value: JsonElement,
@@ -190,11 +223,27 @@ object Sanitise {
         }
 
     /** The tree without usage counters, at any depth. */
-    fun counters(element: JsonElement): JsonElement =
+    fun counters(
+        element: JsonElement,
+        records: Set<String> = emptySet(),
+    ): JsonElement = counters(element, "", records)
+
+    private fun counters(
+        element: JsonElement,
+        path: String,
+        records: Set<String>,
+    ): JsonElement =
         when (element) {
             is JsonObject ->
-                JsonObject(element.filterKeys { key(it) !in counters }.mapValues { (_, value) -> counters(value) })
-            is JsonArray -> JsonArray(element.map(::counters))
+                JsonObject(
+                    element.entries
+                        .filter { (name, _) ->
+                            key(name) !in counters || holdsRecord("$path/${escapePointer(name)}", records)
+                        }.associate { (name, value) ->
+                            name to counters(value, "$path/${escapePointer(name)}", records)
+                        },
+                )
+            is JsonArray -> JsonArray(element.mapIndexed { i, value -> counters(value, "$path/$i", records) })
             else -> element
         }
 }
