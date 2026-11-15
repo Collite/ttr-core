@@ -195,20 +195,39 @@ data class GeneratedInputs(
     }
     private val overlaySha by lazy { overlay?.let { requireNotNull(Hashes.of(it)) { "no overlay $it" } } }
 
-    /** The header of the bundle file at [file] (relative to [out], `/`-separated). */
+    /**
+     * The header of the bundle file at [file] (relative to [out], `/`-separated). Its input paths run between **real**
+     * paths, the file's real directory to the real inputs (review-287 R1, contracts §6): the OS resolves `..`
+     * physically, so a lexical path breaks as soon as a symbolic link (a linked `--out`, macOS `/tmp`) is on the way.
+     */
     fun header(file: String): GeneratedHeader {
         val directory =
-            out
-                .resolve(file)
-                .toAbsolutePath()
-                .normalize()
-                .parent
+            real(
+                out
+                    .resolve(file)
+                    .toAbsolutePath()
+                    .normalize()
+                    .parent,
+            )
         return GeneratedHeader(
-            GeneratedInput(GeneratedHeader.relative(directory, snapshot), snapshotSha),
-            overlay?.let { GeneratedInput(GeneratedHeader.relative(directory, it), requireNotNull(overlaySha)) },
+            GeneratedInput(GeneratedHeader.relative(directory, real(snapshot)), snapshotSha),
+            overlay?.let { GeneratedInput(GeneratedHeader.relative(directory, real(it)), requireNotNull(overlaySha)) },
             profile,
             generator,
         )
+    }
+
+    /**
+     * [path] with its nearest existing ancestor made real and the rest appended as given: the output directory may not
+     * exist yet when a library caller asks for a header. `Files.exists` follows links, so a dangling link counts as
+     * missing and its parent is made real. This shapes the header text only; where apply writes is LintCli's.
+     */
+    private fun real(path: Path): Path {
+        val absolute = path.toAbsolutePath().normalize()
+        var existing: Path? = absolute
+        while (existing != null && !Files.exists(existing)) existing = existing.parent
+        existing ?: return absolute
+        return existing.toRealPath().resolve(existing.relativize(absolute))
     }
 }
 

@@ -31,7 +31,7 @@ import kotlin.io.path.readText
  *
  * Both are errors at the file head (line 1, column 1). Regeneration's own errors (an orphaned overlay key, a dropped
  * input) are reported where they arise, so a broken input is shown at its key. Inputs resolve against the generated
- * file's directory; each snapshot tree is hashed and regenerated once per check. `agents/` is never read (✅MW-44).
+ * file's real directory (review-287 R1); each snapshot tree is hashed and regenerated once per check. `agents/` is never read (✅MW-44).
  */
 object GeneratedGuard {
     fun check(
@@ -54,7 +54,8 @@ object GeneratedGuard {
                 issues += issue("xm/generated-edited: the generated-from header is not one ttr-core writes")
                 continue
             }
-            val directory = file.parent
+            // Header paths run from the file's real directory (review-287 R1): resolve them from it, physically.
+            val directory = file.parent.toRealPath()
             val snapshot = directory.resolve(header.snapshot.path).normalize()
             val inputs = listOfNotNull(header.snapshot, header.overlay)
             val stale =

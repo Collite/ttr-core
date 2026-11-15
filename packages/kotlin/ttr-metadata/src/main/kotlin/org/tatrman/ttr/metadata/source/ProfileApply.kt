@@ -53,7 +53,8 @@ class ProfileApplyResult(
 
 /**
  * Where [ProfileApply] writes and who writes it, for the generated-file header (contracts §6): input paths in a header
- * are relative to the generated file's directory under [out]; [generator] is the ttr-core version.
+ * are relative to the generated file's **real** directory under [out], between real paths (review-287 R1); [generator]
+ * is the ttr-core version.
  */
 data class HeaderOptions(
     val out: Path,

@@ -115,10 +115,12 @@ class GeneratedHeaderSpec :
             val er = GeneratedHeader.read(first.getValue("demo/er.yaml")).shouldNotBeNull()
             er.profile shouldBe "demo-overlay-inline/1"
             er.generator shouldBe "9.9.9"
-            out.resolve("gen/demo").resolve(er.snapshot.path).normalize() shouldBe links
+            // Between real paths (review-287 R1): the temp dir is /var/…, a link to /private/var/… on macOS.
+            val dir = out.toRealPath().resolve("gen/demo")
+            dir.resolve(er.snapshot.path).normalize() shouldBe links.toRealPath()
             er.snapshot.sha256 shouldBe Hashes.tree(links)
-            out.resolve("gen/demo").resolve(er.overlay!!.path).normalize() shouldBe
-                links.resolve("profiles/overlay-inline.yaml")
+            dir.resolve(er.overlay!!.path).normalize() shouldBe
+                links.toRealPath().resolve("profiles/overlay-inline.yaml")
             // The sidecar sits at the out root: the same header, its paths relative to the out root.
             first.getValue("demo.sources.json") shouldStartWith "{\n  \"generated-from\": \"generated-from: ../"
             // Without header options (the loader's and the guard's runs) nothing is prefixed.
