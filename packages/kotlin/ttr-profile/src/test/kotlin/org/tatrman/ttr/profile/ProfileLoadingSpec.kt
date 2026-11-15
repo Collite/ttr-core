@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.profile
 
+import org.tatrman.ttr.yaml.MAX_YAML_CODE_POINTS
 import io.kotest.assertions.withClue
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
@@ -119,7 +120,7 @@ class ProfileLoadingSpec :
                 "%YAML 1.1\n---\n${definition()}",
                 definition() + "---\nprofile: other/1\n",
                 definition(extra = "overlay: {x: {v: " + "[".repeat(65) + "0" + "]".repeat(65) + "}}\n"),
-                definition(extra = "#" + "x".repeat(3_000_001)),
+                definition(extra = "#" + "x".repeat(MAX_YAML_CODE_POINTS + 1)),
                 definition(extra = "overlay: {x: {v: \u0000}}\n"),
             ).forEach { source ->
                 val error =

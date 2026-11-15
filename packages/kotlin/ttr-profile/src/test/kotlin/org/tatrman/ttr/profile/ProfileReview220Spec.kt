@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.profile
 
+import org.tatrman.ttr.yaml.MAX_YAML_CODE_POINTS
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -108,16 +109,17 @@ class ProfileReview220Spec :
                         it.location.column shouldBe column
                     }
                 }
-                file.writeBytes(ByteArray(12_000_001) { 'a'.code.toByte() })
+                val bytes = 4 * MAX_YAML_CODE_POINTS
+                file.writeBytes(ByteArray(bytes + 1) { 'a'.code.toByte() })
                 shouldThrow<ProfileException> { resolver.resolve("demo-cs/1", Path.of("ttr.yaml")) }.also {
                     it.code shouldBe "ys/profile-invalid"
                     it.location.line shouldBe 1
                     it.location.column shouldBe 1
-                    it.detail shouldBe "Profile exceeds 12000000 bytes"
+                    it.detail shouldBe "Profile exceeds $bytes bytes"
                 }
-                file.writeBytes(ByteArray(12_000_000) { 'a'.code.toByte() })
+                file.writeBytes(ByteArray(bytes) { 'a'.code.toByte() })
                 shouldThrow<ProfileException> { resolver.resolve("demo-cs/1", Path.of("ttr.yaml")) }.detail shouldBe
-                    "The incoming YAML document exceeds the limit: 3000000 code points."
+                    "The incoming YAML document exceeds the limit: $MAX_YAML_CODE_POINTS code points."
                 file.writeText(profile220(extra = "extends: ./bad.yaml\n"))
                 root.resolve("bad.yaml").writeBytes(prefix.toByteArray() + byteArrayOf(0xff.toByte()))
                 shouldThrow<ProfileException> { resolver.resolve("demo-cs/1", Path.of("ttr.yaml")) }

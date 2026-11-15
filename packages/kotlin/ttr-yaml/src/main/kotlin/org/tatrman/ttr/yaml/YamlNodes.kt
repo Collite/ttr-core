@@ -579,7 +579,12 @@ private fun readerFailure(
     )
 }
 
-internal const val MAX_YAML_CODE_POINTS = 3_000_000
+/**
+ * The reader budget (contracts §1, ✅D-MW-75 2026-11-14): one YAML document is at most this many code points — the
+ * canonical codec, a profile, a dialect file, a foreign export and a dialect run's canonical document alike. 6 000 000
+ * covers the 5 MiB snapshot guard in any encoding (was P2's 3 000 000, below it).
+ */
+const val MAX_YAML_CODE_POINTS = 6_000_000
 
 internal fun strictUtf8Decoder(): java.nio.charset.CharsetDecoder =
     Charsets.UTF_8

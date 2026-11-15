@@ -6,6 +6,37 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Release — internal grammar 0.22.4: the profile engine and `ttr-metadata-cli` jar (MW P3 S3.5–S3.7)
+
+- `grammar/v0.22.4` is an internal cut (GitHub Packages, prerelease): grammar stays 0.22. `ttr-profile` publishes
+  in the grammar bundle for the first time, at the bundle version. `./gradlew build` now fails when
+  `publish.yml`'s grammar `MODULES` lacks a project that a published module needs at runtime (`grammarBundleClosure`).
+- The GitHub release carries `ttr-metadata-cli-<v>.jar` and `ttr-metadata-cli-<v>.jar.sha256` (`sha256sum -c`). It
+  runs alone, as `java -jar ttr-metadata-cli-<v>.jar lint --root <tree> --strict` (also `profile check`,
+  `profile apply`, `snapshot`, `lint --codes`). Its exit codes and output match the installed distribution, and it
+  prints nothing on stderr for a YAML tree. Known noise: on a `.ttrm` checkout with a `modeler.toml`, and for
+  `export`, the bundled tomlj 1.1.1 prints four `ANTLR Tool/Runtime version 4.11.1 … does not match … 4.13.2` lines
+  (two messages, each twice). They come from tomlj's prebuilt parser, are harmless, and are not fixed in P3
+  (`docs/manual/metadata-cli.md`).
+- `ttr-metadata-cli` (S3.5–S3.6): `lint` (`--strict`, `--format text|json|github`), `profile check`/`profile apply`,
+  and `snapshot --from file:<export> --profile <p>`. `lint` reports a generated file or `<package>.sources.json`
+  sidecar that differs from a fresh generation of its inputs. Every code is in `diagnostic-codes.json` (`lint --codes`).
+  `profile-duplicate` is now `ys/profile-duplicate`. ttr-profile's `profiles/diagnostics.json` resource is removed.
+- S3.7 behaviour: the YAML reader budget is 6 000 000 code points (`MAX_YAML_CODE_POINTS`, now public).
+  - `profile apply` never writes through a symbolic link at or below `--out`. `--out` itself may be a link; any
+    other link exits 2.
+  - `snapshot` captures an export that its profile does not fully know: unknown records are left out, not an error.
+    It refuses an `--out` that is a git work-tree root.
+  - `xm/overlay-orphan` points at the overlay entry's key.
+- **JVM consumers must rebuild against 0.22.4.** These public signatures from 0.22.3 are gone (checked by `javap`
+  against the published 0.22.3 jars):
+  - ttr-metadata: `LoadReportIssue` gains `column` (constructor/`copy`). `ExportRequest` gains `generatedFrom`.
+    `TtrWriter.writeModel(Model)` becomes `writeModel(Model, GeneratedHeader?)`.
+  - ttr-yaml: the `YamlLocations` constructor.
+  - ttrp-emit-spi: `DeploymentMeta` (SPI v2 revision 3, below).
+  - ttr-emit-camunda: the `AuthoringArtifacts`/`CamundaRenderer` constructors, `emitCamunda` and `Dialect.rest`.
+  - All other modules only add signatures. Rebuild dependent JVM modules together; no reader moves its pin in P3.
+
 ### Added — Python client recipe exporter (AU-export P2 S2.1)
 
 - `python_client` emits a typed HTTP run-API package, CLI, subprocess service and per-route pytest suite,

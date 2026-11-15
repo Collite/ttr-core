@@ -84,6 +84,9 @@ class OverlaySpec :
             val bare = shouldThrow<ProfileException> { apply(profile("\n  Nikdo: {description: X}")) }
             bare.code shouldBe "xm/overlay-orphan"
             bare.suggestion.shouldBeNull()
+            // An inline overlay's orphan is anchored at the entry's key, not its value (S3.6 Found (f), S3.7 T0).
+            bare.location.path shouldBe "/overlay/Nikdo"
+            bare.location.column shouldBe 3
         }
 
         // review-251 F9 (✅R251-A): a sourceName key narrows by property, then prefers the record outside binding.

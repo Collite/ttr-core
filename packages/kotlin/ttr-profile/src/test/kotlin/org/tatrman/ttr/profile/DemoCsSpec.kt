@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.profile
 
+import kotlin.io.path.readText
+import java.nio.file.Path
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -130,20 +132,24 @@ class DemoCsSpec :
                 runOps("entity: {Customer: {x: {}, sibling: value}}", entityOps + "- {op: ignore, in: entity, at: /x}")
             }.location.path shouldBe "/entity/Customer/sibling"
         }
-        test("file pattern validation is located and identity diagnostic ships in the library catalogue") {
+        test("file pattern validation is located and identity diagnostic is in the one diagnostic-code catalogue") {
             shouldThrow<ProfileException> { recordProfile("- {op: ignore, files: ['!x']}") }
                 .location.path shouldBe "/operations/0/files/0"
+            // S3.7 T0 (S3.5 Found (h)): one list — ttr-metadata-cli's generated `diagnostic-codes.json` (`lint --codes`);
+            // ttr-profile ships no second copy.
             val catalogue =
                 Json
                     .parseToJsonElement(
-                        requireNotNull(ProfileEngine::class.java.getResourceAsStream("/profiles/diagnostics.json"))
-                            .bufferedReader()
-                            .use { it.readText() },
+                        Path
+                            .of(
+                                "../ttr-metadata-cli/src/main/resources/org/tatrman/ttr/metadata/cli/diagnostic-codes.json",
+                            ).readText(),
                     ).jsonArray
             catalogue
                 .single { it.jsonObject.string("code") == "ys/record-id-missing" }
                 .jsonObject
-                .string("where") shouldBe "RecordPlan (at the authored record)"
+                .string("raisedBy") shouldBe "ttr-profile RecordPlan (at the authored record)"
+            ProfileEngine::class.java.getResource("/profiles/diagnostics.json") shouldBe null
         }
         test("S3.3 links group: cross-file links by sourceName and by path, a cross-package import, as one run") {
             val result = ProfileEngine.apply(linkInputs(), demoChain("values.yaml"), demoRoot)

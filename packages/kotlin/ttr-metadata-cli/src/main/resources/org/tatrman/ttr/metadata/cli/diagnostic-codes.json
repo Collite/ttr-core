@@ -7,6 +7,7 @@
   {"code":"ys/unknown-kind","family":"ys","meaning":"A record discriminator has no kind mapping","raisedBy":"ttr-profile RecordPlan"},
   {"code":"ys/profile-conflict","family":"ys","meaning":"Two operations or records own the same canonical target","raisedBy":"ttr-profile RecordPlan, StructuralOps, CanonicalBuilder"},
   {"code":"ys/value-unmapped","family":"ys","meaning":"A selected value (a package key, a value map) has no mapping and no default","raisedBy":"ttr-profile StructuralOps, ValueOps"},
+  {"code":"ys/profile-duplicate","family":"ys","meaning":"Two catalogue profiles declare one identity: left out of the catalog (a warning); usage for a run naming it","raisedBy":"ttr-metadata-cli lint, profile check|apply (the catalog read)"},
   {"code":"ys/twin-missing","family":"ys","meaning":"A dialect fixture has no canonical twin","raisedBy":"reserved (contracts §5); the conformance roster refuses such a fixture"},
   {"code":"ys/record-id-missing","family":"ys","meaning":"A record has no string ID at kinds.id or the default /$key","raisedBy":"ttr-profile RecordPlan (at the authored record)"},
   {"code":"ys/canonical-invalid","family":"ys","meaning":"A file read as canonical YAML is not valid canonical YAML","raisedBy":"ttr-yaml CanonicalYaml via ttr-metadata YamlFileSource"},

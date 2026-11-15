@@ -32,8 +32,8 @@ class SnapshotCommandSpec :
             records: Int,
             padding: Int = 0,
         ): Path {
-            // A large export stays inside the reader's budget (P2: 3 000 000 code points) while its bytes pass the
-            // 5 MiB guard: each description is lengthened by three-byte characters (U+2026).
+            // A large export passes the 5 MiB guard in bytes with few code points: each description is lengthened by
+            // three-byte characters (U+2026).
             val pad = if (padding == 0) "" else " " + "\u2026".repeat(padding)
             val work = Files.createTempDirectory("s36-snapshot")
             work.resolve("profiles").createDirectories()
@@ -121,6 +121,16 @@ class SnapshotCommandSpec :
             (people + listOf("interní", "usageCount", "lastAccessed")).forEach { (it in text) shouldBe false }
         }
 
+        test("an export over P2's 3 000 000 code points is read and captured: the §1 budget is 6 000 000 (✅D-MW-75)") {
+            val work = work(1)
+            val long = "x".repeat(3_200_000)
+            work.resolve("long.json").writeText("{\"entity\": {\"T\": {\"popis\": \"$long\"}}}\n")
+            work.resolve("long.json").readText().let { it.codePointCount(0, it.length) > 3_000_000 } shouldBe true
+            val out = exec(work, "snapshot", "--from", "file:long.json", "--profile", "cap/1", "--out", "s")
+            out.exitCode shouldBe 0
+            work.resolve("s/long.yaml").readText() shouldBe "entity:\n  T:\n    popis: $long\n"
+        }
+
         test("<out>/.gitattributes marks the snapshot directory generated wherever --out is, once (✅R277-B)") {
             val work = work(1)
             ProcessBuilder("git", "init", "-q").directory(work.toFile()).start().waitFor() shouldBe 0
@@ -148,6 +158,37 @@ class SnapshotCommandSpec :
             exec(bare, "snapshot", "--from", "file:export.json", "--profile", "cap/1", "--out", "s").exitCode shouldBe 0
             bare.resolve(".gitattributes").exists() shouldBe false
             bare.resolve("s/.gitattributes").exists() shouldBe true
+        }
+
+        test("an --out that is a git work-tree root is refused, nothing written (review-277 N4 (b))") {
+            val work = work(1)
+            ProcessBuilder("git", "init", "-q").directory(work.toFile()).start().waitFor() shouldBe 0
+            val root = exec(work, "snapshot", "--from", "file:export.json", "--profile", "cap/1", "--out", ".")
+            root.exitCode shouldBe 2
+            root.stderr shouldBe
+                "ttr-metadata: --out . is a git work-tree root; snapshots go to a directory of their own\n"
+            work.resolve(".gitattributes").exists() shouldBe false
+            work.resolve("export.yaml").exists() shouldBe false
+        }
+
+        test("an export the profile does not fully know is captured, its unknown records kept (review-277 N1)") {
+            val work = work(1)
+            work.resolve("profiles/typed.yaml").writeText(
+                """
+                profile: typed/1
+                grammar: '>=0.22 <1.0'
+                operations:
+                  - {op: package, mapping: {}, default: demo}
+                  - {op: kinds, at: /entity, kind: /typ, mapping: {tabulka: entity}}
+                """.trimIndent() + "\n",
+            )
+            work.resolve("typed.json").writeText(
+                "{\"entity\": {\"T\": {\"typ\": \"tabulka\"}, \"V\": {\"typ\": \"pohled\", \"owner\": \"${people[0]}\"}}}\n",
+            )
+            val out = exec(work, "snapshot", "--from", "file:typed.json", "--profile", "typed/1", "--out", "s")
+            out.exitCode shouldBe 0
+            work.resolve("s/typed.yaml").readText() shouldBe
+                "entity:\n  T:\n    typ: tabulka\n  V:\n    typ: pohled\n    owner: owner\n"
         }
 
         test("usage: an unknown adapter, a missing profile or export; --profile is required") {

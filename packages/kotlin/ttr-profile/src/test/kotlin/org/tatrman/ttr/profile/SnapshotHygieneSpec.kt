@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.profile
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -93,15 +95,15 @@ class SnapshotHygieneSpec :
         test("capture: the profile's ignore, scoped and unscoped, by pointer; a whole-file ignore; never a record") {
             val source = tree("entity:\n  A: {popis: x, poznamka: y, sloupce: {kod: {}}}\naudit: {log: 1}\nnovy: z\n")
             val profile = listOf(recordProfile(ops))
-            CaptureFilter.ignored(source, profile).toSet() shouldBe setOf("/entity/A/poznamka", "/audit")
-            CaptureFilter.prune(source.root.value, CaptureFilter.ignored(source, profile)) shouldBe
+            CaptureFilter.plan(source, profile).ignored.toSet() shouldBe setOf("/entity/A/poznamka", "/audit")
+            CaptureFilter.prune(source.root.value, CaptureFilter.plan(source, profile).ignored) shouldBe
                 Json.parseToJsonElement("""{"entity":{"A":{"popis":"x","sloupce":{"kod":{}}}},"novy":"z"}""")
             val whole = listOf(recordProfile("- {op: ignore, files: [a.yaml]}\n"))
-            CaptureFilter.ignored(source, whole) shouldBe listOf("")
+            CaptureFilter.plan(source, whole).ignored shouldBe listOf("")
             CaptureFilter.prune(source.root.value, listOf("")) shouldBe JsonObject(emptyMap())
             // An ignore that would cover a record stays (apply refuses it as ys/profile-conflict).
             val covering = listOf(recordProfile(ops + "- {op: ignore, in: entity, at: /sloupce}\n"))
-            CaptureFilter.ignored(source, covering).toSet() shouldBe setOf("/entity/A/poznamka", "/audit")
+            CaptureFilter.plan(source, covering).ignored.toSet() shouldBe setOf("/entity/A/poznamka", "/audit")
             // An array element is addressed by index.
             CaptureFilter.prune(Json.parseToJsonElement("""{"a":[1,2,3]}"""), listOf("/a/1")) shouldBe
                 Json.parseToJsonElement("""{"a":[1,3]}""")
@@ -134,7 +136,7 @@ class SnapshotHygieneSpec :
                         "      kod: {}\n      owner: {typ: text, createdBy: Karel}\n      created_by: {typ: text}\n" +
                         "      votes: {typ: integer}\n  owners: {popis: entita jménem owners}\n",
                 )
-            val records = CaptureFilter.records(source, listOf(recordProfile(ops)))
+            val records = CaptureFilter.plan(source, listOf(recordProfile(ops))).records
             records shouldBe
                 setOf(
                     "/entity/Zakaznik",
@@ -155,5 +157,43 @@ class SnapshotHygieneSpec :
                 )
             // Without the records every such key is matched by name.
             Sanitise.counters(Sanitise.principals(source.root.value)).toString() shouldNotContain "integer"
+        }
+
+        test(
+            "capture: an export the profile does not fully know is captured whole; apply is the gate (review-277 N1)",
+        ) {
+            val kinds =
+                "- {op: package, mapping: {}, default: demo}\n" +
+                    "- {op: kinds, at: /entity, kind: /typ, mapping: {tabulka: entity}}\n"
+            val source =
+                tree("entity:\n  T: {typ: tabulka, owner: alice}\n  V: {typ: pohled, owner: bob}\n  W: {popis: bez}\n")
+            listOf(kinds, kinds + "- {op: ignore, at: /audit}\n").forEach { ops ->
+                val plan = CaptureFilter.plan(source, listOf(recordProfile(ops)))
+                // V (unmapped kind) and W (no kind string) are not records; discovery goes on to the next source.
+                plan.records shouldBe setOf("/entity/T")
+                plan.ignored shouldBe emptyList()
+                val clean = Sanitise.counters(Sanitise.principals(source.root.value, plan.records), plan.records)
+                CaptureFilter.prune(clean, plan.ignored) shouldBe
+                    Json.parseToJsonElement(
+                        """
+                        {"entity": {"T": {"typ": "tabulka", "owner": "owner"}, "V": {"typ": "pohled", "owner": "owner"},
+                                    "W": {"popis": "bez"}}}
+                        """.trimIndent(),
+                    )
+            }
+            // A missing id and a kinds.at that selects a scalar are skipped the same way.
+            val ids =
+                "- {op: kinds, at: /entity, id: /nazev, mapping: {e: entity}}\n" +
+                    "- {op: kinds, at: /scalar, mapping: {e: entity}}\n"
+            CaptureFilter
+                .plan(
+                    tree("entity:\n  A: {nazev: A}\n  B: {popis: x}\nscalar: 1\n"),
+                    listOf(recordProfile(ids)),
+                ).records shouldBe setOf("/entity/A")
+            // apply keeps the strict plan: the same export is still refused.
+            val refused =
+                shouldThrow<ProfileException> { ProfileEngine.apply(listOf(source), listOf(recordProfile(kinds))) }
+            refused.code shouldBe "ys/unknown-kind"
+            refused.detail shouldContain "pohled"
         }
     })

@@ -75,9 +75,15 @@ class GeneratedHeaderSpec :
                 "generated-from: ../100%25@"
             // A % not followed by two hex digits is not a header ttr-core writes.
             GeneratedHeader.parse("# generated-from: ../a%2@$sha profile p/1 generator 1 — do not edit").shouldBeNull()
+            // Exactly two hex digits: a signed pair is not one (review-277 N4 (a)), nor is a non-hex one.
+            listOf("%+9", "%-1", "%0g").forEach { escape ->
+                GeneratedHeader
+                    .parse("# generated-from: ../a${escape}b@$sha profile p/1 generator 1 — do not edit")
+                    .shouldBeNull()
+            }
         }
 
-        "hash inputs are deterministic: a tree's digest moves with any content byte, never with hidden or build state" {
+        "hash inputs are deterministic: a tree's digest moves with any content byte, never with hidden state" {
             val a = copy(links)
             val b = copy(links)
             Hashes.tree(a) shouldBe Hashes.tree(b)
@@ -86,8 +92,12 @@ class GeneratedHeaderSpec :
             val before = Hashes.tree(a)
             a.resolve(".git").createDirectories()
             a.resolve(".git/HEAD").writeText("ref: x\n")
-            a.resolve("build/out.txt").also { it.parent.createDirectories() }.writeText("x")
+            a.resolve("agents/a.yaml").also { it.parent.createDirectories() }.writeText("x")
             Hashes.tree(a) shouldBe before
+            // build/ is content to the loader (contracts §4 tree walk), so it is in the hash (S3.7 T0, N4 (d)).
+            a.resolve("build/out.yaml").also { it.parent.createDirectories() }.writeText("x")
+            Hashes.tree(a) shouldNotBe before
+            Files.delete(a.resolve("build/out.yaml"))
             a.resolve("l1-prodej.yaml").writeText(a.resolve("l1-prodej.yaml").readText() + " ")
             Hashes.tree(a) shouldNotBe before
             // A renamed file moves the digest though its bytes are the same.
@@ -105,10 +115,12 @@ class GeneratedHeaderSpec :
             val er = GeneratedHeader.read(first.getValue("demo/er.yaml")).shouldNotBeNull()
             er.profile shouldBe "demo-overlay-inline/1"
             er.generator shouldBe "9.9.9"
-            out.resolve("gen/demo").resolve(er.snapshot.path).normalize() shouldBe links
+            // Between real paths (review-287 R1): the temp dir is /var/…, a link to /private/var/… on macOS.
+            val dir = out.toRealPath().resolve("gen/demo")
+            dir.resolve(er.snapshot.path).normalize() shouldBe links.toRealPath()
             er.snapshot.sha256 shouldBe Hashes.tree(links)
-            out.resolve("gen/demo").resolve(er.overlay!!.path).normalize() shouldBe
-                links.resolve("profiles/overlay-inline.yaml")
+            dir.resolve(er.overlay!!.path).normalize() shouldBe
+                links.toRealPath().resolve("profiles/overlay-inline.yaml")
             // The sidecar sits at the out root: the same header, its paths relative to the out root.
             first.getValue("demo.sources.json") shouldStartWith "{\n  \"generated-from\": \"generated-from: ../"
             // Without header options (the loader's and the guard's runs) nothing is prefixed.

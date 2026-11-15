@@ -6,5 +6,5 @@ defs:
     kind: "er2db_entity"
     id: "SupplierStorage"
     properties:
-      entity: "Supplier"
+      entity: "demo.er.entity.Supplier"
       target: "SupplierTable"

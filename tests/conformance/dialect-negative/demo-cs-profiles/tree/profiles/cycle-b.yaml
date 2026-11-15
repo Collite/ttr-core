@@ -1,0 +1,4 @@
+profile: demo-cycle-b/1
+grammar: '>=0.22 <1.0'
+extends: ./cycle-a.yaml
+operations: []

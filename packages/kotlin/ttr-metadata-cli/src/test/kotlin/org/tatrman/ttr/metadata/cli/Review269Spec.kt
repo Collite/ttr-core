@@ -178,7 +178,13 @@ class Review269Spec :
         }
 
         test("F5: --format github columns are 1-based for semantics errors as for ys/ ones") {
-            val canonical = conformance.resolve("dialect/demo-cs/canonical")
+            // The demo-cs twin is strict-clean since S3.7 T0; this vector keeps its old TTR-SEM-204 file on purpose.
+            val canonical = Files.createTempDirectory("r269-f5").resolve("canonical")
+            canonical.createDirectories()
+            canonical.resolve("04-nest.yaml").writeText(
+                "ttr: \"0.22\"\npackage: \"demo\"\nmodel: \"er\"\ndefs:\n  -\n    kind: \"entity\"\n" +
+                    "    id: \"Order\"\n    properties:\n      semantics:\n        role: \"customer\"\n",
+            )
             val line = exec(canonical.parent, "lint", "--root", "canonical", "--strict", "--format", "github")
             line.stdout shouldContain "::error file=canonical/04-nest.yaml,line=10,col=9::semantics-invalid TTR-SEM-204"
             canonical

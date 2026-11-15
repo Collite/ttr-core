@@ -45,3 +45,14 @@ Library consumers opt in with `MetadataLoader(...).load(LoadOptions(strict = tru
 The CLI reads `[packages].layout` from `modeler.toml` using TOML parsing. Package-declaration mismatches follow TypeScript lint policy: `"off"` suppresses them, `"flexible"` (the default) reports warnings, and `"strict"` reports errors. Malformed TOML applies the default policy and adds located `manifest-invalid` errors; strict loading fails. An unknown layout value applies the default and adds a `manifest-package-layout` warning. A missing `model/` directory returns `no-model-dir` and exit 1 in either mode.
 
 Library callers pass this policy through `LoadOptions(strict = true, packageLayout = PackageLayout.Off)` (or `Flexible` / `Strict`). The Studio BFF must read it from the branch's own manifest. This grading changes only the strict report: legacy `LoadResult.issues`, declared-package model construction, and serving refresh behavior remain unchanged (Bora's ruling ⚑R126-A).
+
+## The released jar
+
+From grammar 0.22.4, each `grammar/v<v>` GitHub release carries `ttr-metadata-cli-<v>.jar`, a self-contained jar, with `ttr-metadata-cli-<v>.jar.sha256` beside it (`sha256sum -c`). A consumer pins it like `model-validator.jar`:
+
+```sh
+java -jar ttr-metadata-cli-<v>.jar lint --root <tree> --strict --format github
+java -jar ttr-metadata-cli-<v>.jar lint --codes
+```
+
+It has the same commands and exit codes as the installed distribution (`lint`, `profile check|apply`, `snapshot`, `load`, `export`). On a YAML tree it prints nothing on stderr. **Known upstream print:** on a `.ttrm` checkout with a `modeler.toml`, and for `export`, the bundled TOML reader (tomlj 1.1.1) prints four lines to stderr: `ANTLR Tool version 4.11.1 used for code generation does not match the current runtime version 4.13.2` and `ANTLR Runtime version 4.11.1 used for parser compilation does not match the current runtime version 4.13.2`, each twice. It comes from tomlj's prebuilt parser; ttr-core's own parsers are generated with 4.13.2. The print is harmless, and the result and exit code are unaffected.

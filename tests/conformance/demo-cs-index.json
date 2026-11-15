@@ -1,0 +1,43 @@
+{
+  "about": "MW-P3 phase DONE 1 (plan §4): the demo-cs/1 fixture index. DoneOneSweepSpec (ttr-metadata-cli) runs every `raises` entry, checks that every catalogue code but the reserved ones is raised by one, and that every `covers` area has its evidence. Paths are relative to tests/conformance; `at` is <file>:<line> under the root the entry lints.",
+  "covers": {
+    "op package": {"in": ["dialect/demo-cs/tree"], "evidence": ["op: package"]},
+    "op kinds": {"in": ["dialect/demo-cs/tree"], "evidence": ["op: kinds"]},
+    "op rename": {"in": ["dialect/demo-cs/tree"], "evidence": ["op: rename"]},
+    "op values": {"in": ["dialect/demo-cs/tree"], "evidence": ["op: values"]},
+    "op shape": {"in": ["dialect/demo-cs/tree"], "evidence": ["op: shape"]},
+    "op nest": {"in": ["dialect/demo-cs/tree"], "evidence": ["op: nest"]},
+    "op unnest": {"in": ["dialect/demo-cs/tree"], "evidence": ["op: unnest"]},
+    "op ignore": {"in": ["dialect/demo-cs/tree"], "evidence": ["op: ignore"]},
+    "op codes": {"in": ["dialect/demo-cs/tree"], "evidence": ["op: codes"]},
+    "op link": {"in": ["dialect/demo-cs/tree", "dialect/demo-cs-links/tree"], "evidence": ["op: link"]},
+    "overlay": {"in": ["dialect/demo-cs-links/tree"], "evidence": ["(?m)^overlay:"], "raises": ["xm/overlay-orphan"]},
+    "inheritance": {"in": ["dialect/demo-cs/tree"], "evidence": ["(?m)^extends: "], "raises": ["ys/profile-cycle"]},
+    "grammar ranges": {"in": ["dialect/demo-cs/tree", "dialect-negative/demo-cs-profiles/tree"], "evidence": ["(?m)^grammar: '>="], "raises": ["ys/profile-grammar-mismatch"]},
+    "declarations": {"in": ["dialect/demo-cs/tree", "dialect-negative/demo-cs-profiles/tree"], "evidence": ["(?m)^profile: \\./profiles/", "(?m)^ttr: \\{profile: "], "raises": ["ys/profile-not-found"]},
+    "unknown-key refusal": {"in": ["dialect-negative/demo-cs/tree"], "evidence": ["preklep"], "raises": ["ys/unknown-key"]},
+    "conflicts": {"in": ["dialect-negative/demo-cs/tree"], "evidence": ["Customer"], "raises": ["ys/profile-conflict"]},
+    "source positions": {"in": ["dialect-negative/demo-cs", "dialect-negative/demo-cs-profiles"], "evidence": [",line=\\d+,col=\\d+::"]},
+    "emission by package x model": {"in": ["dialect/demo-cs-links/canonical"], "evidence": ["(?m)^package: \"demo\"", "(?m)^package: \"prodej\"", "(?m)^model: \"er\"", "(?m)^model: \"binding\""]}
+  },
+  "reserved": ["ys/twin-missing"],
+  "raises": [
+    {"code": "ys/profile-invalid", "lint": "dialect-negative/demo-cs-profiles/tree", "at": "profiles/invalid.yaml:4"},
+    {"code": "ys/profile-grammar-mismatch", "lint": "dialect-negative/demo-cs-profiles/tree", "at": "profiles/old.yaml:2"},
+    {"code": "ys/profile-not-found", "lint": "dialect-negative/demo-cs-profiles/tree", "at": "not-found.yaml:1"},
+    {"code": "ys/profile-cycle", "lint": "dialect-negative/demo-cs-profiles/tree", "at": "profiles/cycle-b.yaml:3"},
+    {"code": "ys/value-unmapped", "lint": "dialect-negative/demo-cs-profiles/tree", "at": "unmapped.yaml:2"},
+    {"code": "ys/canonical-invalid", "lint": "dialect-negative/demo-cs-profiles/tree", "at": "canonical-bad.yaml:4"},
+    {"code": "ys/profile-duplicate", "lint": "dialect-negative/demo-cs-profiles/tree", "at": "profiles/dup-1.yaml:1"},
+    {"code": "ys/unknown-key", "lint": "dialect-negative/demo-cs/tree", "at": "unknown-key.yaml:3"},
+    {"code": "ys/unknown-kind", "lint": "dialect-negative/demo-cs/tree", "at": "unknown-kind.yaml:2"},
+    {"code": "ys/profile-conflict", "lint": "dialect-negative/demo-cs/tree", "at": "conflict.yaml:2"},
+    {"code": "ys/record-id-missing", "lint": "dialect-negative/demo-cs/tree", "at": "missing-id.yaml:2"},
+    {"code": "xm/link-unresolved", "lint": "dialect-negative/demo-cs/tree", "at": "link-unresolved.yaml:4"},
+    {"code": "xm/link-ambiguous", "lint": "dialect-negative/demo-cs/tree", "at": "link-ambiguous.yaml:6"},
+    {"code": "xm/overlay-orphan", "lint": "guard/demo-cs-links/orphan-overlay/model", "at": "tree/profiles/overlay-inline.yaml:5"},
+    {"code": "xm/generated-stale", "lint": "guard/demo-cs-links/stale/model", "at": "demo/er.yaml:1"},
+    {"code": "xm/generated-edited", "lint": "guard/demo-cs-links/edited/model", "at": "demo/er.yaml:1"},
+    {"code": "xm/snapshot-size", "snapshot": "dialect/demo-cs/tree/profiles", "profile": "demo-base/1", "at": "export.yaml:1"}
+  ]
+}

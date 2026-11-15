@@ -6,5 +6,9 @@ defs:
     kind: "entity"
     id: "Order"
     properties:
-      semantics:
-        role: "customer"
+      attributes:
+        -
+          id: "platny"
+          properties:
+            semantics:
+              role: "valid_flag"

@@ -39,6 +39,8 @@ data class ProfileDefinition(
     val writable: Boolean,
     val operations: List<LocatedOp>,
     val locations: Map<String, ProfileSpan>,
+    /** The key spans of an inline `overlay:`'s entries, by path: an orphan is reported at its key (S3.6 Found (f)). */
+    val keyLocations: Map<String, ProfileSpan> = emptyMap(),
 ) {
     val file: String get() = locations.getValue("").file
 }
@@ -141,6 +143,7 @@ object ProfileReader {
                     )
                 },
                 locations,
+                data.paths.filter { it.startsWith("/overlay/") }.associateWith { data.span(it, key = true) },
             )
         }
 }

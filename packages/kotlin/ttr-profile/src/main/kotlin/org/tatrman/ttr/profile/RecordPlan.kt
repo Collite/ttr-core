@@ -106,10 +106,15 @@ internal class PlannedOp(
  *
  * S3.2b (✅D-MW-67 c′): a record is identified by (node path, canonical kind), so one node may become one record per
  * canonical kind — an `entity` and its `er2db_entity` — each going to its own kind's model document.
+ *
+ * [lenient] (S3.7 T0, review-277 N1) is the capture's mode: a source or selection discovery would refuse (unmapped
+ * kind, missing id, self-nesting, two kinds on one record, a `kinds.at` that selects a scalar) is skipped — it is not a
+ * record, and discovery goes on. `apply` keeps the strict plan: it is the gate (contracts §6).
  */
 internal class RecordPlan(
     val tree: ForeignTree,
     private val operations: List<PlannedOp>,
+    private val lenient: Boolean = false,
 ) {
     val consumption = ConsumptionLedger()
     val conflicts = ConflictLedger()
@@ -157,6 +162,7 @@ internal class RecordPlan(
                         selection.value !is JsonObject &&
                         selection.value !is JsonArray
                     ) {
+                        if (lenient) return@forEach
                         throw ProfileException(
                             "ys/profile-invalid",
                             selection.span(key = true),
@@ -165,60 +171,75 @@ internal class RecordPlan(
                     }
                     val sources = if (op.value.string("at").isEmpty()) listOf(selection) else selection.entries()
                     for (source in sources) {
-                        val mapping = op.value.getValue("mapping").jsonObject
-                        val kindNode =
-                            op.value
-                                .optionalString(
-                                    "kind",
-                                )?.let { JsonPointer(it).resolve(source, includeNull = true) }
-                        val foreignKind =
-                            kindNode?.value?.let { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }
-                                ?: if ("kind" !in op.value && mapping.size == 1) mapping.keys.single() else null
-                        val kind =
-                            mapping[foreignKind]?.jsonPrimitive?.content ?: throw ProfileException(
-                                "ys/unknown-kind",
-                                (kindNode ?: source).span(key = true),
-                                if (foreignKind ==
-                                    null
-                                ) {
-                                    "Unmapped record kind: no string at ${op.value.optionalString("kind") ?: ""}"
-                                } else {
-                                    "Unmapped record kind $foreignKind"
-                                },
-                            )
-                        val idNode = JsonPointer(op.value.optionalString("id") ?: "/\$key").resolve(source)
-                        val id =
-                            (idNode?.value as? JsonPrimitive)?.takeIf { it.isString }?.content
-                                ?: throw ProfileException(
-                                    "ys/record-id-missing",
-                                    source.span(),
-                                    "Record needs a string id",
-                                )
-                        // A kind selecting itself would create an infinite nested record graph.
-                        if (parent?.source?.path == source.path) {
-                            throw ProfileException(
-                                "ys/profile-conflict",
-                                source.span(key = true),
-                                "A record cannot nest inside itself",
-                            )
-                        }
-                        if ((source.path to kind) in found) {
-                            throw ProfileException(
-                                "ys/profile-conflict",
-                                source.span(key = true),
-                                "Two kinds operations select the same record",
-                            )
-                        }
-                        consumption.open(source)
-                        kindNode?.let(consumption::consume)
-                        idNode?.let(consumption::consume)
-                        val record = Record(source, kind, id, parent)
-                        found[source.path to kind] = record
+                        val record =
+                            try {
+                                discover(op, source, parent)
+                            } catch (e: ProfileException) {
+                                if (lenient) continue
+                                throw e
+                            }
+                        found[source.path to record.kind] = record
                         madeBy[record] = index
                         changed = true
                     }
                 }
             }
         } while (changed)
+    }
+
+    /** One record from [source], or the error that refuses it; the ledgers change only when it is a record. */
+    private fun discover(
+        op: PlannedOp,
+        source: ForeignNode,
+        parent: Record?,
+    ): Record {
+        val mapping = op.value.getValue("mapping").jsonObject
+        val kindNode =
+            op.value
+                .optionalString(
+                    "kind",
+                )?.let { JsonPointer(it).resolve(source, includeNull = true) }
+        val foreignKind =
+            kindNode?.value?.let { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }
+                ?: if ("kind" !in op.value && mapping.size == 1) mapping.keys.single() else null
+        val kind =
+            mapping[foreignKind]?.jsonPrimitive?.content ?: throw ProfileException(
+                "ys/unknown-kind",
+                (kindNode ?: source).span(key = true),
+                if (foreignKind ==
+                    null
+                ) {
+                    "Unmapped record kind: no string at ${op.value.optionalString("kind") ?: ""}"
+                } else {
+                    "Unmapped record kind $foreignKind"
+                },
+            )
+        val idNode = JsonPointer(op.value.optionalString("id") ?: "/\$key").resolve(source)
+        val id =
+            (idNode?.value as? JsonPrimitive)?.takeIf { it.isString }?.content
+                ?: throw ProfileException(
+                    "ys/record-id-missing",
+                    source.span(),
+                    "Record needs a string id",
+                )
+        // A kind selecting itself would create an infinite nested record graph.
+        if (parent?.source?.path == source.path) {
+            throw ProfileException(
+                "ys/profile-conflict",
+                source.span(key = true),
+                "A record cannot nest inside itself",
+            )
+        }
+        if ((source.path to kind) in found) {
+            throw ProfileException(
+                "ys/profile-conflict",
+                source.span(key = true),
+                "Two kinds operations select the same record",
+            )
+        }
+        consumption.open(source)
+        kindNode?.let(consumption::consume)
+        idNode?.let(consumption::consume)
+        return Record(source, kind, id, parent)
     }
 }

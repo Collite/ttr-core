@@ -4,6 +4,6 @@ extends: ./base.yaml
 operations:
   - {op: ignore, in: entity, at: /poznamka, reason: Other consumer}
   - {op: ignore, files: [layouts/], reason: Layout source}
-  - {op: nest, in: entity, at: /role, to: {kind: entity, path: [semantics, role]}}
+  - {op: nest, in: attribute, at: /role, to: {kind: attribute, path: [semantics, role]}}
   - {op: unnest, in: entity, at: /obalky/popis, to: {kind: entity, property: description}}
   - {op: codes, mapping: {E_MIDDLE: ys/unknown-kind, E_SAME: ys/profile-conflict}}
