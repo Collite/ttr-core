@@ -5,6 +5,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import kotlinx.serialization.json.*
 
 /**
@@ -97,12 +98,13 @@ class LinkKindJoinPairsSpec :
 
         val joinOps = fanout + "- {op: join-pairs, in: relation, at: /spojeni, to: {kind: relation, property: join}}\n"
 
+        // ✅R298-A: the refs are written in the attribute form the loader resolves, `er.entity.<Entity>.<attr>`.
         fun pair(
             from: String,
             to: String,
         ) = buildJsonObject {
-            putJsonObject("from") { put("ref", from) }
-            putJsonObject("to") { put("ref", to) }
+            putJsonObject("from") { put("ref", "er.entity.$from") }
+            putJsonObject("to") { put("ref", "er.entity.$to") }
         }
 
         test("(c) one pair and two AND-joined pairs read into relation.join, in order; the key is consumed") {
@@ -132,6 +134,14 @@ class LinkKindJoinPairsSpec :
                 refused.code shouldBe "xm/join-pair-shape"
                 refused.location.path shouldBe "/vztahy/R/spojeni"
                 refused.detail shouldContain offending
+            }
+            // review-298 R5: a blank value is refused as such, not as a stray 'AND'.
+            listOf("''", "'   '").forEach { blank ->
+                val refused =
+                    shouldThrow<ProfileException> { run(model + "vztahy:\n  R: {spojeni: $blank}\n", joinOps) }
+                refused.code shouldBe "xm/join-pair-shape"
+                refused.detail shouldContain "non-empty"
+                refused.detail shouldNotContain "'AND'"
             }
             shouldThrow<ProfileException> {
                 run(

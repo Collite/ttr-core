@@ -11,11 +11,11 @@ defs:
       join:
         -
           from:
-            ref: "Dodavka.odberatel"
+            ref: "er.entity.Dodavka.odberatel"
           to:
-            ref: "Odberatel.kod"
+            ref: "er.entity.Odberatel.kod"
         -
           from:
-            ref: "Dodavka.rok"
+            ref: "er.entity.Dodavka.rok"
           to:
-            ref: "Odberatel.rok"
+            ref: "er.entity.Odberatel.rok"

@@ -196,8 +196,9 @@ internal class LinkOp(
 /**
  * `join-pairs` (✅D-MW-77, S3.7b; P-8 amended to ten operations): a legacy join string of exactly the shape
  * `a.x = b.y [AND c.z = d.w …]` — two-part references, equality only, `AND`-joined (any case) — becomes
- * `[{from: {ref: a.x}, to: {ref: b.y}}, …]` in declaration order. Any other shape is `xm/join-pair-shape` at the value,
- * naming the offending text. A structural read of one known form, not an expression parser.
+ * `[{from: {ref: er.entity.a.x}, to: {ref: er.entity.b.y}}, …]` in declaration order — the attribute ref form the loader
+ * resolves (✅R298-A; the prefix is output only, the input stays two-part). Any other shape, a blank value included, is
+ * `xm/join-pair-shape` at the value, naming the offending text. A structural read of one known form, not an expression parser.
  */
 internal class JoinPairsOp(
     private val op: PlannedOp,
@@ -220,6 +221,7 @@ internal class JoinPairsOp(
         val text =
             (node.value as? JsonPrimitive)?.takeIf { it.isString }?.content
                 ?: throw refused(node, "join-pairs needs a string `a.x = b.y [AND …]` at ${node.path}")
+        if (text.isBlank()) throw refused(node, "join-pairs needs a non-empty `a.x = b.y [AND …]` at ${node.path}")
         return JsonArray(
             text.split(AND).map { chunk ->
                 val match =
@@ -230,8 +232,8 @@ internal class JoinPairsOp(
                         }}' in join '$text' is not `a.x = b.y` (two-part references, equality only)",
                     )
                 buildJsonObject {
-                    putJsonObject("from") { put("ref", match.groupValues[1]) }
-                    putJsonObject("to") { put("ref", match.groupValues[2]) }
+                    putJsonObject("from") { put("ref", ATTRIBUTE_REF + match.groupValues[1]) }
+                    putJsonObject("to") { put("ref", ATTRIBUTE_REF + match.groupValues[2]) }
                 }
             },
         )
@@ -243,6 +245,8 @@ internal class JoinPairsOp(
     ) = ProfileException("xm/join-pair-shape", node.span(), detail)
 
     private companion object {
+        /** ✅R298-A: `a.x` → `er.entity.a.x`, the attribute qname form `Reference.toQname` resolves (ttr-gen writes it too). */
+        const val ATTRIBUTE_REF = "er.entity."
         val AND = Regex("""\s+AND\s+|\s+AND\s*$""", RegexOption.IGNORE_CASE)
         private const val PART = """[\p{L}\p{N}_]+"""
         val PAIR = Regex("""\s*($PART\.$PART)\s*=\s*($PART\.$PART)\s*""")

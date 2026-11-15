@@ -215,8 +215,9 @@ that exists only as other kinds is `xm/link-kind-missing`; a `kind` that contrad
 the kind the target names (`target.table` with `kind: entity`) is refused at load.
 `join-pairs` reads a legacy join string of exactly `a.x = b.y [AND c.z = d.w …]`
 (two-part references, equality only, `AND` in any case) into
-`relation.join: [{from: {ref: a.x}, to: {ref: b.y}}, …]`; any other shape is
-`xm/join-pair-shape` at the value. It is the one operation that reads a string's
+`relation.join: [{from: {ref: er.entity.a.x}, to: {ref: er.entity.b.y}}, …]` — the
+attribute reference form the loader resolves; the input stays two-part. Any other
+shape, a blank value included, is `xm/join-pair-shape` at the value. It is the one operation that reads a string's
 structure, and only this one form.
 
 Targets use an exact grammar kind and either `property` or an ordered `path`.
