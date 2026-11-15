@@ -174,6 +174,7 @@ internal object StructuralExecutor {
                         "values" -> ValuesOp(op)
                         "shape" -> ShapeOp(op)
                         "link" -> LinkOp(op, index, packages.getValue(plan))
+                        "join-pairs" -> JoinPairsOp(op)
                         "ignore" -> IgnoreOp(op)
                         else -> throw ProfileException(
                             "ys/profile-invalid",

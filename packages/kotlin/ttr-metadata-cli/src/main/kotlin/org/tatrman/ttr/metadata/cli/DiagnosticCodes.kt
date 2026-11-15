@@ -93,6 +93,16 @@ object DiagnosticCodes {
                 "ttr-profile ValueOps (link), Overlay",
             ),
             DiagnosticCode(
+                "xm/link-kind-missing",
+                "A link's kind operand names a kind the reference has no record of (it names only other kinds)",
+                "ttr-profile ValueOps (link with kind:)",
+            ),
+            DiagnosticCode(
+                "xm/join-pair-shape",
+                "A join-pairs value is not exactly `a.x = b.y [AND c.z = d.w …]` (two-part references, equality only)",
+                "ttr-profile ValueOps (join-pairs)",
+            ),
+            DiagnosticCode(
                 "xm/overlay-orphan",
                 "An overlay entry names no emitted definition (its suggestion may carry a rename)",
                 "ttr-profile Overlay",

@@ -17,3 +17,10 @@ operations:
   - {op: link, in: relation, at: /cizi_klic, to: {kind: relation, path: [binding, fk]}, by: sourceName, files: [08-values.yaml]}
   - {op: link, in: er2db_attribute, at: /atribut, to: {kind: er2db_attribute, property: attribute}, by: path}
   - {op: shape, in: query, at: '', to: {kind: query, path: [search, patterns]}, template: [{input: /vzor}, {input: /vzor_alt}]}
+  # S3.7b (✅D-MW-72, ✅D-MW-77): `kind:` on a link whose target names no kind; `join-pairs` reads a legacy join string.
+  - {op: kinds, at: /vazby, mapping: {vazba: relation}, files: [10-vazby.yaml, link-kind-missing.yaml, join-pair-shape.yaml]}
+  - {op: kinds, at: /entity, mapping: {entita: entity}, files: [link-kind-missing.yaml, join-pair-shape.yaml]}
+  - {op: link, in: relation, at: /z, to: {kind: relation, property: from}, by: sourceName, kind: entity, files: [10-vazby.yaml, join-pair-shape.yaml]}
+  - {op: link, in: relation, at: /z, to: {kind: relation, property: from}, by: sourceName, kind: table, files: [link-kind-missing.yaml]}
+  - {op: link, in: relation, at: /na, to: {kind: relation, property: to}, by: sourceName, kind: entity, files: [10-vazby.yaml, link-kind-missing.yaml, join-pair-shape.yaml]}
+  - {op: join-pairs, in: relation, at: /spojeni, to: {kind: relation, property: join}, files: [10-vazby.yaml, link-kind-missing.yaml, join-pair-shape.yaml]}

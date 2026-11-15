@@ -1,0 +1,4 @@
+entity:
+  Pobocka: {}
+vazby:
+  PobockaPobocky: {z: Pobocka, na: Pobocka, spojeni: Pobocka.id <> Pobocka.nadrizena}

@@ -49,7 +49,8 @@ class DiagnosticCodesSpec :
             val entries = Json.parseToJsonElement(out.stdout).jsonArray.map { it.jsonObject }
             entries.map { it.keys }.toSet() shouldBe setOf(setOf("code", "family", "meaning", "raisedBy"))
             entries.map { it.getValue("family").jsonPrimitive.content }.toSet() shouldBe setOf("ys", "xm")
-            // Contracts §5's list, plus the codec's ys/canonical-invalid and the CLI's ys/profile-duplicate (S3.7 T1).
+            // Contracts §5's list, plus the codec's ys/canonical-invalid and the CLI's ys/profile-duplicate (S3.7 T1), and S3.7b's
+            // link kind: and join-pairs codes.
             entries.map { it.getValue("code").jsonPrimitive.content }.toSet() shouldBe
                 setOf(
                     "ys/profile-invalid",
@@ -66,6 +67,8 @@ class DiagnosticCodesSpec :
                     "ys/canonical-invalid",
                     "xm/link-unresolved",
                     "xm/link-ambiguous",
+                    "xm/link-kind-missing",
+                    "xm/join-pair-shape",
                     "xm/overlay-orphan",
                     "xm/generated-stale",
                     "xm/generated-edited",

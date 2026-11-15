@@ -1,0 +1,4 @@
+entity:
+  Sklep: {}
+vazby:
+  SklepVazba: {z: Sklep, na: Sklep, spojeni: Sklep.id = Sklep.id}

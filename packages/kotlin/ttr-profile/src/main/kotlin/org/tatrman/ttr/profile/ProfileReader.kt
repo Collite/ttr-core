@@ -106,6 +106,23 @@ object ProfileReader {
                         "to.kind must equal in ($scope)",
                     )
                 }
+                // ✅D-MW-72 (S3.7b): `link`'s `kind` may name the referent kind only where the target does not already
+                // name another one (`er2db_entity.entity`, `target.table`, … — ✅D-MW-67 (c′)).
+                val referent = op["kind"]?.jsonPrimitive?.content
+                if (op["op"]?.jsonPrimitive?.content == "link" && referent != null) {
+                    val to = op.getValue("to").jsonObject
+                    val path = to["path"]?.jsonArray?.map { it.jsonPrimitive.content } ?: listOf(to.string("property"))
+                    val named = ProfileVocabulary.referentKind(path)
+                    if (named != null && named != referent) {
+                        throw ProfileException(
+                            "ys/profile-invalid",
+                            data.span("/operations/$index/kind", key = true),
+                            "kind $referent disagrees with the target ${path.joinToString(
+                                ".",
+                            )}, which accepts $named records",
+                        )
+                    }
+                }
                 op["files"]?.jsonArray?.forEachIndexed { fileIndex, pattern ->
                     try {
                         FileSelector(listOf(pattern.jsonPrimitive.content))

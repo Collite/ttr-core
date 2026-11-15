@@ -33,7 +33,7 @@ class CliJarSpec :
             val out = java("lint", "--root", "${conformance.resolve("dialect/demo-cs/tree")}", "--strict")
             out.exitCode shouldBe 0
             out.stderr shouldBe ""
-            out.stdout shouldEndWith "11 sources, 0 issues\n"
+            out.stdout shouldEndWith "12 sources, 0 issues\n"
         }
 
         test("java -jar refuses the negative tree with the same annotations and exit code as the distribution") {
