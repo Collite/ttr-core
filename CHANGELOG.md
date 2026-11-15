@@ -6,6 +6,22 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Release — internal grammar 0.22.5: link kind and join-pairs (MW P3 S3.7b)
+
+- `grammar/v0.22.5` is an internal cut (GitHub Packages, prerelease, with the `ttr-metadata-cli-<v>.jar` release
+  asset as for 0.22.4). Grammar stays 0.22: `TTR.g4` is unchanged. Only `ttr-profile`'s operation set and its schema
+  (`profile.schema.json`) grow. Decimal scale needs no change: it is the dataType's `precision`, and `length` is
+  the total digits.
+- `link` takes an optional `kind: <grammar kind>` where its target property names no kind (`relation.from`/`to`).
+  A name shared by an entity and its `er2db_entity` then resolves to the entity. A name that exists only as other
+  kinds raises the new `xm/link-kind-missing`, and a `kind` that contradicts the target's own kind is refused at
+  load (`ys/profile-invalid`). Without `kind`, `link` is unchanged.
+- A tenth operation, `join-pairs` (`in: relation`, `to: {kind: relation, property: join}` only). It reads a legacy
+  join string of exactly `a.x = b.y [AND c.z = d.w …]` into
+  `relation.join: [{from: {ref: er.entity.a.x}, to: {ref: er.entity.b.y}}, …]`, the attribute reference form the
+  loader resolves. Any other shape, including a blank value, raises the new `xm/join-pair-shape` at the value.
+  `lint --codes` lists both new codes.
+
 ### Release — internal grammar 0.22.4: the profile engine and `ttr-metadata-cli` jar (MW P3 S3.5–S3.7)
 
 - `grammar/v0.22.4` is an internal cut (GitHub Packages, prerelease): grammar stays 0.22. `ttr-profile` publishes
