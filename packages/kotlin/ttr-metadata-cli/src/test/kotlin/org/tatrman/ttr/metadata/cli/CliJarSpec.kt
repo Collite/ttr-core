@@ -7,6 +7,7 @@ import io.kotest.matchers.string.shouldEndWith
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.util.jar.JarFile
 import kotlin.io.path.name
 import kotlin.io.path.readText
 
@@ -47,6 +48,12 @@ class CliJarSpec :
                     .resolve("dialect-negative/demo-cs/expected-github.txt")
                     .readText()
                     .replace("file=", "file=$shown/")
+        }
+
+        test("the manifest names the main class and Multi-Release, so versioned classes are read (review-287 N1)") {
+            val attributes = JarFile(jar.toFile()).use { it.manifest.mainAttributes }
+            attributes.getValue("Main-Class") shouldBe "org.tatrman.ttr.metadata.cli.MainKt"
+            attributes.getValue("Multi-Release") shouldBe "true"
         }
 
         test("java -jar lint --codes prints the catalogue; the .sha256 beside the jar is its digest") {

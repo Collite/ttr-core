@@ -56,7 +56,10 @@ val grammarBundleClosure by tasks.registering {
         val listed =
             Regex(""":packages:kotlin:[A-Za-z0-9-]+(?=:publish)""").findAll(line).map { it.value }.toSet()
         check(listed.isNotEmpty()) { "no grammar MODULES line in ${workflow.asFile}" }
-        val runtime = listOf("api", "implementation", "runtimeOnly")
+        // review-287 N2: published test fixtures (`testFixturesApi(project(…))`) are part of the closure too.
+        val runtime =
+            listOf("api", "implementation", "runtimeOnly") +
+                listOf("testFixturesApi", "testFixturesImplementation", "testFixturesRuntimeOnly")
 
         fun direct(path: String): Set<String> =
             runtime

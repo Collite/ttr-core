@@ -97,7 +97,13 @@ val cliJar by tasks.registering(Jar::class) {
     archiveFileName.set("ttr-metadata-cli-${project.version}.jar")
     destinationDirectory.set(layout.buildDirectory.dir("cli-jar"))
     manifest {
-        attributes("Main-Class" to application.mainClass.get(), "Implementation-Version" to project.version.toString())
+        // review-287 N1: the jar carries the dependencies' META-INF/versions/** classes; the JVM reads them only when
+        // the manifest says Multi-Release, as it does for each library jar of the installed distribution.
+        attributes(
+            "Main-Class" to application.mainClass.get(),
+            "Implementation-Version" to project.version.toString(),
+            "Multi-Release" to "true",
+        )
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     // The merged service files first: with EXCLUDE the first copy of a path wins.
