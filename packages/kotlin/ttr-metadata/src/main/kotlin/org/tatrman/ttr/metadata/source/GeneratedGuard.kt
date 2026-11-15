@@ -75,9 +75,10 @@ object GeneratedGuard {
 
             fun overridden() = issue(overridden(header.profile))
             // Before the failed-run skip (review-277 N3): when the tree's own chains fail, an override's document
-            // still gets its message; the run's errors are reported where they arise.
+            // still gets its message; the run's errors are reported where they arise. When a declaration itself failed
+            // to resolve, the tree's own profiles are not fully known: no override verdict (review-287 R4, ✅R287-B).
             if (header.profile !in run.declared) {
-                issues += overridden()
+                if (!run.unresolved) issues += overridden()
                 continue
             }
             if (run.failed) continue
@@ -190,6 +191,8 @@ object GeneratedGuard {
         val problems: List<LoadWarning>,
         /** Every chain identity the tree's declarations resolved, even when its run failed (review-277 N3). */
         val declared: Set<String>,
+        /** A declaration failed to resolve, so [declared] may be short (review-287 R4). */
+        val unresolved: Boolean,
     ) {
         val failed get() = problems.isNotEmpty()
 
@@ -258,6 +261,7 @@ object GeneratedGuard {
                     result.files.filterKeys { it.endsWith(SIDECAR) && '/' !in it },
                     result.planned + result.problems + result.conflicts,
                     result.declared,
+                    result.unresolved,
                 )
             }
         }

@@ -239,6 +239,11 @@ internal class YamlTreeReader(
         val canonical: List<Pair<StorageFile, String>>,
         val dialect: List<Pair<List<ProfileDefinition>, List<Pair<StorageFile, String>>>>,
         val problems: Problems,
+        /**
+         * A declaration failed to resolve (a tree fallback or file header that does not resolve, or no ignore list), so
+         * the tree's own profiles are not fully known (review-287 R4, ✅R287-B): the guard gives no override verdict.
+         */
+        val unresolved: Boolean = false,
     )
 
     override fun read(
@@ -314,13 +319,14 @@ internal class YamlTreeReader(
             ignoreFile?.let { modelIgnore(it, storage, problems) }?.getOrElse { e ->
                 // Fail closed (review-260 F4): without the ignore list no file is known to be content.
                 candidates.forEach { problems.drop(it, (e as Recorded).issue) }
-                return Plan(profiles.root, emptyList(), emptyList(), problems)
+                return Plan(profiles.root, emptyList(), emptyList(), problems, unresolved = true)
             }
         val content = candidates.filter { ignore?.matches(it.underRoot()) != true }
         // Resolved on the first file that falls back to it, so a tree without such a file raises nothing (RR1-1).
         val tree by lazy { treeDeclaration(declarationFile, treeName, storage, profiles, problems) }
         val canonical = mutableListOf<Pair<StorageFile, String>>()
         val dialect = linkedMapOf<List<String>, Pair<List<ProfileDefinition>, MutableList<Pair<StorageFile, String>>>>()
+        var unresolved = false
         for (file in content) {
             val text = storage.read(file)
             val absolute = file.absolute()
@@ -334,9 +340,11 @@ internal class YamlTreeReader(
                     }
                 } catch (e: Recorded) {
                     problems.drop(file, e.issue)
+                    unresolved = true
                     continue
                 } catch (e: ProfileException) {
                     problems.drop(file, problems.profile(e, absolute to file.path))
+                    unresolved = true
                     continue
                 }
             if (chain == null || chain.all { it.operations.isEmpty() && it.overlay == null }) {
@@ -345,7 +353,7 @@ internal class YamlTreeReader(
                 dialect.getOrPut(chain.map { it.file }) { chain to mutableListOf() }.second += file to text
             }
         }
-        return Plan(profiles.root, canonical, dialect.values.toList(), problems)
+        return Plan(profiles.root, canonical, dialect.values.toList(), problems, unresolved)
     }
 
     private fun modelIgnore(

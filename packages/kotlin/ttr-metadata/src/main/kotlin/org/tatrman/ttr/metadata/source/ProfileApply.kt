@@ -49,6 +49,11 @@ class ProfileApplyResult(
      * (review-277 N3): the guard tells an override's document from a broken tree's by it.
      */
     val declared: Set<String> = emptySet(),
+    /**
+     * A declaration failed to resolve, so [declared] may lack a chain the tree declares (review-287 R4): the guard
+     * then gives no ✅R277-A override verdict; the resolution errors are in [planned].
+     */
+    val unresolved: Boolean = false,
 )
 
 /**
@@ -263,6 +268,7 @@ object ProfileApply {
             plan.problems.errors.take(planned),
             generatedBy,
             plan.dialect.map { identity(it.first) }.toSet(),
+            plan.unresolved,
         )
     }
 

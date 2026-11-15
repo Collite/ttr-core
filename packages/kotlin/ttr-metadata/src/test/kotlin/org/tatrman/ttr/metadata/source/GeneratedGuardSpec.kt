@@ -8,6 +8,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldEndWith
 import org.tatrman.ttr.metadata.export.GeneratedHeader
+import org.tatrman.ttr.metadata.export.Hashes
 import org.tatrman.ttr.writer.TtrRenderer
 import org.tatrman.ttr.yaml.CanonicalYaml
 import java.nio.file.Files
@@ -268,6 +269,59 @@ class GeneratedGuardSpec :
             // The tree's own error is still reported where it arises.
             issues.filter { it.file.endsWith("/tree/a.yaml") }.map { it.message } shouldContain
                 "ys/unknown-key: Unconsumed key popis"
+        }
+
+        /**
+         * review-287 R4 (✅R287-B): the pristine tree applied (plus [extra]), then [change]d so a declaration no longer
+         * resolves; every header is re-stamped with the changed tree's hash, as output a CLI whose grammar the range
+         * admitted would hold. The guard's issues.
+         */
+        fun unresolved(
+            extra: Map<String, String> = emptyMap(),
+            change: (Path) -> Unit,
+        ): List<LoadWarning> {
+            val at = case("pristine").resolve("tree")
+            val model = applied(at, extra)
+            val before = Hashes.tree(at)
+            change(at)
+            val after = Hashes.tree(at)
+            Files.walk(model).use { paths -> paths.filter { it.isRegularFile() }.toList() }.forEach {
+                it.writeText(it.readText().replace(before, after))
+            }
+            return GeneratedGuard.check(model, "t")
+        }
+
+        fun overrides(issues: List<LoadWarning>) = issues.filter { "cannot be re-checked" in it.message }
+
+        test("R4 (a): the tree fallback no longer resolves — no override verdict, the mismatch is reported") {
+            val issues =
+                unresolved { at ->
+                    at
+                        .resolve(
+                            "ttr.yaml",
+                        ).writeText("profile: ./profiles/overlay-inline.yaml\ngrammar: '>=0.30 <1.0'\n")
+                }
+            overrides(issues).shouldBeEmpty()
+            codes(issues) shouldContain "ys/profile-grammar-mismatch"
+        }
+
+        test("R4 (b): a file header's profile no longer resolves — no override verdict, the mismatch is reported") {
+            val solo = "profiles/solo.yaml"
+            val issues =
+                unresolved(
+                    mapOf(
+                        solo to profile("demo-solo/1", "solo"),
+                        "10-solo.yaml" to "ttr: {profile: ./$solo, grammar: '>=0.22 <1.0'}\nentity:\n  Solo: {}\n",
+                    ),
+                ) { at -> at.resolve(solo).writeText(profile("demo-solo/1", "solo").replace(">=0.22", ">=0.30")) }
+            overrides(issues).shouldBeEmpty()
+            codes(issues) shouldContain "ys/profile-grammar-mismatch"
+        }
+
+        test("R4 (c): the ignore list does not parse — no override verdict, ys/profile-invalid is reported") {
+            val issues = unresolved { at -> at.resolve("model.ignore").writeText("profiles/\n[\n") }
+            overrides(issues).shouldBeEmpty()
+            codes(issues) shouldContain "ys/profile-invalid"
         }
 
         test("a tree path with a space is header-safe: apply from 'My Tree', then the guard is green (F3)") {
