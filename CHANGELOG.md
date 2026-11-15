@@ -15,8 +15,9 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   runs alone, as `java -jar ttr-metadata-cli-<v>.jar lint --root <tree> --strict` (also `profile check`,
   `profile apply`, `snapshot`, `lint --codes`). Its exit codes and output match the installed distribution, and it
   prints nothing on stderr for a YAML tree. Known noise: on a `.ttrm` checkout with a `modeler.toml`, and for
-  `export`, the bundled tomlj 1.1.1 prints two `ANTLR Tool version 4.11.1 … does not match … 4.13.2` lines once. They
-  come from tomlj's prebuilt parser, are harmless, and are not fixed in P3.
+  `export`, the bundled tomlj 1.1.1 prints four `ANTLR Tool/Runtime version 4.11.1 … does not match … 4.13.2` lines
+  (two messages, each twice). They come from tomlj's prebuilt parser, are harmless, and are not fixed in P3
+  (`docs/manual/metadata-cli.md`).
 - `ttr-metadata-cli` (S3.5–S3.6): `lint` (`--strict`, `--format text|json|github`), `profile check`/`profile apply`,
   and `snapshot --from file:<export> --profile <p>`. `lint` reports a generated file or `<package>.sources.json`
   sidecar that differs from a fresh generation of its inputs. Every code is in `diagnostic-codes.json` (`lint --codes`).
