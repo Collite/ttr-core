@@ -255,7 +255,7 @@ jobs:
           if ! gh release view "$TAG" > /dev/null 2>&1; then
             PRE=""; [ "$PUBLIC" = "true" ] || PRE="--prerelease"
             gh release create "$TAG" --verify-tag --title "$TAG" $PRE \
-              --notes "Grammar-family cut ${VERSION}. Asset: ${jar} (java -jar) with ${jar}.sha256."
+              --notes "Grammar-family cut ${VERSION}. Asset: ${jar} (java -jar) with ${jar}.sha256. Changes and the JVM rebuild notice: CHANGELOG.md at ${TAG}."
           fi
           gh release upload "$TAG" "$dir/$jar" "$dir/$jar.sha256" --clobber
 
