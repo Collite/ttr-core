@@ -206,9 +206,18 @@ operations:
 The root declaration in `ttr.yaml` has just `profile` and `grammar`. A profile
 adds ordered `operations` and optional `extends`, `overlay` and `writable`.
 Operations are `kinds`, `package`, `rename`, `values`, `shape`, `nest`/`unnest`,
-`ignore`, `codes` and `link`. Selectors use JSON Pointers (`at`) and optional file
+`ignore`, `codes`, `link` and `join-pairs`. Selectors use JSON Pointers (`at`) and optional file
 globs (`files`). A shape template uses explicit `{input: <JSON Pointer>}`
-substitutions. A link declares `by: sourceName | iri | path`.
+substitutions. A link declares `by: sourceName | iri | path`; where its target
+property names no kind (`relation.from`/`to`), an optional `kind: <grammar kind>`
+picks the referent kind — an entity over an `er2db_entity` of the same name. A name
+that exists only as other kinds is `xm/link-kind-missing`; a `kind` that contradicts
+the kind the target names (`target.table` with `kind: entity`) is refused at load.
+`join-pairs` reads a legacy join string of exactly `a.x = b.y [AND c.z = d.w …]`
+(two-part references, equality only, `AND` in any case) into
+`relation.join: [{from: {ref: a.x}, to: {ref: b.y}}, …]`; any other shape is
+`xm/join-pair-shape` at the value. It is the one operation that reads a string's
+structure, and only this one form.
 
 Targets use an exact grammar kind and either `property` or an ordered `path`.
 Each path step follows its typed value; open tails require a grammar-declared
