@@ -1899,6 +1899,199 @@
     "schema": "profile"
   },
   {
+    "group": "profile shapes and targets",
+    "name": "link kind entity",
+    "schema": "profile",
+    "valid": true,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "link",
+          "in": "relation",
+          "at": "/z",
+          "to": {
+            "kind": "relation",
+            "property": "from"
+          },
+          "by": "sourceName",
+          "kind": "entity"
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "link kind pointer",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "link",
+          "in": "relation",
+          "at": "/z",
+          "to": {
+            "kind": "relation",
+            "property": "from"
+          },
+          "by": "sourceName",
+          "kind": "/x"
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "link kind unknown",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "link",
+          "in": "relation",
+          "at": "/z",
+          "to": {
+            "kind": "relation",
+            "property": "from"
+          },
+          "by": "sourceName",
+          "kind": "tabulka"
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "join-pairs",
+    "schema": "profile",
+    "valid": true,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "join-pairs",
+          "in": "relation",
+          "at": "/spojeni",
+          "to": {
+            "kind": "relation",
+            "property": "join"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "join-pairs no target",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "join-pairs",
+          "in": "relation",
+          "at": "/spojeni"
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "join-pairs by",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "join-pairs",
+          "in": "relation",
+          "at": "/spojeni",
+          "to": {
+            "kind": "relation",
+            "property": "join"
+          },
+          "by": "sourceName"
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "join-pairs kind",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "join-pairs",
+          "in": "relation",
+          "at": "/spojeni",
+          "to": {
+            "kind": "relation",
+            "property": "join"
+          },
+          "kind": "entity"
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "join-pairs to tags",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "join-pairs",
+          "in": "relation",
+          "at": "/spojeni",
+          "to": {
+            "kind": "relation",
+            "property": "tags"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "join-pairs in entity",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "join-pairs",
+          "in": "entity",
+          "at": "/x",
+          "to": {
+            "kind": "entity",
+            "property": "tags"
+          }
+        }
+      ]
+    }
+  },
+  {
     "group": "exact vocabulary and nested types",
     "name": "lexical policy rejects boolean",
     "value": {

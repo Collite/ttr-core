@@ -884,7 +884,16 @@ export function createSchemas(metadata) {
       ['in', 'at', 'to', 'by']
     ),
     // ✅D-MW-77 (S3.7b, P-8 amended to ten): `a.x = b.y [AND …]` → relation.join pairs.
-    operation('join-pairs', { ...recordSelectors, to: ref('propertyTarget') }, ['in', 'at', 'to']),
+    // review-298 R2: the op exists for relation.join only — the schema says so, at the profile line.
+    operation(
+      'join-pairs',
+      {
+        ...selectors,
+        in: { const: 'relation' },
+        to: object({ kind: { const: 'relation' }, property: { const: 'join' } }, ['kind', 'property']),
+      },
+      ['in', 'at', 'to']
+    ),
   ];
   // Group endpoint selectors by their value type. Repeating a full nested
   // value schema at every path causes eager validators to expand it thousands
