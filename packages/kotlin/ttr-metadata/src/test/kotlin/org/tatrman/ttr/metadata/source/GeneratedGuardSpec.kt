@@ -148,6 +148,32 @@ class GeneratedGuardSpec :
             guard(input).shouldBeEmpty()
         }
 
+        // review-287 R2: a CRLF checkout or a JSON formatter must not unguard a generated sidecar; it fails closed.
+        fun sidecarIssues(change: (String) -> String): List<Pair<String, String>> {
+            val case = case("pristine")
+            val sidecar = case.resolve("model/demo.sources.json")
+            sidecar.writeText(change(sidecar.readText()))
+            return guard(case).map { it.file.substringAfter("/model/") to it.message }
+        }
+        val differs = "xm/generated-edited: the sidecar differs from a fresh generation of its inputs"
+
+        test("R2: a generated sidecar converted to CRLF is still guarded: it differs from a fresh generation") {
+            sidecarIssues { it.replace("\n", "\r\n") } shouldBe listOf("demo.sources.json" to differs)
+        }
+
+        test("R2: a generated sidecar re-indented is still guarded: it differs from a fresh generation") {
+            sidecarIssues { text ->
+                text.lines().joinToString("\n") { it.replace(Regex("^ +")) { m -> m.value + m.value } }
+            } shouldBe listOf("demo.sources.json" to differs)
+        }
+
+        test("R2: a CRLF sidecar that no longer parses has no header ttr-core writes") {
+            sidecarIssues { it.replace("\n", "\r\n").trimEnd().removeSuffix("}") } shouldBe
+                listOf(
+                    "demo.sources.json" to "xm/generated-edited: the generated-from header is not one ttr-core writes",
+                )
+        }
+
         test("a generated .ttrm is checked in its own form: the document rendered") {
             val ttrm = case("pristine")
             val yaml = ttrm.resolve("model/demo/er.yaml")

@@ -3,6 +3,7 @@ package org.tatrman.ttr.metadata.source
 
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.tatrman.ttr.metadata.export.GeneratedHeader
 import org.tatrman.ttr.metadata.export.Hashes
@@ -116,20 +117,27 @@ object GeneratedGuard {
 
     /**
      * A `<package>.sources.json` sidecar's header (contracts §6, S3.6 Found (g)): the `generated-from` string the writer
-     * puts on the line after `{`, which is [GeneratedHeader.text]. A sidecar without one, or whose `generated-from` is
+     * puts first in the object, which is [GeneratedHeader.text]. A sidecar without one, or whose `generated-from` is
      * not a header (a dialect tree's link sidecar), is an input, not generated.
      */
     private object Sidecar {
         private const val KEY = "  \"generated-from\": "
 
+        /**
+         * Claimed whatever the line endings or indentation (review-287 R2: a CRLF checkout or a JSON formatter must not
+         * unguard it), but only as a generated file's first line is: the value starts `generated-from: `. A
+         * hand-written provenance note (a fixture's input sidecar) is not a header.
+         */
+        private val CLAIM = Regex("""\A\{\s*"generated-from"\s*:\s*"${Regex.escape(GeneratedHeader.PREFIX)}""")
+
         fun header(text: String): String? {
-            if (!text.startsWith("{\n$KEY")) return null
-            val value = text.removePrefix("{\n$KEY").substringBefore('\n').removeSuffix(",")
-            // Claimed only as a generated file's first line is: the value starts `generated-from: `. A hand-written
-            // provenance note (a fixture's input sidecar) is not a header.
-            if (!value.startsWith("\"${GeneratedHeader.PREFIX}")) return null
+            if (!CLAIM.containsMatchIn(text)) return null
+            // The value is read from the whole object; a sidecar that does not parse has no header ttr-core writes.
+            // The body is still compared byte for byte with the writer's (fail closed, no normalising).
             return try {
-                (Json.parseToJsonElement(value) as? JsonPrimitive)?.takeIf { it.isString }?.content
+                ((Json.parseToJsonElement(text) as? JsonObject)?.get("generated-from") as? JsonPrimitive)
+                    ?.takeIf { it.isString }
+                    ?.content
             } catch (e: SerializationException) {
                 null
             } ?: ""
