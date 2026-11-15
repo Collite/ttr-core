@@ -1,0 +1,7 @@
+# S3.7b: relation endpoints name fanned-out entities (07-fanout: an entity and its er2db_entity share each name) —
+# `kind: entity` picks the entity; the join is a legacy `a.x = b.y [AND …]` string read by `join-pairs`.
+vazby:
+  DodavkaOdberatele:
+    z: Dodavka
+    na: Odberatel
+    spojeni: Dodavka.odberatel = Odberatel.kod AND Dodavka.rok = Odberatel.rok

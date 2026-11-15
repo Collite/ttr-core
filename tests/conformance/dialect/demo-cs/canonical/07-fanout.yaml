@@ -7,11 +7,25 @@ defs:
     id: "Odberatel"
     properties:
       description: "Odběratel"
+      attributes:
+        -
+          id: "kod"
+          properties: {}
+        -
+          id: "rok"
+          properties: {}
   -
     kind: "entity"
     id: "Dodavka"
     properties:
       description: "Dodávka"
+      attributes:
+        -
+          id: "odberatel"
+          properties: {}
+        -
+          id: "rok"
+          properties: {}
   -
     kind: "entity"
     id: "Sklad"

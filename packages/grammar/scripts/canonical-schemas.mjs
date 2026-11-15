@@ -872,10 +872,27 @@ export function createSchemas(metadata) {
       { mapping: { type: 'object', additionalProperties: { type: 'string', minLength: 1 } } },
       ['mapping']
     ),
+    // ✅D-MW-72 (S3.7b): `kind` names the referent kind where the target property names none.
     operation(
       'link',
-      { ...recordSelectors, to: ref('propertyTarget'), by: { enum: ['sourceName', 'iri', 'path'] } },
+      {
+        ...recordSelectors,
+        to: ref('propertyTarget'),
+        by: { enum: ['sourceName', 'iri', 'path'] },
+        kind: canonicalKind,
+      },
       ['in', 'at', 'to', 'by']
+    ),
+    // ✅D-MW-77 (S3.7b, P-8 amended to ten): `a.x = b.y [AND …]` → relation.join pairs.
+    // review-298 R2: the op exists for relation.join only — the schema says so, at the profile line.
+    operation(
+      'join-pairs',
+      {
+        ...selectors,
+        in: { const: 'relation' },
+        to: object({ kind: { const: 'relation' }, property: { const: 'join' } }, ['kind', 'property']),
+      },
+      ['in', 'at', 'to']
     ),
   ];
   // Group endpoint selectors by their value type. Repeating a full nested
@@ -944,7 +961,7 @@ export function createSchemas(metadata) {
                 at: pointer,
                 files,
                 in: canonicalKind,
-                kind: pointer,
+                kind: any(pointer, canonicalKind),
                 id: pointer,
                 to: ref('canonicalTarget'),
                 mapping: { type: 'object' },

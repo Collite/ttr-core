@@ -12,3 +12,7 @@ clean.
 
 `expected-github.txt` is `lint --root . --strict --format github` run inside `tree/`: one `::error` per file, on the
 authored key or record, with the codes and positions `negative/expect.yaml` pins for each file alone. Exit 1.
+
+`link-kind-missing.yaml` and `join-pair-shape.yaml` (S3.7b) are the negatives of `link`'s `kind:` operand (a name that exists
+only as an entity, linked with `kind: table`) and of `join-pairs` (an inequality); the positive pair is
+`../../dialect/demo-cs/tree/10-vazby.yaml` and its twin.

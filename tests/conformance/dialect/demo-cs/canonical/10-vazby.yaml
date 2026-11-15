@@ -1,0 +1,21 @@
+ttr: "0.22"
+package: "demo"
+model: "er"
+defs:
+  -
+    kind: "relation"
+    id: "DodavkaOdberatele"
+    properties:
+      from: "demo.er.entity.Dodavka"
+      to: "demo.er.entity.Odberatel"
+      join:
+        -
+          from:
+            ref: "er.entity.Dodavka.odberatel"
+          to:
+            ref: "er.entity.Odberatel.kod"
+        -
+          from:
+            ref: "er.entity.Dodavka.rok"
+          to:
+            ref: "er.entity.Odberatel.rok"

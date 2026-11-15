@@ -1,7 +1,9 @@
 ::error file=missing-id.yaml,line=2,col=5::ys/record-id-missing Record needs a string id
 ::error file=unknown-kind.yaml,line=2,col=6::ys/unknown-kind Unmapped record kind jiny
 ::error file=conflict.yaml,line=2,col=26::ys/profile-conflict Two operations write entity.Customer/description
+::error file=join-pair-shape.yaml,line=4,col=54::xm/join-pair-shape 'Pobocka.id <> Pobocka.nadrizena' in join 'Pobocka.id <> Pobocka.nadrizena' is not `a.x = b.y` (two-part references, equality only)
 ::error file=link-ambiguous.yaml,line=6,col=16::xm/link-ambiguous sourceName Sklad matches demo.er.entity.Sklad, demo.db.dbo.Sklad
+::error file=link-kind-missing.yaml,line=4,col=16::xm/link-kind-missing sourceName Sklep names no table record, only demo.er.entity.Sklep (entity)
 ::error file=link-unresolved.yaml,line=4,col=39::xm/link-unresolved No record with sourceName Klient
 ::error file=unknown-key.yaml,line=3,col=5::ys/unknown-key Unconsumed key preklep
 ::error file=unimported.yaml::ttr/unimported-reference 'Dodavatel' is not reachable from this file's imports
