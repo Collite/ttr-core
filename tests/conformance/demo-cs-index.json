@@ -10,7 +10,7 @@
     "op unnest": {"in": ["dialect/demo-cs/tree"], "evidence": ["op: unnest"]},
     "op ignore": {"in": ["dialect/demo-cs/tree"], "evidence": ["op: ignore"]},
     "op codes": {"in": ["dialect/demo-cs/tree"], "evidence": ["op: codes"]},
-    "op link": {"in": ["dialect/demo-cs/tree", "dialect/demo-cs-links/tree"], "evidence": ["op: link", "kind: entity"], "raises": ["xm/link-kind-missing"]},
+    "op link": {"in": ["dialect/demo-cs/tree", "dialect/demo-cs-links/tree"], "evidence": ["op: link", "by: sourceName, kind: entity"], "raises": ["xm/link-kind-missing"]},
     "op join-pairs": {"in": ["dialect/demo-cs/tree"], "evidence": ["op: join-pairs"], "raises": ["xm/join-pair-shape"]},
     "overlay": {"in": ["dialect/demo-cs-links/tree"], "evidence": ["(?m)^overlay:"], "raises": ["xm/overlay-orphan"]},
     "inheritance": {"in": ["dialect/demo-cs/tree"], "evidence": ["(?m)^extends: "], "raises": ["ys/profile-cycle"]},
