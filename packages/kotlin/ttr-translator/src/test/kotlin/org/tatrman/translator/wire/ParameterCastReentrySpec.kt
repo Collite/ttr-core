@@ -110,7 +110,7 @@ class ParameterCastReentrySpec :
             twoHalvesEqualSingle(sql, emptyList())
         }
 
-        "M5 — control: a cast to the parameter's own declared type is the crutch's shape and is unwrapped (green before #407)" {
+        "M5 — control: a cast to the parameter's declared type is the crutch's shape, unwrapped (green before #407)" {
             val sql = "SELECT 'delivered more than ' || CAST({w} AS VARCHAR) || ' days ago' AS r FROM sale"
             decodes(sql, textW)
             twoHalvesEqualSingle(sql, textW)
@@ -126,5 +126,12 @@ class ParameterCastReentrySpec :
             concat.operandsList.map { it.exprCase } shouldBe
                 listOf(Expression.ExprCase.COLUMN_REF, Expression.ExprCase.PARAMETER)
             twoHalvesEqualSingle(sql, textW)
+        }
+
+        // The way's other re-entry divergence: `CASE WHEN … THEN NULL ELSE x END` carries a typed NULL; decoded untyped,
+        // it re-encoded as `unknown:NULL`.
+        "M7 — a typed NULL in a CASE keeps its type through re-entry (red before #407)" {
+            val sql = "SELECT CASE WHEN revenue = 0 THEN NULL ELSE revenue END AS r FROM sale"
+            twoHalvesEqualSingle(sql, emptyList())
         }
     })

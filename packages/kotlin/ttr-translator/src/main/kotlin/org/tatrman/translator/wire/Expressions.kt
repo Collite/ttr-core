@@ -468,7 +468,7 @@ object Expressions {
         builder: RelBuilder,
         lit: Literal,
     ): RexNode {
-        if (lit.isNull) return builder.literal(null)
+        if (lit.isNull) return nullLiteral(builder, lit.type)
         // CalciteExtParser (CEP-P1) — datepart SYMBOL operand. A `symbol:<EnumSimpleName>`-tagged
         // string is an enum-flag constant name; rebuild the SYMBOL RexLiteral via makeFlag so the
         // datetime operator (DATEADD/DATEDIFF/DATEPART) re-validates and unparses the datepart. Only
@@ -695,6 +695,21 @@ object Expressions {
         } else {
             builder.rexBuilder.makeCast(targetType, operand)
         }
+    }
+
+    /**
+     * ttr-core#407 — a NULL literal keeps the type it was encoded with (`CASE WHEN x = 0 THEN NULL ELSE x END`
+     * carries a `float` NULL). An untyped `builder.literal(null)` re-encoded as `unknown:NULL`, so the REL_NODE
+     * re-entry's plan differed from the single call's. A tag outside the surface table stays untyped.
+     */
+    private fun nullLiteral(
+        builder: RelBuilder,
+        typeTag: String,
+    ): RexNode {
+        val name = sqlTypeNameFor(typeTag)
+        if (name == SqlTypeName.ANY) return builder.literal(null)
+        val factory = builder.typeFactory
+        return builder.rexBuilder.makeNullLiteral(factory.createTypeWithNullability(factory.createSqlType(name), true))
     }
 
     /**

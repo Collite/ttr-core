@@ -10,6 +10,7 @@ import org.apache.calcite.rex.RexDynamicParam
 import org.apache.calcite.rex.RexNode
 import org.apache.calcite.sql.SqlKind
 import org.apache.calcite.sql.type.SqlTypeName
+import org.apache.calcite.sql.type.SqlTypeUtil
 import org.tatrman.translator.framework.RelTreeRexShuttle
 
 /**
@@ -25,13 +26,14 @@ import org.tatrman.translator.framework.RelTreeRexShuttle
  * with a fresh one whose `RelDataType` matches the type declared in the matching [SqlParam].
  * Indices that don't have a matching `SqlParam` are left alone (handled by Calcite's inference).
  *
- * It also **unwraps** any `CAST(? AS T)` whose sole operand is a parameter back to a typed bare
- * `?`. The orchestrator wraps placeholders in `CAST(? AS T)` (via
+ * It also **unwraps** a `CAST(? AS T)` whose sole operand is a parameter, and whose `T` is that parameter's
+ * declared type, back to a typed bare `?`. The orchestrator wraps placeholders in `CAST(? AS T)` (via
  * [ParameterBridge.prepareSqlForCalcite] `typed = true`) to satisfy validation in contexts Calcite
  * can't infer — chiefly inside `||` / `CONCAT`. Those casts are a validation-only crutch: keeping
  * them in the rel would leak a `CAST(? AS VARCHAR)` into the executed SQL (and, on dialects whose
  * default `VARCHAR` length is short, truncate the search term). Unwrapping leaves the param typed
- * but cast-free, so the regenerated SQL is identical to the bare-`?` form.
+ * but cast-free, so the regenerated SQL is identical to the bare-`?` form. A cast to any other type is the
+ * author's conversion (`CAST({days} AS VARCHAR)` over an `int`) and stays, over the re-typed `?` (ttr-core#407).
  *
  * Sequencing: this is intended to run **after** the planner produces the validated rel and
  * **before** [org.tatrman.translator.wire.PlanNodeEncoder.encode], so the wire-format param picks up
@@ -64,19 +66,27 @@ object ParameterTyper {
             override fun visitDynamicParam(dynamicParam: RexDynamicParam): RexNode = retype(dynamicParam)
 
             override fun visitCall(call: RexCall): RexNode {
-                // Unwrap a validation-only `CAST(? AS T)` whose sole operand is a known
-                // parameter back to a typed bare `?`. Real casts (over any non-param operand)
-                // and casts over an unmapped param index fall through to the default recursion.
+                // Unwrap a validation-only `CAST(? AS T)` whose sole operand is a known parameter back to a
+                // typed bare `?` — only when T is the parameter's declared type, the one cast the bridge's typed
+                // retry writes. A cast to another type is the author's (ttr-core#407: `CAST({days} AS VARCHAR)`
+                // over an `int`, inside `||`): it stays, over the re-typed `?`. Unwrapped, the `||` kept its
+                // validated text type over an int operand, and the REL_NODE re-entry, which re-derives the type,
+                // failed. Casts over any other operand, or over an unmapped index, fall through likewise.
                 if (call.kind == SqlKind.CAST && call.operands.size == 1) {
                     val operand = call.operands[0]
-                    if (operand is RexDynamicParam &&
-                        operand.index in parameterOrder.indices &&
-                        valuesByName.containsKey(parameterOrder[operand.index])
-                    ) {
-                        return retype(operand)
+                    val declared = declaredType(operand)
+                    if (declared != null && SqlTypeUtil.equalSansNullability(typeFactory, call.type, declared)) {
+                        return retype(operand as RexDynamicParam)
                     }
                 }
                 return super.visitCall(call)
+            }
+
+            /** The declared type of [operand] when it is a parameter with a matching [SqlParam]; else null. */
+            private fun declaredType(operand: RexNode): RelDataType? {
+                if (operand !is RexDynamicParam || operand.index !in parameterOrder.indices) return null
+                val declared = valuesByName[parameterOrder[operand.index]] ?: return null
+                return toRelDataType(declared.type, typeFactory)
             }
 
             private fun retype(dynamicParam: RexDynamicParam): RexNode {
