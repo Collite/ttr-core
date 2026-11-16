@@ -22,6 +22,8 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   Opens and C7 element-template Hidden payloads (ttr-server S3.3 Found 6). `deploymentId` is the engine
   deployment of the running definition, read through Camunda's repository service. Template keyed ports
   retain the event's `at`; batch ports remain `{none: true}`. Customer C7/C8 Opens omit the engine object.
+- The engine approval completion listener captures `task.id`/`task.assignee`; its answer Open adds
+  `taskId`/`answeredBy`, a saved retry body, and `ttrAnchor + ':answer'` (D-159, ⚑AU-S156-1).
 - C7 HTTP output scripts resolve `BpmnError` at runtime for Camunda 7 and CIB seven, preserving
   `TTR_STALE`/`TTR_REFUSED` boundary codes and transient-error retries (ttr-server S3.3 Found 7).
 

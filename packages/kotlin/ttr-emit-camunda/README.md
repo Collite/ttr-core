@@ -17,10 +17,12 @@ all three engine identifiers. Open retries reuse the saved body. The C7 element 
 connector payload uses the same engine fields and preserves `ttrInput.at` on keyed ports. A batch port
 remains `{none: true}`. Query payloads and customer C7/C8 exports carry no engine object.
 
-The Server's optional answer fields, `taskId` and `answeredBy`, identify the completed user task and
-its assignee. The Server accepts an asserted answer only from its configured engine client and verifies
-it against task history. The current one-program rendering has no answer Open; adding those fields
-requires an explicit answer path with task context.
+An approval user task's completion listener captures `task.id` and `task.assignee` in `ttrTaskId` and
+`ttrAnsweredBy`. The answer Open between that task and its completion gateway adds those values as
+`engine.taskId` and `engine.answeredBy`, with `idempotencyKey = ttrAnchor + ':answer'`. Its subprocess
+saves the body and clock before the HTTP task's asynchronous boundary, so retries reuse the same Open.
+The Server accepts an asserted answer only from its configured engine client and verifies the task and
+assignee against engine history. Customer exports and template program Opens assert no answer identity.
 
 C7 HTTP output scripts resolve `BpmnError` from the execution's engine package (`org.camunda` or
 `org.cibseven`). Both engines retain the `TTR_STALE` and `TTR_REFUSED` codes and their drawn boundaries;
