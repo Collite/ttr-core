@@ -1,0 +1,119 @@
+package hartland
+
+model db schema dbo
+
+// Extracted from Collite/ttr-demo 133349ff1af08dd1c04c7cf23137bb78703b9f49, model/ — the entities the decide_return way reads (ttr-core#407).
+
+def table return_request_hdr {
+    description: "Return-request headers (AU H-2) — who returns what order through which channel, and when it was requested. The entity reads the return_request VIEW, which adds the derived state."
+    primaryKey: [rr_request_number]
+    columns: [
+        def column rr_request_number { type: int, isKey: true },
+        def column rr_customer_sk    { type: int },
+        def column rr_order_number   { type: int },
+        def column rr_channel        { type: varchar },                                          // web · marketplace
+        def column rr_requested_date { type: date }
+    ]
+}
+
+def table return_request_line {
+    // rl_customer_sk is the request's customer, DENORMALIZED onto the line by the generator (D-127): a
+    // relation is one hop, and H-2 joins the line to its customer's center (17 §4.1, rel_line_customer).
+    description: "Return-request lines (AU H-2, the key of the flow, D-84). rl_state: received · rejected · settling · awaiting_goods · goods_received · not_returned · closed."
+    primaryKey: [rl_line_id]
+    columns: [
+        def column rl_line_id              { type: int, isKey: true },
+        def column rl_request_number       { type: int },
+        def column rl_line_no              { type: int },
+        def column rl_item_sk              { type: int },
+        def column rl_quantity             { type: int },
+        def column rl_unit_price           { type: { type: decimal, length: 12, precision: 2 } },
+        def column rl_reason               { type: varchar },                                   // damaged · did_not_arrive · wrong_size · other
+        def column rl_requested_resolution { type: varchar },                                   // refund · exchange · replacement
+        def column rl_requested_variant_sk { type: int, optional: true },                                       // NULL unless an exchange names a variant
+        def column rl_state                { type: varchar },
+        def column rl_way                  { type: varchar, optional: true },                                   // NULL until decided — the decide_return route taken
+        def column rl_customer_sk          { type: int }
+    ]
+}
+
+// Substituted: ttr-demo declares `return_request` as a VIEW over return_request_hdr + return_request_line;
+// ErModelHandle exposes db tables only, so the fixture declares its columns as a table.
+def table return_request {
+    // D-84: `received` while any line is received (or none has arrived yet); `closed` when every line is
+    // rejected, not_returned or closed; `decided` in between. Nothing writes it — the recipes write lines.
+    description: "Return requests (AU H-2) — the header with its state derived from its lines: received · decided · closed."
+    columns: [
+        def column rr_request_number { type: int },
+        def column rr_customer_sk    { type: int },
+        def column rr_order_number   { type: int },
+        def column rr_channel        { type: varchar },
+        def column rr_requested_date { type: date },
+        def column rr_state          { type: varchar }
+    ]
+}
+
+def table customer {
+    description: "Customers (D-5: Customers — channel-overlap + demographic branches)."
+    primaryKey: [c_customer_sk]
+    columns: [
+        def column c_customer_sk      { type: int, isKey: true },
+        def column c_customer_id      { type: { type: char, length: 16 } },
+        def column c_current_addr_sk  { type: int },
+        def column c_current_cdemo_sk { type: int },
+        def column c_current_hdemo_sk { type: int },
+        def column c_birth_year       { type: int },
+        // AU D-83 — the customer's distribution center: the modal warehouse of their web/marketplace
+        // lines (data/automation/24-centers.sql). NULL for a customer who never ordered from one.
+        def column c_center_sk        { type: int },
+        // AU — the customer's mail address, generated from the key under the reserved .example domain
+        // (data/automation/10-ddl.sql). TPC-DS's own c_email_address stays unmodelled: its domains are real.
+        def column c_email            { type: { type: varchar, length: 64 } }
+    ]
+}
+
+def table sales_order {
+    // `order` is reserved in SQL: the entity is `order`, the table `sales_order` (D-119).
+    description: "Order headers (AU H-1) — one row per web or marketplace order. so_state: placed · held · released · cancelled; so_held_for: Sales · AR · both."
+    primaryKey: [so_order_number]
+    columns: [
+        def column so_order_number   { type: int, isKey: true },
+        def column so_channel        { type: varchar },                                       // web · marketplace
+        def column so_customer_sk    { type: int },
+        def column so_placed_date    { type: date },
+        def column so_delivered_date { type: date, optional: true },                                          // NULL until delivered
+        def column so_warehouse_sk   { type: int },                                           // the fulfilling distribution center
+        def column so_value          { type: { type: decimal, length: 12, precision: 2 } },
+        def column so_state          { type: varchar },
+        def column so_held_for       { type: varchar, optional: true },                                       // NULL unless held
+        def column so_placed_by      { type: varchar }
+    ]
+}
+
+def table sales_line {
+    description: "Order lines (AU H-1, D-81) — one row per web_sales ∪ catalog_sales line, numbered within its order by item."
+    primaryKey: [sl_order_number, sl_line_no]
+    columns: [
+        def column sl_order_number    { type: int, isKey: true },
+        def column sl_line_no         { type: int, isKey: true },
+        def column sl_item_sk         { type: int },
+        def column sl_quantity        { type: int },
+        def column sl_unit_price      { type: { type: decimal, length: 12, precision: 2 } },
+        def column sl_ext_sales_price { type: { type: decimal, length: 12, precision: 2 } },
+        def column sl_warehouse_sk    { type: int },
+        def column sl_sold_date       { type: date },
+        def column sl_customer_sk     { type: int },
+        def column sl_channel         { type: varchar }                                       // web · marketplace
+    ]
+}
+
+def table inventory {
+    description: "Weekly warehouse-level on-hand snapshots (D-5: Inventory Snapshots — the smoking gun, S1)."
+    primaryKey: [inv_date_sk, inv_item_sk, inv_warehouse_sk]
+    columns: [
+        def column inv_date_sk          { type: int, isKey: true },
+        def column inv_item_sk          { type: int, isKey: true },
+        def column inv_warehouse_sk     { type: int, isKey: true },
+        def column inv_quantity_on_hand { type: int }
+    ]
+}
