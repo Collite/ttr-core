@@ -33,6 +33,24 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - `org.tatrman.translate` and `org.tatrman.translate.v1` ship as namespace packages (no `__init__.py`), like `org` and
   `org.tatrman`: ttr-server generates `translate_pb2` into the same package, and a regular package would hide it.
 
+### Fixed — process-engine Open metadata (AU-export S1.5.6)
+
+- `ttr-emit-camunda` includes `engine {instanceId, businessKey, deploymentId}` in process-engine BPMN
+  Opens and C7 element-template Hidden payloads (ttr-server S3.3 Found 6). `deploymentId` is the engine
+  deployment of the running definition, read through Camunda's repository service. Template keyed ports
+  retain the event's `at`; batch ports remain `{none: true}`. Customer C7/C8 Opens omit the engine object.
+- The engine approval completion listener captures `task.id`/`task.assignee`; its answer Open adds
+  `taskId`/`answeredBy`, the approved row's key, and `ttrAnchor + ':answer:' + ttrTaskId`, without
+  an asynchronous boundary. This is the identity Open only; answer evaluation/close is carried to
+  S1.5.7 by the explicit ⚑AU-S156-2 fallback (D-159).
+- C7 HTTP scripts resolve `BpmnError` and Spin for Camunda 7 and CIB seven without requiring
+  an `execution` binding in connector outputs. Real embedded-engine tests cover both distributions,
+  including success and BPMN/transient errors (review-323 R323-1/2). Unclaimed approval completions
+  are refused before HTTP, answer identity stays local to each row, and synchronous answer Opens
+  omit job retry settings: transient failures roll back completion for the user to retry.
+- C7 cancellation output mappings tolerate a missing Open handle, so first-Open 409/422 responses
+  reach their error boundaries without an anchor or incident (AU-S156-3; also broken on master).
+
 ### Release — internal grammar 0.22.5: link kind and join-pairs (MW P3 S3.7b)
 
 - `grammar/v0.22.5` is an internal cut (GitHub Packages, prerelease, with the `ttr-metadata-cli-<v>.jar` release

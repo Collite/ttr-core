@@ -157,22 +157,27 @@ internal class AuthoringArtifacts(
             """.trimIndent()
         val payload =
             """
+            ${C7Runtime.spin}
             def source = execution.getVariable('ttr_source')
             def programs = $programs
             def queries = $queries
             if (programs.containsKey(source)) {
                 def kind = programs[source].port
-                def port = kind == 'none' ? [none: true] : [(kind): execution.getVariable('ttrInput')[kind]]
-                return org.camunda.spin.Spin.JSON([deployment: execution.getVariable('ttr_deployment'), port: port, origin: 'engine']).toString()
+                def input = kind == 'none' ? null : execution.getVariable('ttrInput')
+                def port = kind == 'none' ? [none: true] : [(kind): input[kind]]
+                if (kind != 'none' && input['at'] != null) port.at = input['at']
+                def engine = ${C7Runtime.engineIdentityGroovy}
+                return SpinClass.JSON([deployment: execution.getVariable('ttr_deployment'), port: port, origin: 'engine', engine: engine]).toString()
             }
             if (!queries.containsKey(source)) throw new IllegalArgumentException('unknown world program or query ' + source)
-            return org.camunda.spin.Spin.JSON([query: source, parameters: queries[source].collectEntries { [(it): execution.getVariable(it)] }]).toString()
+            return SpinClass.JSON([query: source, parameters: queries[source].collectEntries { [(it): execution.getVariable(it)] }]).toString()
             """.trimIndent()
         val result =
             """
+            ${C7Runtime.spin}
             def code = ((Number) statusCode).intValue()
             if (code < 200 || code >= 300) throw new IllegalStateException('run API HTTP ' + code)
-            return org.camunda.spin.Spin.JSON(response)
+            return SpinClass.JSON(response)
             """.trimIndent()
         return buildJsonObject {
             put("type", "camunda:Connector")

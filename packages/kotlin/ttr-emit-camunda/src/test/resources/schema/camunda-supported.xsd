@@ -11,6 +11,7 @@
   <xs:element name="entry"><xs:complexType mixed="true"><xs:attribute name="key" type="xs:string" use="required"/></xs:complexType></xs:element>
   <xs:element name="failedJobRetryTimeCycle" type="xs:string"/>
   <xs:element name="executionListener"><xs:complexType><xs:sequence><xs:element ref="c:script"/></xs:sequence><xs:attribute name="event" type="xs:string" use="required"/></xs:complexType></xs:element>
+  <xs:element name="taskListener"><xs:complexType><xs:sequence><xs:element ref="c:script"/></xs:sequence><xs:attribute name="event" type="xs:string" use="required"/></xs:complexType></xs:element>
   <xs:element name="script"><xs:complexType mixed="true"><xs:attribute name="scriptFormat" type="xs:string" use="required"/></xs:complexType></xs:element>
   <xs:attribute name="historyTimeToLive" type="xs:positiveInteger"/>
   <xs:attribute name="candidateGroups" type="xs:string"/>
