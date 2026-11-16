@@ -36,9 +36,17 @@ fun runMetadataCommand(args: List<String>): CliOutcome {
             LintCommand { outcome = it },
             ProfileCommand().subcommands(ProfileApplyCommand { outcome = it }, ProfileCheckCommand { outcome = it }),
             SnapshotCommand { outcome = it },
+            ImportSchemaCommand { outcome = it },
         )
     // MW S3.5: `lint` and `profile` exit 2 on usage (contracts §5); the older commands keep 64.
-    val usage = if (args.firstOrNull { !it.startsWith("-") } in setOf("lint", "profile", "snapshot")) 2 else 64
+    val usage =
+        if (args.firstOrNull { !it.startsWith("-") } in
+            setOf("lint", "profile", "snapshot", "import-schema")
+        ) {
+            2
+        } else {
+            64
+        }
     return try {
         command.parse(args)
         outcome
@@ -135,6 +143,40 @@ class SnapshotCommand(
     private val large by option("--large", help = "Write a snapshot over 5 MiB").flag()
 
     override fun run() = output(SnapshotCli.run(from, profile, Path.of(out), large))
+}
+
+/** MW-P5 S5.1 T5 — `import-schema --from file:`: a catalog export through the reader harness (contracts §2). */
+class ImportSchemaCommand(
+    private val output: (CliOutcome) -> Unit,
+) : CliktCommand(name = "import-schema") {
+    override fun help(context: Context) =
+        "Generate a db package from a catalog export: <out>/<package>/<model>.ttrm, <package>.sources.json, report.json."
+
+    private val from by option("--from", help = "The source: file:<path> (an export, e.g. OpenMetadata's tables)")
+        .required()
+    private val profile by option("--profile", help = "A shipped profile (om-tables/1) or a profile file").required()
+    private val out by option("--out", help = "Output directory").required()
+    private val root by option("--root", help = "The model root whose sidecars links and overlays read")
+    private val overlay by option("--overlay", help = "An authored overlay applied after the profile's own")
+    private val packageName by option("--package", help = "The package every input lands in (replaces the profile's)")
+    private val dryRun by option("--dry-run", help = "Write nothing; print each file's diff against --out").flag()
+    private val format by option("--format", help = "text (the PR-body Markdown) or json (the report)")
+        .choice("text", "json")
+        .default("text")
+
+    override fun run() =
+        output(
+            ImportSchemaCli.run(
+                from,
+                profile,
+                Path.of(out),
+                root?.let(Path::of),
+                overlay?.let(Path::of),
+                packageName,
+                dryRun,
+                format == "json",
+            ),
+        )
 }
 
 class MetadataCommand : CliktCommand(name = "ttr-metadata") {
