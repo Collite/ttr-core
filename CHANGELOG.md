@@ -6,6 +6,21 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — REL_NODE re-entry keeps an author's parameter cast; decode failures say what failed (translator 0.14.3, ttr-core#407)
+
+- `ttr-translator` — `ParameterTyper` unwraps a `CAST(? AS T)` over a declared parameter only when `T` is the
+  parameter's declared type, the one cast the bridge's typed retry adds for validation. An author's cast to another
+  type stays, over the re-typed parameter. Before, `'… ' || CAST({days} AS VARCHAR)` over an `int` parameter lost its
+  cast. The ER plan then concatenated a bare `int`, and the REL_NODE re-entry (`target=ER → REL_NODE → target=DB`)
+  failed with `rel_node_schema_resolution_failed`. Without `||`, the cast vanished from the plan silently.
+- `ttr-translator` — the REL_NODE decoder keeps a NULL literal's encoded type (`CASE WHEN x = 0 THEN NULL ELSE x END`),
+  so the two-half plan no longer re-encodes it as `unknown:NULL`.
+- `ttr-translator` — a REL_NODE decode failure keeps the code `rel_node_schema_resolution_failed`. Its message now
+  names the exception class, its message and the plan node that failed (`IllegalArgumentException: no message at
+  PROJECT`), where before it was the exception's message or "references unresolved schema". The failure is logged at
+  WARN with the stack. New `PlanNodeDecoder.decodeNamed` throws `PlanNodeDecoder.DecodeException(nodeCase, cause)`;
+  `decode` throws the original exception, unchanged.
+
 ### Release — internal grammar 0.22.5: link kind and join-pairs (MW P3 S3.7b)
 
 - `grammar/v0.22.5` is an internal cut (GitHub Packages, prerelease, with the `ttr-metadata-cli-<v>.jar` release
