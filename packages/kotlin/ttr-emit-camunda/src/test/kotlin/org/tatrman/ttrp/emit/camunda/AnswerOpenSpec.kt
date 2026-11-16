@@ -60,7 +60,7 @@ class AnswerOpenSpec :
                         BPMN,
                         "serviceTask",
                     ).single { it.getAttribute("name") == "answer approve_release" }
-                answer.getAttributeNS("http://camunda.org/schema/1.0/bpmn", "asyncBefore") shouldBe "true"
+                answer.getAttributeNS("http://camunda.org/schema/1.0/bpmn", "asyncBefore") shouldBe ""
                 val answerStep = answer.parentNode as Element
                 val flows = elements(BPMN, "sequenceFlow")
                 flows.any {
@@ -93,7 +93,8 @@ class AnswerOpenSpec :
                         mapOf(
                             "execution" to EngineOpenExecution(),
                             "ttrAnchor" to "anchor-1",
-                            "ttrInput" to mapOf("key" to 4711),
+                            "ttrInput" to mapOf("key" to 9999),
+                            "ttrRow" to Spin.JSON("""{"order_number":4711}"""),
                         )
                 ).forEach { (name, value) ->
                     context.setVariable(name, factory.createValueExpression(value, Any::class.java))
@@ -122,8 +123,10 @@ class AnswerOpenSpec :
                     Json.parseToJsonElement(
                         """{"instanceId":"instance-156","businessKey":"order-4711","deploymentId":"engine-deployment-9","taskId":"task-42","answeredBy":"alice"}""",
                     )
-                open.getValue("idempotencyKey") shouldBe JsonPrimitive("anchor-1:answer")
+                open.getValue("idempotencyKey") shouldBe JsonPrimitive("anchor-1:answer:task-42")
                 open.getValue("deployment") shouldBe JsonPrimitive("release_bpmn")
+                open.getValue("port").jsonObject.getValue("key") shouldBe JsonPrimitive(4711)
+                open.getValue("port").jsonObject.containsKey("at") shouldBe true
             }
         }
     })

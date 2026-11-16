@@ -19,10 +19,16 @@ remains `{none: true}`. Query payloads and customer C7/C8 exports carry no engin
 
 An approval user task's completion listener captures `task.id` and `task.assignee` in `ttrTaskId` and
 `ttrAnsweredBy`. The answer Open between that task and its completion gateway adds those values as
-`engine.taskId` and `engine.answeredBy`, with `idempotencyKey = ttrAnchor + ':answer'`. Its subprocess
-saves the body and clock before the HTTP task's asynchronous boundary, so retries reuse the same Open.
+`engine.taskId` and `engine.answeredBy`, with `idempotencyKey = ttrAnchor + ':answer:' + ttrTaskId` (one task per approved row) and
+`port.key` from that row. Its subprocess saves the body and clock; the HTTP task has no `asyncBefore`,
+so it runs in the transaction that completes the user task.
 The Server accepts an asserted answer only from its configured engine client and verifies the task and
 assignee against engine history. Customer exports and template program Opens assert no answer identity.
+
+This stage ships the answer identity Open only, taking the explicit ⚑AU-S156-2 fallback. The existing
+ordinary step chain assumes the root scope, asynchronous HTTP tasks and approval rendering; it cannot
+be reused unchanged inside the approval row. Answer evaluation/close belongs to S1.5.7; S3.3's full
+answer certification waits for that stage.
 
 C7 HTTP output scripts resolve `BpmnError` from the execution's engine package (`org.camunda` or
 `org.cibseven`). Both engines retain the `TTR_STALE` and `TTR_REFUSED` codes and their drawn boundaries;

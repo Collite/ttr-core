@@ -23,7 +23,9 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   deployment of the running definition, read through Camunda's repository service. Template keyed ports
   retain the event's `at`; batch ports remain `{none: true}`. Customer C7/C8 Opens omit the engine object.
 - The engine approval completion listener captures `task.id`/`task.assignee`; its answer Open adds
-  `taskId`/`answeredBy`, a saved retry body, and `ttrAnchor + ':answer'` (D-159, ⚑AU-S156-1).
+  `taskId`/`answeredBy`, the approved row's key, and `ttrAnchor + ':answer:' + ttrTaskId`, without
+  an asynchronous boundary. This is the identity Open only; answer evaluation/close is carried to
+  S1.5.7 by the explicit ⚑AU-S156-2 fallback (D-159).
 - C7 HTTP output scripts resolve `BpmnError` at runtime for Camunda 7 and CIB seven, preserving
   `TTR_STALE`/`TTR_REFUSED` boundary codes and transient-error retries (ttr-server S3.3 Found 7).
 

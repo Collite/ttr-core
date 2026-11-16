@@ -97,6 +97,7 @@ internal class CamundaRenderer(
         body: String? = null,
         run: String = "ttrRunId",
         query: String? = null,
+        asyncBefore: Boolean = true,
     ): BpmnModel.Node {
         var path = graph.runApi.basePath.trimEnd('/') + graph.runApi.calls.getValue(call)
         (args + ("recipe" to graph.recipe.name)).forEach { (key, value) ->
@@ -140,7 +141,7 @@ internal class CamundaRenderer(
                 bearer = !engine,
             )
         if (d == Dialect.C7) {
-            task.attrs["camunda:asyncBefore"] = "true"
+            if (asyncBefore) task.attrs["camunda:asyncBefore"] = "true"
             task.extensions += Xml("camunda:failedJobRetryTimeCycle", text = "R3/PT15S")
         }
         model.calls +=
@@ -163,16 +164,17 @@ internal class CamundaRenderer(
         first: Boolean,
         answer: Boolean = false,
     ): String {
+        val portType = if (answer) "key" else graph.program.port
         val port =
-            when (graph.program.port) {
+            when (portType) {
                 null, "none" -> obj("none" to "true")
-                "key" -> obj("key" to expr("ttrInput['key']", "ttrInput.key"))
+                "key" -> obj("key" to if (answer) rowKey(graph) else expr("ttrInput['key']", "ttrInput.key"))
                 "keys" -> obj("keys" to expr("ttrInput['keys']", "ttrInput.keys"))
                 "event" -> obj("event" to expr("ttrInput['event']", "ttrInput.event"))
                 else -> error("unsupported Camunda port ${graph.program.port}")
             }
         val timed =
-            if (graph.program.port in
+            if (portType in
                 setOf(null, "none")
             ) {
                 port
@@ -212,7 +214,9 @@ internal class CamundaRenderer(
                     quote(it)
             }
         }
-        if (!first) {
+        if (answer) {
+            fields["idempotencyKey"] = d.concat("ttrAnchor", quote(":answer:"), "ttrTaskId")
+        } else if (!first) {
             fields["idempotencyKey"] = d.concat("ttrAnchor", quote(":$step"))
         } else if (graph.program.mode ==
             "batch"
@@ -714,6 +718,7 @@ internal class CamundaRenderer(
                                     "open",
                                     "ttrAnswerOpen",
                                     body = "ttrAnswerOpenBody",
+                                    asyncBefore = false,
                                 )
                             answerScope.link(answerScope.node("startEvent", "answer start"), answer)
                             answerScope.link(answer, answerScope.node("endEvent", "answer opened"))
@@ -975,7 +980,9 @@ internal class CamundaRenderer(
         engine.deploymentId (the running process definition's deployment id, read through the repository service).
         The engine templates also retain ttrInput.at in keyed ports; batch ports remain {none: true}.
         Approval completion captures task.id/assignee; its answer Open additionally carries engine.taskId and
-        engine.answeredBy, with idempotencyKey = ttrAnchor + ':answer'. Only the engine client may assert an answer.
+        engine.answeredBy, with idempotencyKey = ttrAnchor + ':answer:' + ttrTaskId and the approved row's key.
+        It runs within task completion (no asyncBefore). Answer evaluation/close and certification wait for S1.5.7.
+        Only the engine client may assert an answer.
         Deploy: `ttrp emit --deployment ${root.deployment.name} --deploy` posts this BPMN and the DMN files as one engine
         deployment named ${root.deployment.name}, with duplicate filtering and deployment-source ttrp:<bundle fingerprint>.
         The bearer comes from TTR_BEARER (or --token-env); it is never written to output or export files.

@@ -992,12 +992,12 @@
           <bpmn:subProcess id="n_f64ec36aed917cae906f" name="answer approve_release step">
             <bpmn:extensionElements>
               <camunda:inputOutput>
-                <camunda:inputParameter name="ttrAnswerOpenBody">${S('{}').prop(&quot;deployment&quot;,&quot;release_bpmn&quot;).prop(&quot;port&quot;,S('{}').prop(&quot;key&quot;,ttrInput['key']).prop('at', dateTime().toString())).prop(&quot;origin&quot;,&quot;engine&quot;).prop(&quot;dryRun&quot;,true).prop(&quot;engine&quot;,S('{}').prop(&quot;instanceId&quot;,execution.processInstanceId).prop(&quot;businessKey&quot;,execution.processBusinessKey).prop(&quot;deploymentId&quot;,execution.processEngineServices.repositoryService.getProcessDefinition(execution.processDefinitionId).deploymentId).prop(&quot;taskId&quot;,ttrTaskId).prop(&quot;answeredBy&quot;,ttrAnsweredBy)).prop(&quot;recipeFingerprint&quot;,&quot;sha256:text&quot;).prop(&quot;recipeValuesFingerprint&quot;,&quot;sha256:values&quot;).prop(&quot;idempotencyKey&quot;,ttrAnchor.concat(&quot;:answer&quot;))}</camunda:inputParameter>
+                <camunda:inputParameter name="ttrAnswerOpenBody">${S('{}').prop(&quot;deployment&quot;,&quot;release_bpmn&quot;).prop(&quot;port&quot;,S('{}').prop(&quot;key&quot;,ttrRow.prop(&quot;order_number&quot;).value()).prop('at', dateTime().toString())).prop(&quot;origin&quot;,&quot;engine&quot;).prop(&quot;dryRun&quot;,true).prop(&quot;engine&quot;,S('{}').prop(&quot;instanceId&quot;,execution.processInstanceId).prop(&quot;businessKey&quot;,execution.processBusinessKey).prop(&quot;deploymentId&quot;,execution.processEngineServices.repositoryService.getProcessDefinition(execution.processDefinitionId).deploymentId).prop(&quot;taskId&quot;,ttrTaskId).prop(&quot;answeredBy&quot;,ttrAnsweredBy)).prop(&quot;recipeFingerprint&quot;,&quot;sha256:text&quot;).prop(&quot;recipeValuesFingerprint&quot;,&quot;sha256:values&quot;).prop(&quot;idempotencyKey&quot;,ttrAnchor.concat(&quot;:answer:&quot;).concat(ttrTaskId))}</camunda:inputParameter>
               </camunda:inputOutput>
             </bpmn:extensionElements>
             <bpmn:incoming>n_068c2dd85d87aba7db6f</bpmn:incoming>
             <bpmn:outgoing>n_ece3bb8236caa9ed4c5f</bpmn:outgoing>
-            <bpmn:serviceTask camunda:asyncBefore="true" id="n_4f648418b6cdf6b2e198" name="answer approve_release">
+            <bpmn:serviceTask id="n_4f648418b6cdf6b2e198" name="answer approve_release">
               <bpmn:extensionElements>
                 <camunda:connector>
                   <camunda:connectorId>http-connector</camunda:connectorId>
