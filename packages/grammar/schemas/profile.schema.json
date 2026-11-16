@@ -64,6 +64,14 @@
           "type": "boolean",
           "default": false
         },
+        "skeleton": {
+          "type": "boolean",
+          "default": false
+        },
+        "sourceName": {
+          "type": "string",
+          "pattern": "^(?:/(?:[^~/]|~[01])*)*(?![\\s\\S])"
+        },
         "operations": {
           "type": "array",
           "items": {

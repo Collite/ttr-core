@@ -954,6 +954,11 @@ export function createSchemas(metadata) {
             additionalProperties: { type: 'object', additionalProperties: data },
           }),
           writable: { ...boolean, default: false },
+          // MW-P5 S5.1 (contracts §1, D-14): reader emission data, read by ttr-import only — profile-level flags, not
+          // operations. `skeleton` marks every generated cn definition `abstract: true`; `sourceName` is a pointer,
+          // relative to each record, whose string is the record's sidecar `sourceName` (default: the record id).
+          skeleton: { ...boolean, default: false },
+          sourceName: pointer,
           operations: array({
             ...object(
               {

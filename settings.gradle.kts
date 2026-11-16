@@ -81,6 +81,10 @@ include(":packages:kotlin:ttrp-conform")
 // + a thin `ttr import-schema` clikt CLI. Emits TTR-M through the canonical ttr-writer.
 include(":packages:kotlin:ttr-import-schema")
 
+// MW-P5 S5.1 — the reader harness (contracts §1): front-end → ProfileEngine → TtrRenderer, with the generated header,
+// the `<package>.sources.json` sidecar and the PR-body report. `import-schema --from file:` in ttr-metadata-cli runs it.
+include(":packages:kotlin:ttr-import")
+
 // PL-P4.S3 — the H-1 `security { }` → OPA/Rego generator: deterministic, one-way
 // (block model → policy fragments + data.json). Published as org.tatrman:ttr-security-gen
 // so Perun (S4, tatrman-platform) consumes it as a PUBLISHED artifact (P2). One
