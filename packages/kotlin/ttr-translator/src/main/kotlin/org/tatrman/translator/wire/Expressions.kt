@@ -468,7 +468,7 @@ object Expressions {
         builder: RelBuilder,
         lit: Literal,
     ): RexNode {
-        if (lit.isNull) return builder.literal(null)
+        if (lit.isNull) return nullLiteral(builder, lit.type)
         // CalciteExtParser (CEP-P1) — datepart SYMBOL operand. A `symbol:<EnumSimpleName>`-tagged
         // string is an enum-flag constant name; rebuild the SYMBOL RexLiteral via makeFlag so the
         // datetime operator (DATEADD/DATEDIFF/DATEPART) re-validates and unparses the datepart. Only
@@ -696,6 +696,27 @@ object Expressions {
             builder.rexBuilder.makeCast(targetType, operand)
         }
     }
+
+    /**
+     * ttr-core#407 — a NULL literal keeps the type it was encoded with (`CASE WHEN x = 0 THEN NULL ELSE x END`
+     * carries a `float` NULL); untyped, it re-encoded as `unknown:NULL` and the REL_NODE re-entry's plan differed from
+     * the single call's. Only the tags in [TYPED_NULL_TAGS] are typed: each folds types ([surfaceTypeOf]) that all
+     * have a common type with the one rebuilt here. `datetime` does not — it folds DATE, TIME and TIMESTAMP, and a
+     * TIMESTAMP NULL beside a DATE or TIME value leaves a CASE or a set op without a common type (review-318 F1;
+     * `unparseFromRelNode` decodes too, so the single call failed as well). Every other tag stays untyped.
+     */
+    private fun nullLiteral(
+        builder: RelBuilder,
+        typeTag: String,
+    ): RexNode {
+        if (typeTag !in TYPED_NULL_TAGS) return builder.literal(null)
+        val factory = builder.typeFactory
+        val type = factory.createSqlType(sqlTypeNameFor(typeTag))
+        return builder.rexBuilder.makeNullLiteral(factory.createTypeWithNullability(type, true))
+    }
+
+    /** The surface tags a NULL literal is rebuilt with (see [nullLiteral]): text, bool, int, float — not datetime. */
+    private val TYPED_NULL_TAGS: Set<String> = setOf("text", "bool", "int", "float")
 
     /**
      * TF-P1.S1 (G A9, contracts §3.3) — the physical type code a CAST's target type rides as:

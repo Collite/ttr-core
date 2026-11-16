@@ -1,0 +1,62 @@
+package hartland
+
+model binding
+
+// Extracted from Collite/ttr-demo 133349ff1af08dd1c04c7cf23137bb78703b9f49, model/ — the entities the decide_return way reads (ttr-core#407).
+
+def er2db_entity inventory_map { entity: er.entity.inventory, target: { table: db.dbo.inventory } }
+def er2db_attribute inventory_date_map             { attribute: er.entity.inventory.as_of_date,         target: { column: db.dbo.inventory.inv_date_sk } }
+def er2db_attribute inventory_item_map              { attribute: er.entity.inventory.item,              target: { column: db.dbo.inventory.inv_item_sk } }
+def er2db_attribute inventory_warehouse_map          { attribute: er.entity.inventory.warehouse,         target: { column: db.dbo.inventory.inv_warehouse_sk } }
+def er2db_attribute inventory_quantity_on_hand_map   { attribute: er.entity.inventory.quantity_on_hand,  target: { column: db.dbo.inventory.inv_quantity_on_hand } }
+def er2db_entity customer_map { entity: er.entity.customer, target: { table: db.dbo.customer } }
+def er2db_attribute customer_sk_map          { attribute: er.entity.customer.sk,          target: { column: db.dbo.customer.c_customer_sk } }
+def er2db_attribute customer_customer_id_map  { attribute: er.entity.customer.customer_id,  target: { column: db.dbo.customer.c_customer_id } }
+def er2db_attribute customer_addr_map         { attribute: er.entity.customer.addr,         target: { column: db.dbo.customer.c_current_addr_sk } }
+def er2db_attribute customer_cdemo_map        { attribute: er.entity.customer.cdemo,        target: { column: db.dbo.customer.c_current_cdemo_sk } }
+def er2db_attribute customer_hdemo_map        { attribute: er.entity.customer.hdemo,        target: { column: db.dbo.customer.c_current_hdemo_sk } }
+def er2db_attribute customer_birth_year_map   { attribute: er.entity.customer.birth_year,   target: { column: db.dbo.customer.c_birth_year } }
+def er2db_attribute customer_center_map        { attribute: er.entity.customer.center,       target: { column: db.dbo.customer.c_center_sk } }
+def er2db_attribute customer_email_map         { attribute: er.entity.customer.email,        target: { column: db.dbo.customer.c_email } }
+def er2db_entity order_map { entity: er.entity.order, target: { table: db.dbo.sales_order } }
+def er2db_attribute order_order_number_map         { attribute: er.entity.order.order_number,         target: { column: db.dbo.sales_order.so_order_number } }
+def er2db_attribute order_channel_map              { attribute: er.entity.order.channel,              target: { column: db.dbo.sales_order.so_channel } }
+def er2db_attribute order_customer_map             { attribute: er.entity.order.customer,             target: { column: db.dbo.sales_order.so_customer_sk } }
+def er2db_attribute order_placed_date_map          { attribute: er.entity.order.placed_date,          target: { column: db.dbo.sales_order.so_placed_date } }
+def er2db_attribute order_delivered_date_map       { attribute: er.entity.order.delivered_date,       target: { column: db.dbo.sales_order.so_delivered_date } }
+def er2db_attribute order_fulfilling_warehouse_map { attribute: er.entity.order.fulfilling_warehouse, target: { column: db.dbo.sales_order.so_warehouse_sk } }
+def er2db_attribute order_value_map                { attribute: er.entity.order.value,                target: { column: db.dbo.sales_order.so_value } }
+def er2db_attribute order_state_map                { attribute: er.entity.order.state,                target: { column: db.dbo.sales_order.so_state } }
+def er2db_attribute order_held_for_map             { attribute: er.entity.order.held_for,             target: { column: db.dbo.sales_order.so_held_for } }
+def er2db_attribute order_placed_by_map            { attribute: er.entity.order.placed_by,            target: { column: db.dbo.sales_order.so_placed_by } }
+def er2db_entity sales_line_map { entity: er.entity.sales_line, target: { table: db.dbo.sales_line } }
+def er2db_attribute sales_line_order_number_map    { attribute: er.entity.sales_line.order_number,    target: { column: db.dbo.sales_line.sl_order_number } }
+def er2db_attribute sales_line_line_no_map         { attribute: er.entity.sales_line.line_no,         target: { column: db.dbo.sales_line.sl_line_no } }
+def er2db_attribute sales_line_item_map            { attribute: er.entity.sales_line.item,            target: { column: db.dbo.sales_line.sl_item_sk } }
+def er2db_attribute sales_line_quantity_map        { attribute: er.entity.sales_line.quantity,        target: { column: db.dbo.sales_line.sl_quantity } }
+def er2db_attribute sales_line_unit_price_map      { attribute: er.entity.sales_line.unit_price,      target: { column: db.dbo.sales_line.sl_unit_price } }
+def er2db_attribute sales_line_ext_sales_price_map { attribute: er.entity.sales_line.ext_sales_price, target: { column: db.dbo.sales_line.sl_ext_sales_price } }
+def er2db_attribute sales_line_warehouse_map       { attribute: er.entity.sales_line.warehouse,       target: { column: db.dbo.sales_line.sl_warehouse_sk } }
+def er2db_attribute sales_line_sold_date_map       { attribute: er.entity.sales_line.sold_date,       target: { column: db.dbo.sales_line.sl_sold_date } }
+def er2db_attribute sales_line_customer_map        { attribute: er.entity.sales_line.customer,        target: { column: db.dbo.sales_line.sl_customer_sk } }
+def er2db_attribute sales_line_channel_map         { attribute: er.entity.sales_line.channel,         target: { column: db.dbo.sales_line.sl_channel } }
+def er2db_entity return_request_map { entity: er.entity.return_request, target: { table: db.dbo.return_request } }
+def er2db_attribute return_request_request_number_map { attribute: er.entity.return_request.request_number, target: { column: db.dbo.return_request.rr_request_number } }
+def er2db_attribute return_request_customer_map       { attribute: er.entity.return_request.customer,       target: { column: db.dbo.return_request.rr_customer_sk } }
+def er2db_attribute return_request_order_number_map   { attribute: er.entity.return_request.order_number,   target: { column: db.dbo.return_request.rr_order_number } }
+def er2db_attribute return_request_channel_map        { attribute: er.entity.return_request.channel,        target: { column: db.dbo.return_request.rr_channel } }
+def er2db_attribute return_request_requested_date_map { attribute: er.entity.return_request.requested_date, target: { column: db.dbo.return_request.rr_requested_date } }
+def er2db_attribute return_request_state_map          { attribute: er.entity.return_request.state,          target: { column: db.dbo.return_request.rr_state } }
+def er2db_entity return_request_line_map { entity: er.entity.return_request_line, target: { table: db.dbo.return_request_line } }
+def er2db_attribute return_request_line_line_id_map              { attribute: er.entity.return_request_line.line_id,              target: { column: db.dbo.return_request_line.rl_line_id } }
+def er2db_attribute return_request_line_request_number_map       { attribute: er.entity.return_request_line.request_number,       target: { column: db.dbo.return_request_line.rl_request_number } }
+def er2db_attribute return_request_line_line_no_map              { attribute: er.entity.return_request_line.line_no,              target: { column: db.dbo.return_request_line.rl_line_no } }
+def er2db_attribute return_request_line_item_map                 { attribute: er.entity.return_request_line.item,                 target: { column: db.dbo.return_request_line.rl_item_sk } }
+def er2db_attribute return_request_line_quantity_map             { attribute: er.entity.return_request_line.quantity,             target: { column: db.dbo.return_request_line.rl_quantity } }
+def er2db_attribute return_request_line_unit_price_map           { attribute: er.entity.return_request_line.unit_price,           target: { column: db.dbo.return_request_line.rl_unit_price } }
+def er2db_attribute return_request_line_reason_map               { attribute: er.entity.return_request_line.reason,               target: { column: db.dbo.return_request_line.rl_reason } }
+def er2db_attribute return_request_line_requested_resolution_map { attribute: er.entity.return_request_line.requested_resolution, target: { column: db.dbo.return_request_line.rl_requested_resolution } }
+def er2db_attribute return_request_line_requested_variant_map    { attribute: er.entity.return_request_line.requested_variant,    target: { column: db.dbo.return_request_line.rl_requested_variant_sk } }
+def er2db_attribute return_request_line_state_map                { attribute: er.entity.return_request_line.state,                target: { column: db.dbo.return_request_line.rl_state } }
+def er2db_attribute return_request_line_way_map                  { attribute: er.entity.return_request_line.way,                  target: { column: db.dbo.return_request_line.rl_way } }
+def er2db_attribute return_request_line_customer_map             { attribute: er.entity.return_request_line.customer,             target: { column: db.dbo.return_request_line.rl_customer_sk } }

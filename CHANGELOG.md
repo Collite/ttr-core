@@ -6,6 +6,23 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — REL_NODE re-entry keeps an author's parameter cast; decode failures say what failed (translator 0.14.3, ttr-core#407)
+
+- `ttr-translator` — `ParameterTyper` unwraps a `CAST(? AS T)` over a declared parameter only when `T` is the crutch
+  type the bridge's typed retry writes for it (the declared type; `VARCHAR` for a type outside the surface table). An
+  author's cast to any other type stays, over the re-typed parameter. The crutch type has one definition
+  (`SurfaceTypeMapping.crutchType` / `crutchKeyword`), read by the bridge and the typer alike. Before, `'… ' || CAST({days} AS VARCHAR)` over an `int` parameter lost its
+  cast. The ER plan then concatenated a bare `int`, and the REL_NODE re-entry (`target=ER → REL_NODE → target=DB`)
+  failed with `rel_node_schema_resolution_failed`. Without `||`, the cast vanished from the plan silently.
+- `ttr-translator` — the REL_NODE decoder keeps a NULL literal's encoded type for `text`, `bool`, `int` and `float`
+  (`CASE WHEN x = 0 THEN NULL ELSE x END`), so the two-half plan no longer re-encodes it as `unknown:NULL`. A
+  `datetime` NULL stays untyped: the tag folds DATE, TIME and TIMESTAMP, which have no common type.
+- `ttr-translator` — a REL_NODE decode failure keeps the code `rel_node_schema_resolution_failed`. Its message now
+  names the exception class, its message and the plan node that failed (`IllegalArgumentException: no message at
+  PROJECT`), where before it was the exception's message or "references unresolved schema". The failure is logged at
+  WARN with the stack; a Calcite engine assertion is reported the same way. New `PlanNodeDecoder.decodeNamed`
+  throws `PlanNodeDecoder.DecodeException(nodeCase, cause)`; `decode` throws the original exception, unchanged.
+
 ### Fix — the `ttr-plan-proto` wheel ships `translate.v1` (`translator.proto`)
 
 - The wheel now generates `org/tatrman/translate/v1/translator.proto` (`Language`, `SqlDialect`) beside `plan.v1`.

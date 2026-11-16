@@ -38,7 +38,23 @@ import org.tatrman.plan.v1.schemaCodeToToken
  * stack") rather than producing a wrong tree.
  */
 object PlanNodeDecoder {
+    /** Decode [plan]; a failure throws the decoder's or Calcite's own exception or error, unchanged (see [decodeNamed]). */
     fun decode(
+        plan: PlanNode,
+        framework: TranslatorFramework,
+    ): RelNode =
+        try {
+            decodeNamed(plan, framework)
+        } catch (ex: DecodeException) {
+            throw ex.cause
+        }
+
+    /**
+     * As [decode], but a failure is a [DecodeException] naming the innermost node that failed, its cause the original
+     * exception (ttr-core#407: REL_NODE re-entry reported a Calcite `IllegalArgumentException` with no message as an
+     * unresolved schema, and nothing said where).
+     */
+    fun decodeNamed(
         plan: PlanNode,
         framework: TranslatorFramework,
     ): RelNode {
@@ -46,6 +62,22 @@ object PlanNodeDecoder {
         push(builder, plan, framework.functionCatalog)
         return builder.build()
     }
+
+    /**
+     * A [decodeNamed] failure: [nodeCase] is the innermost plan node whose decode threw [cause] — an exception or a
+     * Calcite `AssertionError` (an engine invariant). The message is the one REL_NODE failure format,
+     * `"<Class>: <message|no message> at <nodeCase>"` ([describe]).
+     */
+    class DecodeException(
+        val nodeCase: PlanNode.NodeCase,
+        override val cause: Throwable,
+    ) : RuntimeException(describe(cause, nodeCase), cause)
+
+    /** The REL_NODE decode failure text: `"<Class>: <message|no message> at <nodeCase>"`. */
+    fun describe(
+        cause: Throwable,
+        nodeCase: PlanNode.NodeCase,
+    ): String = "${cause.javaClass.simpleName}: ${cause.message ?: "no message"} at $nodeCase"
 
     /**
      * Build a [PlanNode] embedded as an expression-level subquery (see [SubqueryExpression]) into
@@ -66,7 +98,25 @@ object PlanNodeDecoder {
         return builder.build()
     }
 
+    /** Decode one node onto [builder]; a failure below is named by the innermost node (see [DecodeException]). */
     private fun push(
+        builder: RelBuilder,
+        plan: PlanNode,
+        catalog: FunctionCatalog,
+    ) {
+        try {
+            pushNode(builder, plan, catalog)
+        } catch (ex: DecodeException) {
+            throw ex
+        } catch (ex: Exception) {
+            throw DecodeException(plan.nodeCase, ex)
+        } catch (ex: AssertionError) {
+            // A Calcite engine assertion (e.g. a Filter whose decoded condition breaks an invariant) — named like any.
+            throw DecodeException(plan.nodeCase, ex)
+        }
+    }
+
+    private fun pushNode(
         builder: RelBuilder,
         plan: PlanNode,
         catalog: FunctionCatalog,

@@ -1,0 +1,201 @@
+package hartland
+
+model er
+
+// Extracted from Collite/ttr-demo 133349ff1af08dd1c04c7cf23137bb78703b9f49, model/ — the entities the decide_return way reads (ttr-core#407).
+
+def entity return_request {
+    description: "Return requests — a customer's request to return goods from one order (the header); its lines carry what is returned. State, derived from the lines: received (a line still waits for a decision) · decided · closed (every line rejected, not returned or closed)."
+    labelPlural: "Return Requests"
+    roles: [transaction]
+    displayLabel: { en: "Return Request", cs: "Reklamace" }
+    attributes: [
+        def attribute request_number { type: int, isKey: true, description: "Return request number." },
+        def attribute customer       { type: int, description: "Returning customer — FK to the 'sk' attribute of the Customer entity." },
+        def attribute order_number   { type: int, description: "The order the goods were bought on — FK to the 'order_number' attribute of the Order entity." },
+        def attribute channel        { type: text, description: "Sales channel of the request: 'web' or 'marketplace'." },
+        def attribute requested_date { type: date, description: "The day the return was requested." },
+        def attribute state {
+            type: text,
+            description: "State of the request, derived from its lines (read-only): 'received', 'decided' or 'closed'.",
+            valueLabels: {
+                "received": { en: "Received", cs: "Přijato" },
+                "decided":  { en: "Decided",  cs: "Rozhodnuto" },
+                "closed":   { en: "Closed",   cs: "Uzavřeno" }
+            }
+        }
+    ]
+}
+
+def entity return_request_line {
+    description: "Return request lines — one returned product of a return request, and where its handling stands. State: received · rejected · settling · awaiting_goods · goods_received · not_returned · closed."
+    labelPlural: "Return Request Lines"
+    roles: [transaction]
+    displayLabel: { en: "Return Request Line", cs: "Řádek reklamace" }
+    attributes: [
+        def attribute line_id              { type: int, isKey: true, description: "Return line number — the key every return decision and obligation is about." },
+        def attribute request_number       { type: int, description: "The line's return request — FK to the 'request_number' attribute of the Return Request entity." },
+        def attribute line_no              { type: int, description: "Line number within the request." },
+        def attribute item                 { type: int, description: "Returned product — FK to the 'sk' attribute of the Product (item) entity." },
+        def attribute quantity             { type: int, description: "Units to return." },
+        def attribute unit_price           { type: { type: decimal, length: 12, precision: 2 }, description: "Unit price the customer paid — quantity × unit price is the line's value." },
+        def attribute reason {
+            type: text,
+            description: "Why the customer returns it: 'damaged', 'did_not_arrive', 'wrong_size' or 'other'.",
+            valueLabels: {
+                "damaged":        { en: "Arrived damaged",   cs: "Dorazilo poškozené" },
+                "did_not_arrive": { en: "Never arrived",     cs: "Zásilka nedorazila" },
+                "wrong_size":     { en: "Size does not fit", cs: "Nevhodná velikost" },
+                "other":          { en: "Another reason",    cs: "Jiná příčina" }
+            }
+        },
+        def attribute requested_resolution {
+            type: text,
+            description: "What the customer asks for: 'refund', 'exchange' or 'replacement'.",
+            valueLabels: {
+                "refund":      { en: "Refund",      cs: "Vrácení peněz" },
+                "exchange":    { en: "Exchange",    cs: "Výměna" },
+                "replacement": { en: "Replacement", cs: "Náhrada" }
+            }
+        },
+        def attribute requested_variant    { type: int, optional: true, description: "The product asked for in an exchange — FK to the 'sk' attribute of the Product (item) entity; empty otherwise." },
+        def attribute state {
+            type: text,
+            description: "Handling state of the line: 'received', 'rejected', 'settling', 'awaiting_goods', 'goods_received', 'not_returned' or 'closed'.",
+            // AU D-67 — the H-2 graph (17 §4): decide_return moves a received line, monitor_inbound an awaiting one,
+            // settle closes; rejected, not_returned and closed are final.
+            states: [received, rejected, settling, awaiting_goods, goods_received, not_returned, closed],
+            transitions: { received: [rejected, settling, awaiting_goods], awaiting_goods: [goods_received, not_returned],
+                           settling: [closed], goods_received: [closed] },
+            valueLabels: {
+                "received":       { en: "Received",       cs: "Přijato" },
+                "rejected":       { en: "Rejected",       cs: "Zamítnuto" },
+                "settling":       { en: "Settling",       cs: "Vyřizuje se" },
+                "awaiting_goods": { en: "Awaiting goods", cs: "Čeká na zboží" },
+                "goods_received": { en: "Goods received", cs: "Zboží přijato" },
+                "not_returned":   { en: "Not returned",   cs: "Nevráceno" },
+                "closed":         { en: "Closed",         cs: "Uzavřeno" }
+            }
+        },
+        def attribute way {
+            type: text, optional: true,
+            description: "How the line is being settled, once decided: 'refund_no_return', 'replacement_no_return', 'exchange' or 'refund_after_return'; empty until decided or when rejected.",
+            valueLabels: {
+                "refund_no_return":      { en: "Refund without return",      cs: "Vrácení peněz bez vratky" },
+                "replacement_no_return": { en: "Replacement without return", cs: "Náhrada bez vratky" },
+                "exchange":              { en: "Exchange",                   cs: "Výměna" },
+                "refund_after_return":   { en: "Refund after return",        cs: "Vrácení peněz po vratce" }
+            }
+        },
+        // D-127 — the request's customer, denormalized onto the line by the generator: rel_line_customer is one hop.
+        def attribute customer             { type: int, description: "Returning customer (the request's) — FK to the 'sk' attribute of the Customer entity." }
+    ]
+}
+
+def entity customer {
+    description: "Customers — the channel-overlap and demographic branches key off this entity."
+    labelPlural: "Customers"
+    // LP-P3·T1 (LP contracts §2.1) — the mention facet, CODE ONLY: this entity holds no
+    // customer name (TPC-DS keeps first/last name out of the hartland cut), so a quoted
+    // literal on this head attributes only when it is code-shaped. A plain quoted word stays
+    // headless (G3) and the fast path refuses — correctly, and visibly.
+    semantics { code: customer_id, code_pattern: "^[A-P]{16}$" }
+    codeAttribute: customer_id
+    roles: [master, dimension]
+    displayLabel: { en: "Customer", cs: "Zákazník" }
+    attributes: [
+        def attribute sk          { type: int, isKey: true, description: "Sequence key. Internal primary key only." },
+        def attribute customer_id { type: text, description: "Unique customer identifier (code)." },
+        def attribute addr        { type: int, description: "Current address — FK to the 'sk' attribute of the Customer Address entity." },
+        def attribute cdemo       { type: int, description: "Customer demographics — FK to the 'sk' attribute of the Customer Demographics entity." },
+        def attribute hdemo       { type: int, description: "Household demographics — FK to the 'sk' attribute of the Household Demographics entity." },
+        def attribute birth_year  { type: int, description: "Customer's year of birth — buyer-age analyses derive age from this." },
+        // AU D-83 — derived by the data build from the modal warehouse of the customer's lines.
+        def attribute center      { type: int, description: "The customer's distribution center — the one that ships most of their orders; FK to the 'sk' attribute of the Distribution Center (warehouse) entity. Empty for a customer with no web or marketplace order." },
+        // AU — the address the customer mail actions (notify_customer, emit) send to.
+        def attribute email       { type: text, description: "The customer's mail address, where customer mail is sent. A demo address under the reserved hartland.example domain; it never reaches a real inbox." }
+    ]
+}
+
+def entity order {
+    // `order` is reserved in SQL, so the table is `sales_order`; er2db carries the name (D-119).
+    description: "Orders — one web or marketplace order (header): who ordered, through which channel, from which distribution center, its value and where it is in the release process. State: placed · held · released · cancelled."
+    labelPlural: "Orders"
+    // The mention facet: an order is asked about by its number («why is 4711 held?»). The legacy
+    // property beside it is kept for the reason store's is (readers before producers, TTR-SEM-218).
+    semantics { code: order_number }
+    codeAttribute: order_number
+    roles: [transaction]
+    displayLabel: { en: "Order", cs: "Objednávka" }
+    attributes: [
+        def attribute order_number         { type: int, isKey: true, description: "Order number — the web or marketplace order number of the order's lines." },
+        def attribute channel              { type: text, description: "Sales channel of the order: 'web' or 'marketplace'." },
+        def attribute customer             { type: int, description: "Ordering customer — FK to the 'sk' attribute of the Customer entity." },
+        def attribute placed_date          { type: date, description: "The day the order was placed." },
+        def attribute delivered_date       { type: date, optional: true, description: "The day the order was delivered; empty until then." },
+        def attribute fulfilling_warehouse { type: int, description: "Distribution center that ships the order — FK to the 'sk' attribute of the Distribution Center (warehouse) entity." },
+        def attribute value                { type: { type: decimal, length: 12, precision: 2 }, description: "Order value — the sum of its lines' extended sales prices." },
+        def attribute state {
+            type: text,
+            description: "Release state of the order: 'placed' (waiting for the release check), 'held', 'released' or 'cancelled'.",
+            // AU D-67: the lifecycle the automation actions are checked against (`release`, `hold`); held → held is the
+            // implicit silent self-transition (D-85).
+            states: [placed, held, released, cancelled],
+            transitions: { placed: [held, released, cancelled], held: [released, cancelled] },
+            valueLabels: {
+                "placed":    { en: "Placed",    cs: "Pořízeno" },
+                "held":      { en: "Held",      cs: "Pozastaveno" },
+                "released":  { en: "Released",  cs: "Uvolněno" },
+                "cancelled": { en: "Cancelled", cs: "Zrušeno" }
+            }
+        },
+        def attribute held_for {
+            type: text, optional: true,
+            description: "Who a held order waits for: 'Sales', 'AR' or 'both'; empty unless the order is held.",
+            valueLabels: {
+                "Sales": { en: "Sales department",       cs: "Obchodní oddělení" },
+                "AR":    { en: "Receivables department", cs: "Oddělení pohledávek" },
+                "both":  { en: "Both departments",       cs: "Obě oddělení" }
+            }
+        },
+        def attribute placed_by            { type: text, description: "Who placed the order (the ordering user or system)." }
+    ]
+}
+
+def entity sales_line {
+    description: "Order lines — one line of a web or marketplace order: the item, quantity, unit and extended price, the shipping distribution center. The release check reads an order's lines; for revenue by channel use All-Channel Sales."
+    labelPlural: "Order Lines"
+    roles: [fact]
+    displayLabel: { en: "Order Line", cs: "Řádek objednávky" }
+    attributes: [
+        def attribute order_number    { type: int, isKey: true, description: "Order number — FK to the 'order_number' attribute of the Order entity." },
+        def attribute line_no         { type: int, isKey: true, description: "Line number within the order." },
+        def attribute item            { type: int, description: "Ordered product — FK to the 'sk' attribute of the Product (item) entity." },
+        def attribute quantity        { type: int, description: "Units ordered on this line." },
+        def attribute unit_price      { type: { type: decimal, length: 12, precision: 2 }, description: "Unit price charged on this line — compared with the price list or the customer's individual price." },
+        def attribute ext_sales_price { type: { type: decimal, length: 12, precision: 2 }, description: "Extended sales price of the line (unit price × quantity)." },
+        def attribute warehouse       { type: int, description: "Distribution center shipping the line — FK to the 'sk' attribute of the Distribution Center (warehouse) entity." },
+        def attribute sold_date       { type: date, description: "The day the line was sold." },
+        def attribute customer        { type: int, description: "Ordering customer — FK to the 'sk' attribute of the Customer entity." },
+        def attribute channel         { type: text, description: "Sales channel of the line: 'web' or 'marketplace'." }
+    ]
+}
+
+def entity inventory {
+    description: "Weekly warehouse-level on-hand snapshots per warehouse and item."
+    roles: [fact]
+    displayLabel: { en: "Inventory Snapshots", cs: "Stavy zásob" }
+    // MS: the mention facet. ⚠ `last`, NOT the bare-id default `sum` (Bora, 2026-09-16):
+    // this fact is only semi-additive — see as_of_date, "stock levels MUST NOT be added
+    // across snapshots" — so a bare `quantity_on_hand` would declare precisely the
+    // aggregation the model forbids. The per-measure `aggregation:` here is the measure's
+    // own (semantics vocabulary v3); it is neither the def-level `aggregation:` property
+    // nor md's, which are separate surfaces by design.
+    semantics { measures: [{ attribute: quantity_on_hand, aggregation: last }] }
+    attributes: [
+        def attribute as_of_date       { type: int, isKey: true, description: "Weekly snapshot date. This entity is only semi-additive - stock levels MUST NOT be added across snapshots." },
+        def attribute item             { type: int, isKey: true, description: "Item primary key (the 'sk' attribute of the Item entity)" },
+        def attribute warehouse        { type: int, isKey: true, description: "Warehouse primary key (the 'sk' attribute of the Warehouse entity)" },
+        def attribute quantity_on_hand { type: int, description: "Quantity on hand of the given item at the time of the snapshot." }
+    ]
+}
