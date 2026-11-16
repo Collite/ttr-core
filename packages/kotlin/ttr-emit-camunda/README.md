@@ -22,6 +22,10 @@ its assignee. The Server accepts an asserted answer only from its configured eng
 it against task history. The current one-program rendering has no answer Open; adding those fields
 requires an explicit answer path with task context.
 
+C7 HTTP output scripts resolve `BpmnError` from the execution's engine package (`org.camunda` or
+`org.cibseven`). Both engines retain the `TTR_STALE` and `TTR_REFUSED` codes and their drawn boundaries;
+transient HTTP failures remain retryable exceptions.
+
 Run the exporter suite on bp-dsk:
 
 ```sh

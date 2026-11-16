@@ -179,9 +179,10 @@ internal enum class Dialect(
                                                         mapOf("scriptFormat" to "groovy"),
                                                         text =
                                                             """
+                                                            def BpmnError = Class.forName(execution.getClass().getName().startsWith('org.cibseven') ? 'org.cibseven.bpm.engine.delegate.BpmnError' : 'org.camunda.bpm.engine.delegate.BpmnError')
                                                             def code = ((Number) statusCode).intValue()
-                                                            if (code == 409) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_STALE', 'run API fingerprint refused')
-                                                            if (code >= 400 && code < 500 && code != 408 && code != 429) throw new org.camunda.bpm.engine.delegate.BpmnError('TTR_REFUSED', 'run API HTTP ' + code + ': ' + response.toString().take(256))
+                                                            if (code == 409) throw BpmnError.getConstructor(String, String).newInstance('TTR_STALE', 'run API fingerprint refused')
+                                                            if (code >= 400 && code < 500 && code != 408 && code != 429) throw BpmnError.getConstructor(String, String).newInstance('TTR_REFUSED', 'run API HTTP ' + code + ': ' + response.toString().take(256))
                                                             if (code < 200 || code >= 300) throw new IllegalStateException('run API HTTP ' + code)
                                                             return org.camunda.spin.Spin.JSON(response)
                                                             """.trimIndent(),

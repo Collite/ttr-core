@@ -98,6 +98,7 @@ class CamundaExpressionSpec :
                         loader,
                         Binding(
                             mapOf(
+                                "execution" to Any(),
                                 "statusCode" to code,
                                 "response" to """{"runId":"run"}""",
                             ),

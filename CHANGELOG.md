@@ -21,7 +21,9 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - `ttr-emit-camunda` includes `engine {instanceId, businessKey, deploymentId}` in process-engine BPMN
   Opens and C7 element-template Hidden payloads (ttr-server S3.3 Found 6). `deploymentId` is the engine
   deployment of the running definition, read through Camunda's repository service. Template keyed ports
-  retain the event's `at`; batch ports remain `{none: true}`. Customer C7/C8 exports are unchanged.
+  retain the event's `at`; batch ports remain `{none: true}`. Customer C7/C8 Opens omit the engine object.
+- C7 HTTP output scripts resolve `BpmnError` at runtime for Camunda 7 and CIB seven, preserving
+  `TTR_STALE`/`TTR_REFUSED` boundary codes and transient-error retries (ttr-server S3.3 Found 7).
 
 ### Release — internal grammar 0.22.5: link kind and join-pairs (MW P3 S3.7b)
 
