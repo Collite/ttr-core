@@ -957,8 +957,11 @@ class Translator(
      *
      * Two distinct failure modes the caller may see:
      *   - `rel_node_decode_failed` — malformed proto bytes.
-     *   - `rel_node_schema_resolution_failed` — proto parsed, but a `Scan` / `TableScan`
-     *     references a qname the current model's SchemaPlus tree doesn't expose.
+     *   - `rel_node_schema_resolution_failed` — the proto parsed, but it does not decode against the current model:
+     *     **any** decode failure, not only a `Scan` / `TableScan` qname the model's SchemaPlus tree does not expose
+     *     (callers match on the code, so it stays one code). The message names the exception's class, its message
+     *     and the plan node that failed (`IllegalArgumentException: no message at PROJECT`); the WARN log carries
+     *     the stack (ttr-core#407).
      */
     private fun parseRelNodeBytes(
         sourceText: String,
@@ -990,11 +993,19 @@ class Translator(
         val framework = TranslatorFramework(model)
         val rel =
             try {
-                PlanNodeDecoder.decode(plan, framework)
+                PlanNodeDecoder.decodeNamed(plan, framework)
             } catch (ex: Exception) {
+                val failed = (ex as? PlanNodeDecoder.DecodeException)?.nodeCase ?: plan.nodeCase
+                val cause = (ex as? PlanNodeDecoder.DecodeException)?.cause ?: ex
+                log.warn(
+                    "REL_NODE decode failed (targetSchema={}, node={})",
+                    targetSchema,
+                    if (failed == plan.nodeCase) "$failed" else "${plan.nodeCase} > $failed",
+                    cause,
+                )
                 return ParseResult.Failure(
                     code = "rel_node_schema_resolution_failed",
-                    message = ex.message ?: "REL_NODE source references unresolved schema",
+                    message = "${cause.javaClass.simpleName}: ${cause.message ?: "no message"} at $failed",
                 )
             } catch (ex: AssertionError) {
                 // An engine assertion (see the class KDoc), e.g. a Filter whose decoded condition breaks an invariant.
