@@ -38,7 +38,7 @@ import org.tatrman.plan.v1.schemaCodeToToken
  * stack") rather than producing a wrong tree.
  */
 object PlanNodeDecoder {
-    /** Decode [plan]; a failure throws the decoder's or Calcite's own exception, unchanged (see [decodeNamed]). */
+    /** Decode [plan]; a failure throws the decoder's or Calcite's own exception or error, unchanged (see [decodeNamed]). */
     fun decode(
         plan: PlanNode,
         framework: TranslatorFramework,
@@ -63,11 +63,21 @@ object PlanNodeDecoder {
         return builder.build()
     }
 
-    /** A [decodeNamed] failure: [nodeCase] is the innermost plan node whose decode threw [cause]. */
+    /**
+     * A [decodeNamed] failure: [nodeCase] is the innermost plan node whose decode threw [cause] — an exception or a
+     * Calcite `AssertionError` (an engine invariant). The message is the one REL_NODE failure format,
+     * `"<Class>: <message|no message> at <nodeCase>"` ([describe]).
+     */
     class DecodeException(
         val nodeCase: PlanNode.NodeCase,
-        override val cause: Exception,
-    ) : RuntimeException("${cause.javaClass.simpleName}: ${cause.message ?: "no message"} at $nodeCase", cause)
+        override val cause: Throwable,
+    ) : RuntimeException(describe(cause, nodeCase), cause)
+
+    /** The REL_NODE decode failure text: `"<Class>: <message|no message> at <nodeCase>"`. */
+    fun describe(
+        cause: Throwable,
+        nodeCase: PlanNode.NodeCase,
+    ): String = "${cause.javaClass.simpleName}: ${cause.message ?: "no message"} at $nodeCase"
 
     /**
      * Build a [PlanNode] embedded as an expression-level subquery (see [SubqueryExpression]) into
@@ -99,6 +109,9 @@ object PlanNodeDecoder {
         } catch (ex: DecodeException) {
             throw ex
         } catch (ex: Exception) {
+            throw DecodeException(plan.nodeCase, ex)
+        } catch (ex: AssertionError) {
+            // A Calcite engine assertion (e.g. a Filter whose decoded condition breaks an invariant) — named like any.
             throw DecodeException(plan.nodeCase, ex)
         }
     }

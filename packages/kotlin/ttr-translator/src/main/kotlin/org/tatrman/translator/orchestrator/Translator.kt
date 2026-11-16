@@ -994,26 +994,13 @@ class Translator(
         val rel =
             try {
                 PlanNodeDecoder.decodeNamed(plan, framework)
+            } catch (ex: PlanNodeDecoder.DecodeException) {
+                return relNodeDecodeFailure(targetSchema, plan.nodeCase, ex.nodeCase, ex.cause)
             } catch (ex: Exception) {
-                val failed = (ex as? PlanNodeDecoder.DecodeException)?.nodeCase ?: plan.nodeCase
-                val cause = (ex as? PlanNodeDecoder.DecodeException)?.cause ?: ex
-                log.warn(
-                    "REL_NODE decode failed (targetSchema={}, node={})",
-                    targetSchema,
-                    if (failed == plan.nodeCase) "$failed" else "${plan.nodeCase} > $failed",
-                    cause,
-                )
-                return ParseResult.Failure(
-                    code = "rel_node_schema_resolution_failed",
-                    message = "${cause.javaClass.simpleName}: ${cause.message ?: "no message"} at $failed",
-                )
+                // Outside any node's decode (the final build): named by the root.
+                return relNodeDecodeFailure(targetSchema, plan.nodeCase, plan.nodeCase, ex)
             } catch (ex: AssertionError) {
-                // An engine assertion (see the class KDoc), e.g. a Filter whose decoded condition breaks an invariant.
-                log.error("REL_NODE decode failed on an engine assertion (targetSchema={})", targetSchema, ex)
-                return ParseResult.Failure(
-                    code = "rel_node_schema_resolution_failed",
-                    message = ex.message ?: ex.javaClass.simpleName,
-                )
+                return relNodeDecodeFailure(targetSchema, plan.nodeCase, plan.nodeCase, ex)
             }
         // Preserve the original `{name}` parameter names carried on the incoming plan's
         // ParameterRefs so the re-encode doesn't revert them to the positional `?N` fallback
@@ -1024,6 +1011,29 @@ class Translator(
             targetSchema,
             relNodeNames = PositionalParameters.namesByIndex(plan),
             expandLogicalBodies = expandLogicalBodies,
+        )
+    }
+
+    /**
+     * ttr-core#407 — a REL_NODE decode failure: logged at WARN with the root and the failing node and the stack; the
+     * code stays `rel_node_schema_resolution_failed` (callers match on it), the message is
+     * [PlanNodeDecoder.describe]'s `"<Class>: <message|no message> at <nodeCase>"`.
+     */
+    private fun relNodeDecodeFailure(
+        targetSchema: SchemaCode,
+        root: PlanNode.NodeCase,
+        failed: PlanNode.NodeCase,
+        cause: Throwable,
+    ): ParseResult.Failure {
+        log.warn(
+            "REL_NODE decode failed (targetSchema={}, node={})",
+            targetSchema,
+            if (failed == root) "$failed" else "$root > $failed",
+            cause,
+        )
+        return ParseResult.Failure(
+            code = "rel_node_schema_resolution_failed",
+            message = PlanNodeDecoder.describe(cause, failed),
         )
     }
 
