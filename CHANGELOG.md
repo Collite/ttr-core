@@ -13,6 +13,8 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   that imports it — ttr-server's `query.proto` and `translate.proto` both do (`RunRequest.source_language`). No
   `.proto` changes: the files are identical to `translator/v0.14.1`'s, so the next wheel is meant to be cut as
   `python-plan/v0.14.1-RELEASE`, matching the Kotlin pair it describes.
+- `org.tatrman.translate` and `org.tatrman.translate.v1` ship as namespace packages (no `__init__.py`), like `org` and
+  `org.tatrman`: ttr-server generates `translate_pb2` into the same package, and a regular package would hide it.
 
 ### Release — internal grammar 0.22.5: link kind and join-pairs (MW P3 S3.7b)
 

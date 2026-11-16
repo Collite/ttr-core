@@ -154,3 +154,13 @@ def test_translator_enums_import_and_roundtrip() -> None:
     assert translator_pb2.Language.Value("REL_NODE") == 4
     assert translator_pb2.SqlDialect.Value("POSTGRESQL") == 2
     assert translator_pb2.SqlDialect.Value("DUCKDB") == 4
+
+
+def test_translate_v1_merges_with_a_consumers_modules() -> None:
+    """`translate.v1` is shared with ttr-server's generated `translate_pb2`: both levels must be PEP 420 namespace
+    packages, or a consumer's module beside `translator_pb2` cannot be imported."""
+    import org.tatrman.translate
+    import org.tatrman.translate.v1
+
+    for package in (org.tatrman.translate, org.tatrman.translate.v1):
+        assert getattr(package, "__file__", None) is None, f"{package.__name__} is a regular package"

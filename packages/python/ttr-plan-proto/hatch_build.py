@@ -77,8 +77,13 @@ class CustomBuildHook(BuildHookInterface):
         # Deeper levels (`org.tatrman.plan`, `.transdsl`, `.dfdsl`, the cn `.concept` / `.statement` /
         # `.assertion`, `.translate`, and below) are
         # wheel-owned and get a regular `__init__.py`.
+        #
+        # `org.tatrman.translate` and `.translate.v1` are shared as well: this wheel owns `translator_pb2` (the library
+        # enums) while ttr-server generates `translate_pb2` (the Translate service) into the same `translate.v1`
+        # package. A regular `__init__.py` at either level would hide the consumer's module
+        # (`cannot import name 'translate_pb2' from 'org.tatrman.translate.v1'`), so both stay namespace levels too.
         org = out / "org"
-        namespace_dirs = {org, org / "tatrman"}
+        namespace_dirs = {org, org / "tatrman", org / "tatrman" / "translate", org / "tatrman" / "translate" / "v1"}
         for directory in [org, *[p for p in org.rglob("*") if p.is_dir()]]:
             init = directory / "__init__.py"
             if directory in namespace_dirs:
