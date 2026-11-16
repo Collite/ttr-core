@@ -14,7 +14,7 @@ import org.tatrman.ttrp.emit.spi.*
 /** A stand-in for the C7 execution the template connector scripts read. */
 class FakeExecution(
     private val variables: Map<String, Any?>,
-) {
+) : EngineOpenExecution() {
     fun getVariable(name: String): Any? = variables[name]
 }
 
@@ -213,14 +213,14 @@ class ProcessEngineRenderSpec :
                 mapOf(
                     "ttr_source" to "release_on_placement",
                     "ttr_deployment" to "release_event",
-                    "ttrInput" to mapOf("key" to 4711),
+                    "ttrInput" to mapOf("key" to 4711, "at" to "2026-11-16T10:00:00Z"),
                 )
             run("url", program) shouldBe "$egress/recipes/release_order/runs"
             Json.parseToJsonElement(run("payload", program) as String) shouldBe
-                Json.parseToJsonElement("""{"deployment":"release_event","port":{"key":4711},"origin":"engine"}""")
+                Json.parseToJsonElement("""{"deployment":"release_event","port":{"key":4711,"at":"2026-11-16T10:00:00Z"},"origin":"engine","engine":{"instanceId":"instance-156","businessKey":"order-4711","deploymentId":"engine-deployment-9"}}""")
             val batch = mapOf("ttr_source" to "morning_release", "ttr_deployment" to "release_morning")
             Json.parseToJsonElement(run("payload", batch) as String) shouldBe
-                Json.parseToJsonElement("""{"deployment":"release_morning","port":{"none":true},"origin":"engine"}""")
+                Json.parseToJsonElement("""{"deployment":"release_morning","port":{"none":true},"origin":"engine","engine":{"instanceId":"instance-156","businessKey":"order-4711","deploymentId":"engine-deployment-9"}}""")
             val query = mapOf("ttr_source" to "er.query.order_totals", "limit" to 10)
             run("url", query) shouldBe "$egress/query"
             Json.parseToJsonElement(run("payload", query) as String) shouldBe

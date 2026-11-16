@@ -16,6 +16,13 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - `org.tatrman.translate` and `org.tatrman.translate.v1` ship as namespace packages (no `__init__.py`), like `org` and
   `org.tatrman`: ttr-server generates `translate_pb2` into the same package, and a regular package would hide it.
 
+### Fixed — process-engine Open metadata (AU-export S1.5.6)
+
+- `ttr-emit-camunda` includes `engine {instanceId, businessKey, deploymentId}` in process-engine BPMN
+  Opens and C7 element-template Hidden payloads (ttr-server S3.3 Found 6). `deploymentId` is the engine
+  deployment of the running definition, read through Camunda's repository service. Template keyed ports
+  retain the event's `at`; batch ports remain `{none: true}`. Customer C7/C8 exports are unchanged.
+
 ### Release — internal grammar 0.22.5: link kind and join-pairs (MW P3 S3.7b)
 
 - `grammar/v0.22.5` is an internal cut (GitHub Packages, prerelease, with the `ttr-metadata-cli-<v>.jar` release

@@ -162,8 +162,12 @@ internal class AuthoringArtifacts(
             def queries = $queries
             if (programs.containsKey(source)) {
                 def kind = programs[source].port
-                def port = kind == 'none' ? [none: true] : [(kind): execution.getVariable('ttrInput')[kind]]
-                return org.camunda.spin.Spin.JSON([deployment: execution.getVariable('ttr_deployment'), port: port, origin: 'engine']).toString()
+                def input = kind == 'none' ? null : execution.getVariable('ttrInput')
+                def port = kind == 'none' ? [none: true] : [(kind): input[kind]]
+                if (kind != 'none' && input['at'] != null) port.at = input['at']
+                def engine = [instanceId: execution.processInstanceId, businessKey: execution.processBusinessKey,
+                    deploymentId: execution.processEngineServices.repositoryService.getProcessDefinition(execution.processDefinitionId).deploymentId]
+                return org.camunda.spin.Spin.JSON([deployment: execution.getVariable('ttr_deployment'), port: port, origin: 'engine', engine: engine]).toString()
             }
             if (!queries.containsKey(source)) throw new IllegalArgumentException('unknown world program or query ' + source)
             return org.camunda.spin.Spin.JSON([query: source, parameters: queries[source].collectEntries { [(it): execution.getVariable(it)] }]).toString()

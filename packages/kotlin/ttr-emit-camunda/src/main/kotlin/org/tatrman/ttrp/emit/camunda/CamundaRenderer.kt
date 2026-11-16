@@ -185,6 +185,15 @@ internal class CamundaRenderer(
                 "origin" to quote("engine"),
                 "dryRun" to root.deployment.dryRun.toString(),
             )
+        if (engine) {
+            fields["engine"] =
+                obj(
+                    "instanceId" to "execution.processInstanceId",
+                    "businessKey" to "execution.processBusinessKey",
+                    "deploymentId" to
+                        "execution.processEngineServices.repositoryService.getProcessDefinition(execution.processDefinitionId).deploymentId",
+                )
+        }
         mapOf(
             "text" to "recipeFingerprint",
             "values" to "recipeValuesFingerprint",
@@ -908,6 +917,9 @@ internal class CamundaRenderer(
         The egress injects the process-engine client's bearer; this BPMN carries no token and no connector secret.
         The engine needs Spin JSON and Groovy for Retry-After normalization. Start this one-program BPMN through
         the engine (REST, Tasklist or a message); configure scheduling and composition in the engine modeller.
+        Start with a nonblank business key: every Open records engine.instanceId, engine.businessKey and
+        engine.deploymentId (the running process definition's deployment id, read through the repository service).
+        The engine templates also retain ttrInput.at in keyed ports; batch ports remain {none: true}.
         Deploy: `ttrp emit --deployment ${root.deployment.name} --deploy` posts this BPMN and the DMN files as one engine
         deployment named ${root.deployment.name}, with duplicate filtering and deployment-source ttrp:<bundle fingerprint>.
         The bearer comes from TTR_BEARER (or --token-env); it is never written to output or export files.

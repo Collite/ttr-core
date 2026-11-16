@@ -1,0 +1,99 @@
+{
+    "$schema": "https://unpkg.com/@camunda/element-templates-json-schema@0.12.1/resources/schema.json",
+    "name": "Tatrman release_on_placement",
+    "id": "tatrman.hartland.worlds.demo.release_on_placement",
+    "version": 1,
+    "appliesTo": [
+        "bpmn:ServiceTask"
+    ],
+    "properties": [
+        {
+            "id": "ttr_source",
+            "label": "World program or query",
+            "type": "Dropdown",
+            "value": "release_on_placement",
+            "choices": [
+                {
+                    "name": "release_on_placement",
+                    "value": "release_on_placement"
+                }
+            ],
+            "binding": {
+                "type": "camunda:inputParameter",
+                "name": "ttr_source"
+            }
+        },
+        {
+            "id": "ttr_deployment",
+            "label": "World deployment (program steps: the run this task opens)",
+            "type": "String",
+            "value": "",
+            "binding": {
+                "type": "camunda:inputParameter",
+                "name": "ttr_deployment"
+            }
+        }
+    ],
+    "scopes": [
+        {
+            "type": "camunda:Connector",
+            "properties": [
+                {
+                    "type": "Hidden",
+                    "value": "http-connector",
+                    "binding": {
+                        "type": "property",
+                        "name": "connectorId"
+                    }
+                },
+                {
+                    "type": "Hidden",
+                    "value": "POST",
+                    "binding": {
+                        "type": "camunda:inputParameter",
+                        "name": "method"
+                    }
+                },
+                {
+                    "type": "Hidden",
+                    "value": "def source = execution.getVariable('ttr_source')\ndef programs = ['release_on_placement': [recipe: 'release_order', port: 'key']]\nprograms.containsKey(source) ? 'http://egress/automation/recipes/' + programs[source].recipe + '/runs' : 'http://egress/automation/query'",
+                    "binding": {
+                        "type": "camunda:inputParameter",
+                        "name": "url",
+                        "scriptFormat": "groovy"
+                    }
+                },
+                {
+                    "type": "Hidden",
+                    "value": "['Content-Type': 'application/json']",
+                    "binding": {
+                        "type": "camunda:inputParameter",
+                        "name": "headers",
+                        "scriptFormat": "groovy"
+                    }
+                },
+                {
+                    "type": "Hidden",
+                    "value": "def source = execution.getVariable('ttr_source')\ndef programs = ['release_on_placement': [recipe: 'release_order', port: 'key']]\ndef queries = [:]\nif (programs.containsKey(source)) {\n    def kind = programs[source].port\n    def input = kind == 'none' ? null : execution.getVariable('ttrInput')\n    def port = kind == 'none' ? [none: true] : [(kind): input[kind]]\n    if (kind != 'none' && input['at'] != null) port.at = input['at']\n    def engine = [instanceId: execution.processInstanceId, businessKey: execution.processBusinessKey,\n        deploymentId: execution.processEngineServices.repositoryService.getProcessDefinition(execution.processDefinitionId).deploymentId]\n    return org.camunda.spin.Spin.JSON([deployment: execution.getVariable('ttr_deployment'), port: port, origin: 'engine', engine: engine]).toString()\n}\nif (!queries.containsKey(source)) throw new IllegalArgumentException('unknown world program or query ' + source)\nreturn org.camunda.spin.Spin.JSON([query: source, parameters: queries[source].collectEntries { [(it): execution.getVariable(it)] }]).toString()",
+                    "binding": {
+                        "type": "camunda:inputParameter",
+                        "name": "payload",
+                        "scriptFormat": "groovy"
+                    }
+                },
+                {
+                    "type": "Hidden",
+                    "value": "ttr_response",
+                    "binding": {
+                        "type": "camunda:outputParameter",
+                        "source": "def code = ((Number) statusCode).intValue()\nif (code < 200 || code >= 300) throw new IllegalStateException('run API HTTP ' + code)\nreturn org.camunda.spin.Spin.JSON(response)",
+                        "scriptFormat": "groovy"
+                    }
+                }
+            ]
+        }
+    ],
+    "metadata": {
+        "fingerprint": "326779a07bf1e12cb2eacc3f7bbcea6d536927b9d49d65fe81deeb121e8fec95"
+    }
+}
