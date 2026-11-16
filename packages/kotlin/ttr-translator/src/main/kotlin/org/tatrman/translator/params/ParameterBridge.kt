@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.translator.params
 
-import org.apache.calcite.sql.type.SqlTypeName
 import org.tatrman.translator.codec.sql.SqlTextScanner
 
 /**
@@ -202,25 +201,12 @@ object ParameterBridge {
     private fun isIdentifierChar(c: Char): Boolean = c.isLetterOrDigit() || c == '_'
 
     /**
-     * Surface parameter type → a SQL type keyword Calcite's parser accepts in a
-     * `CAST(... AS <type>)`. Derives from the shared [SurfaceTypeMapping] table
-     * (N9) so this and [ParameterTyper.toRelDataType] cannot drift; unknown
-     * surface types fall back to [SurfaceTypeMapping.UNKNOWN_SQL_KEYWORD]
-     * (`VARCHAR` — the `ANY` that [ParameterTyper] uses is not a castable SQL
-     * keyword, and `VARCHAR` is the safe default for the text-search contexts
-     * that need this typing). DECIMAL carries an explicit precision/scale (M3)
-     * so a decimal param isn't truncated to scale 0.
+     * Surface parameter type → the SQL type keyword of the typed retry's `CAST(? AS <type>)`: the shared
+     * [SurfaceTypeMapping.crutchKeyword], so [ParameterTyper] recognises exactly this cast as the crutch (N9,
+     * review-318 F2). An unknown surface type gets `VARCHAR` (the `ANY` [ParameterTyper] retypes to is not a castable
+     * keyword); DECIMAL carries an explicit precision/scale (M3) so a decimal param isn't truncated to scale 0.
      */
-    private fun calciteSqlType(surfaceType: String): String {
-        val sqlTypeName =
-            SurfaceTypeMapping.sqlTypeNameOrNull(surfaceType)
-                ?: return SurfaceTypeMapping.UNKNOWN_SQL_KEYWORD
-        return if (sqlTypeName == SqlTypeName.DECIMAL) {
-            "DECIMAL(${SurfaceTypeMapping.DECIMAL_PRECISION}, ${SurfaceTypeMapping.DECIMAL_SCALE})"
-        } else {
-            sqlTypeName.name
-        }
-    }
+    private fun calciteSqlType(surfaceType: String): String = SurfaceTypeMapping.crutchKeyword(surfaceType)
 }
 
 /**

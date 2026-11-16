@@ -43,7 +43,11 @@ class CrutchCastUnwrapSpec :
         }
 
         "C — an author's CAST({q} AS VARCHAR(3)) over a `text` parameter keeps its cast, both halves" {
-            val sql = parity.sameSql("SELECT CAST({q} AS VARCHAR(3)) AS r FROM sale", listOf(SqlParam("q", "text", "abcd")))
+            val sql =
+                parity.sameSql(
+                    "SELECT CAST({q} AS VARCHAR(3)) AS r FROM sale",
+                    listOf(SqlParam("q", "text", "abcd")),
+                )
             sql.getValue(SqlDialect.POSTGRESQL) shouldContain "CAST(? AS VARCHAR(3))"
             sql.getValue(SqlDialect.MSSQL) shouldContain "CAST(? AS VARCHAR(3))"
         }

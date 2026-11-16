@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.translator.params
 
+import org.apache.calcite.rel.type.RelDataType
+import org.apache.calcite.rel.type.RelDataTypeFactory
 import org.apache.calcite.sql.type.SqlTypeFamily
 import org.apache.calcite.sql.type.SqlTypeName
 import org.tatrman.translator.framework.SurfaceType
@@ -80,6 +82,35 @@ object SurfaceTypeMapping {
 
     /** Resolve [surfaceType] to a [SqlTypeName], or null when unknown (caller picks a fallback). */
     fun sqlTypeNameOrNull(surfaceType: String): SqlTypeName? = TABLE[surfaceType.lowercase()]
+
+    /**
+     * The type of the typed retry's validation crutch for a parameter declared [surfaceType] — the one
+     * `CAST(? AS <type>)` [ParameterBridge] writes ([crutchKeyword]) and [ParameterTyper] unwraps. The mapped type
+     * ([TABLE], DECIMAL with [DECIMAL_PRECISION]/[DECIMAL_SCALE]); VARCHAR ([UNKNOWN_SQL_KEYWORD]) for an unknown one.
+     * Both sides read it here so they cannot drift: compared with [ParameterTyper]'s own `ANY` fallback instead, the
+     * crutch over an unknown type (`nvarchar`, `uuid`, …) was taken for an author's cast and reached the executed SQL
+     * (review-318 F2).
+     */
+    fun crutchType(
+        surfaceType: String,
+        factory: RelDataTypeFactory,
+    ): RelDataType {
+        val name = crutchSqlTypeName(surfaceType)
+        return if (name == SqlTypeName.DECIMAL) {
+            factory.createSqlType(SqlTypeName.DECIMAL, DECIMAL_PRECISION, DECIMAL_SCALE)
+        } else {
+            factory.createSqlType(name)
+        }
+    }
+
+    /** [crutchType] as the SQL keyword the bridge writes inside `CAST(? AS …)`. */
+    fun crutchKeyword(surfaceType: String): String {
+        val name = crutchSqlTypeName(surfaceType)
+        return if (name == SqlTypeName.DECIMAL) "DECIMAL($DECIMAL_PRECISION, $DECIMAL_SCALE)" else name.name
+    }
+
+    private fun crutchSqlTypeName(surfaceType: String): SqlTypeName =
+        sqlTypeNameOrNull(surfaceType) ?: SqlTypeName.valueOf(UNKNOWN_SQL_KEYWORD)
 
     /**
      * TF-P5 (contracts §3.1) — the operand family a model-declared function parameter of [surfaceType]

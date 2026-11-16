@@ -26,8 +26,8 @@ import org.tatrman.translator.framework.RelTreeRexShuttle
  * with a fresh one whose `RelDataType` matches the type declared in the matching [SqlParam].
  * Indices that don't have a matching `SqlParam` are left alone (handled by Calcite's inference).
  *
- * It also **unwraps** a `CAST(? AS T)` whose sole operand is a parameter, and whose `T` is that parameter's
- * declared type, back to a typed bare `?`. The orchestrator wraps placeholders in `CAST(? AS T)` (via
+ * It also **unwraps** a `CAST(? AS T)` whose sole operand is a parameter, and whose `T` is the crutch type the
+ * bridge writes for it ([SurfaceTypeMapping.crutchType]), back to a typed bare `?`. The orchestrator wraps placeholders in `CAST(? AS T)` (via
  * [ParameterBridge.prepareSqlForCalcite] `typed = true`) to satisfy validation in contexts Calcite
  * can't infer — chiefly inside `||` / `CONCAT`. Those casts are a validation-only crutch: keeping
  * them in the rel would leak a `CAST(? AS VARCHAR)` into the executed SQL (and, on dialects whose
@@ -63,40 +63,43 @@ object ParameterTyper {
         // Every `?` in the tree, sub-query bodies included: Calcite numbers them across the whole
         // statement, so a sub-query's `?` maps through [parameterOrder] like any other.
         return object : RelTreeRexShuttle() {
-            override fun visitDynamicParam(dynamicParam: RexDynamicParam): RexNode = retype(dynamicParam)
+            override fun visitDynamicParam(dynamicParam: RexDynamicParam): RexNode =
+                declaredOf(dynamicParam)?.let { retype(dynamicParam, it) } ?: dynamicParam
 
             override fun visitCall(call: RexCall): RexNode {
                 // Unwrap a validation-only `CAST(? AS T)` whose sole operand is a known parameter back to a
-                // typed bare `?` — only when T is the parameter's declared type, the one cast the bridge's typed
-                // retry writes. A cast to another type is the author's (ttr-core#407: `CAST({days} AS VARCHAR)`
-                // over an `int`, inside `||`): it stays, over the re-typed `?`. Unwrapped, the `||` kept its
-                // validated text type over an int operand, and the REL_NODE re-entry, which re-derives the type,
-                // failed. Casts over any other operand, or over an unmapped index, fall through likewise.
+                // typed bare `?` — only when T is the crutch the bridge's typed retry writes for that parameter
+                // ([SurfaceTypeMapping.crutchType]). A cast to another type is the author's (ttr-core#407:
+                // `CAST({days} AS VARCHAR)` over an `int`, inside `||`): it stays, over the re-typed `?`. Unwrapped,
+                // the `||` kept its validated text type over an int operand, and the REL_NODE re-entry, which
+                // re-derives the type, failed. Casts over any other operand, or over an unmapped index, fall through.
                 if (call.kind == SqlKind.CAST && call.operands.size == 1) {
                     val operand = call.operands[0]
-                    val declared = declaredType(operand)
-                    if (declared != null && SqlTypeUtil.equalSansNullability(typeFactory, call.type, declared)) {
-                        return retype(operand as RexDynamicParam)
+                    val declared = (operand as? RexDynamicParam)?.let(::declaredOf)
+                    if (declared != null &&
+                        SqlTypeUtil.equalSansNullability(
+                            typeFactory,
+                            call.type,
+                            SurfaceTypeMapping.crutchType(declared.type, typeFactory),
+                        )
+                    ) {
+                        return retype(operand as RexDynamicParam, declared)
                     }
                 }
                 return super.visitCall(call)
             }
 
-            /** The declared type of [operand] when it is a parameter with a matching [SqlParam]; else null. */
-            private fun declaredType(operand: RexNode): RelDataType? {
-                if (operand !is RexDynamicParam || operand.index !in parameterOrder.indices) return null
-                val declared = valuesByName[parameterOrder[operand.index]] ?: return null
-                return toRelDataType(declared.type, typeFactory)
-            }
+            /** The [SqlParam] declared for [dynamicParam]'s index, or null (unmapped index, no such parameter). */
+            private fun declaredOf(dynamicParam: RexDynamicParam): SqlParam? =
+                parameterOrder.getOrNull(dynamicParam.index)?.let { valuesByName[it] }
 
-            private fun retype(dynamicParam: RexDynamicParam): RexNode {
-                val idx = dynamicParam.index
-                if (idx !in parameterOrder.indices) return dynamicParam
-                val name = parameterOrder[idx]
-                val declared = valuesByName[name] ?: return dynamicParam
+            private fun retype(
+                dynamicParam: RexDynamicParam,
+                declared: SqlParam,
+            ): RexNode {
                 val targetType = toRelDataType(declared.type, typeFactory)
                 if (dynamicParam.type.sqlTypeName == targetType.sqlTypeName) return dynamicParam
-                return rexBuilder.makeDynamicParam(targetType, idx)
+                return rexBuilder.makeDynamicParam(targetType, dynamicParam.index)
             }
         }.rewrite(rel)
     }
