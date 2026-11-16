@@ -8,11 +8,10 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ### Fixed — REL_NODE re-entry keeps an author's parameter cast; decode failures say what failed (translator 0.14.3, ttr-core#407)
 
-- `ttr-translator` — `ParameterTyper` unwraps a `CAST(? AS T)` over a declared parameter only when `T` is the
-  parameter's declared type, the one cast the bridge's typed retry adds for validation. An author's cast to another
-  type stays, over the re-typed parameter. The crutch's type has one definition (`SurfaceTypeMapping.crutchType` /
-  `crutchKeyword`), read by the bridge and the typer alike; a parameter of a type outside the surface table keeps
-  getting its crutch unwrapped. Before, `'… ' || CAST({days} AS VARCHAR)` over an `int` parameter lost its
+- `ttr-translator` — `ParameterTyper` unwraps a `CAST(? AS T)` over a declared parameter only when `T` is the crutch
+  type the bridge's typed retry writes for it (the declared type; `VARCHAR` for a type outside the surface table). An
+  author's cast to any other type stays, over the re-typed parameter. The crutch type has one definition
+  (`SurfaceTypeMapping.crutchType` / `crutchKeyword`), read by the bridge and the typer alike. Before, `'… ' || CAST({days} AS VARCHAR)` over an `int` parameter lost its
   cast. The ER plan then concatenated a bare `int`, and the REL_NODE re-entry (`target=ER → REL_NODE → target=DB`)
   failed with `rel_node_schema_resolution_failed`. Without `||`, the cast vanished from the plan silently.
 - `ttr-translator` — the REL_NODE decoder keeps a NULL literal's encoded type for `text`, `bool`, `int` and `float`
@@ -21,8 +20,18 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - `ttr-translator` — a REL_NODE decode failure keeps the code `rel_node_schema_resolution_failed`. Its message now
   names the exception class, its message and the plan node that failed (`IllegalArgumentException: no message at
   PROJECT`), where before it was the exception's message or "references unresolved schema". The failure is logged at
-  WARN with the stack; a Calcite engine assertion is reported the same way. New `PlanNodeDecoder.decodeNamed` throws `PlanNodeDecoder.DecodeException(nodeCase, cause)`;
-  `decode` throws the original exception, unchanged.
+  WARN with the stack; a Calcite engine assertion is reported the same way. New `PlanNodeDecoder.decodeNamed`
+  throws `PlanNodeDecoder.DecodeException(nodeCase, cause)`; `decode` throws the original exception, unchanged.
+
+### Fix — the `ttr-plan-proto` wheel ships `translate.v1` (`translator.proto`)
+
+- The wheel now generates `org/tatrman/translate/v1/translator.proto` (`Language`, `SqlDialect`) beside `plan.v1`.
+  The Maven jar has always carried the file; the wheel did not, so a Python consumer could not compile a `.proto`
+  that imports it — ttr-server's `query.proto` and `translate.proto` both do (`RunRequest.source_language`). No
+  `.proto` changes: the files are identical to `translator/v0.14.1`'s, so the next wheel is meant to be cut as
+  `python-plan/v0.14.1-RELEASE`, matching the Kotlin pair it describes.
+- `org.tatrman.translate` and `org.tatrman.translate.v1` ship as namespace packages (no `__init__.py`), like `org` and
+  `org.tatrman`: ttr-server generates `translate_pb2` into the same package, and a regular package would hide it.
 
 ### Release — internal grammar 0.22.5: link kind and join-pairs (MW P3 S3.7b)
 

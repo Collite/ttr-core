@@ -1,7 +1,8 @@
 # ttr-plan-proto (Python)
 
 Pre-generated Python message classes for the **TTR-P plan pipeline** wire formats:
-`plan.v1`, `transdsl.v1`, `dfdsl.v1`. Importable at their canonical module paths,
+`plan.v1`, `transdsl.v1`, `dfdsl.v1`, the CN frames (`concept.v1`, `statement.v1`, `assertion.v1`) and the
+translator's enums (`translate.v1`: `Language`, `SqlDialect`). Importable at their canonical module paths,
 e.g. `from org.tatrman.plan.v1 import plan_pb2`.
 
 **Canonical source of truth:** the `.proto` files in the sibling Kotlin module

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Hatchling build hook: generate the plan.v1 / transdsl.v1 / dfdsl.v1 Python
+"""Hatchling build hook: generate the plan.v1 / transdsl.v1 / dfdsl.v1 (and translate.v1 enum) Python
 message classes from the canonical `.proto` files before the wheel is assembled.
 
 The `.proto` source of truth lives in the sibling Kotlin module
@@ -32,6 +32,10 @@ PROTOS = [
     "org/tatrman/concept/v1/refs.proto",
     "org/tatrman/statement/v1/statement.proto",
     "org/tatrman/assertion/v1/assertion.proto",
+    # The translator's library enums (`Language`, `SqlDialect`). The jar has always shipped this file; the wheel did not,
+    # so no Python consumer could compile a `.proto` that imports it — the query door's `query.proto` and
+    # `translate.proto` in ttr-server both do (RunRequest.source_language).
+    "org/tatrman/translate/v1/translator.proto",
 ]
 
 
@@ -71,10 +75,15 @@ class CustomBuildHook(BuildHookInterface):
         # regular `org.tatrman` package here shadows the other distribution's
         # submodules and `from org.tatrman.<x>.v1 import …` fails for one of them.
         # Deeper levels (`org.tatrman.plan`, `.transdsl`, `.dfdsl`, the cn `.concept` / `.statement` /
-        # `.assertion`, and below) are
+        # `.assertion`, `.translate`, and below) are
         # wheel-owned and get a regular `__init__.py`.
+        #
+        # `org.tatrman.translate` and `.translate.v1` are shared as well: this wheel owns `translator_pb2` (the library
+        # enums) while ttr-server generates `translate_pb2` (the Translate service) into the same `translate.v1`
+        # package. A regular `__init__.py` at either level would hide the consumer's module
+        # (`cannot import name 'translate_pb2' from 'org.tatrman.translate.v1'`), so both stay namespace levels too.
         org = out / "org"
-        namespace_dirs = {org, org / "tatrman"}
+        namespace_dirs = {org, org / "tatrman", org / "tatrman" / "translate", org / "tatrman" / "translate" / "v1"}
         for directory in [org, *[p for p in org.rglob("*") if p.is_dir()]]:
             init = directory / "__init__.py"
             if directory in namespace_dirs:
