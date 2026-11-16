@@ -37,6 +37,8 @@ class TypedNullReentrySpec :
         // A `datetime` NULL stays untyped (it may be a DATE or a TIME), so a TIMESTAMP's NULL re-encodes as
         // `unknown:NULL` as on master: not byte for byte, the same SQL.
         "N6 — CASE … THEN NULL ELSE a TIMESTAMP literal: the same SQL both ways" {
-            parity.sameSql("SELECT CASE WHEN revenue = 0 THEN NULL ELSE TIMESTAMP '2026-01-01 10:00:00' END AS r FROM sale")
+            parity.sameSql(
+                "SELECT CASE WHEN revenue = 0 THEN NULL ELSE TIMESTAMP '2026-01-01 10:00:00' END AS r FROM sale",
+            )
         }
     })
