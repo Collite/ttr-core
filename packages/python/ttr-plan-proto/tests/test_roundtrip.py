@@ -142,3 +142,15 @@ def test_assertion_event_json_key_is_gone() -> None:
     old = '{ "event": { "qname": "cn.Transfer" }, "identity": { "new": true } }'
     with pytest.raises(json_format.ParseError, match="event"):
         json_format.Parse(old, assertion_pb2.Assertion())
+
+
+def test_translator_enums_import_and_roundtrip() -> None:
+    """`translate.v1` (`translator.proto`) ships in the wheel: a consumer generating a `.proto` that imports it (the
+    query door's `RunRequest.source_language`) needs its descriptor, and the values must match the jar's."""
+    from org.tatrman.translate.v1 import translator_pb2
+
+    assert translator_pb2.DESCRIPTOR.name == "org/tatrman/translate/v1/translator.proto"
+    assert translator_pb2.Language.Value("SQL") == 1
+    assert translator_pb2.Language.Value("REL_NODE") == 4
+    assert translator_pb2.SqlDialect.Value("POSTGRESQL") == 2
+    assert translator_pb2.SqlDialect.Value("DUCKDB") == 4

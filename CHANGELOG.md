@@ -6,6 +6,14 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fix — the `ttr-plan-proto` wheel ships `translate.v1` (`translator.proto`)
+
+- The wheel now generates `org/tatrman/translate/v1/translator.proto` (`Language`, `SqlDialect`) beside `plan.v1`.
+  The Maven jar has always carried the file; the wheel did not, so a Python consumer could not compile a `.proto`
+  that imports it — ttr-server's `query.proto` and `translate.proto` both do (`RunRequest.source_language`). No
+  `.proto` changes: the files are identical to `translator/v0.14.1`'s, so the next wheel is meant to be cut as
+  `python-plan/v0.14.1-RELEASE`, matching the Kotlin pair it describes.
+
 ### Release — internal grammar 0.22.5: link kind and join-pairs (MW P3 S3.7b)
 
 - `grammar/v0.22.5` is an internal cut (GitHub Packages, prerelease, with the `ttr-metadata-cli-<v>.jar` release
