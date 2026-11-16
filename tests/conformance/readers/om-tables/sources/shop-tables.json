@@ -1,0 +1,372 @@
+{
+  "data": [
+    {
+      "id": "e5b4ea6c-058a-5f33-826f-8417935f4f3e",
+      "name": "customers",
+      "fullyQualifiedName": "demo_pg.shop.public.customers",
+      "description": "People and companies who place orders.",
+      "version": 0.3,
+      "updatedAt": 1767225600000,
+      "updatedBy": "ingestion-bot",
+      "href": "http://openmetadata.example/api/v1/tables/e5b4ea6c-058a-5f33-826f-8417935f4f3e",
+      "tableType": "Regular",
+      "columns": [
+        {
+          "name": "customer_id",
+          "dataType": "INT",
+          "dataTypeDisplay": "integer",
+          "description": "Surrogate key.",
+          "fullyQualifiedName": "demo_pg.shop.public.customers.customer_id",
+          "tags": [],
+          "constraint": "PRIMARY_KEY",
+          "ordinalPosition": 1
+        },
+        {
+          "name": "email",
+          "dataType": "VARCHAR",
+          "dataLength": 254,
+          "dataTypeDisplay": "character varying(254)",
+          "description": "Sign-in e-mail address.",
+          "fullyQualifiedName": "demo_pg.shop.public.customers.email",
+          "tags": [
+            {
+              "tagFQN": "PII.Sensitive",
+              "source": "Classification",
+              "labelType": "Manual",
+              "state": "Confirmed"
+            }
+          ],
+          "constraint": "NOT_NULL",
+          "ordinalPosition": 2
+        },
+        {
+          "name": "display_name",
+          "dataType": "VARCHAR",
+          "dataLength": 120,
+          "dataTypeDisplay": "character varying(120)",
+          "fullyQualifiedName": "demo_pg.shop.public.customers.display_name",
+          "tags": [],
+          "constraint": "NULL",
+          "ordinalPosition": 3
+        },
+        {
+          "name": "created_at",
+          "dataType": "TIMESTAMP",
+          "dataTypeDisplay": "timestamp without time zone",
+          "description": "When the account was opened.",
+          "fullyQualifiedName": "demo_pg.shop.public.customers.created_at",
+          "tags": [],
+          "constraint": "NOT_NULL",
+          "ordinalPosition": 4
+        }
+      ],
+      "tableConstraints": [
+        {
+          "constraintType": "PRIMARY_KEY",
+          "columns": [
+            "customer_id"
+          ]
+        }
+      ],
+      "databaseSchema": {
+        "id": "0614b863-75cf-5fcf-a2e3-cd014d70d665",
+        "type": "databaseSchema",
+        "name": "public",
+        "fullyQualifiedName": "demo_pg.shop.public",
+        "deleted": false
+      },
+      "database": {
+        "id": "fa405c33-9d27-590c-b7af-3b1e186ebab2",
+        "type": "database",
+        "name": "shop",
+        "fullyQualifiedName": "demo_pg.shop",
+        "deleted": false
+      },
+      "service": {
+        "id": "af42aa86-25e4-56c7-b9b8-3e8ae9099a46",
+        "type": "databaseService",
+        "name": "demo_pg",
+        "fullyQualifiedName": "demo_pg",
+        "deleted": false
+      },
+      "serviceType": "Postgres",
+      "owners": [
+        {
+          "id": "e94696d4-7798-53c4-91e9-3035fe4fb353",
+          "type": "team",
+          "name": "sales_ops",
+          "fullyQualifiedName": "sales_ops",
+          "displayName": "Sales Ops",
+          "deleted": false
+        }
+      ],
+      "tags": [
+        {
+          "tagFQN": "Tier.Tier1",
+          "source": "Classification",
+          "labelType": "Manual",
+          "state": "Confirmed"
+        }
+      ],
+      "followers": [],
+      "deleted": false,
+      "usageSummary": {
+        "dailyStats": {
+          "count": 41,
+          "percentileRank": 50.0
+        },
+        "weeklyStats": {
+          "count": 287,
+          "percentileRank": 50.0
+        },
+        "monthlyStats": {
+          "count": 1230,
+          "percentileRank": 50.0
+        },
+        "date": "2026-11-01"
+      }
+    },
+    {
+      "id": "44e88926-eb9b-5e64-bd6a-119ed1853359",
+      "name": "orders",
+      "fullyQualifiedName": "demo_pg.shop.public.orders",
+      "description": "One checkout: the order header.",
+      "version": 0.3,
+      "updatedAt": 1767225600000,
+      "updatedBy": "ingestion-bot",
+      "href": "http://openmetadata.example/api/v1/tables/44e88926-eb9b-5e64-bd6a-119ed1853359",
+      "tableType": "Regular",
+      "columns": [
+        {
+          "name": "order_id",
+          "dataType": "BIGINT",
+          "dataTypeDisplay": "bigint",
+          "description": "Surrogate key.",
+          "fullyQualifiedName": "demo_pg.shop.public.orders.order_id",
+          "tags": [],
+          "constraint": "PRIMARY_KEY",
+          "ordinalPosition": 1
+        },
+        {
+          "name": "customer_id",
+          "dataType": "INT",
+          "dataTypeDisplay": "integer",
+          "description": "The customer who placed the order.",
+          "fullyQualifiedName": "demo_pg.shop.public.orders.customer_id",
+          "tags": [],
+          "constraint": "NOT_NULL",
+          "ordinalPosition": 2
+        },
+        {
+          "name": "placed_on",
+          "dataType": "DATE",
+          "dataTypeDisplay": "date",
+          "fullyQualifiedName": "demo_pg.shop.public.orders.placed_on",
+          "tags": [],
+          "constraint": "NOT_NULL",
+          "ordinalPosition": 3
+        },
+        {
+          "name": "total",
+          "dataType": "DECIMAL",
+          "precision": 12,
+          "scale": 2,
+          "dataTypeDisplay": "numeric(12,2)",
+          "description": "Order total incl. tax.",
+          "fullyQualifiedName": "demo_pg.shop.public.orders.total",
+          "tags": [],
+          "constraint": "NOT_NULL",
+          "ordinalPosition": 4
+        },
+        {
+          "name": "is_gift",
+          "dataType": "BOOLEAN",
+          "dataTypeDisplay": "boolean",
+          "fullyQualifiedName": "demo_pg.shop.public.orders.is_gift",
+          "tags": [],
+          "constraint": "NULL",
+          "ordinalPosition": 5
+        }
+      ],
+      "tableConstraints": [
+        {
+          "constraintType": "PRIMARY_KEY",
+          "columns": [
+            "order_id"
+          ]
+        },
+        {
+          "constraintType": "FOREIGN_KEY",
+          "columns": [
+            "customer_id"
+          ],
+          "referredColumns": [
+            "demo_pg.shop.public.customers.customer_id"
+          ]
+        }
+      ],
+      "databaseSchema": {
+        "id": "0614b863-75cf-5fcf-a2e3-cd014d70d665",
+        "type": "databaseSchema",
+        "name": "public",
+        "fullyQualifiedName": "demo_pg.shop.public",
+        "deleted": false
+      },
+      "database": {
+        "id": "fa405c33-9d27-590c-b7af-3b1e186ebab2",
+        "type": "database",
+        "name": "shop",
+        "fullyQualifiedName": "demo_pg.shop",
+        "deleted": false
+      },
+      "service": {
+        "id": "af42aa86-25e4-56c7-b9b8-3e8ae9099a46",
+        "type": "databaseService",
+        "name": "demo_pg",
+        "fullyQualifiedName": "demo_pg",
+        "deleted": false
+      },
+      "serviceType": "Postgres",
+      "owners": [
+        {
+          "id": "e94696d4-7798-53c4-91e9-3035fe4fb353",
+          "type": "team",
+          "name": "sales_ops",
+          "fullyQualifiedName": "sales_ops",
+          "displayName": "Sales Ops",
+          "deleted": false
+        }
+      ],
+      "tags": [],
+      "followers": [],
+      "deleted": false,
+      "usageSummary": {
+        "dailyStats": {
+          "count": 120,
+          "percentileRank": 50.0
+        },
+        "weeklyStats": {
+          "count": 840,
+          "percentileRank": 50.0
+        },
+        "monthlyStats": {
+          "count": 3600,
+          "percentileRank": 50.0
+        },
+        "date": "2026-11-01"
+      }
+    },
+    {
+      "id": "e9c13f25-d036-58f5-a7e6-1c9d62216714",
+      "name": "order_lines",
+      "fullyQualifiedName": "demo_pg.shop.public.order_lines",
+      "version": 0.3,
+      "updatedAt": 1767225600000,
+      "updatedBy": "ingestion-bot",
+      "href": "http://openmetadata.example/api/v1/tables/e9c13f25-d036-58f5-a7e6-1c9d62216714",
+      "tableType": "Regular",
+      "columns": [
+        {
+          "name": "order_id",
+          "dataType": "BIGINT",
+          "dataTypeDisplay": "bigint",
+          "fullyQualifiedName": "demo_pg.shop.public.order_lines.order_id",
+          "tags": [],
+          "constraint": "NOT_NULL",
+          "ordinalPosition": 1
+        },
+        {
+          "name": "line_no",
+          "dataType": "SMALLINT",
+          "dataTypeDisplay": "smallint",
+          "fullyQualifiedName": "demo_pg.shop.public.order_lines.line_no",
+          "tags": [],
+          "constraint": "NOT_NULL",
+          "ordinalPosition": 2
+        },
+        {
+          "name": "sku",
+          "dataType": "VARCHAR",
+          "dataLength": 32,
+          "dataTypeDisplay": "character varying(32)",
+          "description": "Stock-keeping unit.",
+          "fullyQualifiedName": "demo_pg.shop.public.order_lines.sku",
+          "tags": [],
+          "constraint": "NOT_NULL",
+          "ordinalPosition": 3
+        },
+        {
+          "name": "quantity",
+          "dataType": "INT",
+          "dataTypeDisplay": "integer",
+          "fullyQualifiedName": "demo_pg.shop.public.order_lines.quantity",
+          "tags": [],
+          "constraint": "NOT_NULL",
+          "ordinalPosition": 4
+        }
+      ],
+      "tableConstraints": [
+        {
+          "constraintType": "PRIMARY_KEY",
+          "columns": [
+            "order_id",
+            "line_no"
+          ]
+        },
+        {
+          "constraintType": "FOREIGN_KEY",
+          "columns": [
+            "order_id"
+          ],
+          "referredColumns": [
+            "demo_pg.shop.public.orders.order_id"
+          ]
+        }
+      ],
+      "databaseSchema": {
+        "id": "0614b863-75cf-5fcf-a2e3-cd014d70d665",
+        "type": "databaseSchema",
+        "name": "public",
+        "fullyQualifiedName": "demo_pg.shop.public",
+        "deleted": false
+      },
+      "database": {
+        "id": "fa405c33-9d27-590c-b7af-3b1e186ebab2",
+        "type": "database",
+        "name": "shop",
+        "fullyQualifiedName": "demo_pg.shop",
+        "deleted": false
+      },
+      "service": {
+        "id": "af42aa86-25e4-56c7-b9b8-3e8ae9099a46",
+        "type": "databaseService",
+        "name": "demo_pg",
+        "fullyQualifiedName": "demo_pg",
+        "deleted": false
+      },
+      "serviceType": "Postgres",
+      "owners": [],
+      "tags": [],
+      "followers": [],
+      "deleted": false,
+      "usageSummary": {
+        "dailyStats": {
+          "count": 300,
+          "percentileRank": 50.0
+        },
+        "weeklyStats": {
+          "count": 2100,
+          "percentileRank": 50.0
+        },
+        "monthlyStats": {
+          "count": 9000,
+          "percentileRank": 50.0
+        },
+        "date": "2026-11-01"
+      }
+    }
+  ],
+  "paging": {
+    "total": 3
+  }
+}

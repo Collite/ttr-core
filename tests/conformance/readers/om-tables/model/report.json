@@ -1,0 +1,744 @@
+{
+    "frontEnd": "json",
+    "profile": "om-tables/1",
+    "packages": [
+        {
+            "package": "om",
+            "model": "db",
+            "file": "om/db.ttrm",
+            "defs": 3
+        }
+    ],
+    "ignored": [
+        {
+            "file": "shop-tables.json",
+            "line": 4,
+            "column": 7,
+            "path": "/data/0/id",
+            "reason": "OM instance id"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 6,
+            "column": 7,
+            "path": "/data/0/fullyQualifiedName",
+            "reason": "the sidecar's sourceName"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 8,
+            "column": 7,
+            "path": "/data/0/version",
+            "reason": "OM entity version"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 9,
+            "column": 7,
+            "path": "/data/0/updatedAt",
+            "reason": "OM change timestamp"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 10,
+            "column": 7,
+            "path": "/data/0/updatedBy",
+            "reason": "OM change author"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 11,
+            "column": 7,
+            "path": "/data/0/href",
+            "reason": "OM API link"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 12,
+            "column": 7,
+            "path": "/data/0/tableType",
+            "reason": "OM table type"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 17,
+            "column": 11,
+            "path": "/data/0/columns/0/dataTypeDisplay",
+            "reason": "the source's type spelling (dataType is mapped)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 19,
+            "column": 11,
+            "path": "/data/0/columns/0/fullyQualifiedName",
+            "reason": "the sidecar's sourceName"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 20,
+            "column": 11,
+            "path": "/data/0/columns/0/tags",
+            "reason": "tag labels are objects; tags[] needs a list map the operations lack (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 22,
+            "column": 11,
+            "path": "/data/0/columns/0/ordinalPosition",
+            "reason": "column order is the export's list order"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 28,
+            "column": 11,
+            "path": "/data/0/columns/1/dataTypeDisplay",
+            "reason": "the source's type spelling (dataType is mapped)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 30,
+            "column": 11,
+            "path": "/data/0/columns/1/fullyQualifiedName",
+            "reason": "the sidecar's sourceName"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 31,
+            "column": 11,
+            "path": "/data/0/columns/1/tags",
+            "reason": "tag labels are objects; tags[] needs a list map the operations lack (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 40,
+            "column": 11,
+            "path": "/data/0/columns/1/ordinalPosition",
+            "reason": "column order is the export's list order"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 46,
+            "column": 11,
+            "path": "/data/0/columns/2/dataTypeDisplay",
+            "reason": "the source's type spelling (dataType is mapped)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 47,
+            "column": 11,
+            "path": "/data/0/columns/2/fullyQualifiedName",
+            "reason": "the sidecar's sourceName"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 48,
+            "column": 11,
+            "path": "/data/0/columns/2/tags",
+            "reason": "tag labels are objects; tags[] needs a list map the operations lack (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 50,
+            "column": 11,
+            "path": "/data/0/columns/2/ordinalPosition",
+            "reason": "column order is the export's list order"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 55,
+            "column": 11,
+            "path": "/data/0/columns/3/dataTypeDisplay",
+            "reason": "the source's type spelling (dataType is mapped)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 57,
+            "column": 11,
+            "path": "/data/0/columns/3/fullyQualifiedName",
+            "reason": "the sidecar's sourceName"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 58,
+            "column": 11,
+            "path": "/data/0/columns/3/tags",
+            "reason": "tag labels are objects; tags[] needs a list map the operations lack (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 60,
+            "column": 11,
+            "path": "/data/0/columns/3/ordinalPosition",
+            "reason": "column order is the export's list order"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 63,
+            "column": 7,
+            "path": "/data/0/tableConstraints",
+            "reason": "unnamed nested keys; a def fk cannot be lifted from them (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 71,
+            "column": 7,
+            "path": "/data/0/databaseSchema",
+            "reason": "OM schema reference (in the FQN)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 78,
+            "column": 7,
+            "path": "/data/0/database",
+            "reason": "OM database reference (in the FQN)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 85,
+            "column": 7,
+            "path": "/data/0/service",
+            "reason": "OM service reference (in the FQN)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 92,
+            "column": 7,
+            "path": "/data/0/serviceType",
+            "reason": "OM service type"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 93,
+            "column": 7,
+            "path": "/data/0/owners",
+            "reason": "the db grammar has no owner property (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 103,
+            "column": 7,
+            "path": "/data/0/tags",
+            "reason": "tag labels are objects; tags[] needs a list map the operations lack (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 111,
+            "column": 7,
+            "path": "/data/0/followers",
+            "reason": "OM followers"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 112,
+            "column": 7,
+            "path": "/data/0/deleted",
+            "reason": "OM soft-delete flag"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 113,
+            "column": 7,
+            "path": "/data/0/usageSummary",
+            "reason": "usage statistics"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 130,
+            "column": 7,
+            "path": "/data/1/id",
+            "reason": "OM instance id"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 132,
+            "column": 7,
+            "path": "/data/1/fullyQualifiedName",
+            "reason": "the sidecar's sourceName"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 134,
+            "column": 7,
+            "path": "/data/1/version",
+            "reason": "OM entity version"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 135,
+            "column": 7,
+            "path": "/data/1/updatedAt",
+            "reason": "OM change timestamp"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 136,
+            "column": 7,
+            "path": "/data/1/updatedBy",
+            "reason": "OM change author"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 137,
+            "column": 7,
+            "path": "/data/1/href",
+            "reason": "OM API link"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 138,
+            "column": 7,
+            "path": "/data/1/tableType",
+            "reason": "OM table type"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 143,
+            "column": 11,
+            "path": "/data/1/columns/0/dataTypeDisplay",
+            "reason": "the source's type spelling (dataType is mapped)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 145,
+            "column": 11,
+            "path": "/data/1/columns/0/fullyQualifiedName",
+            "reason": "the sidecar's sourceName"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 146,
+            "column": 11,
+            "path": "/data/1/columns/0/tags",
+            "reason": "tag labels are objects; tags[] needs a list map the operations lack (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 148,
+            "column": 11,
+            "path": "/data/1/columns/0/ordinalPosition",
+            "reason": "column order is the export's list order"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 153,
+            "column": 11,
+            "path": "/data/1/columns/1/dataTypeDisplay",
+            "reason": "the source's type spelling (dataType is mapped)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 155,
+            "column": 11,
+            "path": "/data/1/columns/1/fullyQualifiedName",
+            "reason": "the sidecar's sourceName"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 156,
+            "column": 11,
+            "path": "/data/1/columns/1/tags",
+            "reason": "tag labels are objects; tags[] needs a list map the operations lack (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 158,
+            "column": 11,
+            "path": "/data/1/columns/1/ordinalPosition",
+            "reason": "column order is the export's list order"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 163,
+            "column": 11,
+            "path": "/data/1/columns/2/dataTypeDisplay",
+            "reason": "the source's type spelling (dataType is mapped)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 164,
+            "column": 11,
+            "path": "/data/1/columns/2/fullyQualifiedName",
+            "reason": "the sidecar's sourceName"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 165,
+            "column": 11,
+            "path": "/data/1/columns/2/tags",
+            "reason": "tag labels are objects; tags[] needs a list map the operations lack (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 167,
+            "column": 11,
+            "path": "/data/1/columns/2/ordinalPosition",
+            "reason": "column order is the export's list order"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 174,
+            "column": 11,
+            "path": "/data/1/columns/3/dataTypeDisplay",
+            "reason": "the source's type spelling (dataType is mapped)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 176,
+            "column": 11,
+            "path": "/data/1/columns/3/fullyQualifiedName",
+            "reason": "the sidecar's sourceName"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 177,
+            "column": 11,
+            "path": "/data/1/columns/3/tags",
+            "reason": "tag labels are objects; tags[] needs a list map the operations lack (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 179,
+            "column": 11,
+            "path": "/data/1/columns/3/ordinalPosition",
+            "reason": "column order is the export's list order"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 184,
+            "column": 11,
+            "path": "/data/1/columns/4/dataTypeDisplay",
+            "reason": "the source's type spelling (dataType is mapped)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 185,
+            "column": 11,
+            "path": "/data/1/columns/4/fullyQualifiedName",
+            "reason": "the sidecar's sourceName"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 186,
+            "column": 11,
+            "path": "/data/1/columns/4/tags",
+            "reason": "tag labels are objects; tags[] needs a list map the operations lack (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 188,
+            "column": 11,
+            "path": "/data/1/columns/4/ordinalPosition",
+            "reason": "column order is the export's list order"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 191,
+            "column": 7,
+            "path": "/data/1/tableConstraints",
+            "reason": "unnamed nested keys; a def fk cannot be lifted from them (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 208,
+            "column": 7,
+            "path": "/data/1/databaseSchema",
+            "reason": "OM schema reference (in the FQN)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 215,
+            "column": 7,
+            "path": "/data/1/database",
+            "reason": "OM database reference (in the FQN)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 222,
+            "column": 7,
+            "path": "/data/1/service",
+            "reason": "OM service reference (in the FQN)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 229,
+            "column": 7,
+            "path": "/data/1/serviceType",
+            "reason": "OM service type"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 230,
+            "column": 7,
+            "path": "/data/1/owners",
+            "reason": "the db grammar has no owner property (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 240,
+            "column": 7,
+            "path": "/data/1/tags",
+            "reason": "tag labels are objects; tags[] needs a list map the operations lack (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 241,
+            "column": 7,
+            "path": "/data/1/followers",
+            "reason": "OM followers"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 242,
+            "column": 7,
+            "path": "/data/1/deleted",
+            "reason": "OM soft-delete flag"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 243,
+            "column": 7,
+            "path": "/data/1/usageSummary",
+            "reason": "usage statistics"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 260,
+            "column": 7,
+            "path": "/data/2/id",
+            "reason": "OM instance id"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 262,
+            "column": 7,
+            "path": "/data/2/fullyQualifiedName",
+            "reason": "the sidecar's sourceName"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 263,
+            "column": 7,
+            "path": "/data/2/version",
+            "reason": "OM entity version"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 264,
+            "column": 7,
+            "path": "/data/2/updatedAt",
+            "reason": "OM change timestamp"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 265,
+            "column": 7,
+            "path": "/data/2/updatedBy",
+            "reason": "OM change author"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 266,
+            "column": 7,
+            "path": "/data/2/href",
+            "reason": "OM API link"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 267,
+            "column": 7,
+            "path": "/data/2/tableType",
+            "reason": "OM table type"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 272,
+            "column": 11,
+            "path": "/data/2/columns/0/dataTypeDisplay",
+            "reason": "the source's type spelling (dataType is mapped)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 273,
+            "column": 11,
+            "path": "/data/2/columns/0/fullyQualifiedName",
+            "reason": "the sidecar's sourceName"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 274,
+            "column": 11,
+            "path": "/data/2/columns/0/tags",
+            "reason": "tag labels are objects; tags[] needs a list map the operations lack (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 276,
+            "column": 11,
+            "path": "/data/2/columns/0/ordinalPosition",
+            "reason": "column order is the export's list order"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 281,
+            "column": 11,
+            "path": "/data/2/columns/1/dataTypeDisplay",
+            "reason": "the source's type spelling (dataType is mapped)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 282,
+            "column": 11,
+            "path": "/data/2/columns/1/fullyQualifiedName",
+            "reason": "the sidecar's sourceName"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 283,
+            "column": 11,
+            "path": "/data/2/columns/1/tags",
+            "reason": "tag labels are objects; tags[] needs a list map the operations lack (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 285,
+            "column": 11,
+            "path": "/data/2/columns/1/ordinalPosition",
+            "reason": "column order is the export's list order"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 291,
+            "column": 11,
+            "path": "/data/2/columns/2/dataTypeDisplay",
+            "reason": "the source's type spelling (dataType is mapped)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 293,
+            "column": 11,
+            "path": "/data/2/columns/2/fullyQualifiedName",
+            "reason": "the sidecar's sourceName"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 294,
+            "column": 11,
+            "path": "/data/2/columns/2/tags",
+            "reason": "tag labels are objects; tags[] needs a list map the operations lack (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 296,
+            "column": 11,
+            "path": "/data/2/columns/2/ordinalPosition",
+            "reason": "column order is the export's list order"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 301,
+            "column": 11,
+            "path": "/data/2/columns/3/dataTypeDisplay",
+            "reason": "the source's type spelling (dataType is mapped)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 302,
+            "column": 11,
+            "path": "/data/2/columns/3/fullyQualifiedName",
+            "reason": "the sidecar's sourceName"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 303,
+            "column": 11,
+            "path": "/data/2/columns/3/tags",
+            "reason": "tag labels are objects; tags[] needs a list map the operations lack (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 305,
+            "column": 11,
+            "path": "/data/2/columns/3/ordinalPosition",
+            "reason": "column order is the export's list order"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 308,
+            "column": 7,
+            "path": "/data/2/tableConstraints",
+            "reason": "unnamed nested keys; a def fk cannot be lifted from them (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 326,
+            "column": 7,
+            "path": "/data/2/databaseSchema",
+            "reason": "OM schema reference (in the FQN)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 333,
+            "column": 7,
+            "path": "/data/2/database",
+            "reason": "OM database reference (in the FQN)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 340,
+            "column": 7,
+            "path": "/data/2/service",
+            "reason": "OM service reference (in the FQN)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 347,
+            "column": 7,
+            "path": "/data/2/serviceType",
+            "reason": "OM service type"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 348,
+            "column": 7,
+            "path": "/data/2/owners",
+            "reason": "the db grammar has no owner property (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 349,
+            "column": 7,
+            "path": "/data/2/tags",
+            "reason": "tag labels are objects; tags[] needs a list map the operations lack (S5.1 Found)"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 350,
+            "column": 7,
+            "path": "/data/2/followers",
+            "reason": "OM followers"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 351,
+            "column": 7,
+            "path": "/data/2/deleted",
+            "reason": "OM soft-delete flag"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 352,
+            "column": 7,
+            "path": "/data/2/usageSummary",
+            "reason": "usage statistics"
+        },
+        {
+            "file": "shop-tables.json",
+            "line": 369,
+            "column": 3,
+            "path": "/paging",
+            "reason": "export paging"
+        }
+    ],
+    "overridden": [],
+    "warnings": []
+}
