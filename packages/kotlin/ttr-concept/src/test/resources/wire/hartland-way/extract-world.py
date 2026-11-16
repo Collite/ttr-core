@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Extract the decide_return way's slice of the ttr-demo model at a commit into a fixture world dir."""
 import re, subprocess, sys, pathlib
 repo, commit, out = sys.argv[1], sys.argv[2], pathlib.Path(sys.argv[3])
