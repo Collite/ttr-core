@@ -61,6 +61,12 @@ class AnswerOpenSpec :
                         "serviceTask",
                     ).single { it.getAttribute("name") == "answer approve_release" }
                 answer.getAttributeNS("http://camunda.org/schema/1.0/bpmn", "asyncBefore") shouldBe ""
+                answer
+                    .getElementsByTagNameNS(
+                        "http://camunda.org/schema/1.0/bpmn",
+                        "failedJobRetryTimeCycle",
+                    ).length shouldBe
+                    0
                 val answerStep = answer.parentNode as Element
                 val flows = elements(BPMN, "sequenceFlow")
                 flows.any {

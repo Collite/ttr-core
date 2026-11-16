@@ -26,8 +26,13 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   `taskId`/`answeredBy`, the approved row's key, and `ttrAnchor + ':answer:' + ttrTaskId`, without
   an asynchronous boundary. This is the identity Open only; answer evaluation/close is carried to
   S1.5.7 by the explicit ⚑AU-S156-2 fallback (D-159).
-- C7 HTTP output scripts resolve `BpmnError` at runtime for Camunda 7 and CIB seven, preserving
-  `TTR_STALE`/`TTR_REFUSED` boundary codes and transient-error retries (ttr-server S3.3 Found 7).
+- C7 HTTP scripts resolve `BpmnError` and Spin for Camunda 7 and CIB seven without requiring
+  an `execution` binding in connector outputs. Real embedded-engine tests cover both distributions,
+  including success and BPMN/transient errors (review-323 R323-1/2). Unclaimed approval completions
+  are refused before HTTP, answer identity stays local to each row, and synchronous answer Opens
+  omit job retry settings: transient failures roll back completion for the user to retry.
+- C7 cancellation output mappings tolerate a missing Open handle, so first-Open 409/422 responses
+  reach their error boundaries without an anchor or incident (AU-S156-3; also broken on master).
 
 ### Release — internal grammar 0.22.5: link kind and join-pairs (MW P3 S3.7b)
 

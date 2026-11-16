@@ -74,7 +74,7 @@
                 },
                 {
                     "type": "Hidden",
-                    "value": "def source = execution.getVariable('ttr_source')\ndef programs = ['release_on_placement': [recipe: 'release_order', port: 'key']]\ndef queries = [:]\nif (programs.containsKey(source)) {\n    def kind = programs[source].port\n    def input = kind == 'none' ? null : execution.getVariable('ttrInput')\n    def port = kind == 'none' ? [none: true] : [(kind): input[kind]]\n    if (kind != 'none' && input['at'] != null) port.at = input['at']\n    def engine = [instanceId: execution.processInstanceId, businessKey: execution.processBusinessKey,\n        deploymentId: execution.processEngineServices.repositoryService.getProcessDefinition(execution.processDefinitionId).deploymentId]\n    return org.camunda.spin.Spin.JSON([deployment: execution.getVariable('ttr_deployment'), port: port, origin: 'engine', engine: engine]).toString()\n}\nif (!queries.containsKey(source)) throw new IllegalArgumentException('unknown world program or query ' + source)\nreturn org.camunda.spin.Spin.JSON([query: source, parameters: queries[source].collectEntries { [(it): execution.getVariable(it)] }]).toString()",
+                    "value": "def SpinClass; try { SpinClass = Class.forName('org.cibseven.spin.Spin') } catch (ClassNotFoundException e) { SpinClass = Class.forName('org.camunda.spin.Spin') }\ndef source = execution.getVariable('ttr_source')\ndef programs = ['release_on_placement': [recipe: 'release_order', port: 'key']]\ndef queries = [:]\nif (programs.containsKey(source)) {\n    def kind = programs[source].port\n    def input = kind == 'none' ? null : execution.getVariable('ttrInput')\n    def port = kind == 'none' ? [none: true] : [(kind): input[kind]]\n    if (kind != 'none' && input['at'] != null) port.at = input['at']\n    def engine = [instanceId: execution.processInstanceId, businessKey: execution.processBusinessKey, deploymentId: execution.processEngineServices.repositoryService.getProcessDefinition(execution.processDefinitionId).deploymentId]\n    return SpinClass.JSON([deployment: execution.getVariable('ttr_deployment'), port: port, origin: 'engine', engine: engine]).toString()\n}\nif (!queries.containsKey(source)) throw new IllegalArgumentException('unknown world program or query ' + source)\nreturn SpinClass.JSON([query: source, parameters: queries[source].collectEntries { [(it): execution.getVariable(it)] }]).toString()",
                     "binding": {
                         "type": "camunda:inputParameter",
                         "name": "payload",
@@ -86,7 +86,7 @@
                     "value": "ttr_response",
                     "binding": {
                         "type": "camunda:outputParameter",
-                        "source": "def code = ((Number) statusCode).intValue()\nif (code < 200 || code >= 300) throw new IllegalStateException('run API HTTP ' + code)\nreturn org.camunda.spin.Spin.JSON(response)",
+                        "source": "def SpinClass; try { SpinClass = Class.forName('org.cibseven.spin.Spin') } catch (ClassNotFoundException e) { SpinClass = Class.forName('org.camunda.spin.Spin') }\ndef code = ((Number) statusCode).intValue()\nif (code < 200 || code >= 300) throw new IllegalStateException('run API HTTP ' + code)\nreturn SpinClass.JSON(response)",
                         "scriptFormat": "groovy"
                     }
                 }

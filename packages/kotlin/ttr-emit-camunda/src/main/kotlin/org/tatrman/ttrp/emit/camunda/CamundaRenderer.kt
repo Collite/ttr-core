@@ -140,8 +140,8 @@ internal class CamundaRenderer(
                 budget(graph),
                 bearer = !engine,
             )
-        if (d == Dialect.C7) {
-            if (asyncBefore) task.attrs["camunda:asyncBefore"] = "true"
+        if (d == Dialect.C7 && asyncBefore) {
+            task.attrs["camunda:asyncBefore"] = "true"
             task.extensions += Xml("camunda:failedJobRetryTimeCycle", text = "R3/PT15S")
         }
         model.calls +=
@@ -189,13 +189,7 @@ internal class CamundaRenderer(
                 "dryRun" to root.deployment.dryRun.toString(),
             )
         if (engine) {
-            val engineFields =
-                linkedMapOf(
-                    "instanceId" to "execution.processInstanceId",
-                    "businessKey" to "execution.processBusinessKey",
-                    "deploymentId" to
-                        "execution.processEngineServices.repositoryService.getProcessDefinition(execution.processDefinitionId).deploymentId",
-                )
+            val engineFields = C7Runtime.engineIdentity.toMutableMap()
             if (answer) {
                 engineFields["taskId"] = "ttrTaskId"
                 engineFields["answeredBy"] = "ttrAnsweredBy"
@@ -271,8 +265,11 @@ internal class CamundaRenderer(
         }
         if (d == Dialect.C8) inputs["ttrStepAt"] = stepClock(graph, first)
         inputs["ttrOpenBody"] = openBody(graph, name, first)
-        val outputs = linkedMapOf("ttrPreviousRunId" to d.string("ttrOpen", "runId"))
-        if (first) outputs["ttrAnchor"] = d.string("ttrOpen", "runId")
+        // C7 runs output mappings on cancellation too, including an Open that threw before returning a handle.
+        val runId = d.string("ttrOpen", "runId")
+        val openedRun = expr("execution.getVariable('ttrOpen') != null ? $runId : null", runId)
+        val outputs = linkedMapOf("ttrPreviousRunId" to openedRun)
+        if (first) outputs["ttrAnchor"] = openedRun
         sub.extensions += d.mapping(inputs, outputs)
         val start = scope.node("startEvent", "start $name")
         val end = scope.node("endEvent", "step complete")
@@ -604,6 +601,7 @@ internal class CamundaRenderer(
         paging.default(complete, truncated)
         val rowScope = BpmnModel.Scope(stableId("${scope.id}/route/${route.name}"))
         val each = scope.node("subProcess", "each ${route.name} row", child = rowScope)
+        if (engine) each.extensions += d.mapping(mapOf("ttrTaskId" to "null", "ttrAnsweredBy" to "null"))
         val collection = expr("$rows.elements()", rows)
         each.tail +=
             if (d ==
@@ -691,6 +689,7 @@ internal class CamundaRenderer(
                                             mapOf("scriptFormat" to "groovy"),
                                             text =
                                                 """
+                                                if (!task.assignee?.trim()) throw new IllegalStateException('approval task must be claimed before it is completed')
                                                 task.execution.setVariable('ttrTaskId', task.id)
                                                 task.execution.setVariable('ttrAnsweredBy', task.assignee)
                                                 """.trimIndent(),
@@ -972,7 +971,7 @@ internal class CamundaRenderer(
 
     private fun engineConnection(): String =
         """
-        Every HTTP step is Camunda Connect's http-connector calling the executor's egress, $egress (D-158).
+        Every HTTP step is Camunda Connect's http-connector calling the executor's egress, $egress.
         The egress injects the process-engine client's bearer; this BPMN carries no token and no connector secret.
         The engine needs Spin JSON and Groovy for Retry-After normalization. Start this one-program BPMN through
         the engine (REST, Tasklist or a message); configure scheduling and composition in the engine modeller.
@@ -981,7 +980,8 @@ internal class CamundaRenderer(
         The engine templates also retain ttrInput.at in keyed ports; batch ports remain {none: true}.
         Approval completion captures task.id/assignee; its answer Open additionally carries engine.taskId and
         engine.answeredBy, with idempotencyKey = ttrAnchor + ':answer:' + ttrTaskId and the approved row's key.
-        It runs within task completion (no asyncBefore). Answer evaluation/close and certification wait for S1.5.7.
+        It runs within task completion (no asyncBefore). This version opens the answer run; it does not yet
+        evaluate or close it. A transient answer Open failure rolls back completion; the user completes again.
         Only the engine client may assert an answer.
         Deploy: `ttrp emit --deployment ${root.deployment.name} --deploy` posts this BPMN and the DMN files as one engine
         deployment named ${root.deployment.name}, with duplicate filtering and deployment-source ttrp:<bundle fingerprint>.
