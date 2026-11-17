@@ -170,6 +170,7 @@ internal object StructuralExecutor {
         val builder = CanonicalBuilder(plans, packages, perFile)
         val index = LinkIndex.build(plans, packages, root, sourceName)
         plans.forEach { plan ->
+            ignored += plan.skipped
             ops.filter { it.matches(plan.tree) }.forEach { op ->
                 val implementation =
                     when (op.name) {
@@ -179,6 +180,7 @@ internal object StructuralExecutor {
                         "shape" -> ShapeOp(op)
                         "link" -> LinkOp(op, index, packages.getValue(plan))
                         "join-pairs" -> JoinPairsOp(op)
+                        "each" -> EachOp(op)
                         "ignore" -> IgnoreOp(op)
                         else -> throw ProfileException(
                             "ys/profile-invalid",

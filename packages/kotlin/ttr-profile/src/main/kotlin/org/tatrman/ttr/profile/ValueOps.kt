@@ -8,7 +8,12 @@ internal fun PlannedOp.targetPath(): List<String> {
     return target["path"]?.jsonArray?.map { it.jsonPrimitive.content } ?: listOf(target.string("property"))
 }
 
-/** `values`: a foreign scalar → the canonical value its `mapping` names; missing or null → `default` if given. */
+/**
+ * `values`: a foreign scalar → the canonical value its `mapping` names; missing or null → `default` if given. With the
+ * `split` operand (✅D-MW-81, S5.2a; the schema then forbids `mapping`/`default`) a string → the list of its trimmed
+ * non-empty parts: the separator is matched without its surrounding whitespace (`"; "` splits like `";"`), a blank
+ * separator splits on whitespace runs; a non-string is `ys/split-not-a-string`; a missing or null input stays absent.
+ */
 internal class ValuesOp(
     private val op: PlannedOp,
 ) : Op {
@@ -18,13 +23,18 @@ internal class ValuesOp(
         ignored: MutableList<Ignored>,
     ) {
         val path = op.targetPath()
-        val mapping = op.value.getValue("mapping").jsonObject
+        val mapping = op.value["mapping"]?.jsonObject ?: JsonObject(emptyMap())
         val default = op.value["default"]
+        val split = op.value.optionalString("split")
         for (record in plan.records.filter { it.kind == op.scope }) {
             val source = op.at.resolve(record.source, includeNull = true)
             source?.let(plan.consumption::consume)
             if (source == null || source.value == JsonNull) {
                 default?.let { builder.write(plan, record, path, it, source ?: record.source) }
+                continue
+            }
+            if (split != null) {
+                builder.write(plan, record, path, split(source, split), source)
                 continue
             }
             // A default covers a missing, null or unmapped scalar, never a misauthored structure.
@@ -43,6 +53,75 @@ internal class ValuesOp(
             builder.write(plan, record, path, mapped, source)
         }
     }
+
+    private fun split(
+        source: ForeignNode,
+        separator: String,
+    ): JsonArray {
+        val text =
+            (source.value as? JsonPrimitive)?.takeIf { it.isString }?.content ?: throw ProfileException(
+                "ys/split-not-a-string",
+                source.span(key = true),
+                "split needs a string at ${source.path}",
+            )
+        val parts = separator.trim().let { if (it.isEmpty()) text.split(WHITESPACE) else text.split(it) }
+        return JsonArray(parts.map(String::trim).filter(String::isNotEmpty).map(::JsonPrimitive))
+    }
+
+    private companion object {
+        val WHITESPACE = Regex("""\s+""")
+    }
+}
+
+/** A template input found nowhere — or a container whose every input was missing (✅R251-B). */
+internal object Missing
+
+/** [value] is a [JsonElement] or [Missing]; [inputs] says whether any `{input:}` lies beneath. */
+internal class Filled(
+    val value: Any,
+    val inputs: Boolean,
+)
+
+/**
+ * Fills a `shape` template — `{input: <pointer text>}` substitutions only (P-8), each resolved by [input] (null = missing)
+ * and handed to [consume] when found. A list element or object member whose input is missing is dropped, and so is a
+ * container that had inputs beneath it none of which was found (✅D-MW-67 (b), ✅R251-B); a literal `{}`/`[]` stays.
+ * Shared by `shape` (one template per record) and `each` (one per list element).
+ */
+internal fun fillTemplate(
+    template: JsonElement,
+    input: (String) -> ForeignNode?,
+    consume: (ForeignNode) -> Unit,
+): Filled {
+    fun <K> container(
+        parts: List<Pair<K, Filled>>,
+        build: (List<Pair<K, Filled>>) -> JsonElement,
+    ): Filled {
+        val inputs = parts.any { it.second.inputs }
+        val present = parts.filter { it.second.value !== Missing }
+        // Inputs beneath and none found: a literal sibling does not keep the container (✅R251-B).
+        val emptied = inputs && present.none { it.second.inputs }
+        return if (emptied) Filled(Missing, true) else Filled(build(present), inputs)
+    }
+
+    fun fill(node: JsonElement): Filled =
+        when {
+            node is JsonObject && node.keys == setOf("input") -> {
+                val found = input(node.string("input"))
+                found?.let(consume)
+                Filled(found?.value?.takeIf { it != JsonNull } ?: Missing, true)
+            }
+            node is JsonObject ->
+                container(node.entries.map { (key, value) -> key to fill(value) }) { present ->
+                    JsonObject(present.associate { (key, filled) -> key to filled.value as JsonElement })
+                }
+            node is JsonArray ->
+                container(node.map { Unit to fill(it) }) { present ->
+                    JsonArray(present.map { it.second.value as JsonElement })
+                }
+            else -> Filled(node, false)
+        }
+    return fill(template)
 }
 
 /**
@@ -54,8 +133,6 @@ internal class ValuesOp(
 internal class ShapeOp(
     private val op: PlannedOp,
 ) : Op {
-    private object Missing
-
     override fun apply(
         plan: RecordPlan,
         builder: CanonicalBuilder,
@@ -66,48 +143,99 @@ internal class ShapeOp(
         for (record in plan.records.filter { it.kind == op.scope }) {
             val base = op.at.resolve(record.source, includeNull = true) ?: continue
             plan.consumption.open(base)
-
-            // value is Missing for a missing input, and for a container with inputs beneath it none of which was
-            // found (✅R251-B: dropped like a missing leaf, all the way up). A literal {} or [] has no inputs: kept.
-            class Filled(
-                val value: Any,
-                val inputs: Boolean,
-            )
-
-            fun <K> container(
-                parts: List<Pair<K, Filled>>,
-                build: (List<Pair<K, Filled>>) -> JsonElement,
-            ): Filled {
-                val inputs = parts.any { it.second.inputs }
-                val present = parts.filter { it.second.value !== Missing }
-                // Inputs beneath and none found: a literal sibling does not keep the container (✅R251-B).
-                val emptied = inputs && present.none { it.second.inputs }
-                return if (emptied) Filled(Missing, true) else Filled(build(present), inputs)
-            }
-
-            fun fill(node: JsonElement): Filled =
-                when {
-                    node is JsonObject && node.keys == setOf("input") -> {
-                        val input = JsonPointer(node.string("input")).resolve(base, includeNull = true)
-                        input?.let(plan.consumption::consume)
-                        Filled(input?.value?.takeIf { it != JsonNull } ?: Missing, true)
-                    }
-                    node is JsonObject ->
-                        container(node.entries.map { (key, value) -> key to fill(value) }) { present ->
-                            JsonObject(present.associate { (key, filled) -> key to filled.value as JsonElement })
-                        }
-                    node is JsonArray ->
-                        container(node.map { Unit to fill(it) }) { present ->
-                            JsonArray(present.map { it.second.value as JsonElement })
-                        }
-                    else -> Filled(node, false)
-                }
-            val filled = fill(template)
+            val filled =
+                fillTemplate(
+                    template,
+                    { JsonPointer(it).resolve(base, includeNull = true) },
+                    plan.consumption::consume,
+                )
             if (!filled.inputs) plan.consumption.consume(base)
             val shaped = filled.value
             if (base.value == JsonNull || shaped === Missing) continue
             builder.write(plan, record, path, shaped as JsonElement, base)
         }
+    }
+}
+
+/**
+ * `each` (✅D-MW-81, S5.2a; P-8 amended to eleven operations): the list at `at` (relative to the record) → one `shape`
+ * template filled per element, in order. An input `$item` or `$item/<pointer>` reads the element; a plain pointer reads
+ * the record. An element whose template yields nothing is dropped. Without `key` the result is the list; with `key` (a
+ * pointer within the element) it is an object keyed by each element's string there — a duplicate is
+ * `ys/each-duplicate-key`, a missing (or non-string) one `ys/each-missing-key`, both at the element. A non-list is
+ * `ys/each-not-a-list`; an empty list writes `[]`/`{}`; a missing or null `at` writes nothing. The list is consumed
+ * whole. It walks the list as `link` does (`entries()`, one result per element) and fills as `shape` does
+ * ([fillTemplate]); no expressions.
+ */
+internal class EachOp(
+    private val op: PlannedOp,
+) : Op {
+    override fun apply(
+        plan: RecordPlan,
+        builder: CanonicalBuilder,
+        ignored: MutableList<Ignored>,
+    ) {
+        val path = op.targetPath()
+        val template = op.value.getValue("shape")
+        val keyText = op.value.optionalString("key")
+        val key = keyText?.let(::JsonPointer)
+        for (record in plan.records.filter { it.kind == op.scope }) {
+            val source = op.at.resolve(record.source, includeNull = true) ?: continue
+            plan.consumption.consume(source)
+            if (source.value == JsonNull) continue
+            if (source.value !is JsonArray) {
+                throw ProfileException(
+                    "ys/each-not-a-list",
+                    source.span(key = true),
+                    "each needs a list at ${source.path}",
+                )
+            }
+            val shaped =
+                source.entries().map { element ->
+                    element to
+                        fillTemplate(
+                            template,
+                            { text ->
+                                if (text == ITEM || text.startsWith("$ITEM/")) {
+                                    JsonPointer(text.removePrefix(ITEM)).resolve(element, includeNull = true)
+                                } else {
+                                    JsonPointer(text).resolve(record.source, includeNull = true)
+                                }
+                            },
+                            plan.consumption::consume,
+                        ).value
+                }
+            val result =
+                if (key == null) {
+                    JsonArray(shaped.mapNotNull { (_, value) -> value as? JsonElement })
+                } else {
+                    val keyed = linkedMapOf<String, JsonElement>()
+                    // An element whose template yields nothing is dropped before its key is checked (review-338 B2).
+                    shaped.filter { (_, value) -> value is JsonElement }.forEach { (element, value) ->
+                        val name =
+                            (key.resolve(element)?.value as? JsonPrimitive)?.takeIf { it.isString }?.content
+                                ?: throw ProfileException(
+                                    "ys/each-missing-key",
+                                    element.span(),
+                                    "each needs a string key at ${element.path}$keyText",
+                                )
+                        if (name in keyed) {
+                            throw ProfileException(
+                                "ys/each-duplicate-key",
+                                element.span(),
+                                "Duplicate each key $name at ${element.path}",
+                            )
+                        }
+                        keyed[name] = value as JsonElement
+                    }
+                    JsonObject(keyed)
+                }
+            builder.write(plan, record, path, result, source)
+        }
+    }
+
+    private companion object {
+        const val ITEM = "\$item"
     }
 }
 

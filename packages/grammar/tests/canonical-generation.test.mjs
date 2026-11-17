@@ -307,8 +307,11 @@ test('D-MW-64 record operands follow canonical kinds and operation scope', () =>
   const profile = JSON.parse(files['profile.schema.json']);
   const envelope = profile.oneOf[1].properties.operations.items;
   const ops = Object.fromEntries(envelope.allOf.map((b) => [b.if.properties.op.const, b.then]));
-  assert.deepEqual(envelope.properties.in, ops.kinds.properties.mapping.additionalProperties);
-  for (const name of ['rename', 'values', 'shape', 'nest', 'unnest', 'link']) {
+  // ✅D-MW-81 (S5.2a): a kinds mapping value is a canonical kind or null (the record skip).
+  assert.deepEqual(ops.kinds.properties.mapping.additionalProperties, {
+    anyOf: [envelope.properties.in, { type: 'null' }],
+  });
+  for (const name of ['rename', 'values', 'shape', 'nest', 'unnest', 'link', 'each']) {
     assert.ok(ops[name].required.includes('in'), name);
     assert.deepEqual(ops[name].properties.in, envelope.properties.in);
   }
@@ -321,4 +324,9 @@ test('D-MW-64 record operands follow canonical kinds and operation scope', () =>
   assert.deepEqual(ops.kinds.properties.id, envelope.properties.at);
   assert.deepEqual(ops.kinds.if, { properties: { mapping: { minProperties: 2 } } });
   assert.deepEqual(ops.kinds.then, { required: ['kind'] });
+  // ✅D-MW-81 (S5.2a): each needs its list, target and template; split replaces mapping/default on values.
+  assert.deepEqual(ops.each.required, ['op', 'in', 'at', 'to', 'shape']);
+  assert.ok(!ops.values.required.includes('mapping'));
+  assert.deepEqual(ops.values.if, { required: ['split'] });
+  assert.deepEqual(ops.values.else, { required: ['mapping'] });
 });

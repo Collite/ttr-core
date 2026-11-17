@@ -206,7 +206,7 @@ operations:
 The root declaration in `ttr.yaml` has just `profile` and `grammar`. A profile
 adds ordered `operations` and optional `extends`, `overlay` and `writable`.
 Operations are `kinds`, `package`, `rename`, `values`, `shape`, `nest`/`unnest`,
-`ignore`, `codes`, `link` and `join-pairs`. Selectors use JSON Pointers (`at`) and optional file
+`ignore`, `codes`, `link`, `join-pairs` and `each`. Selectors use JSON Pointers (`at`) and optional file
 globs (`files`). A shape template uses explicit `{input: <JSON Pointer>}`
 substitutions. A link declares `by: sourceName | iri | path`; where its target
 property names no kind (`relation.from`/`to`), an optional `kind: <grammar kind>`
@@ -218,7 +218,22 @@ the kind the target names (`target.table` with `kind: entity`) is refused at loa
 `relation.join: [{from: {ref: er.entity.a.x}, to: {ref: er.entity.b.y}}, …]` — the
 attribute reference form the loader resolves; the input stays two-part. Any other
 shape, a blank value included, is `xm/join-pair-shape` at the value. It is the one operation that reads a string's
-structure, and only this one form.
+structure, and only this one form (`split`, below, only cuts a string at a fixed separator).
+
+Three additions serve list-shaped sources such as glossaries (MW-P5 S5.2a):
+
+- `each` (`in`, `at`, `to`, `shape`, optional `key`) fills the `shape` template once per element of the list at `at`,
+  in order. An input `$item` or `$item/<pointer>` reads the element; a plain pointer reads the record. Without `key`
+  the result is a list; with `key` (a pointer within the element) it is an object keyed by each element's string
+  there, so `[{"@value": "Smlouva", "@language": "cs"}, …]` with `key: /@language` and `shape: {input: $item/@value}`
+  becomes the language map `{cs: Smlouva, …}`. A duplicate key is `ys/each-duplicate-key` and a missing one
+  `ys/each-missing-key`, both at the element. A non-list is `ys/each-not-a-list`. An empty list writes `[]` or `{}`.
+- `values` takes `split: "<separator>"` in place of `mapping`: a string becomes the list of its trimmed non-empty
+  parts. The separator is matched without its surrounding whitespace, and an empty or blank separator splits on whitespace runs.
+  `split` with `mapping` or `default` is refused at load. A non-string is `ys/split-not-a-string`.
+- A `kinds` mapping value `null` skips the record: neither it nor anything beneath it emits or is refused, and it is listed once in the report's `ignored[]`
+  with `record` (its id) and `reason: "kind mapping null (<kind pointer> = <value>)"`. An unmapped value is still
+  `ys/unknown-kind`.
 
 Targets use an exact grammar kind and either `property` or an ordered `path`.
 Each path step follows its typed value; open tails require a grammar-declared

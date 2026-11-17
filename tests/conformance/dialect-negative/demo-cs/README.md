@@ -16,3 +16,8 @@ authored key or record, with the codes and positions `negative/expect.yaml` pins
 `link-kind-missing.yaml` and `join-pair-shape.yaml` (S3.7b) are the negatives of `link`'s `kind:` operand (a name that exists
 only as an entity, linked with `kind: table`) and of `join-pairs` (an inequality); the positive pair is
 `../../dialect/demo-cs/tree/10-vazby.yaml` and its twin.
+
+`each-not-a-list.yaml`, `each-missing-key.yaml`, `each-duplicate-key.yaml` and `split-not-a-string.yaml` (MW-P5 S5.2a,
+✅D-MW-81) are the negatives of the `each` op (keyed by `@language`) and of `values`' `split` operand; the positive is
+`../../dialect/demo-cs/tree/11-pojmy.yaml` and its twin, which also carries the `kinds` null-skip (a `navrh` term is
+skipped into `ignored[]`, never an error).
