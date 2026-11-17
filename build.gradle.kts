@@ -130,4 +130,4 @@ val libraryCliEdges by tasks.registering {
         logger.lifecycle("library -> CLI edges OK: ${found.size} allowed (${found.sorted().joinToString()})")
     }
 }
-// wired into check at T3
+tasks.named("check") { dependsOn(libraryCliEdges) }
