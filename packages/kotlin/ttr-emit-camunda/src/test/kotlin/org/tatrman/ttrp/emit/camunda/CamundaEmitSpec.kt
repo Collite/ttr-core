@@ -82,7 +82,13 @@ internal fun releaseGraph(
             "approve_release" to
                 ActionMeta(
                     mapOf("who" to "role"),
-                    mapOf("camunda" to "user task", "native" to "task"),
+                    // The engine target carries grammar 0.22's shape (D-142: no `task` sink; a writer sink the Server
+                    // holds, the engine's door); the customer targets keep the explicit user-task sink.
+                    if (target == "process_engine") {
+                        mapOf("native" to "transition", "process_engine" to "door")
+                    } else {
+                        mapOf("camunda" to "user task", "native" to "task")
+                    },
                     "required",
                     false,
                     "2 working_days",
