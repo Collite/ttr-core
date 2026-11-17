@@ -26,6 +26,8 @@ describe(`TS canonical YAML conformance (${twins.length} twins)`, () => {
       rmSync(stem + 'orphan.yaml');
       writeFileSync(stem + '.ttrg', '');
       expect(() => yamlTwins(root)).toThrow('Colliding');
-    } finally { rmSync(root, {recursive: true, force: true}); }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

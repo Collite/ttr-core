@@ -14,12 +14,26 @@ for (const twin of yamlTwins()) {
 
 describe('canonical YAML model families', () => {
   it('covers every model code and the empty envelope', () => {
-    expect([...representatives.keys()].sort()).toEqual(['automation', 'binding', 'cn', 'cnc', 'db', 'er', 'lexicon', 'md', 'none', 'query', 'world']);
+    expect([...representatives.keys()].sort()).toEqual([
+      'automation',
+      'binding',
+      'cn',
+      'cnc',
+      'db',
+      'er',
+      'lexicon',
+      'md',
+      'none',
+      'query',
+      'world',
+    ]);
   });
   it.each([...representatives])('%s has the same TS dump as its native twin', (_model, twin) => {
     const yaml = parseYamlDocument(readFileSync(twin.yaml, 'utf8'), twin.yaml);
     expect(yaml.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
     const native = parseString(readFileSync(twin.native, 'utf8'), twin.native);
-    expect(dump({ast: yaml.ast, errors: yaml.diagnostics, sourceFile: twin.yaml})).toBe(dump(native));
+    expect(dump({ ast: yaml.ast, errors: yaml.diagnostics, sourceFile: twin.yaml })).toBe(
+      dump(native)
+    );
   });
 });

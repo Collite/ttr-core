@@ -12,7 +12,7 @@ for (const twin of twins) {
   try {
     const dumps = twinDumps(twin);
     const dest = path.join(out, twin.name.replace(/\.ttr[mg]$/, '.json'));
-    mkdirSync(path.dirname(dest), {recursive: true});
+    mkdirSync(path.dirname(dest), { recursive: true });
     writeFileSync(dest, dumps.yaml + '\n');
     if (dumps.native !== dumps.yaml) throw new Error('TS YAML/native dump mismatch');
   } catch (error) {
@@ -20,5 +20,7 @@ for (const twin of twins) {
     failed++;
   }
 }
-console.log(`TS canonical YAML: ${twins.length} twins, ${twins.length - failed} equal, ${failed} failed`);
+console.log(
+  `TS canonical YAML: ${twins.length} twins, ${twins.length - failed} equal, ${failed} failed`
+);
 if (failed) process.exitCode = 1;

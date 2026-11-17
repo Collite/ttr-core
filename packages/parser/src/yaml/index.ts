@@ -6,30 +6,63 @@ import { YamlInput, YamlFailure } from './input.js';
 import { YamlBridge } from './bridge.js';
 import { YamlLocations } from './locations.js';
 
-export interface YamlParseResult extends ParseResult { diagnostics: ParseError[] }
+export interface YamlParseResult extends ParseResult {
+  diagnostics: ParseError[];
+}
 
 /** Canonical YAML 1.2 only. Invalid syntax/schema yields located diagnostics and no AST. */
 export function parseYamlDocument(text: string, uri = '<yaml>'): YamlParseResult {
   const diagnostics: ParseError[] = [];
   let input: YamlInput | undefined;
   try {
-    input = new YamlInput(text,uri);
+    input = new YamlInput(text, uri);
     input.validate();
     const writer = new YamlBridge(input);
     const bridge = writer.write();
-    for (const path of input.pl) if (!writer.embedded.has(path)) throw new YamlFailure(path,'!pl is allowed only at an embedded-block position');
-    const native = parseString(bridge.text,uri);
-    const locations = new YamlLocations(input,bridge,diagnostics);
-    for (const error of native.errors) diagnostics.push({...error, code: error.severity === 'error' && (!error.code || error.code === DiagnosticCode.ParseError) ? DiagnosticCode.YamlValue : error.code, source: locations.source(error.source)});
-    if (!native.ast || diagnostics.some((d) => d.severity === 'error' && d.code?.startsWith('ys/'))) return {diagnostics, errors: diagnostics, sourceFile: uri};
+    for (const path of input.pl)
+      if (!writer.embedded.has(path))
+        throw new YamlFailure(path, '!pl is allowed only at an embedded-block position');
+    const native = parseString(bridge.text, uri);
+    const locations = new YamlLocations(input, bridge, diagnostics);
+    for (const error of native.errors)
+      diagnostics.push({
+        ...error,
+        code:
+          error.severity === 'error' && (!error.code || error.code === DiagnosticCode.ParseError)
+            ? DiagnosticCode.YamlValue
+            : error.code,
+        source: locations.source(error.source),
+      });
+    if (!native.ast || diagnostics.some((d) => d.severity === 'error' && d.code?.startsWith('ys/')))
+      return { diagnostics, errors: diagnostics, sourceFile: uri };
     const ast = locations.copy(native.ast);
-    return {ast, diagnostics, errors: diagnostics, sourceFile: uri};
+    return { ast, diagnostics, errors: diagnostics, sourceFile: uri };
   } catch (error) {
     if (!(error instanceof YamlFailure)) throw error;
-    const [start,end] = error.span ?? [0,Math.min(text.length,1)];
-    const position = (offset: number) => { const lines = text.slice(0,offset).split('\n'); return {line: lines.length, column: lines.at(-1)!.length}; };
-    const a = position(start), b = position(end);
-    diagnostics.push({code:error.code, severity:'error', message:error.message, source: input && !error.span ? input.source(error.path) : {file:uri, line:a.line, column:a.column, endLine:b.line, endColumn:b.column, offsetStart:start, offsetEnd:end}});
-    return {diagnostics, errors:diagnostics, sourceFile:uri};
+    const [start, end] = error.span ?? [0, Math.min(text.length, 1)];
+    const position = (offset: number) => {
+      const lines = text.slice(0, offset).split('\n');
+      return { line: lines.length, column: lines.at(-1)!.length };
+    };
+    const a = position(start),
+      b = position(end);
+    diagnostics.push({
+      code: error.code,
+      severity: 'error',
+      message: error.message,
+      source:
+        input && !error.span
+          ? input.source(error.path)
+          : {
+              file: uri,
+              line: a.line,
+              column: a.column,
+              endLine: b.line,
+              endColumn: b.column,
+              offsetStart: start,
+              offsetEnd: end,
+            },
+    });
+    return { diagnostics, errors: diagnostics, sourceFile: uri };
   }
 }
