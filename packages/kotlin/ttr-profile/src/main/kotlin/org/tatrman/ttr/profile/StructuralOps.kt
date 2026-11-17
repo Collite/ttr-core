@@ -100,13 +100,17 @@ internal class IgnoreOp(
 }
 
 internal object StructuralExecutor {
-    /** [root] is the model root: `<package>.sources.json` sidecars and `renames.yaml` are read from it when given. */
+    /**
+     * [root] is the model root: `<package>.sources.json` sidecars and `renames.yaml` are read from it when given.
+     * [sourceName] is the records' `sourceName` pointer ([LinkIndex.build]).
+     */
     fun apply(
         tree: List<ForeignTree>,
         operations: List<LocatedOp>,
         overlay: List<OverlayEntry> = emptyList(),
         root: Path? = null,
         perFile: Boolean = false,
+        sourceName: JsonPointer? = null,
     ): ApplyResult {
         val ops = operations.map(::PlannedOp)
         val ignored = mutableListOf<Ignored>()
@@ -164,7 +168,7 @@ internal object StructuralExecutor {
                 }
             }
         val builder = CanonicalBuilder(plans, packages, perFile)
-        val index = LinkIndex.build(plans, packages, root)
+        val index = LinkIndex.build(plans, packages, root, sourceName)
         plans.forEach { plan ->
             ops.filter { it.matches(plan.tree) }.forEach { op ->
                 val implementation =

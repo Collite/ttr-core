@@ -99,14 +99,18 @@ data class ApplyResult(
 /**
  * [profile] is the resolved ancestor-to-child chain returned by [ProfileResolver]. [root] is the model root: link
  * resolution reads its `<package>.sources.json` sidecars, an orphan's suggestion its `renames.yaml`, and a path overlay
- * must stay inside it. Overlays apply ancestor first, so a child's entry wins.
+ * must stay inside it. Overlays apply ancestor first, so a child's entry wins. [sourceName] (✅R330-A, an API argument,
+ * not an operation) is a JSON Pointer relative to each record's foreign node: where it selects a string (an OM FQN),
+ * that is the record's `sourceName` — in [ApplyResult.sources] and for this run's `by: sourceName` links and overlay
+ * keys; elsewhere, and without it, the record id.
  */
 object ProfileEngine {
     fun apply(
         tree: List<ForeignTree>,
         profile: List<ProfileDefinition>,
         root: Path? = null,
-    ): ApplyResult = apply(tree, profile, root, perFile = false)
+        sourceName: String? = null,
+    ): ApplyResult = apply(tree, profile, root, perFile = false, sourceName = sourceName)
 
     /**
      * As above; with [perFile] each emitted document holds the records of one input file ([EmittedDocument.file]), so a
@@ -117,6 +121,7 @@ object ProfileEngine {
         profile: List<ProfileDefinition>,
         root: Path?,
         perFile: Boolean,
+        sourceName: String? = null,
     ): ApplyResult =
         StructuralExecutor.apply(
             tree,
@@ -124,5 +129,6 @@ object ProfileEngine {
             profile.flatMap { OverlayLoader.load(it, root) },
             root,
             perFile,
+            sourceName?.let(::JsonPointer),
         )
 }

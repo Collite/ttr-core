@@ -6,6 +6,26 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — the reader harness: `ttr-import` and `import-schema --from file:` (MW-P5 S5.1)
+
+- New module `org.tatrman:ttr-import` (grammar bundle): a `FrontEnd` (pure parser → located `ForeignTree`s), the
+  `json` front-end (JSON or YAML through ttr-yaml's nodes), and `Reader`, which runs a profile over the trees and
+  writes each emitted document as `.ttrm` through `TtrRenderer` with the generated-from header, definitions in bytewise
+  qname order. It also writes the `<package>.sources.json` sidecar and a report (`{ignored[], overridden[], packages[],
+  warnings[]}` plus a Markdown PR-body section). Shipped profiles live in the repository's `profiles/` and are bundled
+  as resources; the first is `om-tables/1` (an OpenMetadata `/api/v1/tables` export → `db`).
+- `ttr-metadata-cli import-schema --from file:<export> --profile <p> --out <dir> [--root] [--overlay] [--package]
+  [--dry-run] [--format text|json]`. Exit 0 / 1 (a located profile error) / 2 (usage). `--from openmetadata` is
+  reserved for S5.5. The JDBC `import-schema` in `ttr-import-schema` is unchanged.
+- `profile.schema.json` accepts two top-level profile keys that only ttr-import reads: `skeleton` (every generated `cn`
+  definition becomes `abstract: true`, D-14) and `sourceName` (a record-relative pointer whose string becomes the
+  sidecar's `sourceName`). The ten operations are unchanged.
+- `ttr-profile` (review-330): `ProfileEngine.apply` takes an optional `sourceName` pointer (an API argument, not an
+  operation), so a run's records carry it for `by: sourceName` links and overlay keys on the first import
+  (✅R330-A). `ProfileResolver` takes an optional provider of shipped profiles: a bare identity resolves to a catalog
+  entry first, then a shipped profile, so a user profile can `extends: om-tables/1` (✅R330-B). `Bytewise` is public.
+- `ttr-yaml`: `readBoundedYaml(path, what)`, the bounded strict-UTF-8 reader `readProfileYaml` now delegates to.
+
 ### Fixed — REL_NODE re-entry keeps an author's parameter cast; decode failures say what failed (translator 0.14.3, ttr-core#407)
 
 - `ttr-translator` — `ParameterTyper` unwraps a `CAST(? AS T)` over a declared parameter only when `T` is the crutch

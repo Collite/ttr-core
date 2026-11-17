@@ -1,0 +1,21 @@
+{
+  "generated-from": "generated-from: ../sources/shop-tables.json@dee706dff1aa715c1ab9d42dc14d694577d081ff30e0f8ef046fbb85583e4e62 profile om-tables/1 generator 0.0.1-LOCAL — do not edit",
+  "entries": [
+    {"qname":"om.db.dbo.customers","kind":"table","sourceName":"demo_pg.shop.public.customers","locator":"customers"},
+    {"qname":"om.db.dbo.customers.created_at","kind":"column","sourceName":"demo_pg.shop.public.customers.created_at","locator":"customers/created_at"},
+    {"qname":"om.db.dbo.customers.customer_id","kind":"column","sourceName":"demo_pg.shop.public.customers.customer_id","locator":"customers/customer_id"},
+    {"qname":"om.db.dbo.customers.display_name","kind":"column","sourceName":"demo_pg.shop.public.customers.display_name","locator":"customers/display_name"},
+    {"qname":"om.db.dbo.customers.email","kind":"column","sourceName":"demo_pg.shop.public.customers.email","locator":"customers/email"},
+    {"qname":"om.db.dbo.order_lines","kind":"table","sourceName":"demo_pg.shop.public.order_lines","locator":"order_lines"},
+    {"qname":"om.db.dbo.order_lines.line_no","kind":"column","sourceName":"demo_pg.shop.public.order_lines.line_no","locator":"order_lines/line_no"},
+    {"qname":"om.db.dbo.order_lines.order_id","kind":"column","sourceName":"demo_pg.shop.public.order_lines.order_id","locator":"order_lines/order_id"},
+    {"qname":"om.db.dbo.order_lines.quantity","kind":"column","sourceName":"demo_pg.shop.public.order_lines.quantity","locator":"order_lines/quantity"},
+    {"qname":"om.db.dbo.order_lines.sku","kind":"column","sourceName":"demo_pg.shop.public.order_lines.sku","locator":"order_lines/sku"},
+    {"qname":"om.db.dbo.orders","kind":"table","sourceName":"demo_pg.shop.public.orders","locator":"orders"},
+    {"qname":"om.db.dbo.orders.customer_id","kind":"column","sourceName":"demo_pg.shop.public.orders.customer_id","locator":"orders/customer_id"},
+    {"qname":"om.db.dbo.orders.is_gift","kind":"column","sourceName":"demo_pg.shop.public.orders.is_gift","locator":"orders/is_gift"},
+    {"qname":"om.db.dbo.orders.order_id","kind":"column","sourceName":"demo_pg.shop.public.orders.order_id","locator":"orders/order_id"},
+    {"qname":"om.db.dbo.orders.placed_on","kind":"column","sourceName":"demo_pg.shop.public.orders.placed_on","locator":"orders/placed_on"},
+    {"qname":"om.db.dbo.orders.total","kind":"column","sourceName":"demo_pg.shop.public.orders.total","locator":"orders/total"}
+  ]
+}

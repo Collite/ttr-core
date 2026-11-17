@@ -201,21 +201,21 @@ object SourcesJsonWriter {
         val body = if (lines.isEmpty()) "[]" else lines.joinToString(",\n", "[\n", "\n  ]") { "    $it" }
         return "{\n$head  \"entries\": $body\n}\n"
     }
+}
 
-    /** Bytewise (UTF-8) order, as the exporter sorts qnames. */
-    private object Bytewise : Comparator<String> {
-        override fun compare(
-            a: String,
-            b: String,
-        ): Int {
-            val x = a.toByteArray(Charsets.UTF_8)
-            val y = b.toByteArray(Charsets.UTF_8)
-            for (i in 0 until minOf(x.size, y.size)) {
-                val c = (x[i].toInt() and 0xff) - (y[i].toInt() and 0xff)
-                if (c != 0) return c
-            }
-            return x.size - y.size
+/** Bytewise (UTF-8) string order, as the exporter, the sidecar writer and the readers sort qnames. */
+object Bytewise : Comparator<String> {
+    override fun compare(
+        a: String,
+        b: String,
+    ): Int {
+        val x = a.toByteArray(Charsets.UTF_8)
+        val y = b.toByteArray(Charsets.UTF_8)
+        for (i in 0 until minOf(x.size, y.size)) {
+            val c = (x[i].toInt() and 0xff) - (y[i].toInt() and 0xff)
+            if (c != 0) return c
         }
+        return x.size - y.size
     }
 }
 
@@ -257,10 +257,16 @@ internal class LinkIndex(
     fun qname(value: String): List<LinkEntry> = byQname[value].orEmpty()
 
     companion object {
+        /**
+         * [sourceName] (✅R330-A) is a pointer relative to each record's foreign node: where it selects a string, that
+         * string is the record's `sourceName` (an OM FQN), so `by: sourceName` links and overlay keys match it in this
+         * very run; elsewhere, and without one, the record id.
+         */
         fun build(
             plans: List<RecordPlan>,
             packages: Map<RecordPlan, String>,
             root: Path?,
+            sourceName: JsonPointer? = null,
         ): LinkIndex {
             val run =
                 plans.flatMap { plan ->
@@ -270,7 +276,7 @@ internal class LinkIndex(
                             Qnames.of(record, pkg),
                             record.kind,
                             pkg,
-                            record.id,
+                            sourceName?.let { foreignName(record, it) } ?: record.id,
                             null,
                             Qnames.path(record),
                             record,
@@ -279,5 +285,10 @@ internal class LinkIndex(
                 }
             return LinkIndex(run) { root?.let(SourcesJsonReader::read) ?: emptyList() }
         }
+
+        private fun foreignName(
+            record: Record,
+            pointer: JsonPointer,
+        ): String? = (pointer.resolve(record.source)?.value as? JsonPrimitive)?.takeIf { it.isString }?.content
     }
 }

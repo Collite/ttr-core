@@ -1,0 +1,32 @@
+// generated-from: ../../sources/shop-tables.json@dee706dff1aa715c1ab9d42dc14d694577d081ff30e0f8ef046fbb85583e4e62 profile om-tables/1 generator 0.0.1-LOCAL — do not edit
+package om
+model db
+
+def table customers { description: "People and companies who place orders.",
+    columns: [
+        def column customer_id { type: int, isKey: true, description: "Surrogate key.", },
+        def column email { type: { type: text, length: 254 }, description: "Sign-in e-mail address.", },
+        def column display_name { type: { type: text, length: 120 }, optional: true, },
+        def column created_at { type: datetime, description: "When the account was opened.", },
+    ]
+}
+
+def table order_lines {
+    columns: [
+        def column order_id { type: bigint, },
+        def column line_no { type: int, },
+        def column sku { type: { type: text, length: 32 }, description: "Stock-keeping unit.", },
+        def column quantity { type: int, },
+    ]
+}
+
+def table orders { description: "One checkout: the order header.",
+    columns: [
+        def column order_id { type: bigint, isKey: true, description: "Surrogate key.", },
+        def column customer_id { type: int, description: "The customer who placed the order.", },
+        def column placed_on { type: date, },
+        def column total { type: { type: decimal, length: 12, precision: 2 }, description: "Order total incl. tax.", },
+        def column is_gift { type: bool, optional: true, },
+    ]
+}
+

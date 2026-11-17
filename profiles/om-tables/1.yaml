@@ -1,0 +1,119 @@
+# om-tables/1 — an OpenMetadata `/api/v1/tables` export (`{data: [<table>…], paging}`) → TTR `db` (MW-P5 S5.1,
+# contracts §3; XM 06 §3 "catalog physical"). Shipped with ttr-core and bundled into ttr-import, so
+# `ttr-metadata import-schema --from file:<export.json> --profile om-tables/1` resolves it without a file.
+#
+# Tables and columns map as `import-schema` maps a database (the same type table); descriptions → `description`; each
+# table's and column's OM FQN → the sidecar's `sourceName` (reader key below). Everything else the export carries is a
+# declared ignore with its reason, so the PR body's `ignored[]` shows what did not make it. `--package` replaces the
+# `package` default; `--overlay` adds an authored overlay on top.
+#
+# Not carried by v1 (each listed with its reason in the report — MW-P5 S5.1 Found):
+# - tags: OM tag labels are objects (`{tagFQN, source, labelType, state, …}`); `tags[]` needs their `tagFQN`s, a list map
+#   the ten operations do not have (P-8).
+# - foreign keys and composite keys: OM lists them, unnamed, in each table's `tableConstraints`; a `def fk` is a
+#   top-level db definition with a name, which no operation can lift from a nested list.
+# - owners: the db grammar has no `owner` property (0.22).
+#
+# Scope (review-330): v1 is written against the invented fixture (tests/conformance/readers/om-tables); MW-P5 S5.5
+# certifies it against real OM payloads (✅R330-C). One export file holds one OM database schema; the schema is not
+# part of the qname (every table is `<pkg>.db.dbo.<name>`), so a snapshot maps one file to one package (✅R330-D).
+profile: om-tables/1
+grammar: '>=0.22 <1.0'
+sourceName: /fullyQualifiedName
+operations:
+  - {op: package, mapping: {}, default: om}
+  - {op: kinds, at: /data, id: /name, mapping: {table: table}}
+  - {op: kinds, in: table, at: /columns, id: /name, mapping: {column: column}}
+
+  # Tables.
+  - {op: rename, in: table, at: /description, to: {kind: table, property: description}}
+
+  # Columns: the type as import-schema maps a SQL type; character length or numeric precision → length, scale →
+  # precision (the TTR decimal scale); the OM column constraint → isKey / optional.
+  - op: values
+    in: column
+    at: /dataType
+    to: {kind: column, path: [type, type]}
+    mapping:
+      CHAR: text
+      VARCHAR: text
+      STRING: text
+      TEXT: text
+      MEDIUMTEXT: text
+      NTEXT: text
+      CLOB: text
+      UUID: text
+      TINYINT: int
+      SMALLINT: int
+      INT: int
+      BIGINT: bigint
+      LONG: bigint
+      BOOLEAN: bool
+      BIT: bool
+      DECIMAL: decimal
+      NUMERIC: decimal
+      NUMBER: decimal
+      MONEY: decimal
+      FLOAT: float
+      DOUBLE: float
+      DATE: date
+      TIME: time
+      DATETIME: datetime
+      TIMESTAMP: datetime
+      TIMESTAMPZ: datetime
+    default: text
+  - {op: rename, in: column, at: /dataLength, to: {kind: column, path: [type, length]}}
+  - {op: rename, in: column, at: /precision, to: {kind: column, path: [type, length]}}
+  - {op: rename, in: column, at: /scale, to: {kind: column, path: [type, precision]}}
+  - op: values
+    in: column
+    at: /constraint
+    to: {kind: column, property: isKey}
+    mapping: {PRIMARY_KEY: true, UNIQUE: false, NOT_NULL: false, 'NULL': false}
+  - op: values
+    in: column
+    at: /constraint
+    to: {kind: column, property: optional}
+    mapping: {PRIMARY_KEY: false, UNIQUE: false, NOT_NULL: false, 'NULL': true}
+  - {op: rename, in: column, at: /description, to: {kind: column, property: description}}
+
+  # Carried outside the model.
+  - {op: ignore, in: table, at: /fullyQualifiedName, reason: the sidecar's sourceName}
+  - {op: ignore, in: column, at: /fullyQualifiedName, reason: the sidecar's sourceName}
+
+  # Not carried by v1 (see the header).
+  - {op: ignore, in: table, at: /tags, reason: 'tag labels are objects; tags[] needs a list map the operations lack (S5.1 Found)'}
+  - {op: ignore, in: column, at: /tags, reason: 'tag labels are objects; tags[] needs a list map the operations lack (S5.1 Found)'}
+  - {op: ignore, in: table, at: /tableConstraints, reason: 'unnamed nested keys; a def fk cannot be lifted from them (S5.1 Found)'}
+  - {op: ignore, in: table, at: /owners, reason: 'the db grammar has no owner property (S5.1 Found)'}
+
+  # Catalog bookkeeping: identity, versioning and navigation of the OM instance, not the model.
+  - {op: ignore, at: /paging, reason: export paging}
+  - {op: ignore, in: table, at: /id, reason: OM instance id}
+  - {op: ignore, in: column, at: /id, reason: OM instance id}
+  - {op: ignore, in: table, at: /displayName, reason: OM display label}
+  - {op: ignore, in: column, at: /displayName, reason: OM display label}
+  - {op: ignore, in: table, at: /href, reason: OM API link}
+  - {op: ignore, in: table, at: /version, reason: OM entity version}
+  - {op: ignore, in: table, at: /updatedAt, reason: OM change timestamp}
+  - {op: ignore, in: table, at: /updatedBy, reason: OM change author}
+  - {op: ignore, in: table, at: /changeDescription, reason: OM change history}
+  - {op: ignore, in: table, at: /incrementalChangeDescription, reason: OM change history}
+  - {op: ignore, in: table, at: /deleted, reason: OM soft-delete flag}
+  - {op: ignore, in: table, at: /followers, reason: OM followers}
+  - {op: ignore, in: table, at: /votes, reason: OM votes}
+  - {op: ignore, in: table, at: /extension, reason: OM custom properties}
+  - {op: ignore, in: column, at: /extension, reason: OM custom properties}
+  - {op: ignore, in: table, at: /service, reason: OM service reference (in the FQN)}
+  - {op: ignore, in: table, at: /serviceType, reason: OM service type}
+  - {op: ignore, in: table, at: /database, reason: OM database reference (in the FQN)}
+  - {op: ignore, in: table, at: /databaseSchema, reason: OM schema reference (in the FQN)}
+  - {op: ignore, in: table, at: /tableType, reason: OM table type}
+  - {op: ignore, in: column, at: /dataTypeDisplay, reason: the source's type spelling (dataType is mapped)}
+  - {op: ignore, in: column, at: /ordinalPosition, reason: column order is the export's list order}
+
+  # Usage and profiling statistics: measurements of the data, never model facts.
+  - {op: ignore, in: table, at: /usageSummary, reason: usage statistics}
+  - {op: ignore, in: table, at: /profile, reason: profiler statistics}
+  - {op: ignore, in: column, at: /profile, reason: profiler statistics}
+  - {op: ignore, in: column, at: /customMetrics, reason: profiler metrics}

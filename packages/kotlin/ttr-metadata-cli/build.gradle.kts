@@ -155,6 +155,8 @@ sourceSets.main { resources.srcDir(generateMetadataVersion) }
 
 dependencies {
     implementation(project(":packages:kotlin:ttr-metadata"))
+    // MW-P5 S5.1 T5: `import-schema --from file:` runs the reader harness.
+    implementation(project(":packages:kotlin:ttr-import"))
     implementation(libs.clikt)
     implementation(libs.tomlj)
     implementation(libs.apache.commons.compress)
