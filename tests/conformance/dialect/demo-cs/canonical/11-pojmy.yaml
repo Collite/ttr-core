@@ -1,0 +1,14 @@
+ttr: "0.22"
+package: "demo"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "Smlouva"
+    properties:
+      description:
+        cs: "Smlouva"
+        en: "Contract"
+      tags:
+        - "pravo"
+        - "obchod"

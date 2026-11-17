@@ -120,6 +120,14 @@ internal class RecordPlan(
     val conflicts = ConflictLedger()
     private val found = linkedMapOf<Pair<String, String>, Record>()
     private val madeBy = mutableMapOf<Record, Int>()
+    private val skips = linkedMapOf<String, Pair<ForeignNode, Ignored>>()
+
+    /**
+     * ✅D-MW-81 (S5.2a): the nodes a `kinds` mapping value `null` skipped — no record, no error, each listed once in
+     * `ignored[]`. A node another `kinds` op made a record of is not skipped (that record's keys stay checked).
+     */
+    lateinit var skipped: List<Ignored>
+        private set
 
     /** Source position first; records of one node follow the index of the `kinds` operation that made them. */
     val records: List<Record> by lazy {
@@ -141,6 +149,7 @@ internal class RecordPlan(
                 it.value
                     .getValue("mapping")
                     .jsonObject.values
+                    .filter { it != JsonNull }
                     .map { kind -> kind.jsonPrimitive.content }
             }.distinct()
 
@@ -177,7 +186,7 @@ internal class RecordPlan(
                             } catch (e: ProfileException) {
                                 if (lenient) continue
                                 throw e
-                            }
+                            } ?: continue
                         found[source.path to record.kind] = record
                         madeBy[record] = index
                         changed = true
@@ -185,14 +194,23 @@ internal class RecordPlan(
                 }
             }
         } while (changed)
+        val recorded = found.keys.map { it.first }.toSet()
+        skipped =
+            skips.filterKeys { it !in recorded }.values.map { (node, ignored) ->
+                consumption.consume(node)
+                ignored
+            }
     }
 
-    /** One record from [source], or the error that refuses it; the ledgers change only when it is a record. */
+    /**
+     * One record from [source], null when its kind maps to `null` (a skip, ✅D-MW-81), or the error that refuses it;
+     * the ledgers change only when it is a record.
+     */
     private fun discover(
         op: PlannedOp,
         source: ForeignNode,
         parent: Record?,
-    ): Record {
+    ): Record? {
         val mapping = op.value.getValue("mapping").jsonObject
         val kindNode =
             op.value
@@ -202,6 +220,19 @@ internal class RecordPlan(
         val foreignKind =
             kindNode?.value?.let { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }
                 ?: if ("kind" !in op.value && mapping.size == 1) mapping.keys.single() else null
+        if (foreignKind != null && mapping[foreignKind] == JsonNull) {
+            val id = JsonPointer(op.value.optionalString("id") ?: "/\$key").resolve(source)
+            skips.putIfAbsent(
+                source.path,
+                source to
+                    Ignored(
+                        source.span(key = true),
+                        "kind mapping null (${op.value.optionalString("kind") ?: "kind"} = $foreignKind)",
+                        (id?.value as? JsonPrimitive)?.takeIf { it.isString }?.content,
+                    ),
+            )
+            return null
+        }
         val kind =
             mapping[foreignKind]?.jsonPrimitive?.content ?: throw ProfileException(
                 "ys/unknown-kind",

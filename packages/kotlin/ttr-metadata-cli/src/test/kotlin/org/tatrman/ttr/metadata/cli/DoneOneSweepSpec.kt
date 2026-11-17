@@ -119,7 +119,7 @@ class DoneOneSweepSpec :
         }
 
         test(
-            "every covered area has its evidence in its fixtures: ten families (link, join-pairs …), overlay, inheritance, ranges …",
+            "every covered area has its evidence in its fixtures: eleven families (link, join-pairs, each …), overlay, inheritance, ranges …",
         ) {
             val covers = index.getValue("covers").jsonObject
             val ops =
@@ -135,6 +135,7 @@ class DoneOneSweepSpec :
                     "codes",
                     "link",
                     "join-pairs",
+                    "each",
                 )
             val required =
                 ops.map { "op $it" } +

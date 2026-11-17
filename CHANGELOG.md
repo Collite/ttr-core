@@ -6,6 +6,21 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — `each`, `split` and the `kinds` null-skip in the profile engine (MW-P5 S5.2a, ✅D-MW-81)
+
+- An eleventh operation, `each` (`in`, `at`, `to`, `shape`, optional `key`): the list at `at` → one `shape` template
+  per element, in order. `$item` / `$item/<pointer>` inputs read the element and plain pointers read the record. With
+  `key` the result is an object keyed by each element's string at that pointer. New codes `ys/each-not-a-list`,
+  `ys/each-missing-key` and `ys/each-duplicate-key` (located at the list or the element).
+- `values` takes a `split: "<separator>"` operand instead of `mapping`/`default`: a string → its trimmed non-empty
+  parts. The separator is matched without surrounding whitespace, and a blank one splits on whitespace runs. A
+  non-string raises the new `ys/split-not-a-string`.
+- A `kinds` mapping value `null` skips the record (no emission, no error). The record is listed once in `ignored[]`
+  with the new optional `record` field (its id) and `reason: "kind mapping null (<pointer> = <value>)"`. `Ignored`
+  gains `record: String?`. Reports without a skip are byte-identical.
+- `profile.schema.json`: the `each` op, the `eachTemplate` definition, `split`, and `null` as a `kinds` mapping value.
+  `ShapeOp`'s template fill is now the shared `fillTemplate`, with no change in behaviour.
+
 ### Added — the reader harness: `ttr-import` and `import-schema --from file:` (MW-P5 S5.1)
 
 - New module `org.tatrman:ttr-import` (grammar bundle): a `FrontEnd` (pure parser → located `ForeignTree`s), the
