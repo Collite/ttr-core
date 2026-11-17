@@ -5,6 +5,7 @@ import groovy.lang.Binding
 import groovy.lang.GroovyShell
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import kotlinx.serialization.json.*
 import org.camunda.bpm.impl.juel.ExpressionFactoryImpl
 import org.camunda.bpm.impl.juel.SimpleContext
@@ -79,11 +80,6 @@ class AnswerOpenSpec :
                         it.getAttribute("name") ==
                             "approve_release complete"
                     }
-                flows.any {
-                    it.getAttribute("sourceRef") == answerStep.getAttribute("id") &&
-                        it.getAttribute("targetRef") == done.getAttribute("id")
-                } shouldBe
-                    true
                 val inputs = answerStep.getElementsByTagNameNS("http://camunda.org/schema/1.0/bpmn", "inputParameter")
                 val payload =
                     (0 until inputs.length)
@@ -111,9 +107,10 @@ class AnswerOpenSpec :
                 anchor.textContent shouldBe "\${ttrOpen.prop(\"runId\").stringValue()}"
                 val value = factory.createValueExpression(context, payload, Any::class.java).getValue(context)
                 context.setVariable("ttrAnswerOpenBody", factory.createValueExpression(value, Any::class.java))
+                val answerInputs = answer.getElementsByTagNameNS("http://camunda.org/schema/1.0/bpmn", "inputParameter")
                 val savedPayload =
-                    (0 until inputs.length)
-                        .map { inputs.item(it) as Element }
+                    (0 until answerInputs.length)
+                        .map { answerInputs.item(it) as Element }
                         .single { it.getAttribute("name") == "payload" }
                         .textContent
                 factory
@@ -131,8 +128,170 @@ class AnswerOpenSpec :
                     )
                 open.getValue("idempotencyKey") shouldBe JsonPrimitive("anchor-1:answer:task-42")
                 open.getValue("deployment") shouldBe JsonPrimitive("release_bpmn")
-                open.getValue("port").jsonObject.getValue("key") shouldBe JsonPrimitive(4711)
+                open.getValue("port").jsonObject.getValue("key") shouldBe buildJsonObject { put("order_number", 4711) }
                 open.getValue("port").jsonObject.containsKey("at") shouldBe true
+
+                // Grammar 0.22's approval shape (a writer sink, the engine's door): asked, never performed directly.
+                elements(BPMN, "serviceTask").none { it.getAttribute("name") == "perform approve_release" } shouldBe
+                    true
+
+                // D-233: the answer Open is the row's one call; the response decides.
+                fun inside(
+                    element: Element,
+                    ancestor: Element,
+                ): Boolean = generateSequence(element.parentNode) { it.parentNode }.any { it === ancestor }
+                elements(BPMN, "serviceTask").filter { inside(it, answerStep) }.map { it.getAttribute("name") } shouldBe
+                    listOf("answer approve_release")
+                xml.contains("answer evaluate") shouldBe false
+                xml.contains("answer close") shouldBe false
+                val script =
+                    answer
+                        .getElementsByTagNameNS("http://camunda.org/schema/1.0/bpmn", "script")
+                        .let { nodes -> (0 until nodes.length).map { nodes.item(it).textContent } }
+                        .single { "statusCode" in it }
+                // A 409 on the answer (answer-unmatched, *-stale) refuses with the body; it is not an outdated export.
+                script.contains("TTR_STALE") shouldBe false
+                script.contains("TTR_REFUSED") shouldBe true
+                // R3: a 202 (the same key still in flight) rolls the completion back like a 5xx; it is never refused.
+                script.contains("if (code == 202) throw new IllegalStateException(") shouldBe true
+                // No route is read again inside the answer: the approval is not re-asked.
+                elements(BPMN, "userTask").count { inside(it, answerStep) } shouldBe 0
+
+                fun mapping(
+                    element: Element,
+                    kind: String,
+                ): Map<String, String> =
+                    (0 until element.childNodes.length)
+                        .map { element.childNodes.item(it) }
+                        .filterIsInstance<Element>()
+                        .single { it.localName == "extensionElements" }
+                        .getElementsByTagNameNS("http://camunda.org/schema/1.0/bpmn", "inputOutput")
+                        .item(0)
+                        .childNodes
+                        .let { nodes -> (0 until nodes.length).map { nodes.item(it) }.filterIsInstance<Element>() }
+                        .filter { it.localName == kind }
+                        .associate { it.getAttribute("name") to it.textContent }
+                val stepInputs = mapping(answerStep, "inputParameter")
+                listOf(
+                    "",
+                    "Code",
+                    "Headers",
+                    "RetryAfter",
+                ).forEach { stepInputs["ttrAnswerOpen$it"] shouldBe "\${null}" }
+                val outputs = mapping(answerStep, "outputParameter")
+                outputs.keys shouldBe setOf("ttrAnswerRunId", "ttrAnswerStatus", "ttrAnswerDecision")
+                // C7 runs these outputs on cancellation too (a refused Open): each is guarded (D-229).
+                outputs.values.forEach {
+                    it.startsWith("\${execution.getVariable('ttrAnswerOpen') != null && ") shouldBe
+                        true
+                }
+                // Row-local (R323-4): the row declares them, so none reaches the process instance.
+                val row =
+                    generateSequence(answerStep.parentNode) { it.parentNode }.filterIsInstance<Element>().first {
+                        it.localName == "subProcess"
+                    }
+                val rowInputs = mapping(row, "inputParameter")
+                listOf("ttrTaskId", "ttrAnsweredBy", "ttrAnswerRunId", "ttrAnswerStatus", "ttrAnswerDecision").forEach {
+                    rowInputs[it] shouldBe "\${null}"
+                }
+                // The decision gateway: closed + commit continues; anything else refuses (an error end, run_refused).
+                val decided =
+                    elements(BPMN, "exclusiveGateway").single {
+                        it.getAttribute("name") ==
+                            "answer approve_release decided"
+                    }
+                flows.any {
+                    it.getAttribute("sourceRef") == answerStep.getAttribute("id") &&
+                        it.getAttribute("targetRef") == decided.getAttribute("id")
+                } shouldBe true
+                val outgoing = flows.filter { it.getAttribute("sourceRef") == decided.getAttribute("id") }
+                outgoing.size shouldBe 2
+                val toDone = outgoing.single { it.getAttribute("targetRef") == done.getAttribute("id") }
+                toDone.textContent.trim() shouldBe
+                    "\${(ttrAnswerStatus == \"closed\") && (ttrAnswerDecision == \"commit\")}"
+                val refusal = outgoing.single { it !== toDone }
+                decided.getAttribute("default") shouldBe refusal.getAttribute("id")
+                val refusedEnd =
+                    elements(BPMN, "endEvent").single {
+                        it.getAttribute("id") ==
+                            refusal.getAttribute("targetRef")
+                    }
+                (
+                    refusedEnd
+                        .getElementsByTagNameNS(
+                            BPMN,
+                            "errorEventDefinition",
+                        ).item(0) as Element
+                ).getAttribute("errorRef") shouldBe
+                    "run_refused"
+                // The engine keeps the refusal's message for the person who inspects the run.
+                elements(BPMN, "errorEventDefinition").count {
+                    it.getAttribute("errorRef") == "run_refused" &&
+                        it.getAttributeNS("http://camunda.org/schema/1.0/bpmn", "errorMessageVariable") ==
+                        "ttrRefusedReason"
+                } shouldBe 1
+
+                // ✅R336-A: rows are held only at the root close, which leaves the run `waiting`; the approval is asked
+                // after it, never inside the routes.
+                fun named(
+                    kind: String,
+                    name: String,
+                ) = elements(BPMN, kind).single { it.getAttribute("name") == name }
+
+                fun flow(
+                    from: Element,
+                    to: Element,
+                ) = flows.single {
+                    it.getAttribute("sourceRef") == from.getAttribute("id") &&
+                        it.getAttribute("targetRef") == to.getAttribute("id")
+                }
+                val outcome = named("exclusiveGateway", "close outcome")
+                flow(named("serviceTask", "close"), outcome)
+                flow(outcome, named("endEvent", "evaluation ended")).textContent shouldContain
+                    "ttrClosed.prop(\"status\").stringValue() == \"closed\""
+                val approvals = named("inclusiveGateway", "approvals")
+                flow(outcome, approvals).textContent shouldContain
+                    "ttrClosed.prop(\"status\").stringValue() == \"waiting\""
+                val otherwise = flows.single { it.getAttribute("id") == outcome.getAttribute("default") }
+                (
+                    elements(BPMN, "endEvent")
+                        .single { it.getAttribute("id") == otherwise.getAttribute("targetRef") }
+                        .getElementsByTagNameNS(BPMN, "errorEventDefinition")
+                        .item(0) as Element
+                ).getAttribute("errorRef") shouldBe "run_refused"
+                val askEach = named("subProcess", "ask each release_confirmed row")
+                row shouldBe askEach
+                inside(user, askEach) shouldBe true
+                flow(approvals, askEach).textContent shouldContain "> 0"
+                val routeRow = named("subProcess", "each release_confirmed row")
+                elements(BPMN, "userTask").none { inside(it, routeRow) } shouldBe true
+                elements(BPMN, "serviceTask").none { inside(it, routeRow) } shouldBe true
+            }
+        }
+        "an approval action the Server holds no rows for (no native sink) is not asked on the engine (R2)" {
+            val base = releaseGraph("process_engine")
+            val approve = base.actions.getValue("approve_release")
+            val graph =
+                base.copy(
+                    actions =
+                        base.actions + ("approve_release" to approve.copy(sinks = mapOf("process_engine" to "door"))),
+                    deployment = base.deployment.copy(egressUrl = "http://egress/automation"),
+                )
+            val xml = CamundaRenderer(RecipeEmitRequest(graph, "{}", "", "{}"), Dialect.C7, engine = true).render()
+            validateBpmn(xml)
+            xml.contains("name=\"approve approve_release\"") shouldBe false
+            xml.contains("name=\"answer ") shouldBe false
+            xml.contains("name=\"close outcome\"") shouldBe false
+            // Found 6's fallback until S1.5.8's export-time refusal: the Server performs it.
+            xml.contains("name=\"perform approve_release\"") shouldBe true
+        }
+        for (target in listOf("camunda_7", "camunda_8")) {
+            "the customer target $target renders the approval user task without an answer chain" {
+                val dialect = if (target == "camunda_7") Dialect.C7 else Dialect.C8
+                val xml = CamundaRenderer(RecipeEmitRequest(releaseGraph(target), "{}", "", "{}"), dialect).render()
+                xml.contains("name=\"approve approve_release\"") shouldBe true
+                xml.contains("name=\"answer ") shouldBe false
+                xml.contains("ttrAnswer") shouldBe false
             }
         }
     })
