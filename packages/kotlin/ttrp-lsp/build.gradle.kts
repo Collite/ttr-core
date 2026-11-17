@@ -30,6 +30,8 @@ tasks.test {
 }
 
 dependencies {
+    // An application binds its own SLF4J provider; libraries never do (AU-export S1.5.9 / review-340 H1).
+    runtimeOnly(libs.slf4j.nop)
     // LSP4J is `api`: it appears in the LanguageServer/LanguageClient surface the
     // test fixtures + Stage 5.1 WS transport consume.
     api(libs.lsp4j)

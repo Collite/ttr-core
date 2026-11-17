@@ -6,10 +6,10 @@ import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.string.shouldStartWith
 
 /**
- * AU-export S1.5.9 review-340 H1: ttr-designer-server is an application, so it binds its own SLF4J provider. A library never does.
- * Before S1.5.9 it got slf4j-nop only through `ttrp-frontend -> ttr-metadata-cli`, and without a provider SLF4J prints
- * "No SLF4J providers were found" on stderr. The build passes the published `runtimeClasspath`'s components in
- * `ttr.runtimeClasspath` (gradle/runtime-classpath-components.gradle.kts).
+ * AU-export S1.5.9 review-340 H1: ttr-designer-server is an application, so it binds its own SLF4J provider. A library
+ * never does. Before S1.5.9 it got slf4j-nop only through `ttrp-frontend -> ttr-metadata-cli`, and without a
+ * provider SLF4J prints "No SLF4J providers were found" on stderr. The build passes the published
+ * `runtimeClasspath`'s components in `ttr.runtimeClasspath` (gradle/runtime-classpath-components.gradle.kts).
  */
 class Slf4jProviderSpec :
     StringSpec({
@@ -20,7 +20,8 @@ class Slf4jProviderSpec :
                 ) { "the build did not pass ttr.runtimeClasspath" }.split(',')
             val providers =
                 components.filter { component ->
-                    PROVIDERS.any { component.startsWith(it) } || component.startsWith("org.apache.logging.log4j:log4j-slf4j")
+                    PROVIDERS.any { component.startsWith(it) } ||
+                        component.startsWith("org.apache.logging.log4j:log4j-slf4j")
                 }
             providers shouldHaveSize 1
             providers.single() shouldStartWith "org.slf4j:slf4j-nop:"
