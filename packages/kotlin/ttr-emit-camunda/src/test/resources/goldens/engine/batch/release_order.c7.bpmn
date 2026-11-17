@@ -4,7 +4,7 @@
   <bpmn:error errorCode="TTR_REFUSED" id="run_refused" />
   <bpmn:process camunda:historyTimeToLive="30" id="morning_release" isExecutable="true" name="morning_release">
     <bpmn:extensionElements>
-      <ttr:contract>{&quot;schemaVersion&quot;:1,&quot;target&quot;:&quot;process_engine&quot;,&quot;deployment&quot;:&quot;release_bpmn&quot;,&quot;recipes&quot;:[&quot;release_order&quot;],&quot;calls&quot;:[{&quot;task&quot;:&quot;n_d626ade7d8b9e41c9575&quot;,&quot;name&quot;:&quot;open&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/recipes/release_order/runs&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_df0cb8fe953ac278f4e3&quot;,&quot;name&quot;:&quot;status&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_2283248ac9d1670fcccd&quot;,&quot;name&quot;:&quot;open&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/recipes/release_order/runs&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_7281ae840e332ec36afe&quot;,&quot;name&quot;:&quot;part&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/parts/candidates&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;part&quot;:&quot;candidates&quot;}},{&quot;task&quot;:&quot;n_050a6626f4bc412a3b8c&quot;,&quot;name&quot;:&quot;part&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/parts/shortfall&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;part&quot;:&quot;shortfall&quot;}},{&quot;task&quot;:&quot;n_861c186c1fd0d137d74c&quot;,&quot;name&quot;:&quot;part&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/parts/price_differences&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;part&quot;:&quot;price_differences&quot;}},{&quot;task&quot;:&quot;n_ad1ffd1d18d79536b965&quot;,&quot;name&quot;:&quot;part&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/parts/overdue&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;part&quot;:&quot;overdue&quot;}},{&quot;task&quot;:&quot;n_bf538bd9a626e51f2306&quot;,&quot;name&quot;:&quot;part&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/parts/decision&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;part&quot;:&quot;decision&quot;}},{&quot;task&quot;:&quot;n_feb3fb453d50c8cb8801&quot;,&quot;name&quot;:&quot;evaluate&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/evaluate&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_f5b54cf15678908902d2&quot;,&quot;name&quot;:&quot;status&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_786e71992e3b89b2d204&quot;,&quot;name&quot;:&quot;status&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_edb1850318637a37b3ca&quot;,&quot;name&quot;:&quot;route&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/routes/hold_sales&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;route&quot;:&quot;hold_sales&quot;}},{&quot;task&quot;:&quot;n_e930bc7f5f3eeb1644dd&quot;,&quot;name&quot;:&quot;perform&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/actions/hold/perform&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;action&quot;:&quot;hold&quot;}},{&quot;task&quot;:&quot;n_8f11a0edb57000669571&quot;,&quot;name&quot;:&quot;outcome&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/actions/notify/outcome&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;action&quot;:&quot;notify&quot;}},{&quot;task&quot;:&quot;n_f9eaca6dafd8d7419fbd&quot;,&quot;name&quot;:&quot;route&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/routes/hold_ar&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;route&quot;:&quot;hold_ar&quot;}},{&quot;task&quot;:&quot;n_77aebb526b160cdd4264&quot;,&quot;name&quot;:&quot;perform&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/actions/hold/perform&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;action&quot;:&quot;hold&quot;}},{&quot;task&quot;:&quot;n_37383c5c7629cca4e767&quot;,&quot;name&quot;:&quot;outcome&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/actions/notify/outcome&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;action&quot;:&quot;notify&quot;}},{&quot;task&quot;:&quot;n_fc201d85bfebf5c4e987&quot;,&quot;name&quot;:&quot;route&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/routes/release_confirmed&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;route&quot;:&quot;release_confirmed&quot;}},{&quot;task&quot;:&quot;n_b4ca41e7f970925088b8&quot;,&quot;name&quot;:&quot;open&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/recipes/release_order/runs&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_3458ceb18150acb9fe32&quot;,&quot;name&quot;:&quot;route&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/routes/release&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;route&quot;:&quot;release&quot;}},{&quot;task&quot;:&quot;n_a15e9cd5a2fad50b8d95&quot;,&quot;name&quot;:&quot;perform&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/actions/release/perform&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;action&quot;:&quot;release&quot;}},{&quot;task&quot;:&quot;n_95c806f8fe8610d2826e&quot;,&quot;name&quot;:&quot;close&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/close&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}}],&quot;routes&quot;:[{&quot;recipe&quot;:&quot;release_order&quot;,&quot;route&quot;:&quot;hold_sales&quot;,&quot;flow&quot;:&quot;n_c689e3d71fdd2461cb1e&quot;,&quot;gateway&quot;:&quot;n_76fab166d3eed9b21a76&quot;,&quot;entry&quot;:&quot;n_0001d4efdf8046dd271d&quot;,&quot;task&quot;:&quot;n_edb1850318637a37b3ca&quot;},{&quot;recipe&quot;:&quot;release_order&quot;,&quot;route&quot;:&quot;hold_ar&quot;,&quot;flow&quot;:&quot;n_d70540f0c275f21f6894&quot;,&quot;gateway&quot;:&quot;n_76fab166d3eed9b21a76&quot;,&quot;entry&quot;:&quot;n_274b24e9b329767e7ae2&quot;,&quot;task&quot;:&quot;n_f9eaca6dafd8d7419fbd&quot;},{&quot;recipe&quot;:&quot;release_order&quot;,&quot;route&quot;:&quot;release_confirmed&quot;,&quot;flow&quot;:&quot;n_0eff7a11eca6f2ae698d&quot;,&quot;gateway&quot;:&quot;n_76fab166d3eed9b21a76&quot;,&quot;entry&quot;:&quot;n_d488b8041225b57e6e41&quot;,&quot;task&quot;:&quot;n_fc201d85bfebf5c4e987&quot;},{&quot;recipe&quot;:&quot;release_order&quot;,&quot;route&quot;:&quot;release&quot;,&quot;flow&quot;:&quot;n_aaa171c42f4fc93e2f3d&quot;,&quot;gateway&quot;:&quot;n_76fab166d3eed9b21a76&quot;,&quot;entry&quot;:&quot;n_8704da6c269681eb0d60&quot;,&quot;task&quot;:&quot;n_3458ceb18150acb9fe32&quot;}]}</ttr:contract>
+      <ttr:contract>{&quot;schemaVersion&quot;:1,&quot;target&quot;:&quot;process_engine&quot;,&quot;deployment&quot;:&quot;release_bpmn&quot;,&quot;recipes&quot;:[&quot;release_order&quot;],&quot;calls&quot;:[{&quot;task&quot;:&quot;n_d626ade7d8b9e41c9575&quot;,&quot;name&quot;:&quot;open&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/recipes/release_order/runs&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_df0cb8fe953ac278f4e3&quot;,&quot;name&quot;:&quot;status&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_2283248ac9d1670fcccd&quot;,&quot;name&quot;:&quot;open&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/recipes/release_order/runs&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_7281ae840e332ec36afe&quot;,&quot;name&quot;:&quot;part&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/parts/candidates&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;part&quot;:&quot;candidates&quot;}},{&quot;task&quot;:&quot;n_050a6626f4bc412a3b8c&quot;,&quot;name&quot;:&quot;part&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/parts/shortfall&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;part&quot;:&quot;shortfall&quot;}},{&quot;task&quot;:&quot;n_861c186c1fd0d137d74c&quot;,&quot;name&quot;:&quot;part&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/parts/price_differences&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;part&quot;:&quot;price_differences&quot;}},{&quot;task&quot;:&quot;n_ad1ffd1d18d79536b965&quot;,&quot;name&quot;:&quot;part&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/parts/overdue&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;part&quot;:&quot;overdue&quot;}},{&quot;task&quot;:&quot;n_bf538bd9a626e51f2306&quot;,&quot;name&quot;:&quot;part&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/parts/decision&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;part&quot;:&quot;decision&quot;}},{&quot;task&quot;:&quot;n_feb3fb453d50c8cb8801&quot;,&quot;name&quot;:&quot;evaluate&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/evaluate&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_f5b54cf15678908902d2&quot;,&quot;name&quot;:&quot;status&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_786e71992e3b89b2d204&quot;,&quot;name&quot;:&quot;status&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_edb1850318637a37b3ca&quot;,&quot;name&quot;:&quot;route&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/routes/hold_sales&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;route&quot;:&quot;hold_sales&quot;}},{&quot;task&quot;:&quot;n_e930bc7f5f3eeb1644dd&quot;,&quot;name&quot;:&quot;perform&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/actions/hold/perform&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;action&quot;:&quot;hold&quot;}},{&quot;task&quot;:&quot;n_8f11a0edb57000669571&quot;,&quot;name&quot;:&quot;outcome&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/actions/notify/outcome&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;action&quot;:&quot;notify&quot;}},{&quot;task&quot;:&quot;n_f9eaca6dafd8d7419fbd&quot;,&quot;name&quot;:&quot;route&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/routes/hold_ar&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;route&quot;:&quot;hold_ar&quot;}},{&quot;task&quot;:&quot;n_77aebb526b160cdd4264&quot;,&quot;name&quot;:&quot;perform&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/actions/hold/perform&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;action&quot;:&quot;hold&quot;}},{&quot;task&quot;:&quot;n_37383c5c7629cca4e767&quot;,&quot;name&quot;:&quot;outcome&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/actions/notify/outcome&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;action&quot;:&quot;notify&quot;}},{&quot;task&quot;:&quot;n_fc201d85bfebf5c4e987&quot;,&quot;name&quot;:&quot;route&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/routes/release_confirmed&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;route&quot;:&quot;release_confirmed&quot;}},{&quot;task&quot;:&quot;n_b4ca41e7f970925088b8&quot;,&quot;name&quot;:&quot;open&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/recipes/release_order/runs&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_41d611fe5dfb12b361c7&quot;,&quot;name&quot;:&quot;close&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/close&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_03796effa90a8306e54e&quot;,&quot;name&quot;:&quot;status&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_1fed32d4269eeb45851f&quot;,&quot;name&quot;:&quot;evaluate&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/evaluate&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_47c1be90a3cfb37cd6fb&quot;,&quot;name&quot;:&quot;status&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}},{&quot;task&quot;:&quot;n_3458ceb18150acb9fe32&quot;,&quot;name&quot;:&quot;route&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/routes/release&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;route&quot;:&quot;release&quot;}},{&quot;task&quot;:&quot;n_a15e9cd5a2fad50b8d95&quot;,&quot;name&quot;:&quot;perform&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/actions/release/perform&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{&quot;action&quot;:&quot;release&quot;}},{&quot;task&quot;:&quot;n_95c806f8fe8610d2826e&quot;,&quot;name&quot;:&quot;close&quot;,&quot;method&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;/automation/runs/{id}/close&quot;,&quot;recipe&quot;:&quot;release_order&quot;,&quot;program&quot;:&quot;morning_release&quot;,&quot;mode&quot;:&quot;batch&quot;,&quot;arguments&quot;:{}}],&quot;routes&quot;:[{&quot;recipe&quot;:&quot;release_order&quot;,&quot;route&quot;:&quot;hold_sales&quot;,&quot;flow&quot;:&quot;n_c689e3d71fdd2461cb1e&quot;,&quot;gateway&quot;:&quot;n_76fab166d3eed9b21a76&quot;,&quot;entry&quot;:&quot;n_0001d4efdf8046dd271d&quot;,&quot;task&quot;:&quot;n_edb1850318637a37b3ca&quot;},{&quot;recipe&quot;:&quot;release_order&quot;,&quot;route&quot;:&quot;hold_ar&quot;,&quot;flow&quot;:&quot;n_d70540f0c275f21f6894&quot;,&quot;gateway&quot;:&quot;n_76fab166d3eed9b21a76&quot;,&quot;entry&quot;:&quot;n_274b24e9b329767e7ae2&quot;,&quot;task&quot;:&quot;n_f9eaca6dafd8d7419fbd&quot;},{&quot;recipe&quot;:&quot;release_order&quot;,&quot;route&quot;:&quot;release_confirmed&quot;,&quot;flow&quot;:&quot;n_0eff7a11eca6f2ae698d&quot;,&quot;gateway&quot;:&quot;n_76fab166d3eed9b21a76&quot;,&quot;entry&quot;:&quot;n_d488b8041225b57e6e41&quot;,&quot;task&quot;:&quot;n_fc201d85bfebf5c4e987&quot;},{&quot;recipe&quot;:&quot;release_order&quot;,&quot;route&quot;:&quot;release&quot;,&quot;flow&quot;:&quot;n_aaa171c42f4fc93e2f3d&quot;,&quot;gateway&quot;:&quot;n_76fab166d3eed9b21a76&quot;,&quot;entry&quot;:&quot;n_8704da6c269681eb0d60&quot;,&quot;task&quot;:&quot;n_3458ceb18150acb9fe32&quot;}]}</ttr:contract>
     </bpmn:extensionElements>
     <bpmn:startEvent camunda:asyncAfter="true" id="n_9407749ce5c5d54087e3" name="start with ttrInput key">
       <bpmn:outgoing>n_12be60dfb3962855295e</bpmn:outgoing>
@@ -1012,10 +1012,37 @@
             <bpmn:extensionElements>
               <camunda:inputOutput>
                 <camunda:inputParameter name="ttrAnswerOpenBody">${S('{}').prop(&quot;deployment&quot;,&quot;release_bpmn&quot;).prop(&quot;port&quot;,S('{}').prop(&quot;key&quot;,ttrRow.prop(&quot;order_number&quot;).value()).prop('at', dateTime().toString())).prop(&quot;origin&quot;,&quot;engine&quot;).prop(&quot;dryRun&quot;,true).prop(&quot;engine&quot;,S('{}').prop(&quot;instanceId&quot;,execution.processInstanceId).prop(&quot;businessKey&quot;,execution.processBusinessKey).prop(&quot;deploymentId&quot;,execution.processEngineServices.repositoryService.getProcessDefinition(execution.processDefinitionId).deploymentId).prop(&quot;taskId&quot;,ttrTaskId).prop(&quot;answeredBy&quot;,ttrAnsweredBy)).prop(&quot;recipeFingerprint&quot;,&quot;sha256:text&quot;).prop(&quot;recipeValuesFingerprint&quot;,&quot;sha256:values&quot;).prop(&quot;idempotencyKey&quot;,ttrAnchor.concat(&quot;:answer:&quot;).concat(ttrTaskId))}</camunda:inputParameter>
+                <camunda:inputParameter name="ttrAnswerOpen">${null}</camunda:inputParameter>
+                <camunda:inputParameter name="ttrAnswerOpenCode">${null}</camunda:inputParameter>
+                <camunda:inputParameter name="ttrAnswerOpenHeaders">${null}</camunda:inputParameter>
+                <camunda:inputParameter name="ttrAnswerOpenRetryAfter">${null}</camunda:inputParameter>
+                <camunda:inputParameter name="ttrAnswerEvaluation">${null}</camunda:inputParameter>
+                <camunda:inputParameter name="ttrAnswerEvaluationCode">${null}</camunda:inputParameter>
+                <camunda:inputParameter name="ttrAnswerEvaluationHeaders">${null}</camunda:inputParameter>
+                <camunda:inputParameter name="ttrAnswerEvaluationRetryAfter">${null}</camunda:inputParameter>
+                <camunda:inputParameter name="ttrAnswerClosed">${null}</camunda:inputParameter>
+                <camunda:inputParameter name="ttrAnswerClosedCode">${null}</camunda:inputParameter>
+                <camunda:inputParameter name="ttrAnswerClosedHeaders">${null}</camunda:inputParameter>
+                <camunda:inputParameter name="ttrAnswerClosedRetryAfter">${null}</camunda:inputParameter>
+                <camunda:inputParameter name="ttrHandle">${null}</camunda:inputParameter>
+                <camunda:inputParameter name="ttrHandleCode">${null}</camunda:inputParameter>
+                <camunda:inputParameter name="ttrHandleHeaders">${null}</camunda:inputParameter>
+                <camunda:inputParameter name="ttrHandleRetryAfter">${null}</camunda:inputParameter>
               </camunda:inputOutput>
             </bpmn:extensionElements>
             <bpmn:incoming>n_4d018ea0f281a7017254</bpmn:incoming>
             <bpmn:outgoing>n_98624e5c16836d8c9a74</bpmn:outgoing>
+            <bpmn:startEvent id="n_aefed99b61499d9772f0" name="answer start">
+              <bpmn:outgoing>n_c5c3249690876b51d96a</bpmn:outgoing>
+            </bpmn:startEvent>
+            <bpmn:endEvent id="n_cd74d52cb00c37edad64" name="answer refused">
+              <bpmn:incoming>n_c9bd3c62efd3e8946007</bpmn:incoming>
+              <bpmn:incoming>n_7c80bea3255c0dccabb5</bpmn:incoming>
+              <bpmn:incoming>n_7bc30e1cfb728ccb23c9</bpmn:incoming>
+              <bpmn:incoming>n_c21815f0d05896266cdb</bpmn:incoming>
+              <bpmn:incoming>n_d4db967129bc2e15bc84</bpmn:incoming>
+              <bpmn:errorEventDefinition errorRef="run_refused" />
+            </bpmn:endEvent>
             <bpmn:serviceTask id="n_b4ca41e7f970925088b8" name="answer approve_release">
               <bpmn:extensionElements>
                 <camunda:connector>
@@ -1041,16 +1068,257 @@
                 </camunda:connector>
               </bpmn:extensionElements>
               <bpmn:incoming>n_c5c3249690876b51d96a</bpmn:incoming>
-              <bpmn:outgoing>n_60387a4f3d120ca1ccd5</bpmn:outgoing>
+              <bpmn:outgoing>n_cfa3d234aa7fe1935005</bpmn:outgoing>
             </bpmn:serviceTask>
-            <bpmn:startEvent id="n_aefed99b61499d9772f0" name="answer start">
-              <bpmn:outgoing>n_c5c3249690876b51d96a</bpmn:outgoing>
-            </bpmn:startEvent>
-            <bpmn:endEvent id="n_67add99b259b5e8ac91c" name="answer opened">
-              <bpmn:incoming>n_60387a4f3d120ca1ccd5</bpmn:incoming>
+            <bpmn:exclusiveGateway default="n_c9bd3c62efd3e8946007" id="n_c0e83220693faea041d4" name="answer ownership">
+              <bpmn:incoming>n_cfa3d234aa7fe1935005</bpmn:incoming>
+              <bpmn:outgoing>n_80b32d60dd3475e698c4</bpmn:outgoing>
+              <bpmn:outgoing>n_0104609bfa9527538d15</bpmn:outgoing>
+              <bpmn:outgoing>n_fc9ef52fe7ca28dd3bab</bpmn:outgoing>
+              <bpmn:outgoing>n_c9bd3c62efd3e8946007</bpmn:outgoing>
+            </bpmn:exclusiveGateway>
+            <bpmn:serviceTask camunda:asyncBefore="true" id="n_41d611fe5dfb12b361c7" name="answer close">
+              <bpmn:extensionElements>
+                <camunda:connector>
+                  <camunda:connectorId>http-connector</camunda:connectorId>
+                  <camunda:inputOutput>
+                    <camunda:inputParameter name="method">POST</camunda:inputParameter>
+                    <camunda:inputParameter name="url">${&quot;http://egress/automation/runs/&quot;.concat(ttrAnswerOpen.prop(&quot;runId&quot;).stringValue()).concat(&quot;/close&quot;)}</camunda:inputParameter>
+                    <camunda:inputParameter name="headers">
+                      <camunda:map>
+                        <camunda:entry key="Content-Type">application/json</camunda:entry>
+                      </camunda:map>
+                    </camunda:inputParameter>
+                    <camunda:inputParameter name="payload">${(S('{}')).toString()}</camunda:inputParameter>
+                    <camunda:outputParameter name="ttrAnswerClosed">
+                      <camunda:script scriptFormat="groovy">def BpmnError; try { BpmnError = Class.forName('org.cibseven.bpm.engine.delegate.BpmnError') } catch (ClassNotFoundException e) { BpmnError = Class.forName('org.camunda.bpm.engine.delegate.BpmnError') }&#10;def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw BpmnError.getConstructor(String, String).newInstance('TTR_STALE', 'run API fingerprint refused')&#10;if (code &gt;= 400 &amp;&amp; code &lt; 500 &amp;&amp; code != 408 &amp;&amp; code != 429) throw BpmnError.getConstructor(String, String).newInstance('TTR_REFUSED', 'run API HTTP ' + code + ': ' + response.toString().take(256))&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;def SpinClass; try { SpinClass = Class.forName('org.cibseven.spin.Spin') } catch (ClassNotFoundException e) { SpinClass = Class.forName('org.camunda.spin.Spin') }&#10;return SpinClass.JSON(response)</camunda:script>
+                    </camunda:outputParameter>
+                    <camunda:outputParameter name="ttrAnswerClosedCode">${statusCode}</camunda:outputParameter>
+                    <camunda:outputParameter name="ttrAnswerClosedHeaders">${headers}</camunda:outputParameter>
+                    <camunda:outputParameter name="ttrAnswerClosedRetryAfter">
+                      <camunda:script scriptFormat="groovy">def value = headers['retry-after'] ?: headers['Retry-After']&#10;try {&#10;    def seconds = new BigDecimal(value.toString())&#10;    return seconds &gt; 0 ? seconds : 15&#10;} catch (Exception ignored) {&#10;    try {&#10;        def instant = java.time.ZonedDateTime.parse(value.toString(), java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).toInstant()&#10;        return Math.max(1L, (long) Math.ceil(java.time.Duration.between(java.time.Instant.now(), instant).toMillis() / 1000.0))&#10;    } catch (Exception absent) { return 15 }&#10;}</camunda:script>
+                    </camunda:outputParameter>
+                  </camunda:inputOutput>
+                </camunda:connector>
+                <camunda:failedJobRetryTimeCycle>R3/PT15S</camunda:failedJobRetryTimeCycle>
+              </bpmn:extensionElements>
+              <bpmn:incoming>n_80b32d60dd3475e698c4</bpmn:incoming>
+              <bpmn:incoming>n_fbae5a9922b53607c3e3</bpmn:incoming>
+              <bpmn:outgoing>n_359633495a5105ef1753</bpmn:outgoing>
+            </bpmn:serviceTask>
+            <bpmn:subProcess id="n_2768287de30c7f2ac124" name="answer evaluation within budget">
+              <bpmn:extensionElements>
+                <camunda:inputOutput>
+                  <camunda:outputParameter name="ttrAnswerEvaluation">${ttrAnswerEvaluation}</camunda:outputParameter>
+                </camunda:inputOutput>
+              </bpmn:extensionElements>
+              <bpmn:incoming>n_0104609bfa9527538d15</bpmn:incoming>
+              <bpmn:outgoing>n_fbae5a9922b53607c3e3</bpmn:outgoing>
+              <bpmn:startEvent id="n_9d96afa01d2d0afd4cae" name="answer evaluation start">
+                <bpmn:outgoing>n_0ab72e7dd28d302f14b6</bpmn:outgoing>
+              </bpmn:startEvent>
+              <bpmn:serviceTask camunda:asyncBefore="true" id="n_1fed32d4269eeb45851f" name="answer evaluate">
+                <bpmn:extensionElements>
+                  <camunda:connector>
+                    <camunda:connectorId>http-connector</camunda:connectorId>
+                    <camunda:inputOutput>
+                      <camunda:inputParameter name="method">POST</camunda:inputParameter>
+                      <camunda:inputParameter name="url">${&quot;http://egress/automation/runs/&quot;.concat(ttrAnswerOpen.prop(&quot;runId&quot;).stringValue()).concat(&quot;/evaluate&quot;)}</camunda:inputParameter>
+                      <camunda:inputParameter name="headers">
+                        <camunda:map>
+                          <camunda:entry key="Content-Type">application/json</camunda:entry>
+                        </camunda:map>
+                      </camunda:inputParameter>
+                      <camunda:inputParameter name="payload">${(S('{}')).toString()}</camunda:inputParameter>
+                      <camunda:outputParameter name="ttrAnswerEvaluation">
+                        <camunda:script scriptFormat="groovy">def BpmnError; try { BpmnError = Class.forName('org.cibseven.bpm.engine.delegate.BpmnError') } catch (ClassNotFoundException e) { BpmnError = Class.forName('org.camunda.bpm.engine.delegate.BpmnError') }&#10;def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw BpmnError.getConstructor(String, String).newInstance('TTR_STALE', 'run API fingerprint refused')&#10;if (code &gt;= 400 &amp;&amp; code &lt; 500 &amp;&amp; code != 408 &amp;&amp; code != 429) throw BpmnError.getConstructor(String, String).newInstance('TTR_REFUSED', 'run API HTTP ' + code + ': ' + response.toString().take(256))&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;def SpinClass; try { SpinClass = Class.forName('org.cibseven.spin.Spin') } catch (ClassNotFoundException e) { SpinClass = Class.forName('org.camunda.spin.Spin') }&#10;return SpinClass.JSON(response)</camunda:script>
+                      </camunda:outputParameter>
+                      <camunda:outputParameter name="ttrAnswerEvaluationCode">${statusCode}</camunda:outputParameter>
+                      <camunda:outputParameter name="ttrAnswerEvaluationHeaders">${headers}</camunda:outputParameter>
+                      <camunda:outputParameter name="ttrAnswerEvaluationRetryAfter">
+                        <camunda:script scriptFormat="groovy">def value = headers['retry-after'] ?: headers['Retry-After']&#10;try {&#10;    def seconds = new BigDecimal(value.toString())&#10;    return seconds &gt; 0 ? seconds : 15&#10;} catch (Exception ignored) {&#10;    try {&#10;        def instant = java.time.ZonedDateTime.parse(value.toString(), java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).toInstant()&#10;        return Math.max(1L, (long) Math.ceil(java.time.Duration.between(java.time.Instant.now(), instant).toMillis() / 1000.0))&#10;    } catch (Exception absent) { return 15 }&#10;}</camunda:script>
+                      </camunda:outputParameter>
+                    </camunda:inputOutput>
+                  </camunda:connector>
+                  <camunda:failedJobRetryTimeCycle>R3/PT15S</camunda:failedJobRetryTimeCycle>
+                </bpmn:extensionElements>
+                <bpmn:incoming>n_0ab72e7dd28d302f14b6</bpmn:incoming>
+                <bpmn:outgoing>n_167aaf3ab9a0ca47151a</bpmn:outgoing>
+              </bpmn:serviceTask>
+              <bpmn:exclusiveGateway default="n_aefdbc2a51818425dd0b" id="n_df831c55d6c6e8dbd120" name="answer evaluation complete">
+                <bpmn:incoming>n_5c52144e4ad79af67b8d</bpmn:incoming>
+                <bpmn:outgoing>n_aefdbc2a51818425dd0b</bpmn:outgoing>
+                <bpmn:outgoing>n_8e8aadc16127cec48203</bpmn:outgoing>
+                <bpmn:outgoing>n_59f85117cd5b411f9815</bpmn:outgoing>
+              </bpmn:exclusiveGateway>
+              <bpmn:intermediateCatchEvent id="n_cdfb41e1305ff69785a2" name="answer evaluation poll">
+                <bpmn:incoming>n_aefdbc2a51818425dd0b</bpmn:incoming>
+                <bpmn:outgoing>n_e1b7e2308cbbf5f33ea6</bpmn:outgoing>
+                <bpmn:timerEventDefinition>
+                  <bpmn:timeDuration>${'PT'.concat(ttrAnswerEvaluationRetryAfter.toString()).concat('S')}</bpmn:timeDuration>
+                </bpmn:timerEventDefinition>
+              </bpmn:intermediateCatchEvent>
+              <bpmn:serviceTask camunda:asyncBefore="true" id="n_47c1be90a3cfb37cd6fb" name="answer evaluation status">
+                <bpmn:extensionElements>
+                  <camunda:connector>
+                    <camunda:connectorId>http-connector</camunda:connectorId>
+                    <camunda:inputOutput>
+                      <camunda:inputParameter name="method">GET</camunda:inputParameter>
+                      <camunda:inputParameter name="url">${&quot;http://egress/automation/runs/&quot;.concat(ttrAnswerOpen.prop(&quot;runId&quot;).stringValue()).concat(&quot;&quot;)}</camunda:inputParameter>
+                      <camunda:inputParameter name="headers">
+                        <camunda:map>
+                          <camunda:entry key="Content-Type">application/json</camunda:entry>
+                        </camunda:map>
+                      </camunda:inputParameter>
+                      <camunda:outputParameter name="ttrAnswerEvaluation">
+                        <camunda:script scriptFormat="groovy">def BpmnError; try { BpmnError = Class.forName('org.cibseven.bpm.engine.delegate.BpmnError') } catch (ClassNotFoundException e) { BpmnError = Class.forName('org.camunda.bpm.engine.delegate.BpmnError') }&#10;def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw BpmnError.getConstructor(String, String).newInstance('TTR_STALE', 'run API fingerprint refused')&#10;if (code &gt;= 400 &amp;&amp; code &lt; 500 &amp;&amp; code != 408 &amp;&amp; code != 429) throw BpmnError.getConstructor(String, String).newInstance('TTR_REFUSED', 'run API HTTP ' + code + ': ' + response.toString().take(256))&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;def SpinClass; try { SpinClass = Class.forName('org.cibseven.spin.Spin') } catch (ClassNotFoundException e) { SpinClass = Class.forName('org.camunda.spin.Spin') }&#10;return SpinClass.JSON(response)</camunda:script>
+                      </camunda:outputParameter>
+                      <camunda:outputParameter name="ttrAnswerEvaluationCode">${statusCode}</camunda:outputParameter>
+                      <camunda:outputParameter name="ttrAnswerEvaluationHeaders">${headers}</camunda:outputParameter>
+                      <camunda:outputParameter name="ttrAnswerEvaluationRetryAfter">
+                        <camunda:script scriptFormat="groovy">def value = headers['retry-after'] ?: headers['Retry-After']&#10;try {&#10;    def seconds = new BigDecimal(value.toString())&#10;    return seconds &gt; 0 ? seconds : 15&#10;} catch (Exception ignored) {&#10;    try {&#10;        def instant = java.time.ZonedDateTime.parse(value.toString(), java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).toInstant()&#10;        return Math.max(1L, (long) Math.ceil(java.time.Duration.between(java.time.Instant.now(), instant).toMillis() / 1000.0))&#10;    } catch (Exception absent) { return 15 }&#10;}</camunda:script>
+                      </camunda:outputParameter>
+                    </camunda:inputOutput>
+                  </camunda:connector>
+                  <camunda:failedJobRetryTimeCycle>R3/PT15S</camunda:failedJobRetryTimeCycle>
+                </bpmn:extensionElements>
+                <bpmn:incoming>n_167aaf3ab9a0ca47151a</bpmn:incoming>
+                <bpmn:incoming>n_e1b7e2308cbbf5f33ea6</bpmn:incoming>
+                <bpmn:outgoing>n_5c52144e4ad79af67b8d</bpmn:outgoing>
+              </bpmn:serviceTask>
+              <bpmn:endEvent id="n_4241a204167f6e79374a" name="answer verdict ready">
+                <bpmn:incoming>n_59f85117cd5b411f9815</bpmn:incoming>
+              </bpmn:endEvent>
+              <bpmn:endEvent id="n_54d90a584e12c13bd80c" name="answer evaluation failed or abandoned">
+                <bpmn:incoming>n_8e8aadc16127cec48203</bpmn:incoming>
+                <bpmn:errorEventDefinition errorRef="run_refused" />
+              </bpmn:endEvent>
+              <bpmn:sequenceFlow id="n_0ab72e7dd28d302f14b6" sourceRef="n_9d96afa01d2d0afd4cae" targetRef="n_1fed32d4269eeb45851f" />
+              <bpmn:sequenceFlow id="n_aefdbc2a51818425dd0b" sourceRef="n_df831c55d6c6e8dbd120" targetRef="n_cdfb41e1305ff69785a2" />
+              <bpmn:sequenceFlow id="n_167aaf3ab9a0ca47151a" sourceRef="n_1fed32d4269eeb45851f" targetRef="n_47c1be90a3cfb37cd6fb" />
+              <bpmn:sequenceFlow id="n_e1b7e2308cbbf5f33ea6" sourceRef="n_cdfb41e1305ff69785a2" targetRef="n_47c1be90a3cfb37cd6fb" />
+              <bpmn:sequenceFlow id="n_5c52144e4ad79af67b8d" sourceRef="n_47c1be90a3cfb37cd6fb" targetRef="n_df831c55d6c6e8dbd120" />
+              <bpmn:sequenceFlow id="n_8e8aadc16127cec48203" name="failed or abandoned" sourceRef="n_df831c55d6c6e8dbd120" targetRef="n_54d90a584e12c13bd80c">
+                <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${(ttrAnswerEvaluation.prop(&quot;status&quot;).stringValue() == &quot;failed&quot;) || (ttrAnswerEvaluation.prop(&quot;status&quot;).stringValue() == &quot;abandoned&quot;)}</bpmn:conditionExpression>
+              </bpmn:sequenceFlow>
+              <bpmn:sequenceFlow id="n_59f85117cd5b411f9815" name="verdict ready" sourceRef="n_df831c55d6c6e8dbd120" targetRef="n_4241a204167f6e79374a">
+                <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${(ttrAnswerEvaluation.hasProp(&quot;verdict&quot;) &amp;&amp; !ttrAnswerEvaluation.prop(&quot;verdict&quot;).isNull()) &amp;&amp; (!(ttrAnswerEvaluation.prop(&quot;status&quot;).stringValue() == &quot;running&quot;) &amp;&amp; !(ttrAnswerEvaluation.prop(&quot;status&quot;).stringValue() == &quot;open&quot;))}</bpmn:conditionExpression>
+              </bpmn:sequenceFlow>
+            </bpmn:subProcess>
+            <bpmn:subProcess id="n_54c94fbb532a17f7a291" name="await other execution">
+              <bpmn:extensionElements>
+                <camunda:inputOutput>
+                  <camunda:inputParameter name="ttrHandleRetryAfter">${ttrAnswerOpenRetryAfter}</camunda:inputParameter>
+                  <camunda:outputParameter name="ttrHandle">${ttrHandle}</camunda:outputParameter>
+                </camunda:inputOutput>
+              </bpmn:extensionElements>
+              <bpmn:incoming>n_fc9ef52fe7ca28dd3bab</bpmn:incoming>
+              <bpmn:outgoing>n_0efa8a448cd5336137d7</bpmn:outgoing>
+              <bpmn:startEvent id="n_389f27bc5308b897b33b" name="handle start">
+                <bpmn:outgoing>n_ea3271c7518517db01f9</bpmn:outgoing>
+              </bpmn:startEvent>
+              <bpmn:endEvent id="n_1cb3f9dcf894a2962e3d" name="handle settled">
+                <bpmn:incoming>n_bfca96c6f9670b8bf374</bpmn:incoming>
+              </bpmn:endEvent>
+              <bpmn:intermediateCatchEvent id="n_34011215640a8c877d94" name="honour Retry-After">
+                <bpmn:incoming>n_ea3271c7518517db01f9</bpmn:incoming>
+                <bpmn:incoming>n_ca471473a48fcb0f615f</bpmn:incoming>
+                <bpmn:outgoing>n_ea2312d265eef2ab8c15</bpmn:outgoing>
+                <bpmn:timerEventDefinition>
+                  <bpmn:timeDuration>${'PT'.concat(ttrHandleRetryAfter.toString()).concat('S')}</bpmn:timeDuration>
+                </bpmn:timerEventDefinition>
+              </bpmn:intermediateCatchEvent>
+              <bpmn:serviceTask camunda:asyncBefore="true" id="n_03796effa90a8306e54e" name="handle status">
+                <bpmn:extensionElements>
+                  <camunda:connector>
+                    <camunda:connectorId>http-connector</camunda:connectorId>
+                    <camunda:inputOutput>
+                      <camunda:inputParameter name="method">GET</camunda:inputParameter>
+                      <camunda:inputParameter name="url">${&quot;http://egress/automation/runs/&quot;.concat(ttrAnswerOpen.prop(&quot;runId&quot;).stringValue()).concat(&quot;&quot;)}</camunda:inputParameter>
+                      <camunda:inputParameter name="headers">
+                        <camunda:map>
+                          <camunda:entry key="Content-Type">application/json</camunda:entry>
+                        </camunda:map>
+                      </camunda:inputParameter>
+                      <camunda:outputParameter name="ttrHandle">
+                        <camunda:script scriptFormat="groovy">def BpmnError; try { BpmnError = Class.forName('org.cibseven.bpm.engine.delegate.BpmnError') } catch (ClassNotFoundException e) { BpmnError = Class.forName('org.camunda.bpm.engine.delegate.BpmnError') }&#10;def code = ((Number) statusCode).intValue()&#10;if (code == 409) throw BpmnError.getConstructor(String, String).newInstance('TTR_STALE', 'run API fingerprint refused')&#10;if (code &gt;= 400 &amp;&amp; code &lt; 500 &amp;&amp; code != 408 &amp;&amp; code != 429) throw BpmnError.getConstructor(String, String).newInstance('TTR_REFUSED', 'run API HTTP ' + code + ': ' + response.toString().take(256))&#10;if (code &lt; 200 || code &gt;= 300) throw new IllegalStateException('run API HTTP ' + code)&#10;def SpinClass; try { SpinClass = Class.forName('org.cibseven.spin.Spin') } catch (ClassNotFoundException e) { SpinClass = Class.forName('org.camunda.spin.Spin') }&#10;return SpinClass.JSON(response)</camunda:script>
+                      </camunda:outputParameter>
+                      <camunda:outputParameter name="ttrHandleCode">${statusCode}</camunda:outputParameter>
+                      <camunda:outputParameter name="ttrHandleHeaders">${headers}</camunda:outputParameter>
+                      <camunda:outputParameter name="ttrHandleRetryAfter">
+                        <camunda:script scriptFormat="groovy">def value = headers['retry-after'] ?: headers['Retry-After']&#10;try {&#10;    def seconds = new BigDecimal(value.toString())&#10;    return seconds &gt; 0 ? seconds : 15&#10;} catch (Exception ignored) {&#10;    try {&#10;        def instant = java.time.ZonedDateTime.parse(value.toString(), java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).toInstant()&#10;        return Math.max(1L, (long) Math.ceil(java.time.Duration.between(java.time.Instant.now(), instant).toMillis() / 1000.0))&#10;    } catch (Exception absent) { return 15 }&#10;}</camunda:script>
+                      </camunda:outputParameter>
+                    </camunda:inputOutput>
+                  </camunda:connector>
+                  <camunda:failedJobRetryTimeCycle>R3/PT15S</camunda:failedJobRetryTimeCycle>
+                </bpmn:extensionElements>
+                <bpmn:incoming>n_ea2312d265eef2ab8c15</bpmn:incoming>
+                <bpmn:outgoing>n_41c847ba0023ef6f82b7</bpmn:outgoing>
+              </bpmn:serviceTask>
+              <bpmn:exclusiveGateway default="n_ca471473a48fcb0f615f" id="n_2e1ed1fcea9862c00526" name="handle terminal">
+                <bpmn:incoming>n_41c847ba0023ef6f82b7</bpmn:incoming>
+                <bpmn:outgoing>n_bfca96c6f9670b8bf374</bpmn:outgoing>
+                <bpmn:outgoing>n_ca471473a48fcb0f615f</bpmn:outgoing>
+              </bpmn:exclusiveGateway>
+              <bpmn:sequenceFlow id="n_ea3271c7518517db01f9" sourceRef="n_389f27bc5308b897b33b" targetRef="n_34011215640a8c877d94" />
+              <bpmn:sequenceFlow id="n_ea2312d265eef2ab8c15" sourceRef="n_34011215640a8c877d94" targetRef="n_03796effa90a8306e54e" />
+              <bpmn:sequenceFlow id="n_41c847ba0023ef6f82b7" sourceRef="n_03796effa90a8306e54e" targetRef="n_2e1ed1fcea9862c00526" />
+              <bpmn:sequenceFlow id="n_bfca96c6f9670b8bf374" name="terminal" sourceRef="n_2e1ed1fcea9862c00526" targetRef="n_1cb3f9dcf894a2962e3d">
+                <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${(((ttrHandle.prop(&quot;status&quot;).stringValue() == &quot;closed&quot;) || (ttrHandle.prop(&quot;status&quot;).stringValue() == &quot;waiting&quot;)) || (ttrHandle.prop(&quot;status&quot;).stringValue() == &quot;abandoned&quot;)) || (ttrHandle.prop(&quot;status&quot;).stringValue() == &quot;failed&quot;)}</bpmn:conditionExpression>
+              </bpmn:sequenceFlow>
+              <bpmn:sequenceFlow id="n_ca471473a48fcb0f615f" sourceRef="n_2e1ed1fcea9862c00526" targetRef="n_34011215640a8c877d94" />
+            </bpmn:subProcess>
+            <bpmn:boundaryEvent attachedToRef="n_54c94fbb532a17f7a291" cancelActivity="true" id="n_8d5881e7ba6f710992e7" name="handle budget exceeded">
+              <bpmn:outgoing>n_7c80bea3255c0dccabb5</bpmn:outgoing>
+              <bpmn:timerEventDefinition>
+                <bpmn:timeDuration>PT1920S</bpmn:timeDuration>
+              </bpmn:timerEventDefinition>
+            </bpmn:boundaryEvent>
+            <bpmn:endEvent id="n_268f18cb18e3b40b709d" name="answer closed">
+              <bpmn:incoming>n_65a9a30bccd1054859d4</bpmn:incoming>
+              <bpmn:incoming>n_ba84b3faab11fc264d95</bpmn:incoming>
             </bpmn:endEvent>
+            <bpmn:exclusiveGateway default="n_7bc30e1cfb728ccb23c9" id="n_dfa10b8216e7662e887d" name="answer settled">
+              <bpmn:incoming>n_0efa8a448cd5336137d7</bpmn:incoming>
+              <bpmn:outgoing>n_65a9a30bccd1054859d4</bpmn:outgoing>
+              <bpmn:outgoing>n_7bc30e1cfb728ccb23c9</bpmn:outgoing>
+            </bpmn:exclusiveGateway>
+            <bpmn:exclusiveGateway default="n_c21815f0d05896266cdb" id="n_a7035ba616aa7db63d52" name="answer run closed">
+              <bpmn:incoming>n_359633495a5105ef1753</bpmn:incoming>
+              <bpmn:outgoing>n_ba84b3faab11fc264d95</bpmn:outgoing>
+              <bpmn:outgoing>n_c21815f0d05896266cdb</bpmn:outgoing>
+            </bpmn:exclusiveGateway>
+            <bpmn:boundaryEvent attachedToRef="n_2768287de30c7f2ac124" cancelActivity="true" id="n_2ee4cc10067ddf95de8d" name="answer evaluation budget exceeded">
+              <bpmn:outgoing>n_d4db967129bc2e15bc84</bpmn:outgoing>
+              <bpmn:timerEventDefinition>
+                <bpmn:timeDuration>PT1920S</bpmn:timeDuration>
+              </bpmn:timerEventDefinition>
+            </bpmn:boundaryEvent>
             <bpmn:sequenceFlow id="n_c5c3249690876b51d96a" sourceRef="n_aefed99b61499d9772f0" targetRef="n_b4ca41e7f970925088b8" />
-            <bpmn:sequenceFlow id="n_60387a4f3d120ca1ccd5" sourceRef="n_b4ca41e7f970925088b8" targetRef="n_67add99b259b5e8ac91c" />
+            <bpmn:sequenceFlow id="n_cfa3d234aa7fe1935005" sourceRef="n_b4ca41e7f970925088b8" targetRef="n_c0e83220693faea041d4" />
+            <bpmn:sequenceFlow id="n_80b32d60dd3475e698c4" name="200 replayed" sourceRef="n_c0e83220693faea041d4" targetRef="n_41d611fe5dfb12b361c7">
+              <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${(ttrAnswerOpenCode == 200) &amp;&amp; (ttrAnswerOpen.prop(&quot;replayed&quot;).boolValue())}</bpmn:conditionExpression>
+            </bpmn:sequenceFlow>
+            <bpmn:sequenceFlow id="n_0104609bfa9527538d15" name="201 claimed" sourceRef="n_c0e83220693faea041d4" targetRef="n_2768287de30c7f2ac124">
+              <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${ttrAnswerOpenCode == 201}</bpmn:conditionExpression>
+            </bpmn:sequenceFlow>
+            <bpmn:sequenceFlow id="n_fc9ef52fe7ca28dd3bab" name="202 handle" sourceRef="n_c0e83220693faea041d4" targetRef="n_54c94fbb532a17f7a291">
+              <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${ttrAnswerOpenCode == 202}</bpmn:conditionExpression>
+            </bpmn:sequenceFlow>
+            <bpmn:sequenceFlow id="n_c9bd3c62efd3e8946007" sourceRef="n_c0e83220693faea041d4" targetRef="n_cd74d52cb00c37edad64" />
+            <bpmn:sequenceFlow id="n_7c80bea3255c0dccabb5" sourceRef="n_8d5881e7ba6f710992e7" targetRef="n_cd74d52cb00c37edad64" />
+            <bpmn:sequenceFlow id="n_0efa8a448cd5336137d7" sourceRef="n_54c94fbb532a17f7a291" targetRef="n_dfa10b8216e7662e887d" />
+            <bpmn:sequenceFlow id="n_65a9a30bccd1054859d4" name="closed" sourceRef="n_dfa10b8216e7662e887d" targetRef="n_268f18cb18e3b40b709d">
+              <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${ttrHandle.prop(&quot;status&quot;).stringValue() == &quot;closed&quot;}</bpmn:conditionExpression>
+            </bpmn:sequenceFlow>
+            <bpmn:sequenceFlow id="n_7bc30e1cfb728ccb23c9" sourceRef="n_dfa10b8216e7662e887d" targetRef="n_cd74d52cb00c37edad64" />
+            <bpmn:sequenceFlow id="n_fbae5a9922b53607c3e3" sourceRef="n_2768287de30c7f2ac124" targetRef="n_41d611fe5dfb12b361c7" />
+            <bpmn:sequenceFlow id="n_359633495a5105ef1753" sourceRef="n_41d611fe5dfb12b361c7" targetRef="n_a7035ba616aa7db63d52" />
+            <bpmn:sequenceFlow id="n_ba84b3faab11fc264d95" name="closed" sourceRef="n_a7035ba616aa7db63d52" targetRef="n_268f18cb18e3b40b709d">
+              <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${ttrAnswerClosed.prop(&quot;status&quot;).stringValue() == &quot;closed&quot;}</bpmn:conditionExpression>
+            </bpmn:sequenceFlow>
+            <bpmn:sequenceFlow id="n_c21815f0d05896266cdb" sourceRef="n_a7035ba616aa7db63d52" targetRef="n_cd74d52cb00c37edad64" />
+            <bpmn:sequenceFlow id="n_d4db967129bc2e15bc84" sourceRef="n_2ee4cc10067ddf95de8d" targetRef="n_cd74d52cb00c37edad64" />
           </bpmn:subProcess>
           <bpmn:endEvent id="n_8832740d2f3edff3d4af" name="row complete">
             <bpmn:incoming>n_4779e88da23fe737ff06</bpmn:incoming>
@@ -1319,22 +1587,22 @@
         <dc:Bounds height="36" width="36" x="60" y="120" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_561d86fb9f0cebe47c4c" id="n_561d86fb9f0cebe47c4c_di">
-        <dc:Bounds height="36" width="36" x="9362" y="120" />
+        <dc:Bounds height="36" width="36" x="10984" y="120" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_f8989cfa101981fa39fb" id="n_f8989cfa101981fa39fb_di">
-        <dc:Bounds height="90" width="160" x="9102" y="120" />
+        <dc:Bounds height="90" width="160" x="10724" y="120" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_49bce64263ee1cc88c34" id="n_49bce64263ee1cc88c34_di">
-        <dc:Bounds height="90" width="160" x="9102" y="270" />
+        <dc:Bounds height="90" width="160" x="10724" y="270" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_37cd645b0f8512494beb" id="n_37cd645b0f8512494beb_di" isExpanded="true">
-        <dc:Bounds height="2080" width="8670" x="196" y="120" />
+        <dc:Bounds height="2826" width="10292" x="196" y="120" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_b03eb5fc1b226a08b438" id="n_b03eb5fc1b226a08b438_di">
         <dc:Bounds height="36" width="36" x="236" y="220" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_e82c754d22795500d3ec" id="n_e82c754d22795500d3ec_di">
-        <dc:Bounds height="36" width="36" x="8750" y="220" />
+        <dc:Bounds height="36" width="36" x="10372" y="220" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_57c5afabe6817006e706" id="n_57c5afabe6817006e706_di">
         <dc:Bounds height="36" width="36" x="2280" y="220" />
@@ -1401,7 +1669,7 @@
         <dc:Bounds height="50" width="50" x="2130" y="220" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_7bf8afb18b6c69a960d6" id="n_7bf8afb18b6c69a960d6_di" isExpanded="true">
-        <dc:Bounds height="1860" width="6220" x="2430" y="220" />
+        <dc:Bounds height="2606" width="7842" x="2430" y="220" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_7fac5eafc9abeb1f7cc4" id="n_7fac5eafc9abeb1f7cc4_di">
         <dc:Bounds height="36" width="36" x="2470" y="320" />
@@ -1530,7 +1798,7 @@
         <dc:Bounds height="50" width="50" x="5158" y="416" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_f87add6b1ce842123e62" id="n_f87add6b1ce842123e62_di">
-        <dc:Bounds height="50" width="50" x="8124" y="320" />
+        <dc:Bounds height="50" width="50" x="9746" y="320" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_0001d4efdf8046dd271d" id="n_0001d4efdf8046dd271d_di" isExpanded="true">
         <dc:Bounds height="352" width="1112" x="5308" y="320" />
@@ -1811,7 +2079,7 @@
         <di:waypoint x="6304" y="1262" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape bpmnElement="n_1bd926fb424bf5c74f6f" id="n_1bd926fb424bf5c74f6f_di" isExpanded="true">
-        <dc:Bounds height="530" width="1504" x="6520" y="1060" />
+        <dc:Bounds height="1276" width="3126" x="6520" y="1060" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_61e344bb61873e954b6d" id="n_61e344bb61873e954b6d_di">
         <dc:Bounds height="36" width="36" x="6560" y="1160" />
@@ -1820,33 +2088,200 @@
         <dc:Bounds height="50" width="50" x="6696" y="1160" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_c7bc6e4d5053f4605b99" id="n_c7bc6e4d5053f4605b99_di">
-        <dc:Bounds height="50" width="50" x="7758" y="1160" />
+        <dc:Bounds height="50" width="50" x="9380" y="1160" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_8fe8781c3b35fe9fbb1f" id="n_8fe8781c3b35fe9fbb1f_di">
         <dc:Bounds height="90" width="160" x="6846" y="1160" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_91703312dfa01aecee07" id="n_91703312dfa01aecee07_di" isExpanded="true">
-        <dc:Bounds height="310" width="552" x="7106" y="1160" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape bpmnElement="n_b4ca41e7f970925088b8" id="n_b4ca41e7f970925088b8_di">
-        <dc:Bounds height="90" width="160" x="7282" y="1260" />
+        <dc:Bounds height="1056" width="2174" x="7106" y="1160" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_aefed99b61499d9772f0" id="n_aefed99b61499d9772f0_di">
         <dc:Bounds height="36" width="36" x="7146" y="1260" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape bpmnElement="n_67add99b259b5e8ac91c" id="n_67add99b259b5e8ac91c_di">
-        <dc:Bounds height="36" width="36" x="7542" y="1260" />
+      <bpmndi:BPMNShape bpmnElement="n_cd74d52cb00c37edad64" id="n_cd74d52cb00c37edad64_di">
+        <dc:Bounds height="36" width="36" x="9164" y="1260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_b4ca41e7f970925088b8" id="n_b4ca41e7f970925088b8_di">
+        <dc:Bounds height="90" width="160" x="7282" y="1260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_c0e83220693faea041d4" id="n_c0e83220693faea041d4_di">
+        <dc:Bounds height="50" width="50" x="7542" y="1260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_41d611fe5dfb12b361c7" id="n_41d611fe5dfb12b361c7_di">
+        <dc:Bounds height="90" width="160" x="8754" y="1260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_2768287de30c7f2ac124" id="n_2768287de30c7f2ac124_di" isExpanded="true">
+        <dc:Bounds height="448" width="962" x="7692" y="1260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_9d96afa01d2d0afd4cae" id="n_9d96afa01d2d0afd4cae_di">
+        <dc:Bounds height="36" width="36" x="7732" y="1360" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_1fed32d4269eeb45851f" id="n_1fed32d4269eeb45851f_di">
+        <dc:Bounds height="90" width="160" x="7868" y="1360" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_df831c55d6c6e8dbd120" id="n_df831c55d6c6e8dbd120_di">
+        <dc:Bounds height="50" width="50" x="8388" y="1360" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_cdfb41e1305ff69785a2" id="n_cdfb41e1305ff69785a2_di">
+        <dc:Bounds height="36" width="36" x="8538" y="1360" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_47c1be90a3cfb37cd6fb" id="n_47c1be90a3cfb37cd6fb_di">
+        <dc:Bounds height="90" width="160" x="8128" y="1360" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_4241a204167f6e79374a" id="n_4241a204167f6e79374a_di">
+        <dc:Bounds height="36" width="36" x="8538" y="1456" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_54d90a584e12c13bd80c" id="n_54d90a584e12c13bd80c_di">
+        <dc:Bounds height="36" width="36" x="8538" y="1552" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="n_0ab72e7dd28d302f14b6" id="n_0ab72e7dd28d302f14b6_di">
+        <di:waypoint x="7768" y="1378" />
+        <di:waypoint x="7868" y="1405" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_aefdbc2a51818425dd0b" id="n_aefdbc2a51818425dd0b_di">
+        <di:waypoint x="8438" y="1385" />
+        <di:waypoint x="8538" y="1378" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_167aaf3ab9a0ca47151a" id="n_167aaf3ab9a0ca47151a_di">
+        <di:waypoint x="8028" y="1405" />
+        <di:waypoint x="8128" y="1405" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_e1b7e2308cbbf5f33ea6" id="n_e1b7e2308cbbf5f33ea6_di">
+        <di:waypoint x="8556" y="1360" />
+        <di:waypoint x="8556" y="1330" />
+        <di:waypoint x="8208" y="1330" />
+        <di:waypoint x="8208" y="1360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_5c52144e4ad79af67b8d" id="n_5c52144e4ad79af67b8d_di">
+        <di:waypoint x="8288" y="1405" />
+        <di:waypoint x="8388" y="1385" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_8e8aadc16127cec48203" id="n_8e8aadc16127cec48203_di">
+        <di:waypoint x="8438" y="1385" />
+        <di:waypoint x="8538" y="1570" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_59f85117cd5b411f9815" id="n_59f85117cd5b411f9815_di">
+        <di:waypoint x="8438" y="1385" />
+        <di:waypoint x="8538" y="1474" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape bpmnElement="n_54c94fbb532a17f7a291" id="n_54c94fbb532a17f7a291_di" isExpanded="true">
+        <dc:Bounds height="310" width="838" x="7692" y="1768" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_389f27bc5308b897b33b" id="n_389f27bc5308b897b33b_di">
+        <dc:Bounds height="36" width="36" x="7732" y="1868" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_1cb3f9dcf894a2962e3d" id="n_1cb3f9dcf894a2962e3d_di">
+        <dc:Bounds height="36" width="36" x="8414" y="1868" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_34011215640a8c877d94" id="n_34011215640a8c877d94_di">
+        <dc:Bounds height="36" width="36" x="7868" y="1868" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_03796effa90a8306e54e" id="n_03796effa90a8306e54e_di">
+        <dc:Bounds height="90" width="160" x="8004" y="1868" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_2e1ed1fcea9862c00526" id="n_2e1ed1fcea9862c00526_di">
+        <dc:Bounds height="50" width="50" x="8264" y="1868" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="n_ea3271c7518517db01f9" id="n_ea3271c7518517db01f9_di">
+        <di:waypoint x="7768" y="1886" />
+        <di:waypoint x="7868" y="1886" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_ea2312d265eef2ab8c15" id="n_ea2312d265eef2ab8c15_di">
+        <di:waypoint x="7904" y="1886" />
+        <di:waypoint x="8004" y="1913" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_41c847ba0023ef6f82b7" id="n_41c847ba0023ef6f82b7_di">
+        <di:waypoint x="8164" y="1913" />
+        <di:waypoint x="8264" y="1893" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_bfca96c6f9670b8bf374" id="n_bfca96c6f9670b8bf374_di">
+        <di:waypoint x="8314" y="1893" />
+        <di:waypoint x="8414" y="1886" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_ca471473a48fcb0f615f" id="n_ca471473a48fcb0f615f_di">
+        <di:waypoint x="8289" y="1868" />
+        <di:waypoint x="8289" y="1838" />
+        <di:waypoint x="7886" y="1838" />
+        <di:waypoint x="7886" y="1868" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape bpmnElement="n_8d5881e7ba6f710992e7" id="n_8d5881e7ba6f710992e7_di">
+        <dc:Bounds height="36" width="36" x="8480" y="2060" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_268f18cb18e3b40b709d" id="n_268f18cb18e3b40b709d_di">
+        <dc:Bounds height="36" width="36" x="9164" y="1356" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_dfa10b8216e7662e887d" id="n_dfa10b8216e7662e887d_di">
+        <dc:Bounds height="50" width="50" x="8630" y="1768" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_a7035ba616aa7db63d52" id="n_a7035ba616aa7db63d52_di">
+        <dc:Bounds height="50" width="50" x="9014" y="1260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="n_2ee4cc10067ddf95de8d" id="n_2ee4cc10067ddf95de8d_di">
+        <dc:Bounds height="36" width="36" x="8604" y="1690" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge bpmnElement="n_c5c3249690876b51d96a" id="n_c5c3249690876b51d96a_di">
         <di:waypoint x="7182" y="1278" />
         <di:waypoint x="7282" y="1305" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge bpmnElement="n_60387a4f3d120ca1ccd5" id="n_60387a4f3d120ca1ccd5_di">
+      <bpmndi:BPMNEdge bpmnElement="n_cfa3d234aa7fe1935005" id="n_cfa3d234aa7fe1935005_di">
         <di:waypoint x="7442" y="1305" />
-        <di:waypoint x="7542" y="1278" />
+        <di:waypoint x="7542" y="1285" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_80b32d60dd3475e698c4" id="n_80b32d60dd3475e698c4_di">
+        <di:waypoint x="7592" y="1285" />
+        <di:waypoint x="8754" y="1305" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_0104609bfa9527538d15" id="n_0104609bfa9527538d15_di">
+        <di:waypoint x="7592" y="1285" />
+        <di:waypoint x="7692" y="1484" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_fc9ef52fe7ca28dd3bab" id="n_fc9ef52fe7ca28dd3bab_di">
+        <di:waypoint x="7592" y="1285" />
+        <di:waypoint x="7692" y="1923" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_c9bd3c62efd3e8946007" id="n_c9bd3c62efd3e8946007_di">
+        <di:waypoint x="7592" y="1285" />
+        <di:waypoint x="9164" y="1278" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_7c80bea3255c0dccabb5" id="n_7c80bea3255c0dccabb5_di">
+        <di:waypoint x="8516" y="2078" />
+        <di:waypoint x="9164" y="1278" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_0efa8a448cd5336137d7" id="n_0efa8a448cd5336137d7_di">
+        <di:waypoint x="8530" y="1923" />
+        <di:waypoint x="8630" y="1793" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_65a9a30bccd1054859d4" id="n_65a9a30bccd1054859d4_di">
+        <di:waypoint x="8680" y="1793" />
+        <di:waypoint x="9164" y="1374" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_7bc30e1cfb728ccb23c9" id="n_7bc30e1cfb728ccb23c9_di">
+        <di:waypoint x="8680" y="1793" />
+        <di:waypoint x="9164" y="1278" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_fbae5a9922b53607c3e3" id="n_fbae5a9922b53607c3e3_di">
+        <di:waypoint x="8654" y="1484" />
+        <di:waypoint x="8754" y="1305" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_359633495a5105ef1753" id="n_359633495a5105ef1753_di">
+        <di:waypoint x="8914" y="1305" />
+        <di:waypoint x="9014" y="1285" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_ba84b3faab11fc264d95" id="n_ba84b3faab11fc264d95_di">
+        <di:waypoint x="9064" y="1285" />
+        <di:waypoint x="9164" y="1374" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_c21815f0d05896266cdb" id="n_c21815f0d05896266cdb_di">
+        <di:waypoint x="9064" y="1285" />
+        <di:waypoint x="9164" y="1278" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="n_d4db967129bc2e15bc84" id="n_d4db967129bc2e15bc84_di">
+        <di:waypoint x="8640" y="1708" />
+        <di:waypoint x="9164" y="1278" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape bpmnElement="n_8832740d2f3edff3d4af" id="n_8832740d2f3edff3d4af_di">
-        <dc:Bounds height="36" width="36" x="7908" y="1160" />
+        <dc:Bounds height="36" width="36" x="9530" y="1160" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge bpmnElement="n_a19c9508bd94a4c524e8" id="n_a19c9508bd94a4c524e8_di">
         <di:waypoint x="6596" y="1178" />
@@ -1854,7 +2289,7 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_4803b343e653e5548a12" id="n_4803b343e653e5548a12_di">
         <di:waypoint x="6746" y="1185" />
-        <di:waypoint x="7758" y="1185" />
+        <di:waypoint x="9380" y="1185" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_529a8c807d3feb30d66f" id="n_529a8c807d3feb30d66f_di">
         <di:waypoint x="6746" y="1185" />
@@ -1862,15 +2297,15 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_4d018ea0f281a7017254" id="n_4d018ea0f281a7017254_di">
         <di:waypoint x="7006" y="1205" />
-        <di:waypoint x="7106" y="1315" />
+        <di:waypoint x="7106" y="1688" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_98624e5c16836d8c9a74" id="n_98624e5c16836d8c9a74_di">
-        <di:waypoint x="7658" y="1315" />
-        <di:waypoint x="7758" y="1185" />
+        <di:waypoint x="9280" y="1688" />
+        <di:waypoint x="9380" y="1185" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_4779e88da23fe737ff06" id="n_4779e88da23fe737ff06_di">
-        <di:waypoint x="7808" y="1185" />
-        <di:waypoint x="7908" y="1178" />
+        <di:waypoint x="9430" y="1185" />
+        <di:waypoint x="9530" y="1178" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape bpmnElement="n_8704da6c269681eb0d60" id="n_8704da6c269681eb0d60_di" isExpanded="true">
         <dc:Bounds height="352" width="1112" x="5308" y="1556" />
@@ -1931,30 +2366,30 @@
         <di:waypoint x="6304" y="1674" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape bpmnElement="n_7c4b0679c6e38a4bf7d7" id="n_7c4b0679c6e38a4bf7d7_di" isExpanded="true">
-        <dc:Bounds height="310" width="552" x="6520" y="1650" />
+        <dc:Bounds height="310" width="552" x="6520" y="2396" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_8c9aeffd2a2b9711ceeb" id="n_8c9aeffd2a2b9711ceeb_di">
-        <dc:Bounds height="36" width="36" x="6560" y="1750" />
+        <dc:Bounds height="36" width="36" x="6560" y="2496" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_a15e9cd5a2fad50b8d95" id="n_a15e9cd5a2fad50b8d95_di">
-        <dc:Bounds height="90" width="160" x="6696" y="1750" />
+        <dc:Bounds height="90" width="160" x="6696" y="2496" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_73fe50043be0fe85273e" id="n_73fe50043be0fe85273e_di">
-        <dc:Bounds height="36" width="36" x="6956" y="1750" />
+        <dc:Bounds height="36" width="36" x="6956" y="2496" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge bpmnElement="n_ed3f3b33857da318992c" id="n_ed3f3b33857da318992c_di">
-        <di:waypoint x="6596" y="1768" />
-        <di:waypoint x="6696" y="1795" />
+        <di:waypoint x="6596" y="2514" />
+        <di:waypoint x="6696" y="2541" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_b990e8228ad8c59e7064" id="n_b990e8228ad8c59e7064_di">
-        <di:waypoint x="6856" y="1795" />
-        <di:waypoint x="6956" y="1768" />
+        <di:waypoint x="6856" y="2541" />
+        <di:waypoint x="6956" y="2514" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape bpmnElement="n_95c806f8fe8610d2826e" id="n_95c806f8fe8610d2826e_di">
-        <dc:Bounds height="90" width="160" x="8274" y="320" />
+        <dc:Bounds height="90" width="160" x="9896" y="320" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_f1d9bbd008b4fe1a819a" id="n_f1d9bbd008b4fe1a819a_di">
-        <dc:Bounds height="36" width="36" x="8534" y="320" />
+        <dc:Bounds height="36" width="36" x="10156" y="320" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_411638b2df2fdd6af60d" id="n_411638b2df2fdd6af60d_di">
         <dc:Bounds height="36" width="36" x="4598" y="912" />
@@ -1981,7 +2416,7 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_cf2b2a4d709ab23acd82" id="n_cf2b2a4d709ab23acd82_di">
         <di:waypoint x="5208" y="441" />
-        <di:waypoint x="8124" y="345" />
+        <di:waypoint x="9746" y="345" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_c689e3d71fdd2461cb1e" id="n_c689e3d71fdd2461cb1e_di">
         <di:waypoint x="5208" y="441" />
@@ -1993,7 +2428,7 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_4b2083583f874e596181" id="n_4b2083583f874e596181_di">
         <di:waypoint x="7892" y="475" />
-        <di:waypoint x="8124" y="345" />
+        <di:waypoint x="9746" y="345" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_d70540f0c275f21f6894" id="n_d70540f0c275f21f6894_di">
         <di:waypoint x="5208" y="441" />
@@ -2005,7 +2440,7 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_453bc71989bca22bbb67" id="n_453bc71989bca22bbb67_di">
         <di:waypoint x="7892" y="845" />
-        <di:waypoint x="8124" y="345" />
+        <di:waypoint x="9746" y="345" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_0eff7a11eca6f2ae698d" id="n_0eff7a11eca6f2ae698d_di">
         <di:waypoint x="5208" y="441" />
@@ -2013,11 +2448,11 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_da928778defb754a0ec0" id="n_da928778defb754a0ec0_di">
         <di:waypoint x="6420" y="1320" />
-        <di:waypoint x="6520" y="1325" />
+        <di:waypoint x="6520" y="1698" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_b6fa38ae305717a60314" id="n_b6fa38ae305717a60314_di">
-        <di:waypoint x="8024" y="1325" />
-        <di:waypoint x="8124" y="345" />
+        <di:waypoint x="9646" y="1698" />
+        <di:waypoint x="9746" y="345" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_aaa171c42f4fc93e2f3d" id="n_aaa171c42f4fc93e2f3d_di">
         <di:waypoint x="5208" y="441" />
@@ -2025,19 +2460,19 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_6c53f4499b921b08f688" id="n_6c53f4499b921b08f688_di">
         <di:waypoint x="6420" y="1732" />
-        <di:waypoint x="6520" y="1805" />
+        <di:waypoint x="6520" y="2551" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_51fd5a785ff62f65940a" id="n_51fd5a785ff62f65940a_di">
-        <di:waypoint x="7072" y="1805" />
-        <di:waypoint x="8124" y="345" />
+        <di:waypoint x="7072" y="2551" />
+        <di:waypoint x="9746" y="345" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_848ddbb11a8a85a86903" id="n_848ddbb11a8a85a86903_di">
-        <di:waypoint x="8174" y="345" />
-        <di:waypoint x="8274" y="365" />
+        <di:waypoint x="9796" y="345" />
+        <di:waypoint x="9896" y="365" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_b95b3218d13e5d4516fd" id="n_b95b3218d13e5d4516fd_di">
-        <di:waypoint x="8434" y="365" />
-        <di:waypoint x="8534" y="338" />
+        <di:waypoint x="10056" y="365" />
+        <di:waypoint x="10156" y="338" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_db0ad2c2176ed65de97b" id="n_db0ad2c2176ed65de97b_di">
         <di:waypoint x="4634" y="930" />
@@ -2053,7 +2488,7 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_ce11fe307446707e17c7" id="n_ce11fe307446707e17c7_di">
         <di:waypoint x="682" y="245" />
-        <di:waypoint x="8750" y="238" />
+        <di:waypoint x="10372" y="238" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_e5510f5d65d082bee5d0" id="n_e5510f5d65d082bee5d0_di">
         <di:waypoint x="682" y="245" />
@@ -2077,7 +2512,7 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_0c568889bc8a1c197d7a" id="n_0c568889bc8a1c197d7a_di">
         <di:waypoint x="1770" y="245" />
-        <di:waypoint x="8750" y="238" />
+        <di:waypoint x="10372" y="238" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_1b1c36d633eb99b246b7" id="n_1b1c36d633eb99b246b7_di">
         <di:waypoint x="1770" y="245" />
@@ -2101,51 +2536,51 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_444536f82d11250f93d4" id="n_444536f82d11250f93d4_di">
         <di:waypoint x="2330" y="341" />
-        <di:waypoint x="2430" y="1150" />
+        <di:waypoint x="2430" y="1523" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_e7f691cf6f3f2db6a2c5" id="n_e7f691cf6f3f2db6a2c5_di">
-        <di:waypoint x="8650" y="1150" />
-        <di:waypoint x="8750" y="238" />
+        <di:waypoint x="10272" y="1523" />
+        <di:waypoint x="10372" y="238" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape bpmnElement="n_66e018aa8aadc785e0ad" id="n_66e018aa8aadc785e0ad_di">
-        <dc:Bounds height="50" width="50" x="8966" y="120" />
+        <dc:Bounds height="50" width="50" x="10588" y="120" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_a014c7e56a6fe23ec6be" id="n_a014c7e56a6fe23ec6be_di">
-        <dc:Bounds height="36" width="36" x="8816" y="2182" />
+        <dc:Bounds height="36" width="36" x="10438" y="2928" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_aad46a58fc1af8035796" id="n_aad46a58fc1af8035796_di">
-        <dc:Bounds height="36" width="36" x="8816" y="2182" />
+        <dc:Bounds height="36" width="36" x="10438" y="2928" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="n_10f8daabe4901b95563e" id="n_10f8daabe4901b95563e_di">
-        <dc:Bounds height="36" width="36" x="9116" y="420" />
+        <dc:Bounds height="36" width="36" x="10738" y="420" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge bpmnElement="n_bf8afafa09ec0e9eb55d" id="n_bf8afafa09ec0e9eb55d_di">
-        <di:waypoint x="9262" y="165" />
-        <di:waypoint x="9362" y="138" />
+        <di:waypoint x="10884" y="165" />
+        <di:waypoint x="10984" y="138" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_3a601f95273f8cb770bd" id="n_3a601f95273f8cb770bd_di">
-        <di:waypoint x="9262" y="315" />
-        <di:waypoint x="9362" y="138" />
+        <di:waypoint x="10884" y="315" />
+        <di:waypoint x="10984" y="138" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_12be60dfb3962855295e" id="n_12be60dfb3962855295e_di">
         <di:waypoint x="96" y="138" />
-        <di:waypoint x="196" y="1160" />
+        <di:waypoint x="196" y="1533" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_4bfad1c9cac9c7ca6964" id="n_4bfad1c9cac9c7ca6964_di">
-        <di:waypoint x="8866" y="1160" />
-        <di:waypoint x="8966" y="145" />
+        <di:waypoint x="10488" y="1533" />
+        <di:waypoint x="10588" y="145" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_98d7e8f6e7dbbbba14bf" id="n_98d7e8f6e7dbbbba14bf_di">
-        <di:waypoint x="8852" y="2200" />
-        <di:waypoint x="9102" y="165" />
+        <di:waypoint x="10474" y="2946" />
+        <di:waypoint x="10724" y="165" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_eaca2480c416fd5d20f0" id="n_eaca2480c416fd5d20f0_di">
-        <di:waypoint x="8852" y="2200" />
-        <di:waypoint x="9102" y="315" />
+        <di:waypoint x="10474" y="2946" />
+        <di:waypoint x="10724" y="315" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="n_59eea7ceb3c257ff619c" id="n_59eea7ceb3c257ff619c_di">
-        <di:waypoint x="9016" y="145" />
-        <di:waypoint x="9116" y="438" />
+        <di:waypoint x="10638" y="145" />
+        <di:waypoint x="10738" y="438" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
