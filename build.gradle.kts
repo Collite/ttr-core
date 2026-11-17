@@ -37,6 +37,19 @@ allprojects {
         }
 }
 
+// The project paths a module declares in [scopes]; [declared] answers one scope's project dependencies (null: no
+// such configuration). One reading for grammarBundleClosure and libraryCliEdges (review-340 N2), so the two cannot
+// drift in how they read a scope.
+fun projectDeps(
+    scopes: List<String>,
+    declared: (String) -> Collection<String>?,
+): Set<String> = scopes.flatMap { declared(it).orEmpty() }.toSet()
+
+fun declaredProjectDeps(p: Project): (String) -> Collection<String>? =
+    { scope ->
+        p.configurations.findByName(scope)?.dependencies?.withType(ProjectDependency::class.java)?.map { it.path }
+    }
+
 // MW S3.7 T3 (from S3.4 review-260 F1, caught only by review: ttr-profile was missing from the bundle) — the grammar
 // bundle's release closure. publish.yml's `grammar/v*` MODULES must list every project the published modules depend on
 // at runtime (api · implementation · runtimeOnly, transitively): a POM names its project dependencies at the bundle's
@@ -61,11 +74,7 @@ val grammarBundleClosure by tasks.registering {
             listOf("api", "implementation", "runtimeOnly") +
                 listOf("testFixturesApi", "testFixturesImplementation", "testFixturesRuntimeOnly")
 
-        fun direct(path: String): Set<String> =
-            runtime
-                .mapNotNull { project(path).configurations.findByName(it) }
-                .flatMap { it.dependencies.withType(ProjectDependency::class.java).map { dep -> dep.path } }
-                .toSet()
+        fun direct(path: String): Set<String> = projectDeps(runtime, declaredProjectDeps(project(path)))
         val closure = mutableSetOf<String>()
         val queue = ArrayDeque(listed)
         while (queue.isNotEmpty()) {
@@ -98,27 +107,38 @@ val libraryCliEdges by tasks.registering {
     group = "verification"
     description = "No non-*-cli module depends on a *-cli module (MW S4.1 fat-jar failure; AU-export S1.5.9)"
     doLast {
+        // review-340 L1: the scopes that reach a consumer's compile or runtime classpath, or the module's own runtime.
+        // Not `compileOnly` (it reaches neither) and not the test scopes.
         val scopes =
-            listOf("api", "implementation", "compileOnly", "runtimeOnly") +
-                listOf("testFixturesApi", "testFixturesImplementation", "testFixturesRuntimeOnly")
+            listOf("api", "implementation", "runtimeOnly", "compileOnlyApi") +
+                listOf(
+                    "testFixturesApi",
+                    "testFixturesImplementation",
+                    "testFixturesRuntimeOnly",
+                    "testFixturesCompileOnlyApi",
+                )
 
         fun isCli(path: String) = path.substringAfterLast(':').endsWith("-cli")
 
         fun edges(graph: Map<String, Set<String>>): Set<String> =
             graph.flatMap { (from, to) -> to.filter { !isCli(from) && isCli(it) }.map { "$from -> $it" } }.toSet()
 
-        // The rule must trigger (a guard that never fires passes everything): a synthetic library → CLI edge is found.
+        // The rule must trigger (a guard that never fires passes everything): a synthetic library → CLI edge is found…
         check(edges(mapOf(":lib" to setOf(":x-cli", ":y"), ":z-cli" to setOf(":w-cli"))) == setOf(":lib -> :x-cli")) {
             "libraryCliEdges: the rule no longer finds a library -> CLI edge"
         }
-        val graph =
-            subprojects.associate { p ->
-                p.path to
-                    scopes
-                        .mapNotNull { p.configurations.findByName(it) }
-                        .flatMap { it.dependencies.withType(ProjectDependency::class.java).map { dep -> dep.path } }
-                        .toSet()
+        // …through every listed scope, read by the same function the real graph is read with; and not through the
+        // scopes that reach no consumer and no runtime.
+        scopes.forEach { scope ->
+            val read = projectDeps(scopes) { if (it == scope) listOf(":x-cli") else null }
+            check(edges(mapOf(":lib" to read)) == setOf(":lib -> :x-cli")) { "libraryCliEdges does not read `$scope`" }
+        }
+        listOf("compileOnly", "testImplementation", "testRuntimeOnly").forEach { scope ->
+            check(projectDeps(scopes) { if (it == scope) listOf(":x-cli") else null }.isEmpty()) {
+                "libraryCliEdges reads `$scope`, which reaches no consumer"
             }
+        }
+        val graph = subprojects.associate { p -> p.path to projectDeps(scopes, declaredProjectDeps(p)) }
         val found = edges(graph)
         val offending = (found - allowedCliEdges.keys).sorted()
         check(offending.isEmpty()) {
