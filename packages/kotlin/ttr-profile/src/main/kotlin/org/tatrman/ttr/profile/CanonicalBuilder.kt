@@ -52,6 +52,21 @@ internal object ProfileVocabulary {
 
     fun semanticsKind(kind: String): String = if (kind in conceptKinds) "concept" else kind
 
+    /**
+     * S5.2b, ✅R346-A: the keywords an overlay re-kinds a definition to — the cn stereotypes only (a cn role is a
+     * concept: one `def role` production, read by the file's model). Other models: `kind:` stays a property.
+     */
+    val cnStereotypes = setOf("kind", "subkind", "variant", "role", "event", "phase", "quality", "relation_type")
+
+    /** The keyword an overlay `kind:` [value] re-kinds [record] to: a top-level cn record and a cn stereotype; else null. */
+    fun rekind(
+        record: Record,
+        value: JsonElement,
+    ): String? {
+        val keyword = (value as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
+        return keyword.takeIf { record.parent == null && model(record.kind) == "cn" && it in cnStereotypes }
+    }
+
     fun model(kind: String): String {
         val ast =
             when (kind) {
@@ -159,6 +174,12 @@ internal class CanonicalBuilder(
     private val perFile: Boolean = false,
 ) {
     private val properties = mutableMapOf<Record, MutableMap<String, JsonElement>>()
+
+    /** S5.2b: the keyword an overlay re-kinded a definition to; identity, qname and document stay the transform's. */
+    private val rekinds = mutableMapOf<Record, String>()
+
+    /** Review-346 F3: the re-kinded record's qname and the overlay value that re-kinded it, named in a failed load. */
+    private val rekindOrigins = mutableMapOf<Record, Pair<String, ProfileSpan>>()
     private val children = mutableMapOf<Record, MutableMap<String, MutableList<Record>>>()
 
     /** The dialect trees by label, built once: relocation looks a span's file up for every emitted document (F9). */
@@ -287,6 +308,28 @@ internal class CanonicalBuilder(
         imports.getOrPut(group(plan, record)) { sortedSetOf() } += "$pkg.*"
     }
 
+    /**
+     * S5.2b (✅D-MW-84, ✅R346-A): an overlay re-kinds the emitted definition of [record] to [keyword] (one that
+     * [ProfileVocabulary.rekind] accepted). Returns the keyword it replaced; [qname] and [origin] name the overlay
+     * in a canonical-validation error inside the re-kinded definition.
+     */
+    fun rekind(
+        record: Record,
+        keyword: String,
+        qname: String,
+        origin: ProfileSpan,
+    ): String {
+        val previous = rekinds[record] ?: record.kind
+        if (keyword == record.kind) {
+            rekinds.remove(record)
+            rekindOrigins.remove(record)
+        } else {
+            rekinds[record] = keyword
+            rekindOrigins[record] = qname to origin
+        }
+        return previous
+    }
+
     /** Overlay values bypass the conflict ledger: the overlay wins. Returns the transform's value, if any. */
     fun overlay(
         record: Record,
@@ -394,7 +437,7 @@ internal class CanonicalBuilder(
                     if (!nested ||
                         (member != null && !ProfileVocabulary.storageMember(record))
                     ) {
-                        put("kind", record.kind)
+                        put("kind", rekinds[record] ?: record.kind)
                     }
                     if (member?.get("named")?.jsonPrimitive?.boolean != false) put("id", record.id)
                     put(propertyKey, JsonObject(props))
@@ -467,9 +510,23 @@ internal class CanonicalBuilder(
                                 }?.value
                             ?: enclosing?.value
                             ?: records.first().source.span()
-                    throw ProfileException("ys/profile-invalid", origin, error.detail)
+                    throw ProfileException("ys/profile-invalid", origin, error.detail + rekinded(records, path))
                 }
             EmittedDocument(canonical, locations, group.file)
         }
+    }
+
+    /**
+     * Review-346 F3: a canonical error inside a definition an overlay re-kinded keeps its dialect location and names the
+     * overlay entry that re-kinded it.
+     */
+    private fun rekinded(
+        records: List<Record>,
+        path: String,
+    ): String {
+        val record = Regex("^/defs/(\\d+)(/|$)").find(path)?.let { records.getOrNull(it.groupValues[1].toInt()) }
+        val keyword = record?.let { rekinds[it] } ?: return ""
+        val (qname, at) = rekindOrigins.getValue(record)
+        return "; the overlay re-kinded $qname from ${record.kind} to $keyword at ${at.file}:${at.line}:${at.column}"
     }
 }

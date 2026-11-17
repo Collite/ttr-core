@@ -22,7 +22,10 @@ data class OverlayEntry(
     val valueLocation: ProfileSpan,
 )
 
-/** The PR body's `overridden[]`: a property both the transform and the overlay supplied; the overlay won. */
+/**
+ * The PR body's `overridden[]`: a property the overlay set — [from] is the transform's value, `JsonNull` when the overlay
+ * added it (S5.2b) — or, with [property] `kind`, a re-kinded definition's old and new keyword.
+ */
 data class Overridden(
     val qname: String,
     val property: String,
@@ -170,7 +173,11 @@ object OverlayLoader {
 }
 
 internal object OverlayApplier {
-    /** After every transform, before rendering: the overlay wins; a key naming no record is `xm/overlay-orphan`. */
+    /**
+     * After every transform, before rendering: the overlay wins; a key naming no record is `xm/overlay-orphan`. S5.2b
+     * (✅D-MW-84, ✅R346-A): `kind: <a cn stereotype>` on a top-level cn record re-kinds the definition; any other `kind:`
+     * is a property.
+     */
     fun apply(
         entries: List<OverlayEntry>,
         index: LinkIndex,
@@ -182,9 +189,18 @@ internal object OverlayApplier {
         val overridden = mutableListOf<Overridden>()
         entries.forEach { entry ->
             val target = record(entry, index, renames)
-            val previous = builder.overlay(target.record!!, entry.property, entry.value, entry.valueLocation)
-            if (previous != null && previous != entry.value) {
-                overridden += Overridden(target.qname, entry.property, previous, entry.value)
+            val record = target.record!!
+            val keyword = if (entry.property == "kind") ProfileVocabulary.rekind(record, entry.value) else null
+            if (keyword != null) {
+                val previous = builder.rekind(record, keyword, target.qname, entry.valueLocation)
+                if (previous != keyword) {
+                    overridden += Overridden(target.qname, "kind", JsonPrimitive(previous), entry.value)
+                }
+                return@forEach
+            }
+            val previous = builder.overlay(record, entry.property, entry.value, entry.valueLocation)
+            if (previous != entry.value) {
+                overridden += Overridden(target.qname, entry.property, previous ?: JsonNull, entry.value)
             }
         }
         return overridden
@@ -208,9 +224,17 @@ internal object OverlayApplier {
                         index.qname(candidate.qname).filter { it.record != null }
                     }
                 }.distinctBy { it.qname }
+        // Review-346 F2: a `kind:` an overlay can re-kind with goes to the records it re-kinds (top-level cn), if any.
+        val rekindable =
+            named
+                .filter { entry.property == "kind" && ProfileVocabulary.rekind(it.record!!, entry.value) != null }
+                .ifEmpty { named }
         // ✅R251-A: under fan-out one name yields several records; keep those whose kind defines the property (none
         // left: all, and canonical validation reports the property), then prefer a record outside the binding model.
-        val defining = named.filter { ProfileVocabulary.defines(it.record!!, entry.property) }.ifEmpty { named }
+        val defining =
+            rekindable
+                .filter { ProfileVocabulary.defines(it.record!!, entry.property) }
+                .ifEmpty { rekindable }
         val primary =
             defining
                 .takeIf { it.size > 1 }
