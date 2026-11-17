@@ -1,14 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import {
-  isAlias,
-  isMap,
-  isNode,
-  isScalar,
-  isSeq,
-  LineCounter,
-  parseAllDocuments,
-  type Node,
-} from 'yaml';
+import { isAlias, isMap, isNode, isScalar, isSeq, parseAllDocuments, type Node } from 'yaml';
 import Ajv2020Module from 'ajv/dist/2020.js';
 import type { ErrorObject, ValidateFunction } from 'ajv';
 import type { SourceLocation } from '../ast.js';
@@ -20,11 +11,12 @@ export type RecordValue = { [key: string]: Json };
 export const pointer = (parent: string, key: string | number): string =>
   `${parent}/${String(key).replace(/~/g, '~0').replace(/\//g, '~1')}`;
 export const record = (v: Json): RecordValue => {
-  if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('Expected a mapping');
+  if (!v || typeof v !== 'object' || Array.isArray(v))
+    throw new YamlFailure('', 'Expected a mapping');
   return v;
 };
 export const list = (v: Json): Json[] => {
-  if (!Array.isArray(v)) throw new Error('Expected a sequence');
+  if (!Array.isArray(v)) throw new YamlFailure('', 'Expected a sequence');
   return v;
 };
 export class YamlFailure extends Error {
@@ -42,24 +34,71 @@ const Ajv = ((Ajv2020Module as unknown as { default?: AjvConstructor }).default 
   Ajv2020Module) as AjvConstructor;
 let validator: ValidateFunction | undefined;
 
+/** UTF-16 is confined to the YAML library boundary; public coordinates count code points. */
+export class YamlCoordinates {
+  readonly points: Uint32Array;
+  private readonly lineStarts = [0];
+  constructor(
+    readonly text: string,
+    readonly uri: string
+  ) {
+    if (text.length > 12_000_000)
+      throw new YamlFailure('', 'YAML exceeds 6000000 code points', DiagnosticCode.YamlSyntax);
+    this.points = new Uint32Array(text.length + 1);
+    let units = 0,
+      points = 0;
+    for (const ch of text) {
+      this.points[units] = points;
+      if (ch.length === 2) this.points[units + 1] = points;
+      units += ch.length;
+      this.points[units] = ++points;
+      if (ch === '\n') this.lineStarts.push(units);
+    }
+    if (points > 6_000_000)
+      throw new YamlFailure('', 'YAML exceeds 6000000 code points', DiagnosticCode.YamlSyntax);
+  }
+  span([start, end]: [number, number]): SourceLocation {
+    start = Math.max(0, Math.min(start, this.text.length));
+    end = Math.max(start, Math.min(end, this.text.length));
+    const position = (offset: number) => {
+      let lo = 0,
+        hi = this.lineStarts.length;
+      while (lo + 1 < hi) {
+        const mid = (lo + hi) >>> 1;
+        if (this.lineStarts[mid] <= offset) lo = mid;
+        else hi = mid;
+      }
+      return { line: lo + 1, column: this.points[offset] - this.points[this.lineStarts[lo]] };
+    };
+    const a = position(start),
+      b = position(end);
+    return {
+      file: this.uri,
+      line: a.line,
+      column: a.column,
+      endLine: b.line,
+      endColumn: b.column,
+      offsetStart: this.points[start],
+      offsetEnd: this.points[end],
+    };
+  }
+}
+
 /** One representation tree owns values, lexical numbers and authored coordinates. No alias expansion. */
 export class YamlInput {
   readonly nodes = new Map<string, Node>();
   readonly keys = new Map<string, Node>();
   readonly pl = new Set<string>();
-  readonly lines = new LineCounter();
   readonly value: RecordValue;
   constructor(
     readonly text: string,
-    readonly uri: string
+    readonly uri: string,
+    readonly coordinates = new YamlCoordinates(text, uri)
   ) {
-    if (text.length > 12_000_000 || [...text].length > 6_000_000)
-      throw new YamlFailure('', 'YAML exceeds 6000000 code points', DiagnosticCode.YamlSyntax);
     const docs = parseAllDocuments(text, {
       version: '1.2',
       schema: 'core',
       uniqueKeys: true,
-      lineCounter: this.lines,
       customTags: [{ tag: '!pl', resolve: (value: string) => value }],
       // Keeping CST text allows numbers to retain their authored spelling.
       keepSourceTokens: true,
@@ -181,20 +220,9 @@ export class YamlInput {
     return this.span(range ? [range[0], range[1]] : [0, Math.min(1, this.text.length)]);
   }
   span([start, end]: [number, number]): SourceLocation {
-    start = Math.max(0, Math.min(start, this.text.length));
-    end = Math.max(start, Math.min(end, this.text.length));
-    const a = this.lines.linePos(start);
-    const b = this.lines.linePos(end);
-    return {
-      file: this.uri,
-      line: a.line,
-      column: a.col - 1,
-      endLine: b.line,
-      endColumn: b.col - 1,
-      offsetStart: start,
-      offsetEnd: end,
-    };
+    return this.coordinates.span([start, end]);
   }
+
   number(path: string, value: number): string {
     const node = this.node(path);
     const raw = isScalar(node) ? node.source : undefined;

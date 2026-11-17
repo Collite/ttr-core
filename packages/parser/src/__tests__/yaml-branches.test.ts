@@ -18,6 +18,7 @@ const portable = (value: unknown) =>
         'lineOffsets',
         'indentWidth',
         'escapes',
+        'textMapping',
         'leadingTrivia',
         'trailingTrivia',
       ].includes(key)
@@ -221,7 +222,7 @@ describe('canonical YAML branches and P2 section 7 rulings', () => {
       indentWidth: 8,
     });
   });
-  it('retains UTF-16 ranges after astral characters and CRLF line endings', () => {
+  it('retains code-point ranges after astral characters and CRLF line endings', () => {
     const text = doc('er', 'entity', {
       description: '😀',
       attributes: [{ id: 'name', properties: { type: 'text' } }],
@@ -232,9 +233,11 @@ describe('canonical YAML branches and P2 section 7 rulings', () => {
     expect(entity.kind).toBe('entity');
     if (entity.kind !== 'entity') throw new Error('entity expected');
     expect(entity.attributes![0].source.offsetStart).toBe(
-      text.indexOf('{', text.indexOf('"attributes"'))
+      [...text.slice(0, text.indexOf('{', text.indexOf('"attributes"')))].length
     );
-    expect(entity.attributes![0].type?.source.offsetStart).toBe(text.indexOf('"text"'));
+    expect(entity.attributes![0].type?.source.offsetStart).toBe(
+      [...text.slice(0, text.indexOf('"text"'))].length
+    );
   });
   it.each([
     'ttr: "0.22"\npackage: &pkg demo',

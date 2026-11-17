@@ -18,6 +18,7 @@ const portable = (ast: unknown) =>
         'lineOffsets',
         'indentWidth',
         'escapes',
+        'textMapping',
       ].includes(key)
         ? undefined
         : value
@@ -37,23 +38,26 @@ describe('canonical YAML reader contract', () => {
     );
   });
 
-  it('locates every AST node on an authored YAML node, with exact UTF-16 line/column offsets', () => {
+  it('locates every AST node on an authored YAML node, with exact code-point line/column offsets', () => {
     const result = parseYamlDocument(source, 'customer.yaml');
     expect(result.ast).toBeDefined();
     const spans = new Set<string>();
     visit(parseDocument(source), {
       Node(_key, node) {
-        if (isNode(node) && node.range) spans.add(`${node.range[0]}:${node.range[1]}`);
+        if (isNode(node) && node.range)
+          spans.add(
+            `${[...source.slice(0, node.range[0])].length}:${[...source.slice(0, node.range[1])].length}`
+          );
       },
     });
     const inspect = (value: unknown): void => {
       if (!value || typeof value !== 'object') return;
-      for (const [key, child] of Object.entries(value)) {
-        if (key === 'source') {
+      for (const child of Object.values(value)) {
+        if (child && typeof child === 'object' && 'offsetStart' in child && 'file' in child) {
           expect(child.file).toBe('customer.yaml');
           expect(spans.has(`${child.offsetStart}:${child.offsetEnd}`)).toBe(true);
-          const prefix = source.slice(0, child.offsetStart).split('\n');
-          expect([child.line, child.column]).toEqual([prefix.length, prefix.at(-1)!.length]);
+          const prefix = [...source].slice(0, child.offsetStart).join('').split('\n');
+          expect([child.line, child.column]).toEqual([prefix.length, [...prefix.at(-1)!].length]);
         } else inspect(child);
       }
     };

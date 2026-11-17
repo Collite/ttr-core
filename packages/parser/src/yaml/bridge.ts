@@ -76,7 +76,7 @@ function mark(piece: Piece, path: string, literal?: Projection['literal']): Piec
   };
 }
 function string(value: Json): string {
-  if (typeof value !== 'string') throw new Error('Expected a string');
+  if (typeof value !== 'string') throw new YamlFailure('', 'Expected a string');
   return value;
 }
 function expression(source: string): Expression {
@@ -111,9 +111,16 @@ function expression(source: string): Expression {
 const symbols = (e: Expression): string[] =>
   e.symbol ? [e.symbol] : e.node ? symbols(e.node) : (e.seq ?? e.alt ?? []).flatMap(symbols);
 const parsed = new Map<string, Expression>();
+const identifiers = new Map(
+  Object.entries(metadata.identifiers).map(([key, value]) => [key, new RegExp(value)])
+);
 
 export class YamlBridge {
   readonly embedded = new Set<string>();
+  private readonly embeddedPaths: string[] = [];
+  private rollback(size: number): void {
+    while (this.embeddedPaths.length > size) this.embedded.delete(this.embeddedPaths.pop()!);
+  }
   constructor(readonly input: YamlInput) {}
   write(): Piece {
     const doc = this.input.value;
@@ -306,10 +313,12 @@ export class YamlBridge {
         let typed: Piece | undefined;
         const prop = properties.get(key);
         if (prop) {
+          const size = this.embeddedPaths.length;
           try {
             typed = this.property(prop, v, p, entries);
           } catch (error) {
-            if (!body.freeForm.length) throw error;
+            this.rollback(size);
+            if (!(error instanceof YamlFailure) || !body.freeForm.length) throw error;
           }
         }
         if (!typed) {
@@ -327,8 +336,8 @@ export class YamlBridge {
     path: string,
     entries: { key: string; value: Json; path: string }[]
   ): Piece {
-    const r = recordOrUndefined(value);
-    const field = (key: string, rule = 'id') => this.render(rule, r![key], pointer(path, key));
+    const field = (key: string, rule = 'id') =>
+      this.render(rule, record(value)[key], pointer(path, key));
     switch (prop.rule) {
       case 'searchableProperty': {
         const method = entries.filter((e) => e.key === 'method').at(-1);
@@ -345,8 +354,8 @@ export class YamlBridge {
         return join([
           field('attribute'),
           ' -> ',
-          r!.to === undefined ? join(['{', field('toColumn'), '}']) : field('to'),
-          ...(r!.from ? [' { from: ', field('from', 'listOfIds'), ' }'] : []),
+          record(value).to === undefined ? join(['{', field('toColumn'), '}']) : field('to'),
+          ...(record(value).from ? [' { from: ', field('from', 'listOfIds'), ' }'] : []),
         ]);
       case 'setProperty':
         return join([field('attribute'), ' = ', field('column')]);
@@ -359,19 +368,21 @@ export class YamlBridge {
     }
   }
   render(name: string, value: Json, path: string): Piece {
+    const size = this.embeddedPaths.length;
     try {
       return mark(this.renderValue(name, value, path), path);
     } catch (error) {
-      if (error instanceof YamlFailure) throw error;
-      throw new YamlFailure(path, error instanceof Error ? error.message : `Invalid ${name}`);
+      this.rollback(size);
+      if (!(error instanceof YamlFailure)) throw error;
+      throw new YamlFailure(error.path || path, error.message, error.code, error.span);
     }
   }
   private renderValue(name: string, value: Json, path: string): Piece {
     if (metadata.bodies[name]) return this.body(name, value, path);
     if (['id', 'qualifiedName', 'key', 'cnKey', 'autoKey'].includes(name)) {
       const text = string(value);
-      const pattern = metadata.identifiers[['cnKey', 'autoKey'].includes(name) ? name : 'id'];
-      if (!new RegExp(pattern).test(text)) throw new Error(`Invalid ${name}`);
+      const pattern = identifiers.get(['cnKey', 'autoKey'].includes(name) ? name : 'id')!;
+      if (!pattern.test(text)) throw new YamlFailure(path, `Invalid ${name}`);
       return raw(text);
     }
     if (
@@ -384,20 +395,20 @@ export class YamlBridge {
     )
       return raw(encodeTtrString(string(value)));
     if (name === 'NUMBER_LITERAL') {
-      if (typeof value !== 'number') throw new Error('Expected a number');
+      if (typeof value !== 'number') throw new YamlFailure(path, 'Expected a number');
       return raw(this.input.number(path, value));
     }
     if (name === 'BOOLEAN_LITERAL') {
-      if (typeof value !== 'boolean') throw new Error('Expected a boolean');
+      if (typeof value !== 'boolean') throw new YamlFailure(path, 'Expected a boolean');
       return raw(String(value));
     }
     if (name === 'NULL_LITERAL') {
-      if (value !== null) throw new Error('Expected null');
+      if (value !== null) throw new YamlFailure(path, 'Expected null');
       return raw('null');
     }
     if (metadata.literals[name]) {
       if (!metadata.literals[name].includes(string(value)))
-        throw new Error(`Not a ${name} literal`);
+        throw new YamlFailure(path, `Not a ${name} literal`);
       return raw(string(value));
     }
     const maps: Record<string, string> = {
@@ -418,7 +429,8 @@ export class YamlBridge {
         ['valueLabelsBody', 'membersBlock'].includes(name)
       );
     const r = recordOrUndefined(value);
-    const field = (key: string, rule = 'id') => this.render(rule, r![key], pointer(path, key));
+    const field = (key: string, rule = 'id') =>
+      this.render(rule, record(value)[key], pointer(path, key));
     switch (name) {
       case 'value':
       case 'cnValue':
@@ -434,7 +446,7 @@ export class YamlBridge {
         );
       }
       case 'autoObject': {
-        const values = list(r!.object).flatMap((v, i) =>
+        const values = list(record(value).object).flatMap((v, i) =>
           Object.entries(record(v)).map(([key, v]) =>
             join([
               `${key}: `,
@@ -449,7 +461,7 @@ export class YamlBridge {
           field('call'),
           '(',
           join(
-            list(r!.args).map((v, i) =>
+            list(record(value).args).map((v, i) =>
               this.generic(v, pointer(pointer(path, 'args'), i), 'value')
             ),
             ', '
@@ -457,10 +469,14 @@ export class YamlBridge {
           ')',
         ]);
       case 'embeddedBlock': {
-        this.embedded.add(path);
+        const text = string(record(value).block);
+        if (!this.embedded.has(path)) {
+          this.embedded.add(path);
+          this.embeddedPaths.push(path);
+        }
         // Always quote the projection; relocation restores the canonical form,
         // tag and exact text without subjecting YAML text to TTR dedentation.
-        return mark(raw(encodeTtrString(string(r!.block))), path, 'block');
+        return mark(raw(encodeTtrString(text)), path, 'block');
       }
       case 'dataType':
         return typeof value === 'string'
@@ -469,22 +485,33 @@ export class YamlBridge {
               this.render(typeof v === 'string' ? 'typeValue' : 'NUMBER_LITERAL', v, p)
             );
       case 'participant':
-        return join([field('ref'), ...(r!.as === undefined ? [] : [' as ', field('as')])]);
+        return join([
+          field('ref'),
+          ...(record(value).as === undefined ? [] : [' as ', field('as')]),
+        ]);
       case 'durationLiteral':
         return join([field('amount', 'NUMBER_LITERAL'), ' ', field('unit')]);
       case 'taggedValue':
         return join([field('tag'), ' ', field('value', 'stringLiteralForm')]);
       case 'callValue':
-        return join([field('call'), ' ', this.render('autoObject', { object: r!.entries }, path)]);
+        return join([
+          field('call'),
+          ' ',
+          this.render('autoObject', { object: record(value).entries }, path),
+        ]);
       case 'rangeLiteral':
         return join([
           this.render(
             'NUMBER_LITERAL',
-            record(r!.range).from,
+            record(record(value).range).from,
             pointer(pointer(path, 'range'), 'from')
           ),
           '..',
-          this.render('NUMBER_LITERAL', record(r!.range).to, pointer(pointer(path, 'range'), 'to')),
+          this.render(
+            'NUMBER_LITERAL',
+            record(record(value).range).to,
+            pointer(pointer(path, 'range'), 'to')
+          ),
         ]);
       case 'restrictValue': {
         if (!r) return this.generic(value, path, 'value');
@@ -500,7 +527,7 @@ export class YamlBridge {
           field('name'),
           '(',
           join(
-            Object.entries(record(r!.args)).map(([key, v]) =>
+            Object.entries(record(record(value).args)).map(([key, v]) =>
               mark(
                 raw(`${key}: ${this.retained(v, pointer(pointer(path, 'args'), key))}`),
                 pointer(pointer(path, 'args'), key)
@@ -511,11 +538,16 @@ export class YamlBridge {
           ')',
         ]);
       case 'levelEntry':
-        return join([field('attribute'), ...(r!.via === undefined ? [] : [' via ', field('via')])]);
+        return join([
+          field('attribute'),
+          ...(record(value).via === undefined ? [] : [' via ', field('via')]),
+        ]);
       case 'matchMethodValue':
         return join([
           field('name'),
-          ...(r!.argument === undefined ? [] : ['(', field('argument', 'NUMBER_LITERAL'), ')']),
+          ...(record(value).argument === undefined
+            ? []
+            : ['(', field('argument', 'NUMBER_LITERAL'), ')']),
         ]);
       case 'parameterDefList':
         return this.array(value, path, (v, p) => this.body('parameterInline', v, p));
@@ -636,9 +668,12 @@ export class YamlBridge {
     if (e.node) return this.expr(e.node, value, path);
     if (e.alt) {
       for (const choice of e.alt) {
+        const size = this.embeddedPaths.length;
         try {
           return this.expr(choice, value, path);
-        } catch {
+        } catch (error) {
+          this.rollback(size);
+          if (!(error instanceof YamlFailure)) throw error;
           /* Try the grammar's next alternative. */
         }
       }

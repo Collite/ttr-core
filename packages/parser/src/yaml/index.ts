@@ -2,7 +2,7 @@
 import type { ParseError, ParseResult } from '../ast.js';
 import { parseString } from '../walker.js';
 import { DiagnosticCode } from '../diagnostics.js';
-import { YamlInput, YamlFailure } from './input.js';
+import { YamlInput, YamlFailure, YamlCoordinates } from './input.js';
 import { YamlBridge } from './bridge.js';
 import { YamlLocations } from './locations.js';
 
@@ -10,12 +10,15 @@ export interface YamlParseResult extends ParseResult {
   diagnostics: ParseError[];
 }
 
-/** Canonical YAML 1.2 only. Invalid syntax/schema yields located diagnostics and no AST. */
+/** Canonical YAML 1.2 only. Invalid syntax/schema yields located diagnostics and no AST.
+ * All ranges count Unicode code points, like parseString; embeddedBlockLocation maps decoded scalar text. */
 export function parseYamlDocument(text: string, uri = '<yaml>'): YamlParseResult {
   const diagnostics: ParseError[] = [];
   let input: YamlInput | undefined;
+  let coordinates: YamlCoordinates | undefined;
   try {
-    input = new YamlInput(text, uri);
+    coordinates = new YamlCoordinates(text, uri);
+    input = new YamlInput(text, uri, coordinates);
     input.validate();
     const writer = new YamlBridge(input);
     const bridge = writer.write();
@@ -40,12 +43,6 @@ export function parseYamlDocument(text: string, uri = '<yaml>'): YamlParseResult
   } catch (error) {
     if (!(error instanceof YamlFailure)) throw error;
     const [start, end] = error.span ?? [0, Math.min(text.length, 1)];
-    const position = (offset: number) => {
-      const lines = text.slice(0, offset).split('\n');
-      return { line: lines.length, column: lines.at(-1)!.length };
-    };
-    const a = position(start),
-      b = position(end);
     diagnostics.push({
       code: error.code,
       severity: 'error',
@@ -53,15 +50,15 @@ export function parseYamlDocument(text: string, uri = '<yaml>'): YamlParseResult
       source:
         input && !error.span
           ? input.source(error.path)
-          : {
+          : (coordinates?.span([start, end]) ?? {
               file: uri,
-              line: a.line,
-              column: a.column,
-              endLine: b.line,
-              endColumn: b.column,
-              offsetStart: start,
-              offsetEnd: end,
-            },
+              line: 1,
+              column: 0,
+              endLine: 1,
+              endColumn: 0,
+              offsetStart: 0,
+              offsetEnd: 0,
+            }),
     });
     return { diagnostics, errors: diagnostics, sourceFile: uri };
   }

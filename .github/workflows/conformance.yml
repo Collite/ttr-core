@@ -37,7 +37,7 @@ jobs:
         run: pnpm --filter @tatrman/conformance dump-yaml
       - name: YAML contract, negative vectors and fixture roster guards
         run: |
-          pnpm --filter @tatrman/parser exec vitest run src/__tests__/yaml-reader.test.ts src/__tests__/yaml-branches.test.ts
+          pnpm --filter @tatrman/parser exec vitest run src/__tests__/yaml-reader.test.ts src/__tests__/yaml-branches.test.ts src/__tests__/yaml-relocation.test.ts src/__tests__/yaml-performance.test.ts
           pnpm --filter @tatrman/conformance test
 
   canonical-yaml:

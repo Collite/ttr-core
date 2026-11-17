@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseString, parseYamlDocument } from '@tatrman/parser';
 import { dump } from './dump.js';
+import { checkYamlLocations } from './yaml-locations.js';
 
 export const fixtureRoot = fileURLToPath(new URL('./fixtures/', import.meta.url));
 export interface YamlTwin {
@@ -41,7 +42,8 @@ export function yamlTwins(root = fixtureRoot): YamlTwin[] {
 
 export function twinDumps(twin: YamlTwin): { native: string; yaml: string } {
   const native = parseString(readFileSync(twin.native, 'utf8'), twin.native);
-  const yaml = parseYamlDocument(readFileSync(twin.yaml, 'utf8'), twin.yaml);
+  const yamlText = readFileSync(twin.yaml, 'utf8');
+  const yaml = parseYamlDocument(yamlText, twin.yaml);
   for (const [file, diagnostics] of [
     [twin.native, native.errors],
     [twin.yaml, yaml.diagnostics],
@@ -50,6 +52,7 @@ export function twinDumps(twin: YamlTwin): { native: string; yaml: string } {
     if (fatal.length || (file === twin.native ? !native.ast : !yaml.ast))
       throw new Error(`${file}: ${JSON.stringify(fatal)}`);
   }
+  checkYamlLocations(yamlText, twin.yaml, yaml.ast);
   return {
     native: dump(native),
     yaml: dump({ ast: yaml.ast, errors: yaml.diagnostics, sourceFile: twin.yaml }),
