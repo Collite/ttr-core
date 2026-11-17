@@ -1,0 +1,18 @@
+profile: skos/1
+grammar: '>=0.22 <1.0'
+skeleton: true
+sourceName: /@id
+lexicon:
+  - {target: kind, at: /subjects, id: /@local, terms: /skos:altLabel, form: /@value, language: /@language}
+operations:
+  - {op: package, mapping: {}, default: glossary}
+  - {op: kinds, at: /subjects, id: /@local, kind: /rdf:type/0/@local, mapping: {Concept: kind, ConceptScheme: null}}
+  - {op: each, in: kind, at: /skos:prefLabel, key: /@language, to: {kind: kind, property: label}, shape: {input: $item/@value}}
+  - {op: each, in: kind, at: /skos:definition, key: /@language, to: {kind: kind, property: description}, shape: {input: $item/@value}}
+  - {op: each, in: kind, at: /skos:broader, to: {kind: kind, property: is_a}, shape: {input: $item/@local}}
+  - {op: each, in: kind, at: /skos:related, to: {kind: kind, property: relations}, shape: {type: related, to: {input: $item/@local}}}
+  - {op: ignore, in: kind, at: /@id, reason: the sidecar's sourceName}
+  - {op: ignore, in: kind, at: /rdf:type, reason: the record kind}
+  - {op: ignore, in: kind, at: /skos:altLabel, reason: lexicon entries (the reader's lexicon key)}
+  - {op: ignore, in: kind, at: /skos:narrower, reason: the inverse of broader (is_a)}
+  - {op: ignore, in: kind, at: /skos:inScheme, reason: the package is the scheme}

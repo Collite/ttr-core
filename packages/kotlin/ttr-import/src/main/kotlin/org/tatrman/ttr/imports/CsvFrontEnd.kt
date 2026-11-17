@@ -24,6 +24,8 @@ import java.nio.file.Path
 object CsvFrontEnd : FrontEnd {
     override val name = "csv"
 
+    override val records = "/rows"
+
     override fun parse(files: List<Path>): List<ForeignTree> =
         labelled(files).map { (file, name) -> ForeignTree.read(tree(JsonFrontEnd.text(file), name), name, name) }
 

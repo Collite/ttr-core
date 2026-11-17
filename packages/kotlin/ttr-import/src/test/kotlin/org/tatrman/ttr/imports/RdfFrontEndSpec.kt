@@ -111,6 +111,10 @@ class RdfFrontEndSpec :
                     .single()
                     .root.value
             fromXml shouldBe fromTurtle
+            RdfFrontEnd.RDFXML.parse(listOf(input(rdfxml, "g.rdf"))).single().let {
+                it.file shouldBe "g.rdf"
+                it.label shouldBe "g.rdf#subjects"
+            }
             RdfFrontEnd.RDFXML.tree(rdfxml, "g") shouldBe RdfFrontEnd.TURTLE.tree(turtle, "g")
         }
 

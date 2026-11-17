@@ -1,0 +1,11 @@
+// generated-from: ../../sources/trade.ttl@f0b88a72b63605af8a41f8437b009dd60e0141a1b4ade4f1c4570b3c1a811a00 profile skos/1 generator 0.0.1-LOCAL — do not edit
+package glossary
+model lexicon locale cs
+
+def term Customer_cs { for: cn.Customer, forms: ["klient"] }
+def term OrderLine_cs { for: cn.OrderLine, forms: ["položka"] }
+def term Organisation_cs { for: cn.Organisation, forms: ["firma"] }
+def term Payment_cs { for: cn.Payment, forms: ["úhrada"] }
+def term Product_cs { for: cn.Product, forms: ["zboží"] }
+def term Shipment_cs { for: cn.Shipment, forms: ["dodávka"] }
+def term Supplier_cs { for: cn.Supplier, forms: ["liferant"] }

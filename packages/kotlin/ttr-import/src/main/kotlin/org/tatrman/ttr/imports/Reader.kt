@@ -102,12 +102,36 @@ object Reader {
             }
             packages += ImportReport.Package(pkg, model, path, canonical.ast.definitions.size)
         }
+        // T4: synonyms → one `lexicon` document per package and locale, beside the engine's documents.
+        val warnings = mutableListOf<String>()
+        val grammar =
+            result.documents
+                .firstOrNull()
+                ?.canonical
+                ?.value
+                ?.text("ttr")
+        if (grammar != null && profile.options.lexicon.isNotEmpty()) {
+            val terms = Lexicon.terms(trees, result.sources, profile.options.lexicon, warnings)
+            Lexicon.documents(terms, grammar).forEach { (path, document) ->
+                if (files.put(path, header.header(path).line(GeneratedHeader.Form.TTRM) + render(document)) != null) {
+                    throw ReaderInputException(
+                        "two generated documents render to $path; the profile's packages collide",
+                    )
+                }
+                packages +=
+                    ImportReport.Package(document.value.text("package"), "lexicon", path, document.ast.definitions.size)
+            }
+        }
         val sidecars = TreeMap<String, String>(Bytewise)
         result.sources.groupBy { it.pkg }.forEach { (pkg, entries) ->
             val name = "$pkg.sources.json"
             sidecars[name] = SourcesJsonWriter.write(header.header(name).text, entries)
         }
-        return GeneratedPackage(files, sidecars, ImportReport.of(frontEnd.name, profile.identity, result, packages))
+        return GeneratedPackage(
+            files,
+            sidecars,
+            ImportReport.of(frontEnd.name, profile.identity, result, packages, warnings, frontEnd.records),
+        )
     }
 
     /**

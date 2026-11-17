@@ -40,15 +40,21 @@ import java.util.TreeMap
  *   Turtle or as RDF/XML yields the same tree.
  *
  * Relative IRIs resolve against `file:///<file name>`, which is the same on every machine. A syntax error is
- * `ys/profile-invalid` at the parser's line and column. RIOT reports no positions for triples, so a diagnostic on a tree
- * node names its path (the subject's IRI and the predicate) and the tree's own line.
+ * `ys/profile-invalid` at the parser's line and column in the file. RIOT reports no positions for triples, so a
+ * diagnostic or `ignored[]` entry on a tree node is labelled `<file name>#subjects`: its line and column are the subject
+ * map's, and its path names the subject's IRI and the predicate. The tree's `file` (what `files` globs and `package`
+ * stems read) is the plain file name.
  */
 class RdfFrontEnd private constructor(
     override val name: String,
     private val lang: Lang,
 ) : FrontEnd {
+    override val records = "/subjects"
+
     override fun parse(files: List<Path>): List<ForeignTree> =
-        labelled(files).map { (file, label) -> ForeignTree.read(tree(JsonFrontEnd.text(file), label), label, label) }
+        labelled(files).map { (file, name) ->
+            ForeignTree.read(tree(JsonFrontEnd.text(file), name), name, "$name$TREE")
+        }
 
     /** The subject map of [text] as JSON text. */
     internal fun tree(
@@ -166,6 +172,9 @@ class RdfFrontEnd private constructor(
     companion object {
         val TURTLE = RdfFrontEnd("turtle", Lang.TURTLE)
         val RDFXML = RdfFrontEnd("rdfxml", Lang.RDFXML)
+
+        /** The label suffix of a subject map's spans: they are positions in the tree, not in the file. */
+        const val TREE = "#subjects"
 
         private const val XSD_STRING = "http://www.w3.org/2001/XMLSchema#string"
 

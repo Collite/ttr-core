@@ -6,6 +6,29 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — `import-glossary`: the `turtle`, `rdfxml` and `csv` front-ends, `skos/1`, `om-glossary/1`, lexicon emission (MW-P5 S5.2)
+
+- `ttr-import` gains three front-ends. `turtle`/`rdfxml` parse with Jena RIOT (`org.apache.jena:jena-arq` 5.6.0 is now
+  a runtime dependency of `ttr-import` only, protobuf excluded, ✅D-MW-81 (a); `ttr-metadata` stays Jena-free) into the
+  subject map `{subjects: {<iri>: {"@id", "@local", <predicate>: [<object>…]}}}`. IRI objects are `{"@id", "@local"}`,
+  literals `{"@value", "@language"|"@type"}`, predicates compacted with a fixed namespace table (`skos:`, `rdf:`, …),
+  everything in bytewise order, so one graph gives one tree in either syntax. Tree spans are labelled
+  `<file>#subjects`. `csv` reads RFC 4180 into `{rows: [<row>…]}` keyed by the header, an empty cell absent, each row
+  on its CSV line.
+- Shipped profiles `skos/1` (SKOS → a `cn` skeleton: `def kind` per `skos:Concept`, `label`/`description` language
+  maps, `broader` → `is_a`, `related` → `relations: [{type: related, to: …}]`, the scheme skipped) and `om-glossary/1`
+  (an OpenMetadata glossary CSV export; non-Approved terms skipped).
+- A third reader-level profile key, `lexicon: [{target, at, id, terms, form?, language? | locale, split?}]`
+  (schema-checked; ✅D-MW-81 (d)): `Reader` emits one `lexicon` document per package and locale
+  (`<pkg>/lexicon.<locale>.ttrm`, `model lexicon locale <id>`), one `def term <id>_<locale> { for: cn.<id>, forms }`
+  per concept.
+- `ttr-metadata-cli import-glossary --from <file> [--syntax turtle|rdfxml|csv] --profile <p> --out <dir> [--root]
+  [--overlay] [--package] [--dry-run] [--format text|json]`, with the outputs, report and exit codes of
+  `import-schema --from file:`.
+- Report: `ignored[]` entries carry the S5.2a `record` field; the Markdown section folds the key beneath a front-end's
+  record collection (`/subjects/*/skos:altLabel`) as it folds list indices. `FrontEnd` gains `records` (default
+  null) and `ReaderOptions` gains `lexicon`.
+
 ### Added — `each`, `split` and the `kinds` null-skip in the profile engine (MW-P5 S5.2a, ✅D-MW-81)
 
 - An eleventh operation, `each` (`in`, `at`, `to`, `shape`, optional `key`): the list at `at` → one `shape` template

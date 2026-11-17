@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.imports
 
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -24,11 +25,13 @@ import java.nio.file.Path
  * The reader's emission data a profile declares at its top level (contracts §1, D-14) — flags, not operations, read by
  * ttr-import only; the engine ignores them. [skeleton]: every generated `cn` definition is `abstract: true`.
  * [sourceName]: a JSON Pointer relative to each record whose string is the record's sidecar `sourceName` (an OM FQN,
- * an IRI's label); without it, or where it selects no string, the sidecar keeps the record id. A child wins.
+ * an IRI's label); without it, or where it selects no string, the sidecar keeps the record id. [lexicon]: the synonym
+ * rules [Lexicon] emits `lexicon` documents by (MW-P5 S5.2 T4). A child wins, key by key.
  */
 data class ReaderOptions(
     val skeleton: Boolean = false,
     val sourceName: String? = null,
+    val lexicon: List<LexiconRule> = emptyList(),
 )
 
 /**
@@ -228,9 +231,25 @@ class ImportProfile internal constructor(
                 ReaderOptions(
                     (value["skeleton"] as? JsonPrimitive)?.booleanOrNull ?: options.skeleton,
                     (value["sourceName"] as? JsonPrimitive)?.contentOrNull ?: options.sourceName,
+                    (value["lexicon"] as? JsonArray)?.map { lexiconRule(it as JsonObject) } ?: options.lexicon,
                 )
             }
     }
+}
+
+/** One schema-checked `lexicon` entry (the profile schema requires target/at/id/terms and one of language/locale). */
+private fun lexiconRule(value: JsonObject): LexiconRule {
+    fun text(key: String) = (value[key] as? JsonPrimitive)?.contentOrNull
+    return LexiconRule(
+        requireNotNull(text("target")),
+        requireNotNull(text("at")),
+        requireNotNull(text("id")),
+        requireNotNull(text("terms")),
+        text("form"),
+        text("language"),
+        text("locale"),
+        text("split"),
+    )
 }
 
 private fun pointer(key: String) = key.replace("~", "~0").replace("/", "~1")

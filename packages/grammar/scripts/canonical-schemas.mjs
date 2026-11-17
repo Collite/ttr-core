@@ -996,6 +996,29 @@ export function createSchemas(metadata) {
           // relative to each record, whose string is the record's sidecar `sourceName` (default: the record id).
           skeleton: { ...boolean, default: false },
           sourceName: pointer,
+          // MW-P5 S5.2 T4 (⚑MW-P5-S52-1 (d) → ✅D-MW-81): synonyms → `lexicon` documents, one per locale, emitted by
+          // ttr-import beside the engine's output. Each entry reads the records at `at` (ids at `id`), keeps those the
+          // run emitted as `target`, and turns the elements at `terms` (a list, or a string cut at `split`) into the forms of
+          // one `def term` per record and locale; the locale is each element's string at `language` or the constant `locale`.
+          lexicon: array(
+            {
+              ...object(
+                {
+                  target: canonicalKind,
+                  at: pointer,
+                  id: pointer,
+                  terms: pointer,
+                  form: pointer,
+                  language: pointer,
+                  locale: { type: 'string', pattern: anchoredPattern('[a-z][a-z0-9_]*') },
+                  split: { type: 'string', minLength: 1 },
+                },
+                ['target', 'at', 'id', 'terms'],
+              ),
+              oneOf: [{ required: ['language'] }, { required: ['locale'] }],
+            },
+            1,
+          ),
           operations: array({
             ...object(
               {

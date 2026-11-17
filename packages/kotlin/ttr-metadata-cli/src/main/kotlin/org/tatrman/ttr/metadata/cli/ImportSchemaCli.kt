@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.metadata.cli
 
+import org.tatrman.ttr.imports.FrontEnd
 import org.tatrman.ttr.imports.ImportProfile
 import org.tatrman.ttr.imports.JsonFrontEnd
 import org.tatrman.ttr.imports.Reader
@@ -43,6 +44,25 @@ object ImportSchemaCli {
                 from.startsWith("file:") && from.length > "file:".length -> Path.of(from.removePrefix("file:"))
                 else -> return usage("--from must be file:<path> (an existing export)")
             }
+        return generate("import-schema", JsonFrontEnd, input, profile, out, root, overlay, packageName, dryRun, json)
+    }
+
+    /**
+     * One reader run of [frontEnd] over [input] for [verb] (`import-schema`, `import-glossary`): resolve the profile, run
+     * the reader, then print the report and write the outputs under [out] (or, `dryRun`, print their diff).
+     */
+    internal fun generate(
+        verb: String,
+        frontEnd: FrontEnd,
+        input: Path,
+        profile: String,
+        out: Path,
+        root: Path?,
+        overlay: Path?,
+        packageName: String?,
+        dryRun: Boolean,
+        json: Boolean,
+    ): CliOutcome {
         val resolved =
             try {
                 ImportProfile.resolve(profile).also { it.refuseOverlay(overlay) }
@@ -64,7 +84,7 @@ object ImportSchemaCli {
         val generated =
             try {
                 Reader.run(
-                    JsonFrontEnd,
+                    frontEnd,
                     resolved,
                     ReaderRequest(
                         listOf(input),
@@ -91,7 +111,7 @@ object ImportSchemaCli {
         files.keys.forEach { path ->
             LintCli.link(output.real, path)?.let { at ->
                 output.discard()
-                return usage("--out $out contains a symbolic link at $at; import-schema does not write through links")
+                return usage("--out $out contains a symbolic link at $at; $verb does not write through links")
             }
         }
         // Every directory first, so a path that cannot be one (a file in its place) fails before any file is written.

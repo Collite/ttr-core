@@ -1,0 +1,45 @@
+# om-glossary/1 — an OpenMetadata glossary CSV export (`parent,name*,displayName,description,synonyms,relatedTerms,…,
+# glossaryStatus,…`) → a TTR cn skeleton package + lexicon (MW-P5 S5.2, contracts §3; XM 06 §3 "glossary → cn skeleton").
+# Shipped with ttr-core: `ttr-metadata import-glossary --from <export.csv> --profile om-glossary/1`.
+#
+# Every Approved term → `def kind <name>` (abstract: true, D-14); a term in any other workflow state is skipped and listed
+# in the report (`kinds` null-skip, ✅D-MW-81 (b)). `displayName`/`description` are English (OpenMetadata's glossaries are
+# monolingual) → `label`/`description` language maps; `synonyms` → the English lexicon document. The term's sidecar
+# `sourceName` is its name (the CSV carries no FQN column).
+#
+# Not carried by v1 (each listed with its reason in the report — MW-P5 S5.2 Found (i)):
+# - parent → is_a: OpenMetadata writes the parent's FQN (`Trade.Party`); a TTR name is its last part, which no operation
+#   takes (P-8: substitutions only).
+# - relatedTerms → relations: a `;`-separated FQN list; `split` makes a list of strings, but a relation is an object
+#   `{type: related, to: <name>}` per element, which `each` makes only from a list in the source.
+profile: om-glossary/1
+grammar: '>=0.22 <1.0'
+skeleton: true
+sourceName: /name*
+lexicon:
+  - {target: kind, at: /rows, id: /name*, terms: /synonyms, split: ';', locale: en}
+operations:
+  - {op: package, mapping: {}, default: glossary}
+  - op: kinds
+    at: /rows
+    id: /name*
+    kind: /glossaryStatus
+    mapping: {Approved: kind, Draft: null, In Review: null, Rejected: null, Deprecated: null}
+  - {op: rename, in: kind, at: /displayName, to: {kind: kind, path: [label, en]}}
+  - {op: rename, in: kind, at: /description, to: {kind: kind, path: [description, en]}}
+
+  # Read by the reader, not the engine.
+  - {op: ignore, in: kind, at: /synonyms, reason: lexicon entries (the reader's lexicon key)}
+
+  # Not carried by v1 (see the header).
+  - {op: ignore, in: kind, at: /parent, reason: 'the parent FQN; is_a needs its last part, which no operation takes (S5.2 Found (i))'}
+  - {op: ignore, in: kind, at: /relatedTerms, reason: 'a ;-separated FQN list; relations need an object per element (S5.2 Found (i))'}
+
+  # Stewardship and presentation: catalog facts, not model facts.
+  - {op: ignore, in: kind, at: /owner, reason: OM owner (no cn property)}
+  - {op: ignore, in: kind, at: /reviewers, reason: OM reviewers}
+  - {op: ignore, in: kind, at: /tags, reason: OM classification tags}
+  - {op: ignore, in: kind, at: /references, reason: OM external links}
+  - {op: ignore, in: kind, at: /color, reason: OM display colour}
+  - {op: ignore, in: kind, at: /iconURL, reason: OM display icon}
+  - {op: ignore, in: kind, at: /extension, reason: OM custom properties}

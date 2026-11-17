@@ -23,13 +23,17 @@ data class ImportReport(
     val overridden: List<Overridden>,
     val packages: List<Package>,
     val warnings: List<String> = emptyList(),
+    /** The front-end's record collection ([FrontEnd.records]); only [markdown]'s folding reads it. */
+    val records: String? = null,
 ) {
+    /** One ignored key; [record] names the record a `kinds` null mapping skipped whole (S5.2a). */
     data class Ignored(
         val file: String,
         val line: Int,
         val column: Int,
         val path: String,
         val reason: String?,
+        val record: String? = null,
     )
 
     data class Overridden(
@@ -69,6 +73,7 @@ data class ImportReport(
                             put("line", it.line)
                             put("column", it.column)
                             put("path", it.path)
+                            it.record?.let { record -> put("record", record) }
                             put("reason", it.reason)
                         }
                     }
@@ -108,7 +113,7 @@ data class ImportReport(
                 appendLine("| key | reason | count | first at |")
                 appendLine("|---|---|---|---|")
                 ignored
-                    .groupBy { folded(it.path) to it.reason.orEmpty() }
+                    .groupBy { folded(it.path, records) to it.reason.orEmpty() }
                     .toSortedMap(
                         compareBy<Pair<String, String>, String>(Bytewise) { it.first }.thenBy(Bytewise) { it.second },
                     ).forEach { (key, items) ->
@@ -148,9 +153,31 @@ data class ImportReport(
     companion object {
         private val pretty = Json { prettyPrint = true }
 
-        /** Record indices folded to a star: `/data/12/columns/3/profile` → `/data/<star>/columns/<star>/profile`. */
-        private fun folded(path: String) =
-            path.split('/').joinToString("/") { if (it.matches(Regex("[0-9]+"))) "*" else it }
+        /**
+         * Record indices folded to a star: `/data/12/columns/3/profile` → `/data/<star>/columns/<star>/profile`; so is the
+         * key beneath the front-end's record collection (`/subjects/<iri>/skos:altLabel` → `/subjects/<star>/skos:altLabel`).
+         */
+        private fun folded(
+            path: String,
+            records: String?,
+        ): String {
+            val keyed =
+                records?.takeIf { path.startsWith("$it/") }?.let { prefix ->
+                    "$prefix/*" +
+                        path.removePrefix("$prefix/").let { rest ->
+                            rest.indexOf('/').let {
+                                if (it <
+                                    0
+                                ) {
+                                    ""
+                                } else {
+                                    rest.substring(it)
+                                }
+                            }
+                        }
+                } ?: path
+            return keyed.split('/').joinToString("/") { if (it.matches(Regex("[0-9]+"))) "*" else it }
+        }
 
         private fun cell(text: String) = text.replace("|", "\\|").replace("\n", " ")
 
@@ -159,6 +186,8 @@ data class ImportReport(
             profile: String,
             result: ApplyResult,
             packages: List<Package>,
+            warnings: List<String> = emptyList(),
+            records: String? = null,
         ): ImportReport =
             ImportReport(
                 frontEnd,
@@ -171,6 +200,7 @@ data class ImportReport(
                             it.location.column,
                             it.location.path,
                             it.reason,
+                            it.record,
                         )
                     }.distinct()
                     .sortedWith(
@@ -183,6 +213,8 @@ data class ImportReport(
                     .map { Overridden(it.qname, it.property, it.from, it.to) }
                     .sortedWith(compareBy<Overridden, String>(Bytewise) { it.qname }.thenBy(Bytewise) { it.property }),
                 packages.sortedWith(compareBy(Bytewise) { it.file }),
+                warnings,
+                records,
             )
     }
 }

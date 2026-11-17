@@ -1,0 +1,6 @@
+// The authored core package beside the generated skeleton (MW-P5 S5.2, ✅D-MW-81 (f)): it declares the open-tier
+// relation type the skeleton's `relations` name.
+package glossary
+model cn
+
+def relation_type related { description: "Related, as SKOS skos:related says: no direction, no further meaning." }

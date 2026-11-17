@@ -1,0 +1,3 @@
+# An authored overlay (MW-P5 S5.2 T1): one term curated by its IRI.
+https://example.org/trade/Customer:
+  description: {en: "A party that has bought from us at least once.", cs: "Strana, která od nás aspoň jednou nakoupila."}

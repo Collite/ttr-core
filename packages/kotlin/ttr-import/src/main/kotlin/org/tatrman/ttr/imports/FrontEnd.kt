@@ -20,6 +20,12 @@ interface FrontEnd {
     /** The name `--from` and the report use (`json`, later `turtle`, `csv`, `xmi`, `pdm`). */
     val name: String
 
+    /**
+     * The pointer of the record collection the front-end's trees put the source's objects under (`/subjects`, `/rows`),
+     * or null; the report folds the key beneath it to a star, so a PR body groups one ignored key over every record.
+     */
+    val records: String? get() = null
+
     fun parse(files: List<Path>): List<ForeignTree>
 }
 
