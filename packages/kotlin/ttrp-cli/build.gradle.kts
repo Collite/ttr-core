@@ -10,6 +10,9 @@ plugins {
     application
 }
 
+// AU-export S1.5.9 review-340: `ttr.runtimeClasspath` for Slf4jProviderSpec.
+apply(from = rootProject.file("gradle/runtime-classpath-components.gradle.kts"))
+
 kotlin {
     jvmToolchain(21)
 }
@@ -63,6 +66,8 @@ application {
 }
 
 dependencies {
+    // An application binds its own SLF4J provider; libraries never do (AU-export S1.5.9 / review-340 H1).
+    runtimeOnly(libs.slf4j.nop)
     implementation(project(":packages:kotlin:ttr-emit-sql-job"))
     implementation(project(":packages:kotlin:ttr-emit-python"))
     implementation(project(":packages:kotlin:ttr-emit-camunda"))

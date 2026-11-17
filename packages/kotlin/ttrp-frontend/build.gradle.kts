@@ -15,6 +15,9 @@ kotlin {
     jvmToolchain(21)
 }
 
+// AU-export S1.5.9: `ttr.runtimeClasspath` for RuntimeClasspathSpec (no CLI rides a library).
+apply(from = rootProject.file("gradle/runtime-classpath-components.gradle.kts"))
+
 tasks.test {
     useJUnitPlatform()
     // Golden AST snapshots: run with `-DupdateSnapshots=true` to (re)write the
@@ -68,9 +71,8 @@ dependencies {
     // Stage 1.3: all model/world reading goes THROUGH ttr-metadata (D-g, offline);
     // ttrp-frontend never parses `.ttrm` directly. TOML for the `[ttrp]` manifest (S5).
     implementation(project(":packages:kotlin:ttr-metadata"))
-    // AU-export S1.5.4 (D-173): the project model loads as the services load it — `[packages].layout` read by
-    // ttr-metadata-cli's one rule (`MetadataLoadCli.readManifest`), not a copy of it.
-    implementation(project(":packages:kotlin:ttr-metadata-cli"))
+    // AU-export S1.5.4 (D-173) → S1.5.9 (D-235): `[packages].layout` is read by ttr-metadata's `PackagesManifest`, the
+    // one rule the CLI uses too. Never a `*-cli` module here: a library's readers carry its runtime (libraryCliEdges).
     // PL-P1.S2: the ② connected binding — `ttr.lock` pins reference cached snapshot archives;
     // MetadataServerSource reads canon out of the cache (no network in load(), B-5).
     implementation(project(":packages:kotlin:ttr-snapshot"))

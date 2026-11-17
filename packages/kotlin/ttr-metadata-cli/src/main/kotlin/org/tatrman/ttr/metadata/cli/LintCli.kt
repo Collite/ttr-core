@@ -5,6 +5,7 @@ import org.tatrman.ttr.metadata.LoadIssue
 import org.tatrman.ttr.metadata.LoadReport
 import org.tatrman.ttr.metadata.LoadReportIssue
 import org.tatrman.ttr.metadata.PackageLayout
+import org.tatrman.ttr.metadata.PackagesManifest
 import org.tatrman.ttr.metadata.source.GeneratedGuard
 import org.tatrman.ttr.metadata.source.HeaderOptions
 import org.tatrman.ttr.metadata.source.LoadWarning
@@ -80,7 +81,7 @@ internal class Target(
             val manifest = project.resolve("modeler.toml")
             val checkout = manifest.isRegularFile()
             val (manifestLayout, issues) =
-                if (checkout) MetadataLoadCli.readManifest(manifest) else PackageLayout.Off to emptyList()
+                if (checkout) PackagesManifest.read(manifest) else PackageLayout.Off to emptyList()
             val modelRoot = if (checkout) project.resolve("model") else project
             if (!Files.isDirectory(modelRoot)) {
                 return Resolved.NoModel(project, MetadataLoadCli.noModelDir(modelRoot, issues))

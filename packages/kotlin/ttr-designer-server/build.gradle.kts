@@ -7,6 +7,9 @@ plugins {
     application
 }
 
+// AU-export S1.5.9 review-340: `ttr.runtimeClasspath` for Slf4jProviderSpec.
+apply(from = rootProject.file("gradle/runtime-classpath-components.gradle.kts"))
+
 kotlin { jvmToolchain(21) }
 tasks.test { useJUnitPlatform() }
 
@@ -15,6 +18,8 @@ application {
 }
 
 dependencies {
+    // An application binds its own SLF4J provider; libraries never do (AU-export S1.5.9 / review-340 H1).
+    runtimeOnly(libs.slf4j.nop)
     implementation(project(":packages:kotlin:ttr-metadata")) // NO ttr-metadata-git (MD3)
     // The TTR-P LSP mounted at /lsp (MD8): the host serves the SAME Phase-4 server object,
     // it never forks LSP logic. lsp4j rides in transitively (ttrp-lsp exposes it `api`).

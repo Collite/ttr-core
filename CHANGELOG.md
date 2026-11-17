@@ -39,6 +39,25 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   anything else refuses. An approval action with another native sink, or none, is performed as before. Customer
   `camunda_7`/`camunda_8` exports are unchanged.
 
+### Fixed — ttrp-frontend no longer depends on ttr-metadata-cli (AU-export S1.5.9, MW S4.1 fat-jar failure)
+
+- `ttrp-frontend` no longer depends on `ttr-metadata-cli`. At 0.22.6 every reader of the model carried the CLI's
+  runtime (clikt, mordant, jna, `slf4j-nop`, ttr-import), and ttr-server's automation `shadowJar` failed with
+  `Zip64RequiredException`. `ttrp-frontend`'s runtime dependency report shrinks from 138 to 98 lines.
+- The `[packages]` manifest read now lives in `ttr-metadata`: `PackagesManifest.read(path)` returns the layout and the
+  manifest's issues. The outcomes are unchanged: a missing key is `flexible`, an unknown value warns, a malformed or
+  unreadable file is `manifest-invalid`. `MetadataLoadCli.readManifest` delegates to it. `ttr-metadata` now takes
+  `org.tomlj:tomlj` as a runtime dependency.
+- A build guard, `libraryCliEdges` in the root `check`, fails when a non-`*-cli` module depends on a `*-cli` module, and
+  names the edge. There are two named allowances: `ttrp-lsp → ttrp-cli` (the LSP launcher is an application) and
+  `ttr-concept → ttr-metadata-cli` (the `ttr` launcher still lives in the published library). The guard also fails when
+  an allowance is no longer needed. It reads `api`, `implementation`, `runtimeOnly`, `compileOnlyApi` and their
+  `testFixtures*` twins.
+- `ttrp-cli`, `ttrp-lsp` and `ttr-designer-server` now declare `slf4j-nop` themselves (review-340). Before this change
+  they got it only through the removed edge, and without it the released `ttrp` printed `SLF4J(W): No SLF4J providers
+  were found` on stderr. An application binds its own SLF4J provider; a library never does.
+- `MetadataLoadCli.readManifest` is deprecated in favour of `PackagesManifest.read`.
+
 ### Added — `each`, `split` and the `kinds` null-skip in the profile engine (MW-P5 S5.2a, ✅D-MW-81)
 
 - An eleventh operation, `each` (`in`, `at`, `to`, `shape`, optional `key`): the list at `at` → one `shape` template
