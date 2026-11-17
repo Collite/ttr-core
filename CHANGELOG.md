@@ -29,6 +29,22 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   record collection (`/subjects/*/skos:altLabel`) as it folds list indices. `FrontEnd` gains `records` (default
   null) and `ReaderOptions` gains `lexicon`.
 
+### Changed — an overlay re-kinds a definition; `overridden[]` reports additions (MW-P5 S5.2b, ✅D-MW-84)
+
+- An overlay entry's `kind: <value>` re-kinds a top-level **cn** definition when the value is a cn stereotype
+  (`kind`, `subkind`, `variant`, `role`, `event`, `phase`, `quality`, `relation_type`; ✅R346-A). Only the emitted
+  keyword changes (`def kind Customer` → `def role Customer`). The document, the qname (`overridden[]`, the
+  `.sources.json` sidecar, links) and the identity checks keep the transform's kind. It is reported as
+  `{qname, property: "kind", from: <old kind>, to: <new kind>}`; a re-kind to the current kind changes and reports
+  nothing. Any other `kind:` value, and `kind:` on a record of any other model, is a property, as before (the cn
+  stereotype reference `kind: Invoice`). A sourceName that fans out to several records sends a re-kinding `kind:` to
+  the cn record. A canonical-validation error inside a re-kinded definition keeps its dialect location and names the
+  overlay entry that re-kinded it.
+- `overridden[]` now also lists every property the overlay **added**, with `from: null`. Before, only replaced values
+  were listed. `Overridden.from` is `JsonNull` for an addition. A report with an overlay that only adds properties is
+  therefore no longer byte-identical. ttr-import's report Markdown says so: an empty `Overridden` section now reads
+  "No overlay entry set a value."
+
 ### Changed — ttr-emit-camunda: the approval row's answer is decided at its Open (ttr-server D-159/D-228/D-233; AU-export S1.5.7)
 
 - The process-engine approval row's answer Open is its one call to the Server, which decides the approved key and
@@ -45,6 +61,25 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   run's close, so the engine asks after the close: `closed` ends the evaluation, `waiting` asks per selected row, and
   anything else refuses. An approval action with another native sink, or none, is performed as before. Customer
   `camunda_7`/`camunda_8` exports are unchanged.
+
+### Fixed — ttrp-frontend no longer depends on ttr-metadata-cli (AU-export S1.5.9, MW S4.1 fat-jar failure)
+
+- `ttrp-frontend` no longer depends on `ttr-metadata-cli`. At 0.22.6 every reader of the model carried the CLI's
+  runtime (clikt, mordant, jna, `slf4j-nop`, ttr-import), and ttr-server's automation `shadowJar` failed with
+  `Zip64RequiredException`. `ttrp-frontend`'s runtime dependency report shrinks from 138 to 98 lines.
+- The `[packages]` manifest read now lives in `ttr-metadata`: `PackagesManifest.read(path)` returns the layout and the
+  manifest's issues. The outcomes are unchanged: a missing key is `flexible`, an unknown value warns, a malformed or
+  unreadable file is `manifest-invalid`. `MetadataLoadCli.readManifest` delegates to it. `ttr-metadata` now takes
+  `org.tomlj:tomlj` as a runtime dependency.
+- A build guard, `libraryCliEdges` in the root `check`, fails when a non-`*-cli` module depends on a `*-cli` module, and
+  names the edge. There are two named allowances: `ttrp-lsp → ttrp-cli` (the LSP launcher is an application) and
+  `ttr-concept → ttr-metadata-cli` (the `ttr` launcher still lives in the published library). The guard also fails when
+  an allowance is no longer needed. It reads `api`, `implementation`, `runtimeOnly`, `compileOnlyApi` and their
+  `testFixtures*` twins.
+- `ttrp-cli`, `ttrp-lsp` and `ttr-designer-server` now declare `slf4j-nop` themselves (review-340). Before this change
+  they got it only through the removed edge, and without it the released `ttrp` printed `SLF4J(W): No SLF4J providers
+  were found` on stderr. An application binds its own SLF4J provider; a library never does.
+- `MetadataLoadCli.readManifest` is deprecated in favour of `PackagesManifest.read`.
 
 ### Added — `each`, `split` and the `kinds` null-skip in the profile engine (MW-P5 S5.2a, ✅D-MW-81)
 
