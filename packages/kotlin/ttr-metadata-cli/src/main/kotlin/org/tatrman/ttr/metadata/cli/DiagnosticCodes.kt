@@ -89,16 +89,6 @@ object DiagnosticCodes {
                 "ttr-profile ValueOps (each)",
             ),
             DiagnosticCode(
-                "ys/each-missing-key",
-                "A list element has no string at the each op's `key`",
-                "ttr-profile ValueOps (each with key:, at the element)",
-            ),
-            DiagnosticCode(
-                "ys/each-duplicate-key",
-                "Two list elements have the same string at the each op's `key`",
-                "ttr-profile ValueOps (each with key:, at the later element)",
-            ),
-            DiagnosticCode(
                 "ys/split-not-a-string",
                 "A values op with `split` selects something other than a string",
                 "ttr-profile ValueOps (values with split:)",

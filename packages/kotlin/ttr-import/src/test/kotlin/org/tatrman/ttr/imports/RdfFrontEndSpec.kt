@@ -54,10 +54,12 @@ class RdfFrontEndSpec :
             """.trimIndent()
 
         test(
-            "a SKOS graph becomes the subject map: @id/@local, compacted predicates, objects sorted, blank nodes numbered",
+            "a SKOS graph becomes the subject map: @id/@local, compacted predicates, objects sorted, blank nodes by content",
         ) {
             val tree = RdfFrontEnd.TURTLE.tree(turtle, "orchard.ttl")
-            Json.parseToJsonElement(tree) shouldBe
+            // ✅R350-B: a blank node's label is 16 hex digits of its content's SHA-256.
+            val blank = Regex("_:[0-9a-f]{16}").find(tree)!!.value
+            Json.parseToJsonElement(tree.replace(blank, "_:b0")) shouldBe
                 Json.parseToJsonElement(
                     """
                     {"subjects": {
@@ -96,7 +98,7 @@ class RdfFrontEndSpec :
                     .jsonObject.keys
                     .toList()
             ) shouldBe
-                listOf("_:b0", "https://example.org/orchard/Fruit", "https://example.org/orchard/Pear")
+                listOf(blank, "https://example.org/orchard/Fruit", "https://example.org/orchard/Pear")
         }
 
         test("the same graph as RDF/XML yields the same tree text, byte for byte") {
@@ -118,10 +120,61 @@ class RdfFrontEndSpec :
             RdfFrontEnd.RDFXML.tree(rdfxml, "g") shouldBe RdfFrontEnd.TURTLE.tree(turtle, "g")
         }
 
-        test("relative IRIs resolve against file:///<file name>, the same on every machine") {
-            val tree = RdfFrontEnd.TURTLE.tree("<#Plum> a <#Fruit> .", "local.ttl")
-            tree shouldContain "\"@id\": \"file:///local.ttl#Plum\""
-            tree shouldContain "\"@local\": \"Plum\""
+        test("relative IRIs resolve against file:/// whatever the file is called (review-350 F3)") {
+            listOf("local.ttl", "trade-2026-11.ttl", "a#b.ttl", "50%.ttl", "x[1].ttl", "Trade Glossary.ttl").forEach {
+                val tree = RdfFrontEnd.TURTLE.tree("<#Plum> a <#Fruit> .", it)
+                tree shouldContain "\"@id\": \"file:///#Plum\""
+                tree shouldContain "\"@local\": \"Plum\""
+            }
+        }
+
+        test("blank nodes: the same labels whatever the syntax and statement order; a cycle is refused (✅R350-B)") {
+            val a = "https://example.org/g/A"
+            val b = "https://example.org/g/B"
+            val turtleAFirst =
+                "@prefix s: <http://www.w3.org/2004/02/skos/core#> .\n" +
+                    "<$a> s:note [ s:prefLabel \"x\" ; s:note [ s:prefLabel \"deep\" ] ] .\n" +
+                    "<$b> s:note [ s:prefLabel \"y\" ] .\n"
+            val xmlBFirst =
+                """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+                         xmlns:s="http://www.w3.org/2004/02/skos/core#">
+                  <rdf:Description rdf:about="$b">
+                    <s:note rdf:parseType="Resource"><s:prefLabel>y</s:prefLabel></s:note>
+                  </rdf:Description>
+                  <rdf:Description rdf:about="$a">
+                    <s:note rdf:parseType="Resource">
+                      <s:note rdf:parseType="Resource"><s:prefLabel>deep</s:prefLabel></s:note>
+                      <s:prefLabel>x</s:prefLabel>
+                    </s:note>
+                  </rdf:Description>
+                </rdf:RDF>
+                """.trimIndent()
+            val tree = RdfFrontEnd.TURTLE.tree(turtleAFirst, "g")
+            RdfFrontEnd.RDFXML.tree(xmlBFirst, "g") shouldBe tree
+            Regex("\"(_:[0-9a-f]{16})\": \\{").findAll(tree).count() shouldBe 3
+
+            shouldThrow<ProfileException> {
+                RdfFrontEnd.TURTLE.tree(
+                    "@prefix s: <http://www.w3.org/2004/02/skos/core#> .\n_:x s:related _:y .\n_:y s:related _:x .\n",
+                    "loop.ttl",
+                )
+            }.let {
+                it.code shouldBe "ys/profile-invalid"
+                it.location.file shouldBe "loop.ttl#subjects"
+                it.detail shouldContain "skos:related → skos:related"
+            }
+        }
+
+        test("a language tag is written in the TTR locale form: en-GB → en_gb, zh-Hans → zh_hans (✅D-MW-87 item 5)") {
+            val tree =
+                RdfFrontEnd.TURTLE.tree(
+                    "<https://x/C> <http://www.w3.org/2004/02/skos/core#prefLabel> \"lorry\"@en-GB, \"货车\"@zh-Hans .",
+                    "t.ttl",
+                )
+            tree shouldContain "\"@language\": \"en_gb\""
+            tree shouldContain "\"@language\": \"zh_hans\""
         }
 
         test("a syntax error is ys/profile-invalid at the parser's line and column, labelled by the file name") {

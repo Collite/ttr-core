@@ -226,8 +226,10 @@ Three additions serve list-shaped sources such as glossaries (MW-P5 S5.2a):
   in order. An input `$item` or `$item/<pointer>` reads the element; a plain pointer reads the record. Without `key`
   the result is a list; with `key` (a pointer within the element) it is an object keyed by each element's string
   there, so `[{"@value": "Smlouva", "@language": "cs"}, …]` with `key: /@language` and `shape: {input: $item/@value}`
-  becomes the language map `{cs: Smlouva, …}`. A duplicate key is `ys/each-duplicate-key` and a missing one
-  `ys/each-missing-key`, both at the element. A non-list is `ys/each-not-a-list`. An empty list writes `[]` or `{}`.
+  becomes the language map `{cs: Smlouva, …}`. An element with no string key takes the literal `missing:` when the op
+  has one (`missing: en`) and is skipped when it has not; a repeated key keeps the element whose value is bytewise
+  first. Each is a report warning (`each key missing → en`, `each key repeated (cs)`), once per record, never an error
+  (✅D-MW-87). A non-list is `ys/each-not-a-list`. An empty list writes `[]` or `{}`.
 - `values` takes `split: "<separator>"` in place of `mapping`: a string becomes the list of its trimmed non-empty
   parts. The separator is matched without its surrounding whitespace, and an empty or blank separator splits on whitespace runs.
   `split` with `mapping` or `default` is refused at load. A non-string is `ys/split-not-a-string`.

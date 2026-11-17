@@ -10,14 +10,15 @@ import org.apache.jena.graph.Node
 import org.apache.jena.graph.Triple
 import org.apache.jena.riot.Lang
 import org.apache.jena.riot.RDFParser
-import org.apache.jena.riot.RiotException
 import org.apache.jena.riot.system.ErrorHandler
 import org.apache.jena.riot.system.StreamRDFBase
+import org.apache.jena.shared.JenaException
 import org.tatrman.ttr.profile.Bytewise
 import org.tatrman.ttr.profile.ForeignTree
 import org.tatrman.ttr.profile.ProfileException
 import org.tatrman.ttr.profile.ProfileSpan
 import java.nio.file.Path
+import java.security.MessageDigest
 import java.util.TreeMap
 
 /**
@@ -31,16 +32,20 @@ import java.util.TreeMap
  * - A subject is keyed by its IRI, verbatim; `@local` is the IRI's part after its last `#` or `/` (left out when empty), so
  *   a profile names a definition with `kinds.id: /@local` while the sidecar keeps `@id` (✅D-MW-81 (e)).
  * - An IRI object is `{"@id", "@local"}` (✅D-MW-83); a literal is `{"@value"}` with `"@language"` when it has a language
- *   tag, or `"@type"` (the datatype IRI) when its datatype is not `xsd:string`.
- * - A blank node is `_:b<n>`, numbered in the order the parser first meets it (a blank node has no name to keep).
+ *   tag, or `"@type"` (the datatype IRI) when its datatype is not `xsd:string` (an `xsd:string` literal has no `@type`).
+ *   A language tag is written in the TTR locale form, lower case with `-` → `_` (`en-GB` → `en_gb`; ✅D-MW-87 item 5), so
+ *   a label map key and a lexicon locale read it alike.
+ * - A blank node is `_:` + 16 hex digits of a SHA-256 of its content (✅R350-B, see [Graph]); a cycle of blank nodes
+ *   is `ys/profile-invalid`.
  * - A predicate's key is its IRI, written `<prefix>:<local>` when it lies in one of the fixed namespaces of [PREFIXES]
  *   (never the document's own prefixes, which differ between syntaxes), so a profile reads `/skos:broader`.
  * - Subjects are in bytewise key order, predicates in bytewise IRI order after `@id`/`@local`, and each predicate's
  *   objects in bytewise order of (`@id`, `@value`, `@language`, `@type`). A graph is a set, so the same graph written as
  *   Turtle or as RDF/XML yields the same tree.
  *
- * Relative IRIs resolve against `file:///<file name>`, which is the same on every machine. A syntax error is
- * `ys/profile-invalid` at the parser's line and column in the file. RIOT reports no positions for triples, so a
+ * Relative IRIs resolve against `file:///` whatever the file is called (review-350 F3), so `<#Customer>` is
+ * `file:///#Customer` in every export of the glossary. A syntax error is `ys/profile-invalid` at the parser's line and
+ * column in the file; any other Jena failure at the file's first line. RIOT reports no positions for triples, so a
  * diagnostic or `ignored[]` entry on a tree node is labelled `<file name>#subjects`: its line and column are the subject
  * map's, and its path names the subject's IRI and the predicate. The tree's `file` (what `files` globs and `package`
  * stems read) is the plain file name.
@@ -61,46 +66,11 @@ class RdfFrontEnd private constructor(
         text: String,
         label: String,
     ): String {
-        val subjects = TreeMap<String, TreeMap<String, MutableSet<JsonObject>>>(Bytewise)
-        val predicates = HashMap<String, String>()
-        val blanks = HashMap<String, String>()
-
-        fun term(node: Node): String =
-            if (node.isBlank) blanks.getOrPut(node.blankNodeLabel) { "_:b${blanks.size}" } else node.uri
-
-        fun reference(id: String): JsonObject =
-            JsonObject(
-                buildMap {
-                    put("@id", JsonPrimitive(id))
-                    local(id)?.let { put("@local", JsonPrimitive(it)) }
-                },
-            )
-
-        fun value(node: Node): JsonObject =
-            if (node.isLiteral) {
-                JsonObject(
-                    buildMap {
-                        put("@value", JsonPrimitive(node.literalLexicalForm))
-                        val language = node.literalLanguage.orEmpty()
-                        if (language.isNotEmpty()) {
-                            put("@language", JsonPrimitive(language))
-                        } else if (node.literalDatatypeURI != XSD_STRING) {
-                            put("@type", JsonPrimitive(node.literalDatatypeURI))
-                        }
-                    },
-                )
-            } else {
-                reference(term(node))
-            }
-
+        val triples = mutableListOf<Triple>()
         val sink =
             object : StreamRDFBase() {
                 override fun triple(triple: Triple) {
-                    val predicate = triple.predicate.uri
-                    val key = predicates.getOrPut(predicate) { compact(predicate) }
-                    subjects
-                        .getOrPut(term(triple.subject)) { TreeMap(Bytewise) }
-                        .getOrPut(key) { sortedSetOf(objectOrder) } += value(triple.`object`)
+                    triples += triple
                 }
             }
         try {
@@ -108,32 +78,105 @@ class RdfFrontEnd private constructor(
                 .create()
                 .fromString(text)
                 .lang(lang)
-                .base("file:///$label")
+                .base(BASE)
                 .errorHandler(Errors(label))
                 .parse(sink)
-        } catch (e: RiotException) {
+        } catch (e: JenaException) {
+            // F3 (review-350): any Jena failure (an IRI it cannot resolve, say), not only RIOT's, is a located error.
             throw ProfileException(
                 "ys/profile-invalid",
                 ProfileSpan(label, 1, 1, 1, 1, ""),
                 e.message ?: "RDF syntax error",
             )
         }
-        val tree =
-            JsonObject(
-                mapOf(
-                    "subjects" to
-                        JsonObject(
-                            subjects.mapValues { (id, properties) ->
-                                val head = reference(id)
-                                val ordered = properties.entries.sortedWith(compareBy(Bytewise) { full(it.key) })
-                                JsonObject(
-                                    head + ordered.associate { (key, objects) -> key to JsonArray(objects.toList()) },
-                                )
-                            },
-                        ),
-                ),
-            )
+        val graph = Graph(triples, label)
+        val subjects = TreeMap<String, JsonObject>(Bytewise)
+        for (subject in graph.subjects) {
+            val id = graph.term(subject, emptyList())
+            subjects[id] =
+                JsonObject(
+                    reference(id) +
+                        graph.properties(subject, emptyList()).mapValues { (_, objects) ->
+                            JsonArray(objects.toList())
+                        },
+                )
+        }
+        val tree = JsonObject(mapOf("subjects" to JsonObject(subjects)))
         return PRETTY.encodeToString(JsonElement.serializer(), tree) + "\n"
+    }
+
+    /**
+     * The parsed graph's terms and properties. ✅R350-B: a blank node is labelled `_:` + the first 16 hex digits of the
+     * SHA-256 of its content — its predicates in bytewise IRI order, each with its objects in [objectOrder], a blank
+     * object by its own label — so the label is the same whatever the syntax or the statement order. Two blank nodes with
+     * the same content get one label (one subject in the tree; their objects are a set). A blank node met again on its own
+     * path has no content label: `ys/profile-invalid`, naming the predicates of the cycle.
+     */
+    private class Graph(
+        triples: List<Triple>,
+        private val label: String,
+    ) {
+        private val bySubject = triples.groupBy { it.subject }
+        private val keys = HashMap<String, String>()
+        private val labels = HashMap<Node, String>()
+        val subjects: Set<Node> = bySubject.keys
+
+        /** [path]: the blank nodes being labelled, outermost first, each with the predicate that leads on. */
+        fun term(
+            node: Node,
+            path: List<Pair<Node, String>>,
+        ): String {
+            if (!node.isBlank) return node.uri
+            labels[node]?.let { return it }
+            val start = path.indexOfFirst { it.first == node }
+            if (start >= 0) {
+                val cycle = path.drop(start).joinToString(" → ") { it.second }
+                throw ProfileException(
+                    "ys/profile-invalid",
+                    ProfileSpan("$label$TREE", 1, 1, 1, 1, "/subjects"),
+                    "blank nodes in a cycle ($cycle) have no content label; give one of them an IRI",
+                )
+            }
+            val content =
+                properties(node, path).entries.joinToString("\n") { (key, objects) ->
+                    "${full(key)} ${JsonArray(objects.toList())}"
+                }
+            val digest = MessageDigest.getInstance("SHA-256").digest(content.toByteArray(Charsets.UTF_8))
+            return "_:${digest.joinToString("") { "%02x".format(it) }.take(16)}".also { labels[node] = it }
+        }
+
+        /** [subject]'s predicates (keys in bytewise order of the full IRI) and their objects in [objectOrder]. */
+        fun properties(
+            subject: Node,
+            path: List<Pair<Node, String>>,
+        ): Map<String, Set<JsonObject>> {
+            val grouped = TreeMap<String, MutableSet<JsonObject>>(compareBy(Bytewise) { full(it) })
+            for (triple in bySubject[subject].orEmpty()) {
+                val key = keys.getOrPut(triple.predicate.uri) { compact(triple.predicate.uri) }
+                grouped.getOrPut(key) { sortedSetOf(objectOrder) } += value(triple.`object`, path + (subject to key))
+            }
+            return grouped
+        }
+
+        private fun value(
+            node: Node,
+            path: List<Pair<Node, String>>,
+        ): JsonObject =
+            if (node.isLiteral) {
+                JsonObject(
+                    buildMap {
+                        put("@value", JsonPrimitive(node.literalLexicalForm))
+                        val language = node.literalLanguage.orEmpty()
+                        if (language.isNotEmpty()) {
+                            put("@language", JsonPrimitive(locale(language)))
+                        } else if (node.literalDatatypeURI != XSD_STRING) {
+                            put("@type", JsonPrimitive(node.literalDatatypeURI))
+                        }
+                    },
+                )
+            } else {
+                reference(term(node, path))
+            }
     }
 
     /** RIOT's errors as located `ys/profile-invalid`; warnings (an odd lexical form, say) do not stop a reader. */
@@ -177,6 +220,21 @@ class RdfFrontEnd private constructor(
         const val TREE = "#subjects"
 
         private const val XSD_STRING = "http://www.w3.org/2001/XMLSchema#string"
+
+        /** An IRI or blank-node term as an object: `{"@id", "@local"}` (✅D-MW-83). */
+        private fun reference(id: String): JsonObject =
+            JsonObject(
+                buildMap {
+                    put("@id", JsonPrimitive(id))
+                    local(id)?.let { put("@local", JsonPrimitive(it)) }
+                },
+            )
+
+        /** F3 (review-350): one base for every file, so a relative IRI does not change with the file's name. */
+        const val BASE = "file:///"
+
+        /** F4 (✅D-MW-87 item 5): a language tag in the TTR locale form — lower case, `-` → `_` (`en-GB` → `en_gb`). */
+        internal fun locale(tag: String): String = tag.lowercase().replace('-', '_')
 
         /** The fixed namespaces a predicate key is compacted with; nothing else is (contracts §1, S5.2 Found (h)). */
         val PREFIXES: Map<String, String> =

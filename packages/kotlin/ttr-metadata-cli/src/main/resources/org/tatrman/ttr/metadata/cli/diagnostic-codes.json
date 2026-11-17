@@ -12,8 +12,6 @@
   {"code":"ys/record-id-missing","family":"ys","meaning":"A record has no string ID at kinds.id or the default /$key","raisedBy":"ttr-profile RecordPlan (at the authored record)"},
   {"code":"ys/canonical-invalid","family":"ys","meaning":"A file read as canonical YAML is not valid canonical YAML","raisedBy":"ttr-yaml CanonicalYaml via ttr-metadata YamlFileSource"},
   {"code":"ys/each-not-a-list","family":"ys","meaning":"An each op's `at` selects something other than a list","raisedBy":"ttr-profile ValueOps (each)"},
-  {"code":"ys/each-missing-key","family":"ys","meaning":"A list element has no string at the each op's `key`","raisedBy":"ttr-profile ValueOps (each with key:, at the element)"},
-  {"code":"ys/each-duplicate-key","family":"ys","meaning":"Two list elements have the same string at the each op's `key`","raisedBy":"ttr-profile ValueOps (each with key:, at the later element)"},
   {"code":"ys/split-not-a-string","family":"ys","meaning":"A values op with `split` selects something other than a string","raisedBy":"ttr-profile ValueOps (values with split:)"},
   {"code":"xm/link-unresolved","family":"xm","meaning":"A link names nothing in the run or its sidecars","raisedBy":"ttr-profile ValueOps (link)"},
   {"code":"xm/link-ambiguous","family":"xm","meaning":"A link names more than one target","raisedBy":"ttr-profile ValueOps (link), Overlay"},

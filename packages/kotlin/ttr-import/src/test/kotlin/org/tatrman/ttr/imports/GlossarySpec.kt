@@ -161,7 +161,7 @@ class GlossarySpec :
             skos.report.ignored
                 .filter { it.record != null }
                 .map { it.record to it.reason } shouldBe
-                listOf("Trade" to "kind mapping null (/rdf:type/0/@local = ConceptScheme)")
+                listOf("Trade" to "kind mapping null (/rdf:type/*/@local = ConceptScheme)")
             skos.report.markdown() shouldContain
                 "| `/subjects/*/skos:altLabel` | lexicon entries (the reader's lexicon key) | 9 |"
         }

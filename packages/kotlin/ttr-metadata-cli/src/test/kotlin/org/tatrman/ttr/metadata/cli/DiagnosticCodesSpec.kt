@@ -66,8 +66,6 @@ class DiagnosticCodesSpec :
                     "ys/record-id-missing",
                     "ys/canonical-invalid",
                     "ys/each-not-a-list",
-                    "ys/each-missing-key",
-                    "ys/each-duplicate-key",
                     "ys/split-not-a-string",
                     "xm/link-unresolved",
                     "xm/link-ambiguous",

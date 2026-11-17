@@ -1,3 +1,24 @@
+# skos/1 — a SKOS glossary (Turtle or RDF/XML, through the `turtle`/`rdfxml` front-ends' subject map) → a TTR cn
+# skeleton package + one lexicon per locale (MW-P5 S5.2, contracts §3; XM 06 §3 "glossary → cn skeleton").
+# Shipped with ttr-core: `ttr-metadata import-glossary --from <glossary.ttl> --profile skos/1`.
+#
+# Every subject typed `skos:Concept` → `def kind <local name>` (abstract: true, D-14): `prefLabel` → `label` and
+# `definition` → `description` (language maps), `broader` → `is_a`, `related` → `relations` (type `related`, declared
+# by the authored core package), `altLabel` → the lexicon. The sidecar's `sourceName` is the subject's IRI.
+#
+# Default locale: en. A `prefLabel`/`definition` with no language tag is English, with a report warning
+# (`each key missing → en`); two in one language keep the bytewise-first, with a warning (`each key repeated (<lang>)`).
+# Language tags arrive in the TTR locale form (`en-GB` → `en_gb`). An `altLabel` with no language is skipped with a
+# warning.
+#
+# Skipped, each listed in the report's ignored[] (✅D-MW-87): a subject whose types are `skos:ConceptScheme`,
+# `skos:Collection` or `skos:OrderedCollection` (the first type in the list this profile names decides; `Concept` beside
+# `owl:Class` is a concept); a subject with no `rdf:type` (a blank node, say) → `kind missing`; a subject with no type
+# this profile names (`owl:Ontology`) → `kind unmapped`. The other SKOS properties of a concept are ignored with their
+# reasons below.
+#
+# Errors (the profile's author must act): a concept predicate outside SKOS core and the ones below (`dct:created`,
+# a custom property) is `ys/unknown-key` — extend this profile (a child profile's `ignore`), or curate with an overlay.
 profile: skos/1
 grammar: '>=0.22 <1.0'
 skeleton: true
@@ -6,9 +27,14 @@ lexicon:
   - {target: kind, at: /subjects, id: /@local, terms: /skos:altLabel, form: /@value, language: /@language}
 operations:
   - {op: package, mapping: {}, default: glossary}
-  - {op: kinds, at: /subjects, id: /@local, kind: /rdf:type/0/@local, mapping: {Concept: kind, ConceptScheme: null}}
-  - {op: each, in: kind, at: /skos:prefLabel, key: /@language, to: {kind: kind, property: label}, shape: {input: $item/@value}}
-  - {op: each, in: kind, at: /skos:definition, key: /@language, to: {kind: kind, property: description}, shape: {input: $item/@value}}
+  - op: kinds
+    at: /subjects
+    id: /@local
+    kind: /rdf:type/*/@local
+    unmapped: skip
+    mapping: {Concept: kind, ConceptScheme: null, Collection: null, OrderedCollection: null}
+  - {op: each, in: kind, at: /skos:prefLabel, key: /@language, missing: en, to: {kind: kind, property: label}, shape: {input: $item/@value}}
+  - {op: each, in: kind, at: /skos:definition, key: /@language, missing: en, to: {kind: kind, property: description}, shape: {input: $item/@value}}
   - {op: each, in: kind, at: /skos:broader, to: {kind: kind, property: is_a}, shape: {input: $item/@local}}
   - {op: each, in: kind, at: /skos:related, to: {kind: kind, property: relations}, shape: {type: related, to: {input: $item/@local}}}
   - {op: ignore, in: kind, at: /@id, reason: the sidecar's sourceName}
@@ -16,3 +42,21 @@ operations:
   - {op: ignore, in: kind, at: /skos:altLabel, reason: lexicon entries (the reader's lexicon key)}
   - {op: ignore, in: kind, at: /skos:narrower, reason: the inverse of broader (is_a)}
   - {op: ignore, in: kind, at: /skos:inScheme, reason: the package is the scheme}
+
+  # The rest of SKOS core on a concept (review-350 F1): no cn property carries them in v1.
+  - {op: ignore, in: kind, at: /skos:topConceptOf, reason: the package is the scheme}
+  - {op: ignore, in: kind, at: /skos:broaderTransitive, reason: entailed by broader (is_a)}
+  - {op: ignore, in: kind, at: /skos:narrowerTransitive, reason: entailed by narrower}
+  - {op: ignore, in: kind, at: /skos:hiddenLabel, reason: 'a search form, not a model fact'}
+  - {op: ignore, in: kind, at: /skos:notation, reason: 'a scheme code, not a model fact'}
+  - {op: ignore, in: kind, at: /skos:note, reason: documentation notes (description carries the definition)}
+  - {op: ignore, in: kind, at: /skos:scopeNote, reason: documentation notes (description carries the definition)}
+  - {op: ignore, in: kind, at: /skos:example, reason: documentation notes (description carries the definition)}
+  - {op: ignore, in: kind, at: /skos:historyNote, reason: documentation notes (description carries the definition)}
+  - {op: ignore, in: kind, at: /skos:editorialNote, reason: documentation notes (description carries the definition)}
+  - {op: ignore, in: kind, at: /skos:changeNote, reason: documentation notes (description carries the definition)}
+  - {op: ignore, in: kind, at: /skos:exactMatch, reason: a mapping to another scheme (not carried in v1)}
+  - {op: ignore, in: kind, at: /skos:closeMatch, reason: a mapping to another scheme (not carried in v1)}
+  - {op: ignore, in: kind, at: /skos:broadMatch, reason: a mapping to another scheme (not carried in v1)}
+  - {op: ignore, in: kind, at: /skos:narrowMatch, reason: a mapping to another scheme (not carried in v1)}
+  - {op: ignore, in: kind, at: /skos:relatedMatch, reason: a mapping to another scheme (not carried in v1)}

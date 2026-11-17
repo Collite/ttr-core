@@ -417,6 +417,12 @@
               },
               "split": {
                 "type": "string"
+              },
+              "unmapped": {
+                "type": "string"
+              },
+              "missing": {
+                "type": "string"
               }
             },
             "required": [
@@ -610,6 +616,12 @@
                           }
                         ]
                       }
+                    },
+                    "unmapped": {
+                      "enum": [
+                        "error",
+                        "skip"
+                      ]
                     }
                   },
                   "required": [
@@ -1639,6 +1651,10 @@
                     "key": {
                       "type": "string",
                       "pattern": "^(?:/(?:[^~/]|~[01])*)*(?![\\s\\S])"
+                    },
+                    "missing": {
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
                   "required": [

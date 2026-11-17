@@ -3,6 +3,7 @@ package org.tatrman.ttr.imports
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -11,7 +12,7 @@ import org.tatrman.ttr.profile.ForeignNode
 import org.tatrman.ttr.profile.ForeignTree
 import org.tatrman.ttr.profile.JsonPointer
 import org.tatrman.ttr.profile.ProfileException
-import org.tatrman.ttr.profile.SourceEntry
+import org.tatrman.ttr.profile.RecordOrigin
 import org.tatrman.ttr.yaml.CanonicalDocument
 import org.tatrman.ttr.yaml.CanonicalYaml
 import java.util.TreeMap
@@ -38,9 +39,11 @@ data class LexiconRule(
  * The reader's lexicon emission (contracts §1, XM 06 §3 "synonyms → lexicon entries"): synonyms become `lexicon` documents,
  * one per package and locale (`model lexicon locale <id>`, a unit-level header the engine does not group by), beside the
  * engine's documents. Each concept gets one `def term <id>_<locale> { for: <model>.<id>, forms: […] }`, terms in bytewise
- * name order, forms in bytewise order with repeats dropped (a graph's set and a CSV cell's list agree). A record the run did not emit as `target` (a skipped draft,
- * say) gets no term. An element without a language is skipped with a warning; a language tag that is not a TTR locale
- * (`[a-z][a-z0-9_]*` once lower-cased) is `ys/profile-invalid` at the element.
+ * name order, forms trimmed, in bytewise order with empty ones and repeats dropped (a graph's set and a CSV cell's list
+ * agree). A record's terms target the definition that record made (its input file and node, [RecordOrigin]); a record the
+ * run did not emit as `target` (a skipped draft, say) gets no term. An element without a language is skipped with a
+ * warning; a language tag that is not a TTR locale (`[a-z][a-z0-9_]*` once lower-cased — the RDF front-end already
+ * writes `en_gb` for `en-GB`) is `ys/profile-invalid` at the element.
  */
 internal object Lexicon {
     /** One generated term: the concept's package, its reference (`cn.Customer`), its id, locale and forms. */
@@ -56,18 +59,19 @@ internal object Lexicon {
 
     fun terms(
         trees: List<ForeignTree>,
-        sources: List<SourceEntry>,
+        origins: List<RecordOrigin>,
         rules: List<LexiconRule>,
         warnings: MutableList<String>,
     ): List<Term> {
         val terms = mutableListOf<Term>()
+        // review-350 F6: a record's terms go to the definition that record made — joined on its input file and node,
+        // never on its id alone, which two packages may share.
+        val made = origins.groupBy { it.file to it.path }
         for (rule in rules) {
-            // The run's records of the target kind, by id (the sidecar's locator of a top-level record is its id).
-            val emitted = sources.filter { it.kind == rule.target && it.locator != null }.groupBy { it.locator!! }
             for (tree in trees) {
                 for (record in records(tree, rule.at)) {
                     val id = string(JsonPointer(rule.id).resolve(record)) ?: continue
-                    for (entry in emitted[id].orEmpty()) {
+                    for (entry in made[tree.label to record.path].orEmpty().filter { it.kind == rule.target }) {
                         val model = entry.qname.removePrefix("${entry.pkg}.").substringBefore('.')
                         elements(record, rule)
                             .mapNotNull { element -> located(element, rule, id, warnings) }
@@ -206,9 +210,14 @@ internal object Lexicon {
         warnings: MutableList<String>,
     ): Pair<String, String>? {
         val (node, part) = element
+        if (part == null && node.value == JsonNull) return null
         val form =
-            part ?: rule.form?.let { string(JsonPointer(it).resolve(node)) } ?: string(node)
-                ?: throw ProfileException("ys/profile-invalid", node.span(), "a lexicon form must be a string")
+            (
+                part ?: rule.form?.let { string(JsonPointer(it).resolve(node)) } ?: string(node)
+                    ?: throw ProfileException("ys/profile-invalid", node.span(), "a lexicon form must be a string")
+            ).trim()
+        // review-350 F5: an empty synonym is no form (as `split` drops an empty part).
+        if (form.isEmpty()) return null
         val locale =
             rule.locale ?: rule.language?.let { string(JsonPointer(it).resolve(node))?.lowercase() } ?: run {
                 warnings += "lexicon: \"$form\" of $id has no language at ${rule.language}; skipped"

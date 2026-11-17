@@ -1,6 +1,0 @@
-pojmy:
-  Dodatek:
-    stav: schvaleno
-    popisy:
-      - {'@value': Dodatek, '@language': cs}
-      - {'@value': Příloha, '@language': cs}

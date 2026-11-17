@@ -193,6 +193,15 @@ internal object StructuralExecutor {
             plan.consumption.check(plan.tree.root)
         }
         val overridden = OverlayApplier.apply(overlay, index, builder, root)
-        return ApplyResult(builder.documents(), ignored.distinct(), ApplyReport(codes, overridden), index.sources())
+        return ApplyResult(
+            builder.documents(),
+            ignored.distinct(),
+            ApplyReport(codes, overridden, plans.flatMap { it.warnings }.distinct()),
+            index.sources(),
+            plans.flatMap { plan ->
+                val pkg = packages.getValue(plan)
+                plan.records.map { RecordOrigin(Qnames.of(it, pkg), it.kind, pkg, plan.tree.label, it.source.path) }
+            },
+        )
     }
 }

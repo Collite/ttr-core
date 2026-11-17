@@ -129,6 +129,9 @@ internal class RecordPlan(
     lateinit var skipped: List<Ignored>
         private set
 
+    /** ✅D-MW-87: the warnings the operations of this tree raised, in order (one per record and message). */
+    val warnings = mutableListOf<ProfileWarning>()
+
     /** Source position first; records of one node follow the index of the `kinds` operation that made them. */
     val records: List<Record> by lazy {
         val order = mutableMapOf<String, Int>()
@@ -223,8 +226,10 @@ internal class RecordPlan(
     }
 
     /**
-     * One record from [source], null when its kind maps to `null` (a skip, ✅D-MW-81), or the error that refuses it;
-     * the ledgers change only when it is a record.
+     * One record from [source], null when it is skipped — its kind maps to `null` (✅D-MW-81), or `unmapped: skip` meets
+     * a kind not in `mapping` or no kind at all (✅D-MW-87) — or the error that refuses it; the ledgers change only when
+     * it is a record. A kind that is a list (a `kind` pointer with a `*` segment, or one selecting a list of strings) takes
+     * its first element in list order that `mapping` names; a `null` mapping counts as named.
      */
     private fun discover(
         op: PlannedOp,
@@ -232,37 +237,52 @@ internal class RecordPlan(
         parent: Record?,
     ): Record? {
         val mapping = op.value.getValue("mapping").jsonObject
+        val kindText = op.value.optionalString("kind")
+        val candidates = kindText?.let { kindCandidates(it, source) }.orEmpty()
         val kindNode =
-            op.value
-                .optionalString(
-                    "kind",
-                )?.let { JsonPointer(it).resolve(source, includeNull = true) }
+            candidates.firstOrNull { (_, value) -> value in mapping }?.first ?: candidates.firstOrNull()?.first
+        // Without `*`, the node the pointer selects (a string, a list, or null) is what an error names and what is consumed.
+        val pointed =
+            kindText?.takeUnless { "/*/" in "$it/" }?.let { JsonPointer(it).resolve(source, includeNull = true) }
         val foreignKind =
-            kindNode?.value?.let { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }
-                ?: if ("kind" !in op.value && mapping.size == 1) mapping.keys.single() else null
-        if (foreignKind != null && mapping[foreignKind] == JsonNull) {
+            if (kindText == null) {
+                if (mapping.size == 1) mapping.keys.single() else null
+            } else {
+                candidates.firstOrNull { (_, value) -> value in mapping }?.second
+            }
+        val skipUnmapped = op.value.optionalString("unmapped") == "skip"
+
+        fun skip(reason: String): Record? {
             val id = JsonPointer(op.value.optionalString("id") ?: "/\$key").resolve(source)
             skips.putIfAbsent(
                 source.path,
                 source to
                     Ignored(
                         source.span(key = true),
-                        "kind mapping null (${op.value.optionalString("kind") ?: "kind"} = $foreignKind)",
+                        reason,
                         (id?.value as? JsonPrimitive)?.takeIf { it.isString }?.content,
                     ),
             )
             return null
         }
+        if (foreignKind != null && mapping[foreignKind] == JsonNull) {
+            return skip("kind mapping null (${kindText ?: "kind"} = $foreignKind)")
+        }
+        if (foreignKind == null && skipUnmapped) {
+            return if (candidates.isEmpty()) {
+                skip("kind missing ($kindText)")
+            } else {
+                skip("kind unmapped (${candidates.joinToString(", ") { it.second }})")
+            }
+        }
         val kind =
             mapping[foreignKind]?.jsonPrimitive?.content ?: throw ProfileException(
                 "ys/unknown-kind",
-                (kindNode ?: source).span(key = true),
-                if (foreignKind ==
-                    null
-                ) {
-                    "Unmapped record kind: no string at ${op.value.optionalString("kind") ?: ""}"
+                (kindNode ?: pointed ?: source).span(key = true),
+                if (candidates.isEmpty()) {
+                    "Unmapped record kind: no string at ${kindText ?: ""}"
                 } else {
-                    "Unmapped record kind $foreignKind"
+                    "Unmapped record kind ${candidates.joinToString(", ") { it.second }}"
                 },
             )
         val idNode = JsonPointer(op.value.optionalString("id") ?: "/\$key").resolve(source)
@@ -289,8 +309,34 @@ internal class RecordPlan(
             )
         }
         consumption.open(source)
-        kindNode?.let(consumption::consume)
+        (pointed ?: kindNode)?.let(consumption::consume)
         idNode?.let(consumption::consume)
         return Record(source, kind, id, parent)
+    }
+
+    /**
+     * The strings a `kinds.kind` pointer reads from [source], in order: the string it selects; each string of a list it
+     * selects; or, where one segment is `*`, the pointer after it read in each element of the list before it.
+     */
+    private fun kindCandidates(
+        pointer: String,
+        source: ForeignNode,
+    ): List<Pair<ForeignNode, String>> {
+        fun string(node: ForeignNode?) = (node?.value as? JsonPrimitive)?.takeIf { it.isString }?.content
+        val segments = if (pointer.isEmpty()) emptyList() else pointer.drop(1).split('/')
+        val star = segments.indexOf("*")
+        val list =
+            if (star < 0) {
+                JsonPointer(pointer).resolve(source)
+            } else {
+                JsonPointer(segments.take(star).joinToString("") { "/$it" }).resolve(source)
+            } ?: return emptyList()
+        val within = if (star < 0) JsonPointer("") else JsonPointer(segments.drop(star + 1).joinToString("") { "/$it" })
+        if (list.value !is JsonArray) {
+            return if (star < 0) listOfNotNull(string(list)?.let { list to it }) else emptyList()
+        }
+        return list.entries().mapNotNull { element ->
+            within.resolve(element)?.let { node -> string(node)?.let { node to it } }
+        }
     }
 }

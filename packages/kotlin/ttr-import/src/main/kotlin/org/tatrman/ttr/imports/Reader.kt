@@ -102,8 +102,15 @@ object Reader {
             }
             packages += ImportReport.Package(pkg, model, path, canonical.ast.definitions.size)
         }
+        // ✅D-MW-87: the engine's warnings (an `each` key missing or repeated) first, then the reader's own.
+        val warnings =
+            result.report.warnings
+                .map {
+                    "${it.record?.let { id ->
+                        "$id: "
+                    } ?: ""}${it.message} — ${it.location.file} ${it.location.path}"
+                }.toMutableList()
         // T4: synonyms → one `lexicon` document per package and locale, beside the engine's documents.
-        val warnings = mutableListOf<String>()
         val grammar =
             result.documents
                 .firstOrNull()
@@ -111,7 +118,7 @@ object Reader {
                 ?.value
                 ?.text("ttr")
         if (grammar != null && profile.options.lexicon.isNotEmpty()) {
-            val terms = Lexicon.terms(trees, result.sources, profile.options.lexicon, warnings)
+            val terms = Lexicon.terms(trees, result.origins, profile.options.lexicon, warnings)
             Lexicon.documents(terms, grammar).forEach { (path, document) ->
                 if (files.put(path, header.header(path).line(GeneratedHeader.Form.TTRM) + render(document)) != null) {
                     throw ReaderInputException(

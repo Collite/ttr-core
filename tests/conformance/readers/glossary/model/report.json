@@ -315,7 +315,7 @@
             "column": 9,
             "path": "/subjects/https:~1~1example.org~1trade~1Trade",
             "record": "Trade",
-            "reason": "kind mapping null (/rdf:type/0/@local = ConceptScheme)"
+            "reason": "kind mapping null (/rdf:type/*/@local = ConceptScheme)"
         },
         {
             "file": "trade.ttl#subjects",

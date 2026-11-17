@@ -100,4 +100,25 @@ class ImportGlossaryCommandSpec :
             }
             root.resolve("model").exists() shouldBe false
         }
+
+        test("review-350 F3: any file name imports, and a relative IRI's sourceName does not change with it") {
+            val turtle =
+                "@prefix s: <http://www.w3.org/2004/02/skos/core#> .\n" +
+                    "<#Rel> a s:Concept ; s:prefLabel \"rel\"@en .\n"
+            val sidecars =
+                listOf("50%.ttl", "x[1].ttl", "a#b.ttl", "Trade Glossary.ttl").map { name ->
+                    val root = Files.createTempDirectory("s52-cli-names")
+                    root.resolve("sources/$name").also { it.parent.createDirectories() }.writeText(turtle)
+                    val out = import(root, name)
+                    withClue("$name: ${out.stderr}") { out.exitCode shouldBe 0 }
+                    root
+                        .resolve("model/glossary.sources.json")
+                        .readText()
+                        .lines()
+                        .drop(2)
+                        .joinToString("\n")
+                }
+            sidecars.distinct().size shouldBe 1
+            sidecars.first() shouldContain "\"sourceName\":\"file:///#Rel\""
+        }
     })

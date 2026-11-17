@@ -37,6 +37,17 @@ data class Ignored(
 data class ApplyReport(
     val codes: Map<String, String>,
     val overridden: List<Overridden> = emptyList(),
+    val warnings: List<ProfileWarning> = emptyList(),
+)
+
+/**
+ * ✅D-MW-87: a report warning — the run went on, and [message] says what the engine did with input a generic profile did
+ * not expect (`each key missing → en`, `each key repeated (en)`). [record] is the record's id; [location] the element.
+ */
+data class ProfileWarning(
+    val location: ProfileSpan,
+    val message: String,
+    val record: String? = null,
 )
 
 /**
@@ -52,14 +63,27 @@ data class SourceEntry(
     val locator: String?,
 )
 
-/** [sources] are the run's records as sidecar entries (MW S3.6 T4), in record order. */
+/**
+ * Where one record of the run came from (review-350 F6): its [qname], [kind] and [pkg] as emitted, and the input [file]
+ * (the tree's label) and node [path] that made it — the record's identity, which a reader joins its own reads to.
+ */
+data class RecordOrigin(
+    val qname: String,
+    val kind: String,
+    val pkg: String,
+    val file: String,
+    val path: String,
+)
+
+/** [sources] are the run's records as sidecar entries (MW S3.6 T4), in record order; [origins] the same records' inputs. */
 data class ApplyResult(
     val documents: List<EmittedDocument>,
     val ignored: List<Ignored>,
     val report: ApplyReport,
     val sources: List<SourceEntry> = emptyList(),
+    val origins: List<RecordOrigin> = emptyList(),
 ) {
-    /** The PR-body report: `documents[]` (package, model, imports, defs), `ignored[]` and `overridden[]`. */
+    /** The PR-body report: `documents[]` (package, model, imports, defs), `ignored[]`, `overridden[]` and `warnings[]`. */
     fun reportJson(): JsonObject =
         buildJsonObject {
             putJsonArray("documents") {
@@ -96,6 +120,21 @@ data class ApplyResult(
                         put("property", item.property)
                         put("from", item.from)
                         put("to", item.to)
+                    }
+                }
+            }
+            // ✅D-MW-87: written only when there is one, so a run without warnings reports byte for byte as before.
+            if (report.warnings.isNotEmpty()) {
+                putJsonArray("warnings") {
+                    report.warnings.forEach { item ->
+                        addJsonObject {
+                            put("file", item.location.file)
+                            put("line", item.location.line)
+                            put("column", item.location.column)
+                            put("path", item.location.path)
+                            item.record?.let { put("record", it) }
+                            put("message", item.message)
+                        }
                     }
                 }
             }
