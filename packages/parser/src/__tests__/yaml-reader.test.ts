@@ -6,7 +6,7 @@ import { parseYamlDocument, parseString } from '../index.js';
 const envelope = 'ttr: "0.22"\nmodel: er\n';
 const source = `${envelope}defs:\n  - kind: entity\n    id: Customer\n    properties:\n      description: {cs: Zákazník, en: Customer}\n      attributes:\n        - id: name\n          properties: {type: text}\n`;
 const portable = (ast: unknown) => JSON.parse(JSON.stringify(ast, (key, value) =>
-  ['source', 'leadingTrivia', 'trailingTrivia', 'tagSource', 'valueSource'].includes(key) ? undefined : value));
+  ['source', 'leadingTrivia', 'trailingTrivia', 'tagSource', 'valueSource', 'textSource', 'lineOffsets', 'indentWidth', 'escapes'].includes(key) ? undefined : value));
 
 describe('canonical YAML reader contract', () => {
   it('builds the native typed AST, including ordered nested definitions and localized text', () => {
