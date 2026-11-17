@@ -5,6 +5,7 @@ import groovy.lang.Binding
 import groovy.lang.GroovyShell
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import kotlinx.serialization.json.*
 import org.camunda.bpm.impl.juel.ExpressionFactoryImpl
 import org.camunda.bpm.impl.juel.SimpleContext
@@ -151,6 +152,8 @@ class AnswerOpenSpec :
                 // A 409 on the answer (answer-unmatched, *-stale) refuses with the body; it is not an outdated export.
                 script.contains("TTR_STALE") shouldBe false
                 script.contains("TTR_REFUSED") shouldBe true
+                // R3: a 202 (the same key still in flight) rolls the completion back like a 5xx; it is never refused.
+                script.contains("if (code == 202) throw new IllegalStateException(") shouldBe true
                 // No route is read again inside the answer: the approval is not re-asked.
                 elements(BPMN, "userTask").count { inside(it, answerStep) } shouldBe 0
 
@@ -227,7 +230,60 @@ class AnswerOpenSpec :
                         it.getAttributeNS("http://camunda.org/schema/1.0/bpmn", "errorMessageVariable") ==
                         "ttrRefusedReason"
                 } shouldBe 1
+
+                // ✅R336-A: rows are held only at the root close, which leaves the run `waiting`; the approval is asked
+                // after it, never inside the routes.
+                fun named(
+                    kind: String,
+                    name: String,
+                ) = elements(BPMN, kind).single { it.getAttribute("name") == name }
+
+                fun flow(
+                    from: Element,
+                    to: Element,
+                ) = flows.single {
+                    it.getAttribute("sourceRef") == from.getAttribute("id") &&
+                        it.getAttribute("targetRef") == to.getAttribute("id")
+                }
+                val outcome = named("exclusiveGateway", "close outcome")
+                flow(named("serviceTask", "close"), outcome)
+                flow(outcome, named("endEvent", "evaluation ended")).textContent shouldContain
+                    "ttrClosed.prop(\"status\").stringValue() == \"closed\""
+                val approvals = named("inclusiveGateway", "approvals")
+                flow(outcome, approvals).textContent shouldContain
+                    "ttrClosed.prop(\"status\").stringValue() == \"waiting\""
+                val otherwise = flows.single { it.getAttribute("id") == outcome.getAttribute("default") }
+                (
+                    elements(BPMN, "endEvent")
+                        .single { it.getAttribute("id") == otherwise.getAttribute("targetRef") }
+                        .getElementsByTagNameNS(BPMN, "errorEventDefinition")
+                        .item(0) as Element
+                ).getAttribute("errorRef") shouldBe "run_refused"
+                val askEach = named("subProcess", "ask each release_confirmed row")
+                row shouldBe askEach
+                inside(user, askEach) shouldBe true
+                flow(approvals, askEach).textContent shouldContain "> 0"
+                val routeRow = named("subProcess", "each release_confirmed row")
+                elements(BPMN, "userTask").none { inside(it, routeRow) } shouldBe true
+                elements(BPMN, "serviceTask").none { inside(it, routeRow) } shouldBe true
             }
+        }
+        "an approval action the Server holds no rows for (no native sink) is not asked on the engine (R2)" {
+            val base = releaseGraph("process_engine")
+            val approve = base.actions.getValue("approve_release")
+            val graph =
+                base.copy(
+                    actions =
+                        base.actions + ("approve_release" to approve.copy(sinks = mapOf("process_engine" to "door"))),
+                    deployment = base.deployment.copy(egressUrl = "http://egress/automation"),
+                )
+            val xml = CamundaRenderer(RecipeEmitRequest(graph, "{}", "", "{}"), Dialect.C7, engine = true).render()
+            validateBpmn(xml)
+            xml.contains("name=\"approve approve_release\"") shouldBe false
+            xml.contains("name=\"answer ") shouldBe false
+            xml.contains("name=\"close outcome\"") shouldBe false
+            // Found 6's fallback until S1.5.8's export-time refusal: the Server performs it.
+            xml.contains("name=\"perform approve_release\"") shouldBe true
         }
         for (target in listOf("camunda_7", "camunda_8")) {
             "the customer target $target renders the approval user task without an answer chain" {
