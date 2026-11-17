@@ -30,18 +30,15 @@ def requests = Collections.synchronizedList([])
 def stubFailures = Collections.synchronizedList([])
 def responseCode = 200
 def responseBody = [runId: 'run-1', replayed: true]
-// A scenario may answer per path; the default is the fixed code and body above.
-def respond = null
 server.createContext('/automation') { exchange ->
     Thread.currentThread().contextClassLoader = engineLoader
     try {
         def body = exchange.requestBody.getText('UTF-8')
         def path = exchange.requestURI.toString()
         requests.add([path: path, body: body ? new JsonSlurper().parseText(body) : null])
-        def answer = respond ? respond(path) : [responseCode, responseBody]
-        def bytes = JsonOutput.toJson(answer[1]).getBytes('UTF-8')
+        def bytes = JsonOutput.toJson(responseBody).getBytes('UTF-8')
         exchange.responseHeaders.set('Content-Type', 'application/json')
-        exchange.sendResponseHeaders(answer[0], bytes.length)
+        exchange.sendResponseHeaders(responseCode, bytes.length)
         exchange.responseBody.withCloseable { it.write(bytes) }
     } catch (Throwable failure) {
         stubFailures.add(failure)
@@ -118,27 +115,28 @@ try {
                 .startBeforeActivity(activity('userTask', 'approve approve_release')).execute()
             [instance, tasks.createTaskQuery().processInstanceId(instance.id).singleResult()]
         }
-        def opened = [runId: 'run-a', replayed: false, status: 'open']
-        def evaluated = [status: 'evaluated', dryRun: false, verdict: [routes: [:], none: 0],
-                         actions: [[action: 'approve_release', key: [order_number: 4711], answered: true]]]
-        // The answer run as the Server answers it (D-230): open → evaluate → status (verdict ready) → close.
-        def answerRun = { Map overrides ->
-            return { String path ->
-                def call = path.endsWith('/automation/recipes/release_order/runs') ? 'open'
-                    : path.endsWith('/evaluate') ? 'evaluate' : path.endsWith('/close') ? 'close' : 'status'
-                if (overrides.containsKey(call)) return overrides[call]
-                call == 'open' ? [201, opened] : call == 'evaluate' ? [200, [verdict: null]]
-                    : call == 'close' ? [200, [status: 'closed']] : [200, evaluated]
-            }
+        // The answer Open as the Server answers it (D-233): decided and closed at Open; the row makes no other call.
+        def decided = { boolean replayed ->
+            [runId: 'run-a', status: 'closed', replayed: replayed,
+             answer: [original: 'run-1', key: [order_number: 4711], decision: 'commit', applied: 1, skipped: 0, unknown: 0, replayed: replayed]]
         }
-        def answerPaths = ['/automation/recipes/release_order/runs', '/automation/runs/run-a/evaluate', '/automation/runs/run-a', '/automation/runs/run-a/close']
+        def openPath = '/automation/recipes/release_order/runs'
         def rootVariables = { instance ->
             history.createHistoricVariableInstanceQuery().processInstanceId(instance.id).list()
                 .findAll { it.activityInstanceId == instance.id }*.name
         }
         def noAnswerOnRoot = { instance ->
-            def leaked = rootVariables(instance).findAll { it.startsWith('ttrAnswer') || it.startsWith('ttrHandle') || it in ['ttrTaskId', 'ttrAnsweredBy'] }
+            def leaked = rootVariables(instance).findAll { it.startsWith('ttrAnswer') || it in ['ttrTaskId', 'ttrAnsweredBy'] }
             assert leaked.empty: leaked
+        }
+        def answered = { instance, name ->
+            def values = history.createHistoricVariableInstanceQuery().processInstanceId(instance.id).variableName(name).list()
+            assert values.every { it.activityInstanceId != instance.id }: values
+            values*.value
+        }
+        def onlyTheAnswer = {
+            assert requests*.path == [openPath]: requests*.path
+            assert !requests.any { it.path.endsWith('/evaluate') || it.path.endsWith('/close') }: requests
         }
         def (instance, task) = approvalTask()
         requests.clear()
@@ -154,7 +152,7 @@ try {
         }
         tasks.setAssignee(task.id, null)
         tasks.claim(task.id, 'alice')
-        // Synchronous transient failures roll back completion; there is no answer job to retry it.
+        // (f) Synchronous transient failures roll back completion; there is no answer job to retry it.
         responseCode = 503
         def transientFailure = null
         try { tasks.complete(task.id) } catch (Exception e) { transientFailure = e }
@@ -164,95 +162,68 @@ try {
         assert !runtime.getVariablesLocal(instance.id).containsKey('ttrTaskId')
         assert !runtime.getVariablesLocal(instance.id).containsKey('ttrAnsweredBy')
         requests.clear()
-        responseCode = 200
-        // The answer run: identity Open in the completion's transaction, then evaluate · status · close of that run.
-        respond = answerRun([:])
+
+        // (a) The answer Open decides: one call, the row ends decided, nothing else is requested.
+        responseCode = 201
+        responseBody = decided(false)
         tasks.complete(task.id)
-        assert requests.size() == 1: requests
+        onlyTheAnswer()
         def open = requests[0].body
-        assert open.engine.taskId == task.id
-        assert open.engine.answeredBy == 'alice'
-        assert open.engine.instanceId == instance.id
-        assert open.port.key == 4711
+        assert open.engine == [instanceId: instance.id, businessKey: 'order-4711', deploymentId: deployment.id, taskId: task.id, answeredBy: 'alice']: open.engine
+        assert open.port.key == [order_number: 4711]: open.port
         assert open.idempotencyKey == 'run-1:answer:' + task.id
-        drainJobs(instance)
-        assert requests*.path.take(4) == answerPaths: requests*.path
-        assert requests.take(4).drop(1).every { !it.body?.engine }: requests
-        // No second approval task: the row completes and the run's own close follows.
         assert tasks.createTaskQuery().processInstanceId(instance.id).count() == 0
         assert history.createHistoricActivityInstanceQuery().processInstanceId(instance.id)
             .activityId(activity('exclusiveGateway', 'approve_release complete')).finished().count() == 1
-        assert requests*.path.drop(4) == ['/automation/runs/run-1/close']: requests*.path
-        assert runtime.createProcessInstanceQuery().processInstanceId(instance.id).count() == 0
-        assert runtime.createIncidentQuery().count() == 0
+        assert answered(instance, 'ttrAnswerDecision') == ['commit']
+        assert answered(instance, 'ttrAnswerRunId') == ['run-a']
+        assert answered(instance, 'ttrAnswerStatus') == ['closed']
+        assert runtime.createIncidentQuery().processInstanceId(instance.id).count() == 0
         noAnswerOnRoot(instance)
+        runtime.deleteProcessInstance(instance.id, 'test complete')
 
-        // A replayed answer Open (the run already exists for this task) closes that run without evaluating again.
+        // (b) An idempotent replay (200, replayed) is the same decision.
         (instance, task) = approvalTask()
         tasks.claim(task.id, 'alice')
         requests.clear()
-        respond = answerRun(open: [200, [runId: 'run-a', replayed: true, protocolRef: 'p']])
+        responseCode = 200
+        responseBody = decided(true)
         tasks.complete(task.id)
-        drainJobs(instance)
-        assert requests*.path == [answerPaths[0], answerPaths[3], '/automation/runs/run-1/close']: requests*.path
-        assert runtime.createProcessInstanceQuery().processInstanceId(instance.id).count() == 0
-
-        // A transient evaluate failure retries the job (R3/PT15S); the completion stays committed.
-        (instance, task) = approvalTask()
-        tasks.claim(task.id, 'alice')
-        requests.clear()
-        respond = answerRun(evaluate: [503, [error: 'busy']])
-        tasks.complete(task.id)
-        assert tasks.createTaskQuery().taskId(task.id).count() == 0
-        def evaluateFailure = null
-        try { drainJobs(instance) } catch (Exception e) { evaluateFailure = e }
-        assert evaluateFailure != null
-        assert (evaluateFailure.toString() + evaluateFailure.cause).contains('run API HTTP 503'): evaluateFailure
-        def failed = management.createJobQuery().processInstanceId(instance.id).withException().singleResult()
-        assert failed != null && failed.retries == 2: failed
+        onlyTheAnswer()
         assert tasks.createTaskQuery().processInstanceId(instance.id).count() == 0
-        assert requests*.path == answerPaths.take(2): requests*.path
-        runtime.deleteProcessInstance(instance.id, 'test complete')
-
-        // A stale close (409) reaches export outdated through TTR_STALE, without an incident.
-        (instance, task) = approvalTask()
-        tasks.claim(task.id, 'alice')
-        requests.clear()
-        respond = answerRun(close: [409, [error: 'deployment-stale']])
-        tasks.complete(task.id)
-        drainJobs(instance)
-        assert requests*.path == answerPaths: requests*.path
-        assert tasks.createTaskQuery().processInstanceId(instance.id).list()*.name == ['export outdated']
-        assert runtime.createIncidentQuery().processInstanceId(instance.id).count() == 0
+        assert answered(instance, 'ttrAnswerDecision') == ['commit']
         noAnswerOnRoot(instance)
         runtime.deleteProcessInstance(instance.id, 'test complete')
 
-        // A close that holds the answered key again (`waiting`) is refused, never taken as decided.
-        (instance, task) = approvalTask()
-        tasks.claim(task.id, 'alice')
-        requests.clear()
-        respond = answerRun(close: [200, [status: 'waiting']])
-        tasks.complete(task.id)
-        drainJobs(instance)
-        assert requests*.path == answerPaths: requests*.path
-        assert tasks.createTaskQuery().processInstanceId(instance.id).list()*.name == ['run refused; inspect evidence']
-        assert runtime.createIncidentQuery().processInstanceId(instance.id).count() == 0
-        runtime.deleteProcessInstance(instance.id, 'test complete')
-
-        // An unverified answer (403) completes the task and reaches run refused, without an incident.
-        (instance, task) = approvalTask()
-        tasks.claim(task.id, 'alice')
-        requests.clear()
-        respond = answerRun(open: [403, [error: 'identity', reason: 'unverified-answer']])
-        tasks.complete(task.id)
-        assert tasks.createTaskQuery().taskId(task.id).count() == 0
-        drainJobs(instance)
-        assert requests*.path == answerPaths.take(1): requests*.path
-        assert tasks.createTaskQuery().processInstanceId(instance.id).list()*.name == ['run refused; inspect evidence']
-        assert runtime.createIncidentQuery().processInstanceId(instance.id).count() == 0
-        noAnswerOnRoot(instance)
-        runtime.deleteProcessInstance(instance.id, 'test complete')
-        respond = null
+        // (c) A Server that holds the key again (201 waiting, no decision) refuses; never counted as decided.
+        // (d)/(e) 409 answer-unmatched or *-stale and (g) 403 identity refuse with the Server's reason.
+        def refusals = [
+            [201, [runId: 'run-a', status: 'waiting'], null],
+            [409, [error: 'answer-unmatched', reason: 'no-held-key'], 'answer-unmatched'],
+            [409, [error: 'deployment-stale', differs: ['deployment']], 'deployment-stale'],
+            [403, [error: 'identity', reason: 'unverified-answer'], 'unverified-answer'],
+        ]
+        for (refusal in refusals) {
+            (instance, task) = approvalTask()
+            tasks.claim(task.id, 'alice')
+            requests.clear()
+            responseCode = refusal[0]
+            responseBody = refusal[1]
+            tasks.complete(task.id)
+            drainJobs(instance)
+            onlyTheAnswer()
+            assert tasks.createTaskQuery().taskId(task.id).count() == 0
+            def names = tasks.createTaskQuery().processInstanceId(instance.id).list()*.name
+            assert names == ['run refused; inspect evidence']: [refusal, names]
+            assert runtime.createIncidentQuery().processInstanceId(instance.id).count() == 0
+            def reason = runtime.getVariable(instance.id, 'ttrRefusedReason')
+            if (refusal[2]) assert reason?.contains(refusal[2]): [refusal, reason]
+            assert !answered(instance, 'ttrAnswerDecision').contains('commit')
+            noAnswerOnRoot(instance)
+            runtime.deleteProcessInstance(instance.id, 'test complete')
+        }
+        responseCode = 200
+        responseBody = [runId: 'run-1', replayed: true]
     } else {
         templates.eachWithIndex { text, index ->
             requests.clear()
