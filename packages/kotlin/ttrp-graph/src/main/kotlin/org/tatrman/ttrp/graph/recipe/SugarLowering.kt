@@ -50,8 +50,10 @@ import org.tatrman.ttrp.resolve.ModelIndex
  *  - **`:as_of − days(365)`**, `:as_of − :return_window` — a bound value minus (or plus) a duration — becomes a
  *    *derived* run-bound value, `:as_of_minus_365_days`, which the runner computes and binds ([DerivedParam]);
  *    date arithmetic on a column is refused (TTRP-TYP-001);
- *  - **`latest(by: d, per: a, b)`** → `aggregate { group_by: a, b  m = max(d) }` and a semi join of the rows back on
- *    `a, b, d = m`: the rows at the latest `d` of their group (an sk orders like its date);
+ *  - **`latest(by: d, per: a, b)`** → `aggregate { group_by: a, b  m = max(d) }`, an inner join of the rows to it on
+ *    never-NULL text keys of `a, b` (review-119 M6) and `filter(d = m or m is null)`: the rows at the latest `d` of
+ *    their group (an sk orders like its date; a group with no `d` at all keeps its rows; S2.4e). A bare `d` is the one
+ *    with the most recent [JoinEntry];
  *  - **`within(c, last: n)`** → `filter(c >= :as_of_minus_<n> and c <= :as_of)`; `from:`/`to:` bound it so. When `c`
  *    is an sk of the calendar (D-82) the rows are semi-joined to the calendar's days in that range on the sk — the
  *    row is unchanged;
@@ -233,35 +235,22 @@ class SugarLowering(
     private fun latest(n: TimeSugar) {
         val byRef = n.refsOf("by").singleOrNull() ?: return badArgs(n)
         val perRefs = n.refsOf("per")
+        if (perRefs.isEmpty()) return badArgs(n) // the checker requires `per:`
         val loc = n.location
         val (names, src) = bare(n, listOf(byRef) + perRefs, PortNames.IN) ?: return
-        // A bare `by:` is the newest column of its name — the date the last join brought (S2.4e, ttr-server#434); a
-        // qualified one was copied to its own `_ttrp_a_` column by [bare].
-        val date = ColumnRef(if (byRef.port == null) NEWEST else null, names.getValue(key(byRef)), loc)
+        // A bare `by:` is the column of its name with the most recent join entry — the instance the last join brought,
+        // the checker's pick (S2.4e, ⚑R352-A); a qualified one was copied to its own `_ttrp_a_` column by [bare].
+        val entry = if (byRef.port == null) model.latestDateEntries[n.id] else null
+        val date = ColumnRef(entry?.let { JoinEntry.qualifier(it) }, names.getValue(key(byRef)), loc)
         val container = GraphOps.containerIdOf(g, n.id)
         val t = token(n.id)
         // A `per:` value may be NULL — GROUP BY keeps its group, an equality never matches it — so each `per:` column
         // groups and joins back as a text key that is never NULL (`'n'`, or `'v' || value`) — an equi-join still
-        // (review-119 M6). One engine computes both sides, so its own text of a value is the same on both. The date
-        // meets its group's max the same way (S2.4e): a group with no date at all (a LEFT join that matched nothing)
-        // keeps its row, NULL and NULL; a NULL date beside a real one is not the latest.
+        // (review-119 M6). One engine computes both sides, so its own text of a value is the same on both.
         val keyCalc = "${n.id}~group"
         val per =
             perRefs.mapIndexed { i, r -> textKey("_ttrp_g_${t}_$i", ColumnRef(null, names.getValue(key(r)), loc), loc) }
-        val dateKey = textKey("_ttrp_d_$t", date, loc)
-        add(Calc(keyCalc, "${n.label}~group", loc, per + dateKey), container)
-        g =
-            g.copy(
-                edges =
-                    g.edges.map {
-                        if (it.to == PortRef(n.id, PortNames.IN) && it.from == src) {
-                            it.copy(from = PortRef(keyCalc, PortNames.OUT))
-                        } else {
-                            it
-                        }
-                    },
-            )
-        edges(src to PortRef(keyCalc, PortNames.IN))
+        add(Calc(keyCalc, "${n.label}~group", loc, per), container)
         val grouped = PortRef(keyCalc, PortNames.OUT)
         val m = "_ttrp_latest_$t"
         val aggId = "${n.id}~max"
@@ -275,22 +264,41 @@ class SugarLowering(
             ),
             container,
         )
-        val maxKeyId = "${n.id}~maxkey"
-        val maxKey = textKey("_ttrp_dm_$t", ColumnRef(null, m, loc), loc)
-        add(Calc(maxKeyId, "${n.label}~maxkey", loc, listOf(maxKey)), container)
-        val on =
-            and(
-                (per.map { it.name to it.name } + (dateKey.name to maxKey.name)).map { (l, r) ->
-                    eq(side(PortNames.LEFT, l, loc), side(PortNames.RIGHT, r, loc), loc)
-                },
+        // Each row meets its group's max on the keys (an equi join, one max per group), and the rows at the max stay.
+        // The date is compared as itself, never as text (S2.4e, ⚑R352-B): a group with no date at all (a LEFT join that
+        // matched nothing) keeps its rows; a NULL date beside a real one is not the latest.
+        val joinId = "${n.id}~latest"
+        add(
+            Join(
+                joinId,
+                "${n.label}~latest",
                 loc,
+                JoinType.INNER,
+                and(per.map { eq(side(PortNames.LEFT, it.name, loc), side(PortNames.RIGHT, it.name, loc), loc) }, loc),
+            ),
+            container,
+        )
+        val m0 = ColumnRef(null, m, loc)
+        val keep =
+            FunctionCall(CatalogId.OR, listOf(eq(date, m0, loc), IsNull(m0, false, loc)), loc)
+        g = GraphOps.swapNode(g, n.id, Filter(n.id, n.label, loc, keep, provenance = n.provenance))
+        // src → ~group → ~latest (left) → the filter; ~group → ~max → ~latest (right).
+        g =
+            g.copy(
+                edges =
+                    g.edges.map {
+                        if (it.to == PortRef(n.id, PortNames.IN) && it.from == src) {
+                            it.copy(from = grouped, to = PortRef(joinId, PortNames.LEFT))
+                        } else {
+                            it
+                        }
+                    },
             )
-        g = GraphOps.swapNode(g, n.id, Join(n.id, n.label, loc, JoinType.SEMI, on, provenance = n.provenance))
-        retargetIn(n.id, PortNames.IN, PortNames.LEFT)
         edges(
+            src to PortRef(keyCalc, PortNames.IN),
             grouped to PortRef(aggId, PortNames.IN),
-            PortRef(aggId, PortNames.OUT) to PortRef(maxKeyId, PortNames.IN),
-            PortRef(maxKeyId, PortNames.OUT) to PortRef(n.id, PortNames.RIGHT),
+            PortRef(aggId, PortNames.OUT) to PortRef(joinId, PortNames.RIGHT),
+            PortRef(joinId, PortNames.OUT) to PortRef(n.id, PortNames.IN),
         )
     }
 
@@ -625,7 +633,8 @@ class SugarLowering(
 
     /**
      * [refs] as names the rows entering [at]'s [port] carry. A bare name is itself — after a join, the left side's
-     * column, as everywhere in TTR-P. A qualified reference (`cp.valid_from`) is computed first under a fresh
+     * column, as everywhere in TTR-P — but for `latest`'s bare `by:`, which reads the column of the name with the most
+     * recent [JoinEntry] (S2.4e). A qualified reference (`cp.valid_from`) is computed first under a fresh
      * `_ttrp_a_` name in a calc spliced in before [at] (the emitter resolves the qualifier there, on the row it
      * names), so the lowering never mistakes it for the left side's column of the same name (review-119 B2). The
      * names by [key], and the port now feeding [at].
@@ -725,14 +734,6 @@ class SugarLowering(
     companion object {
         /** The calendar attribute `working_days` counts (D-82; hartland `date_dim.working_day`). */
         const val WORKING_DAY = "working_day"
-
-        /**
-         * The reserved qualifier of a `latest`'s bare `by:` date (S2.4e, ttr-server#434): the emitter reads it as the
-         * **newest** input column of that name — the date the last join brought — so a second `latest` after a second
-         * join of the same entity reduces by its own instance's date (`as_of_date0`), not the first's (`as_of_date`).
-         * `_ttrp_`-named (RJ-103): no recipe variable or port can be called so.
-         */
-        const val NEWEST = "_ttrp_newest"
 
         private val CALENDAR_FUNCTIONS = setOf("working_days", "age")
         private val AGE = CatalogId("age")

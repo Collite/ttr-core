@@ -40,6 +40,11 @@ data class EmitColumn(
     val qualifiers: Set<String> = emptySet(),
     /** The column's name as written, before a join made it unique (`quantity_on_hand0` → `quantity_on_hand`). */
     val base: String = name,
+    /**
+     * S2.4e (⚑R352-A): the join where the column entered the chain ([org.tatrman.ttrp.graph.recipe.JoinEntry]); null
+     * until it passes one. A `latest`'s bare date reads the column of its base that entered at the join the checker named.
+     */
+    val entry: String? = null,
 )
 
 /** Where a node's input comes from: a real base table, or an upstream node's CTE. */
