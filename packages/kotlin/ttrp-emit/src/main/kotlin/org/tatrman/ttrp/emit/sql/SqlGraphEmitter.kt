@@ -28,6 +28,7 @@ import org.tatrman.ttrp.graph.model.PortRef
 import org.tatrman.ttrp.graph.model.Project
 import org.tatrman.ttrp.graph.model.Sort
 import org.tatrman.ttrp.graph.model.TtrpGraph
+import org.tatrman.ttrp.graph.recipe.SugarLowering
 
 /**
  * Walks a normalized **relational** container in the graph and produces, per (non-`rejects`)
@@ -237,12 +238,15 @@ class SqlGraphEmitter(
             ?.signum()
             ?.let { it >= 0 } == true
 
-    /** The latest column of [cols] the qualifier [q] names under the name [c]. */
+    /**
+     * The latest column of [cols] the qualifier [q] names under the name [c]; [SugarLowering.NEWEST] names every
+     * column — the newest of the name (a `latest`'s own date, S2.4e).
+     */
     private fun find(
         q: String,
         c: String,
         cols: List<EmitColumn>,
-    ) = cols.lastOrNull { it.base == c && q in it.qualifiers }
+    ) = cols.lastOrNull { it.base == c && (q == SugarLowering.NEWEST || q in it.qualifiers) }
 
     /**
      * [r] resolved in [cols] when it is qualified and a column answers to it (`left.`/`right.` after a join too) — a
@@ -254,6 +258,11 @@ class SqlGraphEmitter(
         cols: List<EmitColumn>,
     ): ColumnRef? {
         val q = r.port ?: return null
+        if (q ==
+            SugarLowering.NEWEST
+        ) {
+            return ColumnRef(null, find(q, r.column, cols)?.name ?: r.column, r.location, r.type)
+        }
         val c = graph.refOperands[r.location]?.let { find(it, r.column, cols) } ?: find(q, r.column, cols)
         return c?.let { ColumnRef(null, it.name, r.location, r.type) }
     }

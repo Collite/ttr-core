@@ -235,75 +235,86 @@ class SugarLowering(
         val perRefs = n.refsOf("per")
         val loc = n.location
         val (names, src) = bare(n, listOf(byRef) + perRefs, PortNames.IN) ?: return
-        val by = names.getValue(key(byRef))
+        // A bare `by:` is the newest column of its name — the date the last join brought (S2.4e, ttr-server#434); a
+        // qualified one was copied to its own `_ttrp_a_` column by [bare].
+        val date = ColumnRef(if (byRef.port == null) NEWEST else null, names.getValue(key(byRef)), loc)
         val container = GraphOps.containerIdOf(g, n.id)
+        val t = token(n.id)
         // A `per:` value may be NULL — GROUP BY keeps its group, an equality never matches it — so each `per:` column
         // groups and joins back as a text key that is never NULL (`'n'`, or `'v' || value`) — an equi-join still
-        // (review-119 M6). One engine computes both sides, so its own text of a value is the same on both.
+        // (review-119 M6). One engine computes both sides, so its own text of a value is the same on both. The date
+        // meets its group's max the same way (S2.4e): a group with no date at all (a LEFT join that matched nothing)
+        // keeps its row, NULL and NULL; a NULL date beside a real one is not the latest.
+        val keyCalc = "${n.id}~group"
         val per =
-            if (perRefs.isEmpty()) {
-                emptyList()
-            } else {
-                val keyCalc = "${n.id}~group"
-                val keys =
-                    perRefs.mapIndexed { i, r ->
-                        val col = ColumnRef(null, names.getValue(key(r)), loc)
-                        Aggregation(
-                            "_ttrp_g_${token(n.id)}_$i",
-                            CaseWhen(
-                                listOf(IsNull(col, false, loc) to Literal(LiteralValue.Str("n"), loc)),
-                                FunctionCall(
-                                    CONCAT,
-                                    listOf(
-                                        Literal(LiteralValue.Str("v"), loc),
-                                        org.tatrman.ttrp.expr
-                                            .Cast(col, org.tatrman.ttrp.expr.TtrpType.Str, loc),
-                                    ),
-                                    loc,
-                                ),
-                                loc,
-                            ),
-                        )
-                    }
-                add(Calc(keyCalc, "${n.label}~group", loc, keys), container)
-                g =
-                    g.copy(
-                        edges =
-                            g.edges.map {
-                                if (it.to == PortRef(n.id, PortNames.IN) && it.from == src) {
-                                    it.copy(from = PortRef(keyCalc, PortNames.OUT))
-                                } else {
-                                    it
-                                }
-                            },
-                    )
-                edges(src to PortRef(keyCalc, PortNames.IN))
-                keys.map { it.name }
-            }
-        val grouped = if (per.isEmpty()) src else PortRef("${n.id}~group", PortNames.OUT)
-        val m = "_ttrp_latest_${token(n.id)}"
+            perRefs.mapIndexed { i, r -> textKey("_ttrp_g_${t}_$i", ColumnRef(null, names.getValue(key(r)), loc), loc) }
+        val dateKey = textKey("_ttrp_d_$t", date, loc)
+        add(Calc(keyCalc, "${n.label}~group", loc, per + dateKey), container)
+        g =
+            g.copy(
+                edges =
+                    g.edges.map {
+                        if (it.to == PortRef(n.id, PortNames.IN) && it.from == src) {
+                            it.copy(from = PortRef(keyCalc, PortNames.OUT))
+                        } else {
+                            it
+                        }
+                    },
+            )
+        edges(src to PortRef(keyCalc, PortNames.IN))
+        val grouped = PortRef(keyCalc, PortNames.OUT)
+        val m = "_ttrp_latest_$t"
         val aggId = "${n.id}~max"
         add(
             Aggregate(
                 aggId,
                 "${n.label}~max",
                 loc,
-                groupBy = per,
-                aggregations = listOf(Aggregation(m, AggregateCall(MAX, listOf(ColumnRef(null, by, loc)), false, loc))),
+                groupBy = per.map { it.name },
+                aggregations = listOf(Aggregation(m, AggregateCall(MAX, listOf(date), false, loc))),
             ),
             container,
         )
+        val maxKeyId = "${n.id}~maxkey"
+        val maxKey = textKey("_ttrp_dm_$t", ColumnRef(null, m, loc), loc)
+        add(Calc(maxKeyId, "${n.label}~maxkey", loc, listOf(maxKey)), container)
         val on =
             and(
-                (per.map { it to it } + (by to m)).map { (l, r) ->
+                (per.map { it.name to it.name } + (dateKey.name to maxKey.name)).map { (l, r) ->
                     eq(side(PortNames.LEFT, l, loc), side(PortNames.RIGHT, r, loc), loc)
                 },
                 loc,
             )
         g = GraphOps.swapNode(g, n.id, Join(n.id, n.label, loc, JoinType.SEMI, on, provenance = n.provenance))
         retargetIn(n.id, PortNames.IN, PortNames.LEFT)
-        edges(grouped to PortRef(aggId, PortNames.IN), PortRef(aggId, PortNames.OUT) to PortRef(n.id, PortNames.RIGHT))
+        edges(
+            grouped to PortRef(aggId, PortNames.IN),
+            PortRef(aggId, PortNames.OUT) to PortRef(maxKeyId, PortNames.IN),
+            PortRef(maxKeyId, PortNames.OUT) to PortRef(n.id, PortNames.RIGHT),
+        )
     }
+
+    /** [name] = [col] as a text key that is never NULL: `'n'` for NULL, else `'v' || CAST(col AS text)` (M6). */
+    private fun textKey(
+        name: String,
+        col: Expression,
+        loc: SourceLocation,
+    ) = Aggregation(
+        name,
+        CaseWhen(
+            listOf(IsNull(col, false, loc) to Literal(LiteralValue.Str("n"), loc)),
+            FunctionCall(
+                CONCAT,
+                listOf(
+                    Literal(LiteralValue.Str("v"), loc),
+                    org.tatrman.ttrp.expr
+                        .Cast(col, org.tatrman.ttrp.expr.TtrpType.Str, loc),
+                ),
+                loc,
+            ),
+            loc,
+        ),
+    )
 
     // ---- within ---------------------------------------------------------------------------------------------
 
@@ -714,6 +725,14 @@ class SugarLowering(
     companion object {
         /** The calendar attribute `working_days` counts (D-82; hartland `date_dim.working_day`). */
         const val WORKING_DAY = "working_day"
+
+        /**
+         * The reserved qualifier of a `latest`'s bare `by:` date (S2.4e, ttr-server#434): the emitter reads it as the
+         * **newest** input column of that name — the date the last join brought — so a second `latest` after a second
+         * join of the same entity reduces by its own instance's date (`as_of_date0`), not the first's (`as_of_date`).
+         * `_ttrp_`-named (RJ-103): no recipe variable or port can be called so.
+         */
+        const val NEWEST = "_ttrp_newest"
 
         private val CALENDAR_FUNCTIONS = setOf("working_days", "age")
         private val AGE = CatalogId("age")
