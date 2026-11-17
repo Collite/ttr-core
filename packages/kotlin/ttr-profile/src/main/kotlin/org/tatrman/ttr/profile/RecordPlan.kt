@@ -195,11 +195,22 @@ internal class RecordPlan(
             }
         } while (changed)
         val recorded = found.keys.map { it.first }.toSet()
+        // Nothing beneath a skipped node is discovered, whichever op ran first (review-338 B1): a record or a nested
+        // skip below it is dropped. A node another `kinds` op made a record of is not skipped.
+        val skippedPaths = skips.keys.filter { it !in recorded }
+
+        fun beneathSkip(path: String) = skippedPaths.any { path.startsWith("$it/") }
+        found.entries.removeIf { (key, record) ->
+            beneathSkip(key.first).also { if (it) madeBy.remove(record) }
+        }
         skipped =
-            skips.filterKeys { it !in recorded }.values.map { (node, ignored) ->
-                consumption.consume(node)
-                ignored
-            }
+            skips
+                .filterKeys { it in skippedPaths && !beneathSkip(it) }
+                .values
+                .map { (node, ignored) ->
+                    consumption.consume(node)
+                    ignored
+                }
     }
 
     /**

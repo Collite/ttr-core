@@ -957,7 +957,8 @@ export function createSchemas(metadata) {
         to: ref('propertyTarget'),
         mapping: { type: 'object' },
         default: data,
-        split: { type: 'string', minLength: 1 },
+        // A blank or empty separator splits on whitespace runs (contracts §3; review-338 B3).
+        split: { type: 'string' },
       },
       ['in', 'at', 'to']
     ),

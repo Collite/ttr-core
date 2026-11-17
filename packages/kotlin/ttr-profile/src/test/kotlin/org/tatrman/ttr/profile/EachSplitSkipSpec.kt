@@ -202,6 +202,48 @@ class EachSplitSkipSpec :
         }
 
         test(
+            "each with key: an element whose template yields nothing is dropped before the key checks (review-338 B2)",
+        ) {
+            val ops =
+                entityOps +
+                    "- {op: each, in: entity, at: /popisy, to: {kind: entity, property: description}, " +
+                    "key: /lang, shape: {input: \$item/value}}\n"
+            listOf(
+                "[{unused: x}, {lang: cs, value: Hello}]",
+                "[{lang: cs}, {lang: cs, value: Hello}]",
+                "[{lang: cs, value: Hello}, {lang: cs}]",
+            ).forEach { list ->
+                runOps("entity:\n  E:\n    popisy: $list\n", ops).properties().getValue("description") shouldBe
+                    buildJsonObject { put("cs", "Hello") }
+            }
+        }
+
+        test("split: an empty or blank separator loads strictly and splits on whitespace runs (review-338 B3)") {
+            listOf("", " ", "  ").forEach { separator ->
+                recordProfile(
+                    "  - {op: values, in: entity, at: /znacky, to: {kind: entity, property: tags}, split: '$separator'}",
+                ).operations.single { it.value.string("op") == "values" }
+                runOps("dotazy:\n  q: {vzory: ' a  b c '}\n", splitOps(separator))
+                    .properties()
+                    .getValue("search") shouldBe
+                    buildJsonObject { putJsonArray("patterns") { listOf("a", "b", "c").forEach(::add) } }
+            }
+        }
+
+        test("kinds null-skip: nothing beneath a skipped node is discovered, in either op order (review-338 B1)") {
+            val tree = "groups:\n  G:\n    status: Draft\n    entities:\n      E: {k: x}\n"
+            val skip = "- {op: kinds, at: /groups, kind: /status, mapping: {Draft: null}}\n"
+            val nested = "- {op: kinds, at: /groups/G/entities, mapping: {entity: entity}}\n"
+            val nestedSkip = "- {op: kinds, at: /groups/G/entities, kind: /k, mapping: {x: null}}\n"
+            listOf(skip + nested, nested + skip, nestedSkip + skip, skip + nestedSkip).forEach { kinds ->
+                val result = runOps(tree, "- {op: package, mapping: {}, default: demo}\n" + kinds)
+                result.documents shouldBe emptyList()
+                result.sources shouldBe emptyList()
+                result.ignored.map { it.location.path } shouldBe listOf("/groups/G")
+            }
+        }
+
+        test(
             "schema: a profile using each, split and a null kind loads strictly; each without at is ys/profile-invalid, located",
         ) {
             recordProfile(
