@@ -116,6 +116,12 @@ class RecipeTime(
     val implicitLatestDates = linkedMapOf<String, String>()
 
     /**
+     * S2.4e (⚑R352-A): per `latest` with a bare `by:`, the join where the date it reads entered the chain — the
+     * [JoinEntry] rule picks it here, and the sugar lowering hands it to the emitter. Absent: no join brought it.
+     */
+    val latestDateEntries = linkedMapOf<String, String>()
+
+    /**
      * AU-core-P2 (review-119 M1): every `+`/`-` with a date operand, by location — `dates` for a date − date, `days`
      * for a date ± an integer number of days. The door does no date arithmetic: the sugar lowering turns the ones it
      * can into calendar counts or derived bindings and refuses the rest.
@@ -540,9 +546,15 @@ class RecipeTime(
                         node.location,
                     )
                 }
+                // A bare `by:` (or the implicit TTR-B date) is the column of the name with the most recent join entry —
+                // the one the SQL reduces by; a qualified one names its column itself (S2.4e, ⚑R352-A).
+                val bareBy = node.refsOf("by").singleOrNull()?.port == null
                 for (c in by) {
-                    val t = column(row, c, node, "latest(by:)") ?: continue
-                    if (!isDate(RecipeType.Scalar(t), ColumnRef(null, c, node.location), origin)) {
+                    val entry = if (bareBy && row != null && c in row) rows.inputEntries(node.id)?.get(c) else null
+                    val t = (if (entry != null) entry.type else column(row, c, node, "latest(by:)")) ?: continue
+                    val o = if (entry == null) origin else origin - c + listOfNotNull(entry.origin?.let { c to it })
+                    entry?.join?.let { latestDateEntries[node.id] = it }
+                    if (!isDate(RecipeType.Scalar(t), ColumnRef(null, c, node.location), o)) {
                         err(
                             TtrpDiagnosticId.TYP_001,
                             "`latest(by: $c)` orders by a date (or an sk the model leads to the calendar); `$c` is not one",

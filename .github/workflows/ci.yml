@@ -102,6 +102,7 @@ jobs:
   # tests all of them — new modules are picked up via settings.gradle.kts.
   kotlin:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4

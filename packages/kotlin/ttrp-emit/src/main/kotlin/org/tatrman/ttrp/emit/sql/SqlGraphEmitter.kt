@@ -28,6 +28,7 @@ import org.tatrman.ttrp.graph.model.PortRef
 import org.tatrman.ttrp.graph.model.Project
 import org.tatrman.ttrp.graph.model.Sort
 import org.tatrman.ttrp.graph.model.TtrpGraph
+import org.tatrman.ttrp.graph.recipe.JoinEntry
 
 /**
  * Walks a normalized **relational** container in the graph and produces, per (non-`rejects`)
@@ -254,6 +255,12 @@ class SqlGraphEmitter(
         cols: List<EmitColumn>,
     ): ColumnRef? {
         val q = r.port ?: return null
+        // A `latest`'s bare date (S2.4e): the column of the name that entered at the join the checker named — the
+        // first in row order on a tie (LEFT); the name itself when none did.
+        JoinEntry.joinOf(q)?.let { j ->
+            val c = cols.firstOrNull { it.base == r.column && it.entry == j }?.name ?: r.column
+            return ColumnRef(null, c, r.location, r.type)
+        }
         val c = graph.refOperands[r.location]?.let { find(it, r.column, cols) } ?: find(q, r.column, cols)
         return c?.let { ColumnRef(null, it.name, r.location, r.type) }
     }
@@ -508,7 +515,12 @@ class SqlGraphEmitter(
                     )
             }
         // An IN port's rows are qualified by the port's name (`orders.order_number`).
-        return EmitInput.Upstream(producer.id, feed.from.port, columns.map { it.copy(qualifiers = setOf(port)) })
+        // A container's input starts afresh: its columns entered no join of this chain (S2.4e).
+        return EmitInput.Upstream(
+            producer.id,
+            feed.from.port,
+            columns.map { it.copy(qualifiers = setOf(port), entry = null) },
+        )
     }
 
     /**
@@ -571,8 +583,10 @@ class SqlGraphEmitter(
         ins: List<List<EmitColumn>>,
     ): List<EmitColumn> {
         if (ins.size != 2) return ins.flatten()
-        val left = ins[0]
-        val right = ins[1]
+        // A column enters the chain at the first authored join it passes ([JoinEntry], S2.4e).
+        val stamp = JoinEntry.stamps(node)
+        val left = if (stamp) ins[0].map { if (it.entry == null) it.copy(entry = node.id) else it } else ins[0]
+        val right = if (stamp) ins[1].map { if (it.entry == null) it.copy(entry = node.id) else it } else ins[1]
         // An existence test (semi/anti) keeps the LEFT row type only.
         if (node.type == org.tatrman.ttrp.graph.model.JoinType.SEMI ||
             node.type == org.tatrman.ttrp.graph.model.JoinType.ANTI
@@ -630,7 +644,13 @@ class SqlGraphEmitter(
                 val name = node.aliasOf(i) ?: (c as? ColumnRef)?.column ?: "_expr$i"
                 // A plain column carried under its own name keeps what qualifies it.
                 val carried = (c as? ColumnRef)?.takeIf { it.column == name }?.let { byName[it.column] }
-                EmitColumn(name, computedType(c, byName), carried?.qualifiers.orEmpty(), carried?.base ?: name)
+                EmitColumn(
+                    name,
+                    computedType(c, byName),
+                    carried?.qualifiers.orEmpty(),
+                    carried?.base ?: name,
+                    carried?.entry,
+                )
             }
         if (!node.passthrough) return computed
         // calc add-semantics: input columns first, minus any overridden by a computed alias and

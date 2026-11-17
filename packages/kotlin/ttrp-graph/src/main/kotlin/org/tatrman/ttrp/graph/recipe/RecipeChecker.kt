@@ -212,6 +212,7 @@ class RecipeChecker(
                 routeRow = routeRow,
                 calendarSkWithins = time.calendarSkWithins.toSet(),
                 implicitLatestDates = time.implicitLatestDates.toMap(),
+                latestDateEntries = time.latestDateEntries.toMap(),
                 dateArithmetic = time.dateArithmetic.toMap(),
                 actionObjectsRead = actionObjectsRead,
                 elseNone = sw?.elseRoute?.let { it.name == null } ?: false,
