@@ -17,6 +17,36 @@ tasks.test {
     useJUnitPlatform()
 }
 
+// Keep the two distributions completely separate: neither engine may borrow the other's classes.
+val embeddedEngines =
+    listOf("camunda" to "7.24.0", "cibseven" to "2.2.0").associate { (engine, version) ->
+        engine to
+            configurations.create("${engine}EmbeddedEngine") {
+                isCanBeConsumed = false
+                isCanBeResolved = true
+                dependencies.add(project.dependencies.create("org.$engine.bpm:$engine-engine:$version"))
+                dependencies.add(project.dependencies.create("org.$engine.bpm:$engine-engine-plugin-connect:$version"))
+                dependencies.add(project.dependencies.create("org.$engine.bpm:$engine-engine-plugin-spin:$version"))
+                dependencies.add(
+                    project.dependencies.create("org.$engine.connect:$engine-connect-http-client:$version"),
+                )
+                dependencies.add(
+                    project.dependencies.create("org.$engine.spin:$engine-spin-dataformat-json-jackson:$version"),
+                )
+                dependencies.add(project.dependencies.create("org.apache.groovy:groovy-jsr223:5.0.3"))
+                dependencies.add(project.dependencies.create("org.apache.groovy:groovy-json:5.0.3"))
+                dependencies.add(project.dependencies.create("com.h2database:h2:2.3.232"))
+                dependencies.add(project.dependencies.create("org.slf4j:slf4j-simple:2.0.17"))
+            }
+    }
+
+tasks.test {
+    embeddedEngines.forEach { (engine, classpath) ->
+        inputs.files(classpath)
+        doFirst { systemProperty("$engine.embedded.classpath", classpath.asPath) }
+    }
+}
+
 dependencies {
     implementation(project(":packages:kotlin:ttrp-emit-spi"))
     implementation(libs.kotlinx.ser.json)

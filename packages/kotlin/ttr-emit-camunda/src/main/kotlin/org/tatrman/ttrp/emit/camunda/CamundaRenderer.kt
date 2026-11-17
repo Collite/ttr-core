@@ -97,6 +97,7 @@ internal class CamundaRenderer(
         body: String? = null,
         run: String = "ttrRunId",
         query: String? = null,
+        asyncBefore: Boolean = true,
     ): BpmnModel.Node {
         var path = graph.runApi.basePath.trimEnd('/') + graph.runApi.calls.getValue(call)
         (args + ("recipe" to graph.recipe.name)).forEach { (key, value) ->
@@ -139,7 +140,7 @@ internal class CamundaRenderer(
                 budget(graph),
                 bearer = !engine,
             )
-        if (d == Dialect.C7) {
+        if (d == Dialect.C7 && asyncBefore) {
             task.attrs["camunda:asyncBefore"] = "true"
             task.extensions += Xml("camunda:failedJobRetryTimeCycle", text = "R3/PT15S")
         }
@@ -161,17 +162,19 @@ internal class CamundaRenderer(
         graph: RecipeGraph,
         step: String,
         first: Boolean,
+        answer: Boolean = false,
     ): String {
+        val portType = if (answer) "key" else graph.program.port
         val port =
-            when (graph.program.port) {
+            when (portType) {
                 null, "none" -> obj("none" to "true")
-                "key" -> obj("key" to expr("ttrInput['key']", "ttrInput.key"))
+                "key" -> obj("key" to if (answer) rowKey(graph) else expr("ttrInput['key']", "ttrInput.key"))
                 "keys" -> obj("keys" to expr("ttrInput['keys']", "ttrInput.keys"))
                 "event" -> obj("event" to expr("ttrInput['event']", "ttrInput.event"))
                 else -> error("unsupported Camunda port ${graph.program.port}")
             }
         val timed =
-            if (graph.program.port in
+            if (portType in
                 setOf(null, "none")
             ) {
                 port
@@ -185,6 +188,15 @@ internal class CamundaRenderer(
                 "origin" to quote("engine"),
                 "dryRun" to root.deployment.dryRun.toString(),
             )
+        if (engine) {
+            val engineFields = C7Runtime.engineIdentity.toMutableMap()
+            if (answer) {
+                engineFields["taskId"] = "ttrTaskId"
+                engineFields["answeredBy"] = "ttrAnsweredBy"
+            }
+            fields["engine"] =
+                d.objectValue(engineFields)
+        }
         mapOf(
             "text" to "recipeFingerprint",
             "values" to "recipeValuesFingerprint",
@@ -196,7 +208,9 @@ internal class CamundaRenderer(
                     quote(it)
             }
         }
-        if (!first) {
+        if (answer) {
+            fields["idempotencyKey"] = d.concat("ttrAnchor", quote(":answer:"), "ttrTaskId")
+        } else if (!first) {
             fields["idempotencyKey"] = d.concat("ttrAnchor", quote(":$step"))
         } else if (graph.program.mode ==
             "batch"
@@ -251,8 +265,11 @@ internal class CamundaRenderer(
         }
         if (d == Dialect.C8) inputs["ttrStepAt"] = stepClock(graph, first)
         inputs["ttrOpenBody"] = openBody(graph, name, first)
-        val outputs = linkedMapOf("ttrPreviousRunId" to d.string("ttrOpen", "runId"))
-        if (first) outputs["ttrAnchor"] = d.string("ttrOpen", "runId")
+        // C7 runs output mappings on cancellation too, including an Open that threw before returning a handle.
+        val runId = d.string("ttrOpen", "runId")
+        val openedRun = expr("execution.getVariable('ttrOpen') != null ? $runId : null", runId)
+        val outputs = linkedMapOf("ttrPreviousRunId" to openedRun)
+        if (first) outputs["ttrAnchor"] = openedRun
         sub.extensions += d.mapping(inputs, outputs)
         val start = scope.node("startEvent", "start $name")
         val end = scope.node("endEvent", "step complete")
@@ -319,7 +336,9 @@ internal class CamundaRenderer(
         scope.default(reopened, refused)
         val work = BpmnModel.Scope(stableId("${scope.id}/work"))
         val decide = scope.node("subProcess", "Decide", child = work)
-        decide.extensions += d.mapping(mapOf("ttrRunId" to d.string("ttrOpen", "runId")))
+        val workInputs = linkedMapOf("ttrRunId" to d.string("ttrOpen", "runId"))
+        if (engine && first) workInputs["ttrAnchor"] = d.string("ttrOpen", "runId")
+        decide.extensions += d.mapping(workInputs)
         scope.link(fresh, decide)
         val wstart = work.node("startEvent", "start evaluation")
         val evaluation = BpmnModel.Scope(stableId("${work.id}/evaluation"))
@@ -582,6 +601,7 @@ internal class CamundaRenderer(
         paging.default(complete, truncated)
         val rowScope = BpmnModel.Scope(stableId("${scope.id}/route/${route.name}"))
         val each = scope.node("subProcess", "each ${route.name} row", child = rowScope)
+        if (engine) each.extensions += d.mapping(mapOf("ttrTaskId" to "null", "ttrAnsweredBy" to "null"))
         val collection = expr("$rows.elements()", rows)
         each.tail +=
             if (d ==
@@ -658,7 +678,54 @@ internal class CamundaRenderer(
                             "${wiring.action} selected and wet",
                             d.and(wet(graph), selected(graph, wiring.action)),
                         )
-                        rowScope.link(task, done)
+                        if (engine) {
+                            task.extensions +=
+                                Xml(
+                                    "camunda:taskListener",
+                                    mapOf("event" to "complete"),
+                                    listOf(
+                                        Xml(
+                                            "camunda:script",
+                                            mapOf("scriptFormat" to "groovy"),
+                                            text =
+                                                """
+                                                if (!task.assignee?.trim()) throw new IllegalStateException('approval task must be claimed before it is completed')
+                                                task.execution.setVariable('ttrTaskId', task.id)
+                                                task.execution.setVariable('ttrAnsweredBy', task.assignee)
+                                                """.trimIndent(),
+                                        ),
+                                    ),
+                                )
+                            val answerScope = BpmnModel.Scope(stableId("${task.id}/answer"))
+                            val answerStep =
+                                rowScope.node(
+                                    "subProcess",
+                                    "answer ${wiring.action} step",
+                                    child = answerScope,
+                                )
+                            answerStep.extensions +=
+                                d.mapping(
+                                    mapOf(
+                                        "ttrAnswerOpenBody" to openBody(graph, "answer", first = false, answer = true),
+                                    ),
+                                )
+                            val answer =
+                                http(
+                                    answerScope,
+                                    graph,
+                                    "answer ${wiring.action}",
+                                    "open",
+                                    "ttrAnswerOpen",
+                                    body = "ttrAnswerOpenBody",
+                                    asyncBefore = false,
+                                )
+                            answerScope.link(answerScope.node("startEvent", "answer start"), answer)
+                            answerScope.link(answer, answerScope.node("endEvent", "answer opened"))
+                            rowScope.link(task, answerStep)
+                            rowScope.link(answerStep, done)
+                        } else {
+                            rowScope.link(task, done)
+                        }
                         last = done
                     }
                     sink == "send task" -> {
@@ -904,10 +971,18 @@ internal class CamundaRenderer(
 
     private fun engineConnection(): String =
         """
-        Every HTTP step is Camunda Connect's http-connector calling the executor's egress, $egress (D-158).
+        Every HTTP step is Camunda Connect's http-connector calling the executor's egress, $egress.
         The egress injects the process-engine client's bearer; this BPMN carries no token and no connector secret.
         The engine needs Spin JSON and Groovy for Retry-After normalization. Start this one-program BPMN through
         the engine (REST, Tasklist or a message); configure scheduling and composition in the engine modeller.
+        Start with a nonblank business key: every Open records engine.instanceId, engine.businessKey and
+        engine.deploymentId (the running process definition's deployment id, read through the repository service).
+        The engine templates also retain ttrInput.at in keyed ports; batch ports remain {none: true}.
+        Approval completion captures task.id/assignee; its answer Open additionally carries engine.taskId and
+        engine.answeredBy, with idempotencyKey = ttrAnchor + ':answer:' + ttrTaskId and the approved row's key.
+        It runs within task completion (no asyncBefore). This version opens the answer run; it does not yet
+        evaluate or close it. A transient answer Open failure rolls back completion; the user completes again.
+        Only the engine client may assert an answer.
         Deploy: `ttrp emit --deployment ${root.deployment.name} --deploy` posts this BPMN and the DMN files as one engine
         deployment named ${root.deployment.name}, with duplicate filtering and deployment-source ttrp:<bundle fingerprint>.
         The bearer comes from TTR_BEARER (or --token-env); it is never written to output or export files.
