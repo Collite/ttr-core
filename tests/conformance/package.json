@@ -9,7 +9,8 @@
     "dump-all": "tsx run-ts.ts && tsx run-ts-sem.ts",
     "diff": "tsx diff.ts",
     "diff-sem": "tsx diff-sem.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dump-yaml": "tsx run-ts-yaml.ts"
   },
   "devDependencies": {
     "@tatrman/lint": "workspace:*",
