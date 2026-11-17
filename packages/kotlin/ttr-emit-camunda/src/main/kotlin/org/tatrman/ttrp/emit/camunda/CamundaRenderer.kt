@@ -1050,13 +1050,13 @@ internal class CamundaRenderer(
         Approval completion captures task.id/assignee; its answer Open additionally carries engine.taskId and
         engine.answeredBy, with idempotencyKey = ttrAnchor + ':answer:' + ttrTaskId and the approved row's key.
         An approval-required action the Server performs becomes this user task; the engine never performs it directly.
-        The answer Open runs within task completion (no asyncBefore); a transient failure rolls back completion and the
-        user completes again. The Server decides the approved key's held group at that Open. The row then evaluates
-        and closes the answer run (asyncBefore steps, polled until the verdict is ready, bounded by budget + 2 min);
-        it does not route the run's actions, so the approval is never asked twice. A 200 replay closes the run without
-        evaluating; 202 polls the other execution until closed. A close that is not closed (the key held again)
-        refuses. The ttrAnswer* and ttrHandle variables are local to the answer step. Only the engine client may
-        assert an answer.
+        The answer Open is the row's one call. It runs within task completion (no asyncBefore); a transient failure
+        rolls back completion and the user completes again. Its port.key is the row's key as a column-named object.
+        The Server decides the approved key and closes the answer run at that Open. The row continues only when the
+        response says status closed and answer.decision commit; anything else (waiting, 409, another 4xx) reaches
+        run refused, with the Server's message in ttrRefusedReason, and is never counted as decided. The row reads no
+        route again, so the approval is never asked twice. ttrAnswerRunId, ttrAnswerStatus and ttrAnswerDecision are
+        row-local. Only the engine client may assert an answer.
         Deploy: `ttrp emit --deployment ${root.deployment.name} --deploy` posts this BPMN and the DMN files as one engine
         deployment named ${root.deployment.name}, with duplicate filtering and deployment-source ttrp:<bundle fingerprint>.
         The bearer comes from TTR_BEARER (or --token-env); it is never written to output or export files.

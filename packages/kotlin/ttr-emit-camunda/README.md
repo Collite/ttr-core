@@ -30,30 +30,21 @@ writer sink, e.g. `native: transition` with `process_engine: door` in grammar 0.
 such an action directly. The Server decides
 the approved key's held group when it accepts the answer Open.
 
-The answer step then finishes the answered run, without asking again:
+The answer Open is the row's one call to the Server, which decides the approved key and closes the
+answer run at that Open. Its `port.key` is the row's key as a column-named object (`{order_number: 4711}`),
+the shape the Server matches. The step's outputs set row-local `ttrAnswerRunId` (`runId`), `ttrAnswerStatus`
+(`status`) and `ttrAnswerDecision` (`answer.decision`, null when absent). The row reads no route again, so
+the approval is never asked twice.
 
-| Step | Call | Variable |
-| --- | --- | --- |
-| Open (in the completion's transaction) | `POST /recipes/{recipe}/runs` | `ttrAnswerOpen` |
-| Evaluate (asynchronous) | `POST /runs/{id}/evaluate` | `ttrAnswerEvaluation` |
-| Status, until the verdict is ready (Retry-After, budget + 2 min) | `GET /runs/{id}` | `ttrAnswerEvaluation` |
-| Close (asynchronous) | `POST /runs/{id}/close` | `ttrAnswerClosed` |
-
-`{id}` is `ttrAnswerOpen.runId`. Evaluate and close carry no `engine` object. The step reads no route
-and performs no action: the Server already applied the approved row. Every `ttrAnswer*` and `ttrHandle`
-variable (with its `Code`, `Headers` and `RetryAfter`) is declared on the answer step, so none reaches
-the process instance.
-
-| Answer Open or close | Result |
+| Answer Open response | Result |
 | --- | --- |
-| 201 | Evaluate, read status, close |
-| 200 `replayed` | Close the existing run without evaluating |
-| 202 | Poll the other execution's status; `closed` completes, anything else refuses |
-| Close answers other than `closed` (the key held again) | `run refused; inspect evidence` |
-| 409 (Open, evaluate, status or close) | `TTR_STALE` → `export outdated` |
-| 403 `unverified-answer` and other 4xx except 408/429 | `TTR_REFUSED` → `run refused; inspect evidence` |
-| 5xx, 408, 429 on the Open | The completion rolls back; the user completes again |
-| 5xx, 408, 429 after the Open | The failed job retries (R3/PT15S), then an incident |
+| 201, or 200 `replayed`, with `status: closed` and `answer.decision: commit` | Decided; the row continues |
+| Any other 2xx (e.g. `status: waiting`, no decision) | `run refused; inspect evidence` |
+| 409 (`answer-unmatched`, `*-stale`) and other 4xx except 408/429 (e.g. 403 `unverified-answer`) | `TTR_REFUSED` → `run refused; inspect evidence` |
+| 5xx, 408, 429 | The completion rolls back; the user completes again |
+
+On the engine, `run refused` keeps the refusal's message (the Server's status and body) in
+`ttrRefusedReason`. A refused answer is never counted as decided.
 
 C7 HTTP scripts resolve `BpmnError` and Spin for Camunda 7 and CIB seven without relying on an execution
 binding in connector output scripts. Both engines retain `TTR_STALE` and `TTR_REFUSED` boundary codes;

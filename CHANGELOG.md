@@ -6,14 +6,13 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
-### Changed — ttr-emit-camunda: the answer run is evaluated and closed inside the approval row (ttr-server D-159/D-228; AU-export S1.5.7)
+### Changed — ttr-emit-camunda: the approval row's answer is decided at its Open (ttr-server D-159/D-228/D-233; AU-export S1.5.7)
 
-- After the identity Open (still in the completion's transaction), the process-engine approval row evaluates the
-  answered run, reads its status until the verdict is ready, and closes it (asynchronous steps with the root
-  chain's retry cycle). The verdict poll and the 202 handle loop are shared with the root chain, whose output is
-  unchanged. A 200 replay closes without evaluating. A close that does not answer `closed` (the key held again)
-  reaches `run refused`. The row routes nothing in the answer run, so the approval is never asked twice. Every
-  `ttrAnswer*`/`ttrHandle` variable is local to the answer step.
+- The process-engine approval row's answer Open is its one call to the Server, which decides the approved key and
+  closes the answer run at that Open. The row continues only on `status: closed` with `answer.decision: commit`
+  (201, or 200 replayed). Anything else (`waiting`, `409 answer-unmatched`/`*-stale`, another 4xx) reaches
+  `run refused` with the Server's message in `ttrRefusedReason` and is never counted as decided. The answered
+  `port.key` is the column-named key object. `ttrAnswerRunId`, `ttrAnswerStatus` and `ttrAnswerDecision` are row-local.
 - The process-engine target asks for every `approval: required` action the Server performs (a door or writer sink;
   grammar 0.22: `native: transition`, `process_engine: door`) and never performs it directly; the Server applies it
   once the answer is verified (D-230). Other sinks and customer `camunda_7`/`camunda_8` exports are unchanged.

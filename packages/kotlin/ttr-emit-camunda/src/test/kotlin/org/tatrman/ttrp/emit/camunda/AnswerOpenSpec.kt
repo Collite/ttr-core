@@ -79,11 +79,6 @@ class AnswerOpenSpec :
                         it.getAttribute("name") ==
                             "approve_release complete"
                     }
-                flows.any {
-                    it.getAttribute("sourceRef") == answerStep.getAttribute("id") &&
-                        it.getAttribute("targetRef") == done.getAttribute("id")
-                } shouldBe
-                    true
                 val inputs = answerStep.getElementsByTagNameNS("http://camunda.org/schema/1.0/bpmn", "inputParameter")
                 val payload =
                     (0 until inputs.length)
@@ -132,100 +127,106 @@ class AnswerOpenSpec :
                     )
                 open.getValue("idempotencyKey") shouldBe JsonPrimitive("anchor-1:answer:task-42")
                 open.getValue("deployment") shouldBe JsonPrimitive("release_bpmn")
-                open.getValue("port").jsonObject.getValue("key") shouldBe JsonPrimitive(4711)
+                open.getValue("port").jsonObject.getValue("key") shouldBe buildJsonObject { put("order_number", 4711) }
                 open.getValue("port").jsonObject.containsKey("at") shouldBe true
 
                 // Grammar 0.22's approval shape (a writer sink, the engine's door): asked, never performed directly.
                 elements(BPMN, "serviceTask").none { it.getAttribute("name") == "perform approve_release" } shouldBe
                     true
 
-                // The answer chain (D-228/D-230): open → evaluate → status → close of the answered run, inside the step.
-                fun named(name: String) = elements(BPMN, "serviceTask").single { it.getAttribute("name") == name }
-
+                // D-233: the answer Open is the row's one call; the response decides.
                 fun inside(
                     element: Element,
                     ancestor: Element,
                 ): Boolean = generateSequence(element.parentNode) { it.parentNode }.any { it === ancestor }
-                val chain = listOf("answer evaluate", "answer evaluation status", "answer close").map(::named)
-                chain.forEach { inside(it, answerStep) shouldBe true }
-                val calls =
-                    elements(BPMN, "serviceTask")
-                        .filter { inside(it, answerStep) }
-                        .map { it.getAttribute("name") }
-                // The four calls of the answered run, plus the 202 handle's status poll (the root's loop, reused).
-                calls shouldBe
-                    listOf(
-                        "answer approve_release",
-                        "answer close",
-                        "answer evaluate",
-                        "answer evaluation status",
-                        "handle status",
-                    )
-
-                fun url(task: Element): String =
-                    (0 until task.getElementsByTagNameNS("http://camunda.org/schema/1.0/bpmn", "inputParameter").length)
-                        .map {
-                            task.getElementsByTagNameNS("http://camunda.org/schema/1.0/bpmn", "inputParameter").item(it)
-                                as Element
-                        }.single { it.getAttribute("name") == "url" }
-                        .textContent
-                chain.forEach {
-                    url(it).contains("ttrRunId") shouldBe false
-                    url(it).contains("ttrAnswerOpen.prop(\"runId\").stringValue()") shouldBe true
-                    it.getAttributeNS("http://camunda.org/schema/1.0/bpmn", "asyncBefore") shouldBe "true"
-                }
-                url(named("answer evaluate")).endsWith(".concat(\"/evaluate\")}") shouldBe true
-                url(named("answer close")).endsWith(".concat(\"/close\")}") shouldBe true
-                // Only the Open carries a body with the engine block; evaluate/close send `{}`.
-                listOf("answer evaluate", "answer close").forEach { name ->
-                    val body =
-                        (
-                            0 until
-                                named(
-                                    name,
-                                ).getElementsByTagNameNS("http://camunda.org/schema/1.0/bpmn", "inputParameter").length
-                        ).map {
-                            named(
-                                name,
-                            ).getElementsByTagNameNS(
-                                "http://camunda.org/schema/1.0/bpmn",
-                                "inputParameter",
-                            ).item(it)
-                                as Element
-                        }.single { it.getAttribute("name") == "payload" }
-                            .textContent
-                    body shouldBe "\${(S('{}')).toString()}"
-                }
-                // The shared poll: the answer's evaluation reads status until the verdict is ready, as the root does.
-                elements(BPMN, "endEvent").count { it.getAttribute("name") == "answer verdict ready" } shouldBe 1
-                elements(
-                    BPMN,
-                    "intermediateCatchEvent",
-                ).count { it.getAttribute("name") == "answer evaluation poll" } shouldBe
-                    1
-                elements(BPMN, "endEvent").count { it.getAttribute("name") == "verdict ready" } shouldBe 1
+                elements(BPMN, "serviceTask").filter { inside(it, answerStep) }.map { it.getAttribute("name") } shouldBe
+                    listOf("answer approve_release")
+                xml.contains("answer evaluate") shouldBe false
+                xml.contains("answer close") shouldBe false
+                val script =
+                    answer
+                        .getElementsByTagNameNS("http://camunda.org/schema/1.0/bpmn", "script")
+                        .let { nodes -> (0 until nodes.length).map { nodes.item(it).textContent } }
+                        .single { "statusCode" in it }
+                // A 409 on the answer (answer-unmatched, *-stale) refuses with the body; it is not an outdated export.
+                script.contains("TTR_STALE") shouldBe false
+                script.contains("TTR_REFUSED") shouldBe true
                 // No route is read again inside the answer: the approval is not re-asked.
                 elements(BPMN, "userTask").count { inside(it, answerStep) } shouldBe 0
-                elements(BPMN, "subProcess").none {
-                    inside(it, answerStep) &&
-                        it.getAttribute("name").startsWith("page ")
-                } shouldBe
-                    true
-                // Row-local variables (R323-4): every answer variable is declared null on the answer step.
-                val declared =
-                    (0 until answerStep.childNodes.length)
-                        .map { answerStep.childNodes.item(it) }
+
+                fun mapping(
+                    element: Element,
+                    kind: String,
+                ): Map<String, String> =
+                    (0 until element.childNodes.length)
+                        .map { element.childNodes.item(it) }
                         .filterIsInstance<Element>()
                         .single { it.localName == "extensionElements" }
                         .getElementsByTagNameNS("http://camunda.org/schema/1.0/bpmn", "inputOutput")
                         .item(0)
                         .childNodes
                         .let { nodes -> (0 until nodes.length).map { nodes.item(it) }.filterIsInstance<Element>() }
-                        .filter { it.localName == "inputParameter" }
+                        .filter { it.localName == kind }
                         .associate { it.getAttribute("name") to it.textContent }
-                listOf("ttrAnswerOpen", "ttrAnswerEvaluation", "ttrAnswerClosed", "ttrHandle").forEach { v ->
-                    listOf(v, "${v}Code", "${v}Headers", "${v}RetryAfter").forEach { declared[it] shouldBe "\${null}" }
+                val stepInputs = mapping(answerStep, "inputParameter")
+                listOf(
+                    "",
+                    "Code",
+                    "Headers",
+                    "RetryAfter",
+                ).forEach { stepInputs["ttrAnswerOpen$it"] shouldBe "\${null}" }
+                val outputs = mapping(answerStep, "outputParameter")
+                outputs.keys shouldBe setOf("ttrAnswerRunId", "ttrAnswerStatus", "ttrAnswerDecision")
+                // C7 runs these outputs on cancellation too (a refused Open): each is guarded (D-229).
+                outputs.values.forEach {
+                    it.startsWith("\${execution.getVariable('ttrAnswerOpen') != null && ") shouldBe
+                        true
                 }
+                // Row-local (R323-4): the row declares them, so none reaches the process instance.
+                val row =
+                    generateSequence(answerStep.parentNode) { it.parentNode }.filterIsInstance<Element>().first {
+                        it.localName == "subProcess"
+                    }
+                val rowInputs = mapping(row, "inputParameter")
+                listOf("ttrTaskId", "ttrAnsweredBy", "ttrAnswerRunId", "ttrAnswerStatus", "ttrAnswerDecision").forEach {
+                    rowInputs[it] shouldBe "\${null}"
+                }
+                // The decision gateway: closed + commit continues; anything else refuses (an error end, run_refused).
+                val decided =
+                    elements(BPMN, "exclusiveGateway").single {
+                        it.getAttribute("name") ==
+                            "answer approve_release decided"
+                    }
+                flows.any {
+                    it.getAttribute("sourceRef") == answerStep.getAttribute("id") &&
+                        it.getAttribute("targetRef") == decided.getAttribute("id")
+                } shouldBe true
+                val outgoing = flows.filter { it.getAttribute("sourceRef") == decided.getAttribute("id") }
+                outgoing.size shouldBe 2
+                val toDone = outgoing.single { it.getAttribute("targetRef") == done.getAttribute("id") }
+                toDone.textContent.trim() shouldBe
+                    "\${(ttrAnswerStatus == \"closed\") && (ttrAnswerDecision == \"commit\")}"
+                val refusal = outgoing.single { it !== toDone }
+                decided.getAttribute("default") shouldBe refusal.getAttribute("id")
+                val refusedEnd =
+                    elements(BPMN, "endEvent").single {
+                        it.getAttribute("id") ==
+                            refusal.getAttribute("targetRef")
+                    }
+                (
+                    refusedEnd
+                        .getElementsByTagNameNS(
+                            BPMN,
+                            "errorEventDefinition",
+                        ).item(0) as Element
+                ).getAttribute("errorRef") shouldBe
+                    "run_refused"
+                // The engine keeps the refusal's message for the person who inspects the run.
+                elements(BPMN, "errorEventDefinition").count {
+                    it.getAttribute("errorRef") == "run_refused" &&
+                        it.getAttributeNS("http://camunda.org/schema/1.0/bpmn", "errorMessageVariable") ==
+                        "ttrRefusedReason"
+                } shouldBe 1
             }
         }
         for (target in listOf("camunda_7", "camunda_8")) {
