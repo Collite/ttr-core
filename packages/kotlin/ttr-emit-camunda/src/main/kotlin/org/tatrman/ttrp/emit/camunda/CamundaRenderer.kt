@@ -756,11 +756,12 @@ internal class CamundaRenderer(
                     action.sinks[graph.deployment.type] ?: action.sinks["camunda"] ?: action.sinks["native"]
                         ?: error("missing Camunda sink for ${wiring.action}")
                 when {
-                    // D-230: the engine target asks for every approval-required action, whatever its sink; the Server
-                    // performs it when the answer is verified. Customer targets keep the explicit user-task sinks.
+                    // D-230: the engine target asks for an approval-required action the Server performs (door or writer
+                    // sinks), never performing it directly; the Server applies it once the answer is verified. Customer
+                    // targets keep the explicit user-task sinks.
                     sink == "user task" ||
                         action.approval == "required" &&
-                        (action.sinks["native"] == "task" || engine) -> {
+                        (action.sinks["native"] == "task" || engine && sink in SERVER_PERFORMED) -> {
                         val gate = rowScope.node("exclusiveGateway", "${wiring.action} selected and wet")
                         val done = rowScope.node("exclusiveGateway", "${wiring.action} complete")
                         rowScope.link(last, gate)
@@ -906,18 +907,7 @@ internal class CamundaRenderer(
                         rowScope.link(outcome, done)
                         last = done
                     }
-                    sink in
-                        setOf(
-                            "door",
-                            "service task",
-                            "transition",
-                            "writer",
-                            "obligation",
-                            "task",
-                            "message",
-                            "start",
-                            "http",
-                        ) -> {
+                    sink in SERVER_PERFORMED -> {
                         val perform =
                             http(
                                 rowScope,
@@ -1078,7 +1068,7 @@ internal class CamundaRenderer(
         The engine templates also retain ttrInput.at in keyed ports; batch ports remain {none: true}.
         Approval completion captures task.id/assignee; its answer Open additionally carries engine.taskId and
         engine.answeredBy, with idempotencyKey = ttrAnchor + ':answer:' + ttrTaskId and the approved row's key.
-        Every approval-required action becomes this user task, whatever its sink; the engine never performs it directly.
+        An approval-required action the Server performs becomes this user task; the engine never performs it directly.
         The answer Open runs within task completion (no asyncBefore); a transient failure rolls back completion and the
         user completes again. The Server decides the approved key's held group at that Open. The row then evaluates
         and closes the answer run (asyncBefore steps, polled until the verdict is ready, bounded by budget + 2 min);
@@ -1190,4 +1180,10 @@ internal class CamundaRenderer(
         driver checks routes, tasks, named calls, template bindings and DMN associations offline; it does not
         execute connectors or compare verdicts.
         """.trimIndent() + "\n"
+
+    private companion object {
+        /** Sinks whose action the row hands to the Server's `perform` (the engine performs no writer action itself). */
+        val SERVER_PERFORMED =
+            setOf("door", "service task", "transition", "writer", "obligation", "task", "message", "start", "http")
+    }
 }

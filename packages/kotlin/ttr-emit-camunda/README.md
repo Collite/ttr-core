@@ -25,7 +25,35 @@ answer Open rolls back the completion; the user completes again.
 The Server accepts an asserted answer only from its configured engine client and verifies the task and
 assignee against engine history. Customer exports and template program Opens assert no answer identity.
 
-This version opens the answer run; it does not yet evaluate or close it.
+The engine target asks this way for every `approval: required` action the Server performs (a door or
+writer sink, e.g. `native: transition` with `process_engine: door` in grammar 0.22); it never performs
+such an action directly. The Server decides
+the approved key's held group when it accepts the answer Open.
+
+The answer step then finishes the answered run, without asking again:
+
+| Step | Call | Variable |
+| --- | --- | --- |
+| Open (in the completion's transaction) | `POST /recipes/{recipe}/runs` | `ttrAnswerOpen` |
+| Evaluate (asynchronous) | `POST /runs/{id}/evaluate` | `ttrAnswerEvaluation` |
+| Status, until the verdict is ready (Retry-After, budget + 2 min) | `GET /runs/{id}` | `ttrAnswerEvaluation` |
+| Close (asynchronous) | `POST /runs/{id}/close` | `ttrAnswerClosed` |
+
+`{id}` is `ttrAnswerOpen.runId`. Evaluate and close carry no `engine` object. The step reads no route
+and performs no action: the Server already applied the approved row. Every `ttrAnswer*` and `ttrHandle`
+variable (with its `Code`, `Headers` and `RetryAfter`) is declared on the answer step, so none reaches
+the process instance.
+
+| Answer Open or close | Result |
+| --- | --- |
+| 201 | Evaluate, read status, close |
+| 200 `replayed` | Close the existing run without evaluating |
+| 202 | Poll the other execution's status; `closed` completes, anything else refuses |
+| Close answers other than `closed` (the key held again) | `run refused; inspect evidence` |
+| 409 (Open, evaluate, status or close) | `TTR_STALE` → `export outdated` |
+| 403 `unverified-answer` and other 4xx except 408/429 | `TTR_REFUSED` → `run refused; inspect evidence` |
+| 5xx, 408, 429 on the Open | The completion rolls back; the user completes again |
+| 5xx, 408, 429 after the Open | The failed job retries (R3/PT15S), then an incident |
 
 C7 HTTP scripts resolve `BpmnError` and Spin for Camunda 7 and CIB seven without relying on an execution
 binding in connector output scripts. Both engines retain `TTR_STALE` and `TTR_REFUSED` boundary codes;
