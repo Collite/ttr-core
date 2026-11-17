@@ -25,10 +25,19 @@ answer Open rolls back the completion; the user completes again.
 The Server accepts an asserted answer only from its configured engine client and verifies the task and
 assignee against engine history. Customer exports and template program Opens assert no answer identity.
 
-The engine target asks this way for every `approval: required` action the Server performs (a door or
-writer sink, e.g. `native: transition` with `process_engine: door` in grammar 0.22); it never performs
-such an action directly. The Server decides
-the approved key's held group when it accepts the answer Open.
+The engine target asks this way for an `approval: required` action whose rows the Server holds: one whose
+native sink is `transition`, `writer` or `obligation` (e.g. `native: transition` with `process_engine: door`
+in grammar 0.22). It never performs such an action directly. An approval action with another native sink,
+or none, has nothing held, so nobody is asked for it; it is performed as before.
+
+The Server holds those rows when the run closes, and the run then waits for the answers. So the engine asks
+after the close, never inside the routes:
+
+| Close response `status` | Result |
+| --- | --- |
+| `closed` (nothing held: a dry run, or no such action selected) | The evaluation ends; nobody is asked |
+| `waiting` | For each route that wires such an action, each row whose key has the action selected gets the user task and its answer Open |
+| Anything else | `run refused; inspect evidence` |
 
 The answer Open is the row's one call to the Server, which decides the approved key and closes the
 answer run at that Open. Its `port.key` is the row's key as a column-named object (`{order_number: 4711}`),
@@ -41,10 +50,12 @@ the approval is never asked twice.
 | 201, or 200 `replayed`, with `status: closed` and `answer.decision: commit` | Decided; the row continues |
 | Any other 2xx (e.g. `status: waiting`, no decision) | `run refused; inspect evidence` |
 | 409 (`answer-unmatched`, `*-stale`) and other 4xx except 408/429 (e.g. 403 `unverified-answer`) | `TTR_REFUSED` → `run refused; inspect evidence` |
+| 202 (the same idempotency key is still in flight) | The completion rolls back; completing again gets the decision as `200 replayed` |
 | 5xx, 408, 429 | The completion rolls back; the user completes again |
 
-On the engine, `run refused` keeps the refusal's message (the Server's status and body) in
-`ttrRefusedReason`. A refused answer is never counted as decided.
+A non-2xx refusal keeps the Server's status and body in `ttrRefusedReason`. A 2xx answer that does not
+commit (e.g. `status: waiting`) leaves `ttrRefusedReason` null; its `status` is in the history, as the
+row-local `ttrAnswerStatus`. A refused answer is never counted as decided.
 
 C7 HTTP scripts resolve `BpmnError` and Spin for Camunda 7 and CIB seven without relying on an execution
 binding in connector output scripts. Both engines retain `TTR_STALE` and `TTR_REFUSED` boundary codes;
@@ -58,5 +69,6 @@ Run the exporter suite:
 
 `EmbeddedEngineSpec` deploys generated BPMN and applies Hidden template scripts on isolated in-memory
 Camunda 7.24 and CIB seven 2.2.0 engines with H2 and a local HTTP stub. It verifies response/error handling,
-unclaimed completion, claimed answer identity and row-local variables. It does not certify a deployed
-process-engine service or the answer run's evaluation and close.
+unclaimed completion, claimed answer identity and row-local variables. The approval scenario runs the whole
+process against a stub that keeps each run's state: an answer Open matches only a run that its close left
+`waiting`. It does not certify a deployed process-engine service.

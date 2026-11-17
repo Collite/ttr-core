@@ -11,11 +11,17 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - The process-engine approval row's answer Open is its one call to the Server, which decides the approved key and
   closes the answer run at that Open. The row continues only on `status: closed` with `answer.decision: commit`
   (201, or 200 replayed). Anything else (`waiting`, `409 answer-unmatched`/`*-stale`, another 4xx) reaches
-  `run refused` with the Server's message in `ttrRefusedReason` and is never counted as decided. The answered
-  `port.key` is the column-named key object. `ttrAnswerRunId`, `ttrAnswerStatus` and `ttrAnswerDecision` are row-local.
-- The process-engine target asks for every `approval: required` action the Server performs (a door or writer sink;
-  grammar 0.22: `native: transition`, `process_engine: door`) and never performs it directly; the Server applies it
-  once the answer is verified (D-230). Other sinks and customer `camunda_7`/`camunda_8` exports are unchanged.
+  `run refused` and is never counted as decided. A non-2xx refusal keeps the Server's status and body in
+  `ttrRefusedReason`; a 2xx that does not commit leaves it null (the answer's `status` is the row-local
+  `ttrAnswerStatus`, in the history). A `202` (the same key still in flight) rolls the completion back like a 5xx.
+  The answered `port.key` is the column-named key object. `ttrAnswerRunId`, `ttrAnswerStatus` and
+  `ttrAnswerDecision` are row-local.
+- The process-engine target asks for an `approval: required` action whose rows the Server holds (native sink
+  `transition`, `writer` or `obligation`; grammar 0.22: `native: transition`, `process_engine: door`) and never
+  performs it directly; the Server applies it once the answer is verified (D-230). The Server holds those rows at the
+  run's close, so the engine asks after the close: `closed` ends the evaluation, `waiting` asks per selected row, and
+  anything else refuses. An approval action with another native sink, or none, is performed as before. Customer
+  `camunda_7`/`camunda_8` exports are unchanged.
 
 ### Added — the reader harness: `ttr-import` and `import-schema --from file:` (MW-P5 S5.1)
 
