@@ -82,6 +82,36 @@ class EachSplitSkipSpec :
                 JsonObject(emptyMap())
         }
 
+        test("each, the related rule (⚑MW-P5-S52-2): [{@id, @local}] → relations [{type: related, to: <local>}]") {
+            val related =
+                "pojmy:\n  A:\n    stav: Approved\n    related:\n" +
+                    "      - {'@id': 'http://x/g#B', '@local': B}\n      - {'@id': 'http://x/g#C', '@local': C}\n" +
+                    "      - {'@value': literal, '@language': cs}\n"
+            val result =
+                runOps(
+                    related,
+                    "- {op: package, mapping: {}, default: demo}\n" +
+                        "- {op: kinds, at: /pojmy, kind: /stav, mapping: {Approved: kind}}\n" +
+                        "- {op: each, in: kind, at: /related, to: {kind: kind, property: relations}, " +
+                        "shape: {type: related, to: {input: \$item/@local}}}\n",
+                )
+            // The literal element has no `@local`: its only input is missing, so the element is dropped (✅R251-B).
+            // A cn `kind` keeps its body as an ordered entry list.
+            result.defs().single().getValue("properties") shouldBe
+                buildJsonArray {
+                    addJsonObject {
+                        putJsonArray("relations") {
+                            listOf("B", "C").forEach {
+                                addJsonObject {
+                                    put("type", "related")
+                                    put("to", it)
+                                }
+                            }
+                        }
+                    }
+                }
+        }
+
         test("each: a duplicate key is ys/each-duplicate-key and a missing one ys/each-missing-key, at the element") {
             val duplicate =
                 shouldThrow<ProfileException> {
