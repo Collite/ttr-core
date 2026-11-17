@@ -98,6 +98,8 @@ internal class CamundaRenderer(
         run: String = "ttrRunId",
         query: String? = null,
         asyncBefore: Boolean = true,
+        // false: a 409 refuses like any other 4xx (TTR_REFUSED, with the Server's body) instead of TTR_STALE.
+        conflictIsStale: Boolean = true,
     ): BpmnModel.Node {
         var path = graph.runApi.basePath.trimEnd('/') + graph.runApi.calls.getValue(call)
         (args + ("recipe" to graph.recipe.name)).forEach { (key, value) ->
@@ -139,6 +141,7 @@ internal class CamundaRenderer(
                 result,
                 budget(graph),
                 bearer = !engine,
+                conflictIsStale = conflictIsStale,
             )
         if (d == Dialect.C7 && asyncBefore) {
             task.attrs["camunda:asyncBefore"] = "true"
@@ -168,7 +171,8 @@ internal class CamundaRenderer(
         val port =
             when (portType) {
                 null, "none" -> obj("none" to "true")
-                "key" -> obj("key" to if (answer) rowKey(graph) else expr("ttrInput['key']", "ttrInput.key"))
+                // The Server matches an answer's key against `DryRunAction.key`: always the column-named object.
+                "key" -> obj("key" to if (answer) rowKeyObject(graph) else expr("ttrInput['key']", "ttrInput.key"))
                 "keys" -> obj("keys" to expr("ttrInput['keys']", "ttrInput.keys"))
                 "event" -> obj("event" to expr("ttrInput['event']", "ttrInput.event"))
                 else -> error("unsupported Camunda port ${graph.program.port}")
@@ -459,15 +463,14 @@ internal class CamundaRenderer(
         last: BpmnModel.Node,
         result: String,
         run: String,
-        prefix: String = "",
     ) {
-        val evaluate = http(evaluation, graph, "${prefix}evaluate", "evaluate", result, run = run)
+        val evaluate = http(evaluation, graph, "evaluate", "evaluate", result, run = run)
         evaluation.link(last, evaluate)
-        val evaluated = evaluation.node("exclusiveGateway", "${prefix}evaluation complete")
+        val evaluated = evaluation.node("exclusiveGateway", "evaluation complete")
         val poll =
             timer(
                 evaluation,
-                "${prefix}evaluation poll",
+                "evaluation poll",
                 d.condition(
                     expr(
                         "'PT'.concat(${result}RetryAfter.toString()).concat('S')",
@@ -475,13 +478,13 @@ internal class CamundaRenderer(
                     ),
                 ),
             )
-        val progress = http(evaluation, graph, "${prefix}evaluation status", "status", result, run = run)
+        val progress = http(evaluation, graph, "evaluation status", "status", result, run = run)
         evaluation.default(evaluated, poll)
         evaluation.link(evaluate, progress)
         evaluation.link(poll, progress)
         evaluation.link(progress, evaluated)
-        val evaluationEnd = evaluation.node("endEvent", "${prefix}verdict ready")
-        val evaluationFailed = error(evaluation, "${prefix}evaluation failed or abandoned", "run_refused")
+        val evaluationEnd = evaluation.node("endEvent", "verdict ready")
+        val evaluationFailed = error(evaluation, "evaluation failed or abandoned", "run_refused")
         evaluation.link(
             evaluated,
             evaluationFailed,
@@ -499,94 +502,23 @@ internal class CamundaRenderer(
         evaluation.link(evaluated, evaluationEnd, "verdict ready", ready)
     }
 
-    /** The variables an answer step writes; declared on the step so none reaches the process instance (R323-4). */
-    private val answerLocals =
-        listOf("ttrAnswerOpen", "ttrAnswerEvaluation", "ttrAnswerClosed", "ttrHandle").flatMap {
-            listOf(it, "${it}Code", "${it}Headers", "${it}RetryAfter")
-        }
-
-    /**
-     * The answer run (D-228, D-230): the identity Open runs in the completion's transaction (no asyncBefore), then the
-     * answered run is evaluated and closed like any run. The Server decided the held group at the Open, so the run's
-     * actions are not routed again: the row's approval is never re-asked. A close that is not `closed` (the key held
-     * again) refuses rather than counting as decided.
-     */
-    private fun answerRun(
-        scope: BpmnModel.Scope,
-        graph: RecipeGraph,
-        action: String,
-    ) {
-        val run = d.string("ttrAnswerOpen", "runId")
-        val start = scope.node("startEvent", "answer start")
-        val refused = error(scope, "answer refused", "run_refused")
-        val open =
-            http(
-                scope,
-                graph,
-                "answer $action",
-                "open",
-                "ttrAnswerOpen",
-                body = "ttrAnswerOpenBody",
-                asyncBefore = false,
-            )
-        scope.link(start, open)
-        val codes = scope.node("exclusiveGateway", "answer ownership")
-        scope.link(open, codes)
-        val close = http(scope, graph, "answer close", "close", "ttrAnswerClosed", run = run)
-        scope.link(
-            codes,
-            close,
-            "200 replayed",
-            d.and(eq("ttrAnswerOpenCode", "200"), d.bool("ttrAnswerOpen", "replayed")),
-        )
-        val evaluation = BpmnModel.Scope(stableId("${scope.id}/evaluation"))
-        val bounded = scope.node("subProcess", "answer evaluation within budget", child = evaluation)
-        bounded.extensions += d.mapping(outputs = mapOf("ttrAnswerEvaluation" to "ttrAnswerEvaluation"))
-        scope.link(codes, bounded, "201 claimed", eq("ttrAnswerOpenCode", "201"))
-        val awaiting = awaitHandle(scope, graph, codes, refused, "ttrAnswerOpen")
-        val end = scope.node("endEvent", "answer closed")
-        val settled = scope.node("exclusiveGateway", "answer settled")
-        scope.link(awaiting, settled)
-        scope.link(settled, end, "closed", state("ttrHandle", "closed"))
-        scope.default(settled, refused)
-        evaluateUntilReady(
-            evaluation,
-            graph,
-            evaluation.node("startEvent", "answer evaluation start"),
-            "ttrAnswerEvaluation",
-            run,
-            "answer ",
-        )
-        scope.link(bounded, close)
-        val closed = scope.node("exclusiveGateway", "answer run closed")
-        scope.link(close, closed)
-        scope.link(closed, end, "closed", state("ttrAnswerClosed", "closed"))
-        scope.default(closed, refused)
-        val bound =
-            boundary(
-                scope,
-                bounded,
-                "answer evaluation budget exceeded",
-                Xml(
-                    "bpmn:timerEventDefinition",
-                    children = listOf(Xml("bpmn:timeDuration", text = "PT${budget(graph)}S")),
-                ),
-            )
-        scope.link(bound, refused)
-    }
-
     private fun budget(graph: RecipeGraph): Long {
         val raw = graph.program.budget[if (graph.program.mode == "batch") "batch" else "sync"]
         val seconds = raw?.let(::durationSeconds) ?: if (graph.program.mode == "batch") 1800L else 60L
         return seconds + 120
     }
 
-    private fun rowKey(graph: RecipeGraph): String {
-        val fields = graph.recipe.key.map { it.substringAfterLast('.') }
+    private fun rowKeyValue(key: String) = expr("${d.field("ttrRow", key)}.value()", "ttrRow.$key")
 
-        fun value(key: String) = expr("${d.field("ttrRow", key)}.value()", "ttrRow.$key")
-        return if (fields.size == 1) value(fields.single()) else d.objectValue(fields.associateWith(::value))
+    private fun rowKeyFields(graph: RecipeGraph) = graph.recipe.key.map { it.substringAfterLast('.') }
+
+    private fun rowKey(graph: RecipeGraph): String {
+        val fields = rowKeyFields(graph)
+        return if (fields.size == 1) rowKeyValue(fields.single()) else rowKeyObject(graph)
     }
+
+    private fun rowKeyObject(graph: RecipeGraph): String =
+        d.objectValue(rowKeyFields(graph).associateWith(::rowKeyValue))
 
     private fun route(
         scope: BpmnModel.Scope,
@@ -706,7 +638,13 @@ internal class CamundaRenderer(
         paging.default(complete, truncated)
         val rowScope = BpmnModel.Scope(stableId("${scope.id}/route/${route.name}"))
         val each = scope.node("subProcess", "each ${route.name} row", child = rowScope)
-        if (engine) each.extensions += d.mapping(mapOf("ttrTaskId" to "null", "ttrAnsweredBy" to "null"))
+        if (engine) {
+            each.extensions +=
+                d.mapping(
+                    listOf("ttrTaskId", "ttrAnsweredBy", "ttrAnswerRunId", "ttrAnswerStatus", "ttrAnswerDecision")
+                        .associateWith { "null" },
+                )
+        }
         val collection = expr("$rows.elements()", rows)
         each.tail +=
             if (d ==
@@ -813,15 +751,58 @@ internal class CamundaRenderer(
                                     "answer ${wiring.action} step",
                                     child = answerScope,
                                 )
+                            // D-233: the answer Open is the row's one call. The Server decides and closes the answer run
+                            // there; its response is the decision. C7 runs these outputs on cancellation too (D-229).
+                            val opened = "execution.getVariable('ttrAnswerOpen') != null"
+
+                            fun text(vararg path: String): String {
+                                var node = "ttrAnswerOpen"
+                                val checks = mutableListOf(opened)
+                                path.forEach {
+                                    checks += "$node.isObject() && $node.hasProp(${quote(it)})"
+                                    node = "$node.prop(${quote(it)})"
+                                }
+                                checks += "$node.isString()"
+                                return "${checks.joinToString(" && ")} ? $node.stringValue() : null"
+                            }
                             answerStep.extensions +=
                                 d.mapping(
                                     linkedMapOf(
                                         "ttrAnswerOpenBody" to openBody(graph, "answer", first = false, answer = true),
-                                    ) + answerLocals.associateWith { "null" },
+                                    ) +
+                                        listOf("", "Code", "Headers", "RetryAfter").associate {
+                                            "ttrAnswerOpen$it" to
+                                                "null"
+                                        },
+                                    linkedMapOf(
+                                        "ttrAnswerRunId" to text("runId"),
+                                        "ttrAnswerStatus" to text("status"),
+                                        "ttrAnswerDecision" to text("answer", "decision"),
+                                    ),
                                 )
-                            answerRun(answerScope, graph, wiring.action)
+                            val answer =
+                                http(
+                                    answerScope,
+                                    graph,
+                                    "answer ${wiring.action}",
+                                    "open",
+                                    "ttrAnswerOpen",
+                                    body = "ttrAnswerOpenBody",
+                                    asyncBefore = false,
+                                    conflictIsStale = false,
+                                )
+                            answerScope.link(answerScope.node("startEvent", "answer start"), answer)
+                            answerScope.link(answer, answerScope.node("endEvent", "answer opened"))
                             rowScope.link(task, answerStep)
-                            rowScope.link(answerStep, done)
+                            val decided = rowScope.node("exclusiveGateway", "answer ${wiring.action} decided")
+                            rowScope.link(answerStep, decided)
+                            rowScope.link(
+                                decided,
+                                done,
+                                "closed and committed",
+                                d.and(eq("ttrAnswerStatus", quote("closed")), eq("ttrAnswerDecision", quote("commit"))),
+                            )
+                            rowScope.default(decided, error(rowScope, "answer ${wiring.action} refused", "run_refused"))
                         } else {
                             rowScope.link(task, done)
                         }
@@ -1028,9 +1009,9 @@ internal class CamundaRenderer(
                 "${root.program.name} run refused",
                 Xml(
                     "bpmn:errorEventDefinition",
-                    mapOf(
-                        "errorRef" to "run_refused",
-                    ),
+                    // The engine keeps the refusal's message (the Server's status and body) for the person who inspects it.
+                    mapOf("errorRef" to "run_refused") +
+                        if (engine) mapOf("camunda:errorMessageVariable" to "ttrRefusedReason") else emptyMap(),
                 ),
             )
         scope.link(stale, outdated)

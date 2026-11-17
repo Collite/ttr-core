@@ -118,6 +118,8 @@ internal enum class Dialect(
         retryBudgetSeconds: Long,
         // The process engine's egress injects the bearer (D-158): its HTTP steps carry none.
         bearer: Boolean = true,
+        // false (C7): a 409 refuses like any other 4xx, with the response body, instead of raising TTR_STALE.
+        conflictIsStale: Boolean = true,
     ): List<Xml> =
         if (this == C7) {
             listOf(
@@ -181,7 +183,7 @@ internal enum class Dialect(
                                                             """
                                                             ${C7Runtime.bpmnError}
                                                             def code = ((Number) statusCode).intValue()
-                                                            if (code == 409) throw BpmnError.getConstructor(String, String).newInstance('TTR_STALE', 'run API fingerprint refused')
+                                                            ${if (conflictIsStale) STALE_ON_CONFLICT else ""}
                                                             if (code >= 400 && code < 500 && code != 408 && code != 429) throw BpmnError.getConstructor(String, String).newInstance('TTR_REFUSED', 'run API HTTP ' + code + ': ' + response.toString().take(256))
                                                             if (code < 200 || code >= 300) throw new IllegalStateException('run API HTTP ' + code)
                                                             ${C7Runtime.spin}
@@ -231,6 +233,7 @@ internal enum class Dialect(
                 ),
             )
         } else {
+            require(conflictIsStale) { "a C8 HTTP step raises TTR_STALE on 409" }
             listOf(
                 Xml("zeebe:taskDefinition", mapOf("type" to "io.camunda:http-json:1", "retries" to "3")),
                 Xml(
@@ -298,4 +301,9 @@ internal enum class Dialect(
                 ),
             )
         }
+
+    private companion object {
+        const val STALE_ON_CONFLICT =
+            "if (code == 409) throw BpmnError.getConstructor(String, String).newInstance('TTR_STALE', 'run API fingerprint refused')"
+    }
 }
