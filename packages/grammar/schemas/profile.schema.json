@@ -89,6 +89,7 @@
                   "codes",
                   "link",
                   "join-pairs",
+                  "each",
                   "values"
                 ]
               },
@@ -280,6 +281,16 @@
               },
               "by": {
                 "type": "string"
+              },
+              "shape": {
+                "$ref": "#/$defs/eachTemplate"
+              },
+              "key": {
+                "type": "string",
+                "pattern": "^(?:/(?:[^~/]|~[01])*)*(?![\\s\\S])"
+              },
+              "split": {
+                "type": "string"
               }
             },
             "required": [
@@ -397,73 +408,80 @@
                     "mapping": {
                       "type": "object",
                       "additionalProperties": {
-                        "enum": [
-                          "project",
-                          "table",
-                          "view",
-                          "column",
-                          "index",
-                          "constraint",
-                          "fk",
-                          "procedure",
-                          "entity",
-                          "attribute",
-                          "relation",
-                          "er2db_entity",
-                          "er2db_attribute",
-                          "er2db_relation",
-                          "query",
-                          "role",
-                          "er2cnc_role",
-                          "drill_map",
-                          "area",
-                          "schema",
-                          "domain",
-                          "dimension",
-                          "map",
-                          "hierarchy",
-                          "measure",
-                          "cubelet",
-                          "md2db_cubelet",
-                          "md2db_domain",
-                          "md2db_map",
-                          "md2er_dimension",
-                          "md2er_cubelet",
-                          "world",
-                          "term",
-                          "pattern",
-                          "example",
-                          "parameter",
-                          "action",
-                          "service",
-                          "approval",
-                          "program",
-                          "recipe",
-                          "subkind",
-                          "variant",
-                          "kind",
-                          "event",
-                          "phase",
-                          "quality",
-                          "relation_type",
-                          "cn2md_kind",
-                          "cn2md_role",
-                          "cn2md_quality",
-                          "cn2md_event",
-                          "cn2er_kind",
-                          "cn2er_role",
-                          "cn2er_event",
-                          "cn2er_quality",
-                          "cn2er_phase",
-                          "cn2db_concept",
-                          "engine",
-                          "executor",
-                          "storage",
-                          "identity",
-                          "grant",
-                          "deployment",
-                          "process",
-                          "step"
+                        "anyOf": [
+                          {
+                            "enum": [
+                              "project",
+                              "table",
+                              "view",
+                              "column",
+                              "index",
+                              "constraint",
+                              "fk",
+                              "procedure",
+                              "entity",
+                              "attribute",
+                              "relation",
+                              "er2db_entity",
+                              "er2db_attribute",
+                              "er2db_relation",
+                              "query",
+                              "role",
+                              "er2cnc_role",
+                              "drill_map",
+                              "area",
+                              "schema",
+                              "domain",
+                              "dimension",
+                              "map",
+                              "hierarchy",
+                              "measure",
+                              "cubelet",
+                              "md2db_cubelet",
+                              "md2db_domain",
+                              "md2db_map",
+                              "md2er_dimension",
+                              "md2er_cubelet",
+                              "world",
+                              "term",
+                              "pattern",
+                              "example",
+                              "parameter",
+                              "action",
+                              "service",
+                              "approval",
+                              "program",
+                              "recipe",
+                              "subkind",
+                              "variant",
+                              "kind",
+                              "event",
+                              "phase",
+                              "quality",
+                              "relation_type",
+                              "cn2md_kind",
+                              "cn2md_role",
+                              "cn2md_quality",
+                              "cn2md_event",
+                              "cn2er_kind",
+                              "cn2er_role",
+                              "cn2er_event",
+                              "cn2er_quality",
+                              "cn2er_phase",
+                              "cn2db_concept",
+                              "engine",
+                              "executor",
+                              "storage",
+                              "identity",
+                              "grant",
+                              "deployment",
+                              "process",
+                              "step"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
                         ]
                       }
                     }
@@ -1391,6 +1409,126 @@
                 "if": {
                   "properties": {
                     "op": {
+                      "const": "each"
+                    }
+                  },
+                  "required": [
+                    "op"
+                  ]
+                },
+                "then": {
+                  "type": "object",
+                  "properties": {
+                    "op": {
+                      "const": "each"
+                    },
+                    "at": {
+                      "type": "string",
+                      "pattern": "^(?:/(?:[^~/]|~[01])*)*(?![\\s\\S])"
+                    },
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "minItems": 1
+                    },
+                    "in": {
+                      "enum": [
+                        "project",
+                        "table",
+                        "view",
+                        "column",
+                        "index",
+                        "constraint",
+                        "fk",
+                        "procedure",
+                        "entity",
+                        "attribute",
+                        "relation",
+                        "er2db_entity",
+                        "er2db_attribute",
+                        "er2db_relation",
+                        "query",
+                        "role",
+                        "er2cnc_role",
+                        "drill_map",
+                        "area",
+                        "schema",
+                        "domain",
+                        "dimension",
+                        "map",
+                        "hierarchy",
+                        "measure",
+                        "cubelet",
+                        "md2db_cubelet",
+                        "md2db_domain",
+                        "md2db_map",
+                        "md2er_dimension",
+                        "md2er_cubelet",
+                        "world",
+                        "term",
+                        "pattern",
+                        "example",
+                        "parameter",
+                        "action",
+                        "service",
+                        "approval",
+                        "program",
+                        "recipe",
+                        "subkind",
+                        "variant",
+                        "kind",
+                        "event",
+                        "phase",
+                        "quality",
+                        "relation_type",
+                        "cn2md_kind",
+                        "cn2md_role",
+                        "cn2md_quality",
+                        "cn2md_event",
+                        "cn2er_kind",
+                        "cn2er_role",
+                        "cn2er_event",
+                        "cn2er_quality",
+                        "cn2er_phase",
+                        "cn2db_concept",
+                        "engine",
+                        "executor",
+                        "storage",
+                        "identity",
+                        "grant",
+                        "deployment",
+                        "process",
+                        "step"
+                      ]
+                    },
+                    "to": {
+                      "$ref": "#/$defs/propertyTarget"
+                    },
+                    "shape": {
+                      "$ref": "#/$defs/eachTemplate"
+                    },
+                    "key": {
+                      "type": "string",
+                      "pattern": "^(?:/(?:[^~/]|~[01])*)*(?![\\s\\S])"
+                    }
+                  },
+                  "required": [
+                    "op",
+                    "in",
+                    "at",
+                    "to",
+                    "shape"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "op": {
                       "const": "values"
                     }
                   },
@@ -1501,16 +1639,45 @@
                         "array",
                         "object"
                       ]
+                    },
+                    "split": {
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
                   "required": [
                     "op",
                     "in",
                     "at",
-                    "to",
-                    "mapping"
+                    "to"
                   ],
                   "additionalProperties": false,
+                  "if": {
+                    "required": [
+                      "split"
+                    ]
+                  },
+                  "then": {
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "mapping"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "default"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "else": {
+                    "required": [
+                      "mapping"
+                    ]
+                  },
                   "anyOf": [
                     {
                       "properties": {
@@ -69678,6 +69845,52 @@
             "input": {
               "type": "string",
               "pattern": "^(?:/(?:[^~/]|~[01])*)*(?![\\s\\S])"
+            }
+          },
+          "required": [
+            "input"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "eachTemplate": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/eachTemplate"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/eachTemplate"
+          },
+          "not": {
+            "required": [
+              "input"
+            ]
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "string",
+              "pattern": "^(?:\\x24item)?(?:/(?:[^~/]|~[01])*)*(?![\\s\\S])"
             }
           },
           "required": [
