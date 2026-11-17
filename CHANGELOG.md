@@ -35,7 +35,12 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - A build guard, `libraryCliEdges` in the root `check`, fails when a non-`*-cli` module depends on a `*-cli` module, and
   names the edge. There are two named allowances: `ttrp-lsp → ttrp-cli` (the LSP launcher is an application) and
   `ttr-concept → ttr-metadata-cli` (the `ttr` launcher still lives in the published library). The guard also fails when
-  an allowance is no longer needed.
+  an allowance is no longer needed. It reads `api`, `implementation`, `runtimeOnly`, `compileOnlyApi` and their
+  `testFixtures*` twins.
+- `ttrp-cli`, `ttrp-lsp` and `ttr-designer-server` now declare `slf4j-nop` themselves (review-340). Before this change
+  they got it only through the removed edge, and without it the released `ttrp` printed `SLF4J(W): No SLF4J providers
+  were found` on stderr. An application binds its own SLF4J provider; a library never does.
+- `MetadataLoadCli.readManifest` is deprecated in favour of `PackagesManifest.read`.
 
 ### Added — the reader harness: `ttr-import` and `import-schema --from file:` (MW-P5 S5.1)
 
