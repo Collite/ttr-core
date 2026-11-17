@@ -231,7 +231,7 @@ Three additions serve list-shaped sources such as glossaries (MW-P5 S5.2a):
 - `values` takes `split: "<separator>"` in place of `mapping`: a string becomes the list of its trimmed non-empty
   parts. The separator is matched without its surrounding whitespace, and an empty or blank separator splits on whitespace runs.
   `split` with `mapping` or `default` is refused at load. A non-string is `ys/split-not-a-string`.
-- A `kinds` mapping value `null` skips the record: neither it nor anything beneath it emits, and it is listed once in the report's `ignored[]`
+- A `kinds` mapping value `null` skips the record: neither it nor anything beneath it emits or is refused, and it is listed once in the report's `ignored[]`
   with `record` (its id) and `reason: "kind mapping null (<kind pointer> = <value>)"`. An unmapped value is still
   `ys/unknown-kind`.
 

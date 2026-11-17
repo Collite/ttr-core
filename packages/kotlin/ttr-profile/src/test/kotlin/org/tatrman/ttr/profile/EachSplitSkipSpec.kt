@@ -244,6 +244,36 @@ class EachSplitSkipSpec :
         }
 
         test(
+            "kinds null-skip: a refused descendant beneath a skipped node raises nothing, in either op order (review-338 B1)",
+        ) {
+            val skip = "- {op: kinds, at: /groups, kind: /status, mapping: {Draft: null}}\n"
+            val pkg = "- {op: package, mapping: {}, default: demo}\n"
+            // No string id (a sequence element) and an unmapped kind: both are refusals discovery would raise.
+            val cases =
+                listOf(
+                    "groups:\n  G:\n    status: Draft\n    entities:\n      - {}\n" to
+                        "- {op: kinds, at: /groups/G/entities, mapping: {entity: entity}}\n",
+                    "groups:\n  G:\n    status: Draft\n    entities:\n      E: {k: y}\n" to
+                        "- {op: kinds, at: /groups/G/entities, kind: /k, mapping: {x: entity}}\n",
+                )
+            cases.forEach { (tree, nested) ->
+                listOf(skip + nested, nested + skip).forEach { kinds ->
+                    val result = runOps(tree, pkg + kinds)
+                    result.documents shouldBe emptyList()
+                    result.sources shouldBe emptyList()
+                    result.ignored.map { it.location.path } shouldBe listOf("/groups/G")
+                }
+            }
+            // Control: the same descendants without the skip are still refused.
+            cases.zip(listOf("ys/record-id-missing", "ys/unknown-kind")).forEach { (case, code) ->
+                val (tree, nested) = case
+                shouldThrow<ProfileException> {
+                    runOps(tree, pkg + nested)
+                }.code shouldBe code
+            }
+        }
+
+        test(
             "schema: a profile using each, split and a null kind loads strictly; each without at is ys/profile-invalid, located",
         ) {
             recordProfile(

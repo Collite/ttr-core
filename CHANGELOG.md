@@ -15,7 +15,7 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - `values` takes a `split: "<separator>"` operand instead of `mapping`/`default`: a string → its trimmed non-empty
   parts. The separator is matched without surrounding whitespace, and an empty or blank one splits on whitespace runs. A
   non-string raises the new `ys/split-not-a-string`.
-- A `kinds` mapping value `null` skips the record (no emission, no error), and nothing beneath it is discovered. The record is listed once in `ignored[]`
+- A `kinds` mapping value `null` skips the record (no emission, no error), and nothing beneath it is discovered or refused. The record is listed once in `ignored[]`
   with the new optional `record` field (its id) and `reason: "kind mapping null (<pointer> = <value>)"`. `Ignored`
   gains `record: String?`. Reports without a skip are byte-identical.
 - `profile.schema.json`: the `each` op, the `eachTemplate` definition, `split`, and `null` as a `kinds` mapping value.
