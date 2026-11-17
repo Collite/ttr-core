@@ -8,7 +8,7 @@ import org.tatrman.ttr.metadata.LoadReportIssue
 import org.tatrman.ttr.metadata.LoadResult
 import org.tatrman.ttr.metadata.MetadataLoader
 import org.tatrman.ttr.metadata.PackageLayout
-import org.tatrman.ttr.metadata.cli.MetadataLoadCli
+import org.tatrman.ttr.metadata.PackagesManifest
 import org.tatrman.ttr.metadata.source.BuiltinStockSource
 import org.tatrman.ttr.metadata.source.FileBasedSource
 import org.tatrman.ttr.metadata.source.LocalFsStorage
@@ -20,8 +20,9 @@ import java.nio.file.Path
  * declares (`models/` and `[ttrp] extra-model-roots`, a missing one skipped) is one file source; the built-in stock
  * roles load ahead of them (`roles: [fact]` resolves as it does in Metadata); the automation stdlib is the
  * reconciler's own injection. The verdict is the [LoadReport] under the manifest's `[packages].layout`, read by
- * [MetadataLoadCli.readManifest] — so a hartland-shaped repository (`model/er/x.ttrm` declaring `package hartland`
- * under `layout = "off"`) loads, and `strict` still refuses the mismatch.
+ * [PackagesManifest.read] (the reading the ttr-metadata CLI uses) — so a hartland-shaped repository
+ * (`model/er/x.ttrm` declaring `package hartland` under `layout = "off"`) loads, and `strict` still refuses the
+ * mismatch.
  */
 object ProjectModel {
     /** The source id of root [index]: `ttrp` for the first, `ttrp-<i>` after it (the ids `ModelRepo` always used). */
@@ -37,7 +38,7 @@ object ProjectModel {
     fun layout(manifest: TtrpManifest): Pair<PackageLayout, List<LoadReportIssue>> {
         val file = manifest.manifestDir.resolve("modeler.toml")
         return if (Files.isRegularFile(file)) {
-            MetadataLoadCli.readManifest(file)
+            PackagesManifest.read(file)
         } else {
             PackageLayout.Flexible to
                 emptyList()

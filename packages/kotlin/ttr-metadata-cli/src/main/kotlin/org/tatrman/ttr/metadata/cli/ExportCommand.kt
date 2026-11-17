@@ -10,6 +10,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream
 import org.tatrman.ttr.metadata.LoadOptions
 import org.tatrman.ttr.metadata.MetadataLoader
+import org.tatrman.ttr.metadata.PackagesManifest
 import org.tatrman.ttr.metadata.export.*
 import org.tatrman.ttr.metadata.source.BuiltinStockSource
 import org.tatrman.ttr.metadata.source.FileBasedSource
@@ -78,7 +79,7 @@ class ExportCommand(
             val checkout = Path.of(root).toAbsolutePath().normalize()
             require(Files.isRegularFile(checkout.resolve("modeler.toml"))) { "no modeler.toml under $checkout" }
             require(Files.isDirectory(checkout.resolve("model"))) { "no model/ under $checkout" }
-            val (layout, manifestIssues) = MetadataLoadCli.readManifest(checkout.resolve("modeler.toml"))
+            val (layout, manifestIssues) = PackagesManifest.read(checkout.resolve("modeler.toml"))
             require(
                 manifestIssues.none {
                     it.severity == org.tatrman.ttr.metadata.LoadIssue.Severity.ERROR
