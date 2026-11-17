@@ -3,6 +3,8 @@ import { parseFile } from './walker.js';
 import type { ParseResult } from './ast.js';
 
 export { parseString, parseFile } from './walker.js';
+export { parseYamlDocument } from './yaml/index.js';
+export type { YamlParseResult } from './yaml/index.js';
 export { DiagnosticCode } from './diagnostics.js';
 export { TAG_REGISTRY, resolveTag, EXPRESSION_TAG_REGISTRY, resolveExpressionTag } from './tag-registry.js';
 export { conceptKeyword, conceptProperty, conceptRef, conceptEntry, embeddedBlockLocation } from './concept.js';

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { expressionTagDiagnostic, unknownTagDiagnostic, queryTagDiagnostics } from './tag-diagnostics.js';
 import { decodeTtrString, stringSourcePosition } from './strings.js';
 import {
   CharStream,
@@ -1226,20 +1227,9 @@ function walkExpressionBlock(token: TerminalNode, key: string, file: string, err
       inner = inner.slice(opener[0].length);
       innerStart += opener[0].length;
       form = 'tagged';
-    } else if (tag && resolveTag(tag)) {
-      errors.push({
-        code: DiagnosticCode.LanguageTagMismatch,
-        message: `'${key}:' holds a TTR-P expression — the '${tag}' tag names another language (use """pl or no tag)`,
-        severity: 'error',
-        source: tagSource,
-      });
     } else if (tag) {
-      errors.push({
-        code: DiagnosticCode.UnknownLanguageTag,
-        message: `'${tag}' on the opening line of '${key}:' reads as a language tag; the block is kept as plain text (start the expression on the next line, or tag it """pl)`,
-        severity: 'warning',
-        source: tagSource,
-      });
+      const diagnostic = expressionTagDiagnostic(tag, key, tagSource);
+      if (diagnostic) errors.push(diagnostic);
     }
   }
 
@@ -2170,12 +2160,7 @@ function walkEmbeddedBlock(
 
   const entry = resolveTag(tag);
   if (!entry) {
-    errors.push({
-      code: DiagnosticCode.UnknownLanguageTag,
-      message: `Unknown embedded-language tag '${tag}'`,
-      severity: 'warning',
-      source: tagSource,
-    });
+    errors.push(unknownTagDiagnostic(tag, tagSource));
     // Stored as raw text (DESIGN §5) — keep the extracted value, drop analysis.
     return { kind: 'tripleString', value, source: loc };
   }
@@ -3086,22 +3071,7 @@ function walkQueryDef(
 
   // `language:` is inferred from the tag and soft-deprecated when a tagged block
   // is present (DESIGN §6); a value disagreeing with the tag is an error.
-  if (sourceText?.kind === 'taggedBlock' && language !== undefined) {
-    if (language !== sourceText.language) {
-      errors.push({
-        code: DiagnosticCode.LanguageTagMismatch,
-        message: `'language: ${language}' disagrees with the block tag '${sourceText.tag}' (${sourceText.language})`,
-        severity: 'error',
-        source: sourceText.tagSource,
-      });
-    }
-    errors.push({
-      code: DiagnosticCode.DeprecatedLanguageProperty,
-      message: `'language' on query is deprecated; it is inferred from the '${sourceText.tag}' block tag`,
-      severity: 'warning',
-      source: sourceText.tagSource,
-    });
-  }
+  if (sourceText?.kind === 'taggedBlock') errors.push(...queryTagDiagnostics(language, sourceText));
 
   return { kind: 'query', name, source, description, descriptionLocalized, tags, language, parameters, sourceText, search, ...(skipSecurity !== undefined ? { skipSecurity } : {}) };
 }
