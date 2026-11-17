@@ -8,6 +8,7 @@ import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import org.tatrman.ttr.profile.Bytewise
 import org.tatrman.ttr.profile.ApplyResult
 
 /**

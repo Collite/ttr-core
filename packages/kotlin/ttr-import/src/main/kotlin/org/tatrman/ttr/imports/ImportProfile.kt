@@ -9,10 +9,14 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import org.tatrman.ttr.profile.LocatedOp
 import org.tatrman.ttr.profile.ProfileDefinition
+import org.tatrman.ttr.profile.ProfileException
 import org.tatrman.ttr.profile.ProfileReader
 import org.tatrman.ttr.profile.ProfileResolver
 import org.tatrman.ttr.profile.ProfileSpan
+import org.tatrman.ttr.yaml.CanonicalYamlException
 import org.tatrman.ttr.yaml.YamlData
+import org.tatrman.ttr.yaml.readBoundedYaml
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -40,10 +44,11 @@ class ImportProfile internal constructor(
     val identity: String get() = chain.last().let { "${it.name}/${it.major}" }
 
     /**
-     * The chain the engine applies: with [packageName], every `package` operation names that package ([withPackage]);
-     * with [overlay] (a YAML file `{<qname|sourceName>: {<property>: <value>}}`) applied after every
-     * profile's own overlay: a child profile that declares only the overlay, so the engine applies it as it applies any
-     * overlay and reports `overridden[]` and `xm/overlay-orphan` at the file's own positions.
+     * The chain the engine applies: with [packageName], one `package` operation naming that package ([withPackage]);
+     * with [overlay] (a YAML file `{<qname|sourceName>: {<property>: <value>}}`), a child profile that declares only that
+     * overlay, inline, so the engine applies it as any overlay and reports `overridden[]` and `xm/overlay-orphan` at the
+     * file's own positions. The user named the file, so no model root confines it (review-330 R3); a chain that declares
+     * an overlay of its own is refused ([refuseOverlay]).
      */
     internal fun chain(
         overlay: Path?,
@@ -51,28 +56,86 @@ class ImportProfile internal constructor(
     ): List<ProfileDefinition> {
         val chain = packageName?.let { withPackage(it) } ?: chain
         if (overlay == null) return chain
-        val file = overlay.toAbsolutePath().normalize()
-        if (!Files.isRegularFile(file)) throw ReaderInputException("no overlay file $overlay")
+        refuseOverlay(overlay)
         val leaf = chain.last()
-        val declaring = file.resolveSibling("--overlay").toString()
+        val label = overlay.toString()
+        val data =
+            try {
+                if (!Files.isRegularFile(overlay)) throw ReaderInputException("no overlay file $overlay")
+                YamlData.read(readBoundedYaml(overlay, "Overlay"), label)
+            } catch (e: IOException) {
+                throw ReaderInputException("cannot read overlay $overlay (${e.javaClass.simpleName} ${e.message})")
+            } catch (e: CanonicalYamlException) {
+                throw ProfileException(
+                    "ys/profile-invalid",
+                    ProfileSpan(label, e.line, e.column, e.line, e.column, e.keyPath),
+                    e.detail,
+                )
+            }
 
-        fun span(path: String) = ProfileSpan(declaring, 1, 1, 1, 1, path)
+        fun span(
+            path: String,
+            key: Boolean = false,
+        ) = data
+            .source(
+                path,
+                key,
+            ).let { ProfileSpan(it.file, it.line, it.column + 1, it.endLine, it.endColumn + 1, path) }
+        val locations = mutableMapOf("" to span(""), "/profile" to span(""), "/overlay" to span(""))
+        val keyLocations = mutableMapOf<String, ProfileSpan>()
+        data.value.forEach { (key, properties) ->
+            val keyPath = "/${pointer(key)}"
+            locations["/overlay$keyPath"] = span(keyPath)
+            keyLocations["/overlay$keyPath"] = span(keyPath, key = true)
+            (properties as? JsonObject)?.keys?.forEach { property ->
+                val path = "$keyPath/${pointer(property)}"
+                locations["/overlay$path"] = span(path)
+            }
+        }
         return chain +
             ProfileDefinition(
                 leaf.name,
                 leaf.major,
                 leaf.grammarRange,
                 null,
-                JsonPrimitive(file.fileName.toString()),
+                data.value,
                 false,
                 emptyList(),
-                mapOf("" to span(""), "/profile" to span("/profile"), "/overlay" to span("/overlay")),
+                locations,
+                keyLocations,
             )
     }
 
     /**
-     * `--package`: every `package` operation of the chain becomes `{op: package, mapping: {}, default: <name>}` at its own
-     * position, so every input lands in [name]; a chain without one gets it on its leaf.
+     * ✅R330-E: the generated header names one overlay, so `--overlay` and an overlay the chain declares (a path or an
+     * inline one) are not combined: a [ReaderInputException] naming both, checked before anything is written.
+     */
+    fun refuseOverlay(cli: Path?) {
+        if (cli == null) return
+        val declaring = chain.lastOrNull { it.overlay != null } ?: return
+        val declared =
+            when (val value = declaring.overlay) {
+                is JsonPrimitive ->
+                    sources[declaring]?.let {
+                        Path
+                            .of(it)
+                            .resolveSibling(value.content)
+                            .normalize()
+                            .toString()
+                    }
+                        ?: "${value.content} (in ${declaring.file})"
+                else -> "inline in ${declaring.file}"
+            }
+        throw ReaderInputException(
+            "--overlay $cli cannot be combined with the overlay $declared the profile declares " +
+                "(the generated header names one overlay)",
+        )
+    }
+
+    /**
+     * `--package`: every `package` operation of the chain is dropped, and the leaf gets one `{op: package, mapping: {},
+     * default: <name>}` at its own position, so every input lands in [name] whatever file scopes the profile's own
+     * operations had (review-330 R1).
      */
     private fun withPackage(name: String): List<ProfileDefinition> {
         val op =
@@ -83,14 +146,10 @@ class ImportProfile internal constructor(
             }
 
         fun isPackage(it: LocatedOp) = (it.value["op"] as? JsonPrimitive)?.contentOrNull == "package"
-        if (chain.none { profile -> profile.operations.any(::isPackage) }) {
-            val leaf = chain.last()
-            return chain.dropLast(1) +
-                leaf.copy(operations = leaf.operations + LocatedOp(op, leaf.locations.getValue(""), emptyMap()))
-        }
-        return chain.map { profile ->
-            profile.copy(operations = profile.operations.map { if (isPackage(it)) it.copy(value = op) else it })
-        }
+        val stripped = chain.map { profile -> profile.copy(operations = profile.operations.filterNot(::isPackage)) }
+        val leaf = stripped.last()
+        return stripped.dropLast(1) +
+            leaf.copy(operations = leaf.operations + LocatedOp(op, leaf.locations.getValue(""), emptyMap()))
     }
 
     /** The overlay a header names: [cli] when given, else the nearest file profile's path overlay or inline overlay. */
@@ -119,27 +178,45 @@ class ImportProfile internal constructor(
                 throw ReaderInputException("--profile $reference is neither a shipped profile nor a file")
             }
             val directory = file.parent
-            val chain = ProfileResolver(directory, emptyMap()).resolve("./${file.fileName}", file)
-            // ProfileResolver labels each profile with its real path; read the reader keys from those files.
-            val sources = chain.associateWith { it.file }
-            return ImportProfile(chain, options(chain) { Files.readString(Path.of(sources.getValue(it))) }, sources)
+            // ✅R330-B: a file profile may extend a shipped one (after any catalog entry of that name).
+            val chain = ProfileResolver(directory, emptyMap(), ::shippedText).resolve("./${file.fileName}", file)
+            // ProfileResolver labels each file profile with its real path, a shipped one `<shipped>/profiles/<id>.yaml`.
+            val sources =
+                chain
+                    .filterNot {
+                        it.file.startsWith(
+                            ProfileResolver.SHIPPED_LABEL,
+                        )
+                    }.associateWith { it.file }
+            return ImportProfile(
+                chain,
+                options(chain) { profile ->
+                    sources[profile]?.let { Files.readString(Path.of(it)) }
+                        ?: requireNotNull(shippedText("${profile.name}/${profile.major}"))
+                },
+                sources,
+            )
         }
 
         /** A profile ttr-core ships, by identity; null when it ships none of that name. */
         fun shipped(identity: String): ImportProfile? {
-            if (!Regex("^[a-z0-9][a-z0-9-]*/[0-9]+$").matches(identity)) return null
+            val text = shippedText(identity) ?: return null
             val resource = "$SHIPPED/$identity.yaml"
-            val text =
-                ImportProfile::class.java
-                    .getResourceAsStream(resource)
-                    ?.bufferedReader()
-                    ?.use { it.readText() } ?: return null
-            val profile = ProfileReader.read(text, "<shipped>$resource")
+            val profile = ProfileReader.read(text, ProfileResolver.shippedLabel(identity))
             check(
                 "${profile.name}/${profile.major}" == identity,
             ) { "$resource declares ${profile.name}/${profile.major}" }
             check(profile.extends == null) { "a shipped profile extends nothing: $resource" }
             return ImportProfile(listOf(profile), options(listOf(profile)) { text }, emptyMap())
+        }
+
+        /** The text of a profile ttr-core ships, by identity; null when it ships none of that name. */
+        private fun shippedText(identity: String): String? {
+            if (!Regex("^[a-z0-9][a-z0-9-]*/[0-9]+$").matches(identity)) return null
+            return ImportProfile::class.java
+                .getResourceAsStream("$SHIPPED/$identity.yaml")
+                ?.bufferedReader()
+                ?.use { it.readText() }
         }
 
         private fun options(
@@ -155,3 +232,5 @@ class ImportProfile internal constructor(
             }
     }
 }
+
+private fun pointer(key: String) = key.replace("~", "~0").replace("/", "~1")

@@ -157,7 +157,10 @@ class ImportSchemaCommand(
     private val profile by option("--profile", help = "A shipped profile (om-tables/1) or a profile file").required()
     private val out by option("--out", help = "Output directory").required()
     private val root by option("--root", help = "The model root whose sidecars links and overlays read")
-    private val overlay by option("--overlay", help = "An authored overlay applied after the profile's own")
+    private val overlay by option(
+        "--overlay",
+        help = "An authored overlay {<qname|sourceName>: {<property>: <value>}}; refused when the profile declares one",
+    )
     private val packageName by option("--package", help = "The package every input lands in (replaces the profile's)")
     private val dryRun by option("--dry-run", help = "Write nothing; print each file's diff against --out").flag()
     private val format by option("--format", help = "text (the PR-body Markdown) or json (the report)")

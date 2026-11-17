@@ -2,8 +2,11 @@
 package org.tatrman.ttr.imports
 
 import org.tatrman.ttr.profile.ForeignTree
-import java.nio.charset.CharacterCodingException
-import java.nio.charset.CodingErrorAction
+import org.tatrman.ttr.profile.ProfileException
+import org.tatrman.ttr.profile.ProfileSpan
+import org.tatrman.ttr.yaml.CanonicalYamlException
+import org.tatrman.ttr.yaml.readBoundedYaml
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -20,7 +23,7 @@ interface FrontEnd {
     fun parse(files: List<Path>): List<ForeignTree>
 }
 
-/** A reader's input problem the caller should show as a usage error (exit 2): no file, not UTF-8, a name twice. */
+/** A reader's input problem the caller should show as a usage error (exit 2): no file, unreadable, a name twice. */
 class ReaderInputException(
     message: String,
 ) : IllegalArgumentException(message)
@@ -40,19 +43,25 @@ object JsonFrontEnd : FrontEnd {
         return files.zip(names).map { (file, name) -> ForeignTree.read(text(file), name, name) }
     }
 
-    /** The file as strict UTF-8, a leading byte-order mark dropped. */
+    /**
+     * The file as strict UTF-8, a leading byte-order mark dropped: read through ttr-yaml's bounded reader, so an input
+     * over the reader budget is refused before it is decoded, and malformed UTF-8 is a located error at its line and
+     * column (labelled by the file name, as the tree is).
+     */
     internal fun text(file: Path): String {
         if (!Files.isRegularFile(file)) throw ReaderInputException("no input file $file")
-        val decoder =
-            Charsets.UTF_8
-                .newDecoder()
-                .onMalformedInput(CodingErrorAction.REPORT)
-                .onUnmappableCharacter(CodingErrorAction.REPORT)
         val text =
             try {
-                decoder.decode(java.nio.ByteBuffer.wrap(Files.readAllBytes(file))).toString()
-            } catch (e: CharacterCodingException) {
-                throw ReaderInputException("input $file is not UTF-8")
+                readBoundedYaml(file, "Input")
+            } catch (e: IOException) {
+                throw ReaderInputException("cannot read input $file (${e.javaClass.simpleName} ${e.message})")
+            } catch (e: CanonicalYamlException) {
+                val name = file.fileName.toString()
+                throw ProfileException(
+                    "ys/profile-invalid",
+                    ProfileSpan(name, e.line, e.column, e.line, e.column, ""),
+                    e.detail,
+                )
             }
         return text.removePrefix("\uFEFF")
     }

@@ -19,9 +19,11 @@ import java.nio.file.Path
  *
  * Writes `<out>/<package>/<model>.ttrm` (each with the generated header), `<out>/<package>.sources.json` and
  * `<out>/report.json`; prints the report as a Markdown PR-body section (`--format json`: the report JSON). `--dry-run`
- * writes nothing and prints, per file, its unified diff against what is under `--out`. `--out` follows `profile apply`'s
+ * writes nothing and prints, per file, its unified diff against what is under `--out` (with `--format json` on stderr,
+ * so stdout stays one JSON value). `--out` follows `profile apply`'s
  * rules (✅R277-D): made real once, never written through a link below it, removed again when nothing is written.
- * Exit 0 generated, 1 a profile or engine error (located, on stderr), 2 usage.
+ * Exit 0 generated, 1 a profile or engine error (located, on stderr), 2 usage (an unwritable `--out` included; an
+ * `--out` this run created is removed again).
  */
 object ImportSchemaCli {
     fun run(
@@ -43,7 +45,7 @@ object ImportSchemaCli {
             }
         val resolved =
             try {
-                ImportProfile.resolve(profile)
+                ImportProfile.resolve(profile).also { it.refuseOverlay(overlay) }
             } catch (e: ReaderInputException) {
                 return usage(e.message)
             } catch (e: ProfileException) {
@@ -82,17 +84,30 @@ object ImportSchemaCli {
             }
         val files = generated.outputs()
         val report = if (json) generated.report.json() else generated.report.markdown()
-        if (output == null) return CliOutcome(0, diff(out, files) + report, "")
+        if (output == null) {
+            // review-330 R4: with --format json stdout is the report JSON alone; the diff goes to stderr.
+            return if (json) CliOutcome(0, report, diff(out, files)) else CliOutcome(0, diff(out, files) + report, "")
+        }
         files.keys.forEach { path ->
             LintCli.link(output.real, path)?.let { at ->
                 output.discard()
                 return usage("--out $out contains a symbolic link at $at; import-schema does not write through links")
             }
         }
-        files.forEach { (path, text) ->
-            val file = output.real.resolve(path)
-            Files.createDirectories(file.parent)
-            Files.writeString(file, text)
+        // Every directory first, so a path that cannot be one (a file in its place) fails before any file is written.
+        var writing = ""
+        try {
+            files.keys.forEach { path ->
+                writing = path
+                Files.createDirectories(output.real.resolve(path).parent)
+            }
+            files.forEach { (path, text) ->
+                writing = path
+                Files.writeString(output.real.resolve(path), text)
+            }
+        } catch (e: IOException) {
+            output.discard()
+            return usage("--out $out: cannot write $writing (${e.javaClass.simpleName} ${e.message})")
         }
         return CliOutcome(0, report, "ttr-metadata: wrote ${files.size} files to $out\n")
     }

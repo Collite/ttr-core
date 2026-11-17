@@ -36,10 +36,16 @@ internal fun confinedFile(
  * Declaring files are absolute, or relative to the resolver's root; the label also bases relative references.
  * A chain of more than 32 distinct profiles is refused as too deep, even if it would later cycle;
  * a cycle within 32 profiles is refused as a cycle.
+ *
+ * [shipped] (✅R330-B) gives the text of a profile the caller ships by identity (`om-tables/1`), or null: a bare
+ * identity resolves to a catalog entry first (explicit project configuration), then a shipped profile, else it is
+ * `ys/profile-not-found`. A shipped profile is labelled `<shipped>/profiles/<identity>.yaml`; its `extends` names a
+ * shipped profile only.
  */
 class ProfileResolver(
     root: Path,
     catalog: Map<String, Path>,
+    private val shipped: (String) -> String? = { null },
 ) {
     private val root = root.toRealPath()
     private val catalog = catalog.toMap()
@@ -70,33 +76,45 @@ class ProfileResolver(
         location: ProfileSpan,
     ): List<ProfileDefinition> {
         val chain = mutableListOf<ProfileDefinition>()
-        val visiting = mutableSetOf<Path>()
+        val visiting = mutableSetOf<Any>()
 
         fun visit(
             ref: String,
             from: Path,
             at: ProfileSpan,
             depth: Int,
+            fromShipped: Boolean,
         ) {
             val bundled = isBundled(ref)
-            val path = if (bundled) null else confined(ref, from, at)
-            if (path != null && !visiting.add(path)) {
+            val shippedText = if (bundled) null else shippedProfile(ref, at, fromShipped)
+            val path = if (bundled || shippedText != null) null else confined(ref, from, at)
+            if (!visiting.add(path ?: "$SHIPPED_LABEL$ref")) {
                 throw ProfileException("ys/profile-cycle", at, "Profile cycle through $ref")
             }
             if (depth > 32) throw ProfileException("ys/profile-invalid", at, "Profile chain exceeds 32 profiles")
             val profile =
-                if (bundled) {
-                    canonicalProfile
-                } else {
-                    val source =
-                        try {
-                            profileRead { readProfileYaml(path!!) }
-                        } catch (e: IOException) {
-                            throw ProfileException("ys/profile-not-found", at, "Cannot read profile $ref: ${e.message}")
-                        }
-                    ProfileReader.read(source, path.toString())
+                when {
+                    bundled -> canonicalProfile
+                    shippedText != null -> ProfileReader.read(shippedText, shippedLabel(ref))
+                    else -> {
+                        val source =
+                            try {
+                                profileRead { readProfileYaml(path!!) }
+                            } catch (e: IOException) {
+                                throw ProfileException(
+                                    "ys/profile-not-found",
+                                    at,
+                                    "Cannot read profile $ref: ${e.message}",
+                                )
+                            }
+                        ProfileReader.read(source, path.toString())
+                    }
                 }
-            if (!bundled && ref in catalog) checkCatalogIdentity(ref, profile)
+            if (shippedText != null) {
+                checkIdentity(ref, profile, "Shipped profile")
+            } else if (!bundled && ref in catalog) {
+                checkIdentity(ref, profile, "Catalog entry")
+            }
             checkRange(profile.grammarRange, profile.locations.getValue("/grammar"))
             profile.extends?.let { parent ->
                 visit(
@@ -104,12 +122,34 @@ class ProfileResolver(
                     path ?: from,
                     profile.locations.getValue("/extends"),
                     depth + 1,
+                    shippedText != null,
                 )
             }
             chain += profile
         }
-        visit(reference, declaringFile, location, 1)
+        visit(reference, declaringFile, location, 1, fromShipped = false)
         return chain.toList()
+    }
+
+    /**
+     * The shipped text of [ref] when it is a bare identity no catalog entry names; under a shipped profile it must be one
+     * (null otherwise: a path or a catalog entry).
+     */
+    private fun shippedProfile(
+        ref: String,
+        at: ProfileSpan,
+        fromShipped: Boolean,
+    ): String? {
+        val identity = versionedReference.matches(ref) && !ref.startsWith(".") && !ref.startsWith("/")
+        if (fromShipped) {
+            return (if (identity) shipped(ref) else null)
+                ?: throw ProfileException(
+                    "ys/profile-not-found",
+                    at,
+                    "A shipped profile extends only shipped profiles; none is named $ref",
+                )
+        }
+        return if (identity && ref !in catalog) shipped(ref) else null
     }
 
     private fun confined(
@@ -129,9 +169,10 @@ class ProfileResolver(
             }
         }
 
-    private fun checkCatalogIdentity(
+    private fun checkIdentity(
         key: String,
         profile: ProfileDefinition,
+        what: String,
     ) {
         val versioned = versionedReference.matches(key)
         val matches =
@@ -145,13 +186,18 @@ class ProfileResolver(
             throw ProfileException(
                 "ys/profile-invalid",
                 profile.locations.getValue("/profile"),
-                "Catalog entry $key loads ${profile.name}/${profile.major}",
+                "$what $key loads ${profile.name}/${profile.major}",
             )
         }
     }
 
     companion object {
         private val versionedReference = Regex("^.+/[0-9]+$")
+
+        /** The label prefix of a shipped profile's positions: `<shipped>/profiles/<identity>.yaml`. */
+        const val SHIPPED_LABEL = "<shipped>/profiles/"
+
+        fun shippedLabel(identity: String) = "$SHIPPED_LABEL$identity.yaml"
 
         /** `canonical` and `canonical/1` name the bundled identity profile, whatever a catalog says. */
         fun isBundled(reference: String): Boolean =

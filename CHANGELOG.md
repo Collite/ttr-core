@@ -19,7 +19,12 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   reserved for S5.5. The JDBC `import-schema` in `ttr-import-schema` is unchanged.
 - `profile.schema.json` accepts two top-level profile keys that only ttr-import reads: `skeleton` (every generated `cn`
   definition becomes `abstract: true`, D-14) and `sourceName` (a record-relative pointer whose string becomes the
-  sidecar's `sourceName`). The engine and its ten operations are unchanged.
+  sidecar's `sourceName`). The ten operations are unchanged.
+- `ttr-profile` (review-330): `ProfileEngine.apply` takes an optional `sourceName` pointer (an API argument, not an
+  operation), so a run's records carry it for `by: sourceName` links and overlay keys on the first import
+  (✅R330-A). `ProfileResolver` takes an optional provider of shipped profiles: a bare identity resolves to a catalog
+  entry first, then a shipped profile, so a user profile can `extends: om-tables/1` (✅R330-B). `Bytewise` is public.
+- `ttr-yaml`: `readBoundedYaml(path, what)`, the bounded strict-UTF-8 reader `readProfileYaml` now delegates to.
 
 ### Fixed — REL_NODE re-entry keeps an author's parameter cast; decode failures say what failed (translator 0.14.3, ttr-core#407)
 

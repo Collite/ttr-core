@@ -167,4 +167,125 @@ class ImportSchemaCommandSpec :
             unknown.stderr shouldContain "ys/unknown-key /data/0/retention"
             empty.resolve("model").exists() shouldBe false
         }
+
+        fun importArgs(
+            root: Path,
+            out: Path,
+            vararg extra: String,
+        ) = runMetadataCommand(
+            listOf(
+                "import-schema",
+                "--from",
+                "file:${root.resolve("sources/shop-tables.json")}",
+                "--profile",
+                "om-tables/1",
+                "--out",
+                "$out",
+            ) + extra,
+        )
+
+        test("R3: --root does not confine the --overlay the user names; its positions name the overlay file") {
+            val root = workspace()
+            val model = root.resolve("model")
+            import(root).exitCode shouldBe 0
+            val overlay = root.resolve("src/o.yaml").also { it.parent.createDirectories() }
+            overlay.writeText("demo_pg.shop.public.orders:\n  description: Curated orders.\n")
+            importArgs(root, model, "--root", "$model", "--overlay", "$overlay").let {
+                withClue(it.stderr) { it.exitCode shouldBe 0 }
+                model.resolve("om/db.ttrm").readText() shouldContain
+                    "def table orders { description: \"Curated orders.\""
+            }
+            val orphan = root.resolve("src/orphan.yaml")
+            orphan.writeText("# curated\nom.db.dbo.nothing:\n  description: x\n")
+            importArgs(root, model, "--root", "$model", "--overlay", "$orphan").let {
+                it.exitCode shouldBe 1
+                it.stderr shouldStartWith "$orphan:2:1: error xm/overlay-orphan /om.db.dbo.nothing:"
+            }
+
+            // A file profile's own path overlay keeps the root confinement.
+            val profile = root.resolve("profiles/own.yaml").also { it.parent.createDirectories() }
+            profile.writeText(
+                fixture
+                    .resolve("../../../../profiles/om-tables/1.yaml")
+                    .normalize()
+                    .readText()
+                    .replace("profile: om-tables/1\n", "profile: own/1\noverlay: ../src/o.yaml\n"),
+            )
+            runMetadataCommand(
+                listOf(
+                    "import-schema",
+                    "--from",
+                    "file:${root.resolve("sources/shop-tables.json")}",
+                    "--profile",
+                    "$profile",
+                    "--out",
+                    "$model",
+                    "--root",
+                    "$model",
+                ),
+            ).let {
+                it.exitCode shouldBe 1
+                it.stderr shouldContain "error ys/profile-not-found /overlay: Overlay is outside root"
+            }
+        }
+
+        test("R4: --dry-run --format json keeps stdout one JSON value; the diff goes to stderr") {
+            val root = workspace()
+            import(root).exitCode shouldBe 0
+            val source = root.resolve("sources/shop-tables.json")
+            source.writeText(source.readText().replace("One checkout: the order header.", "One checkout (header)."))
+            val dry = import(root, "--dry-run", "--format", "json")
+            dry.exitCode shouldBe 0
+            Json.parseToJsonElement(dry.stdout).jsonObject.keys shouldBe
+                setOf("frontEnd", "profile", "packages", "ignored", "overridden", "warnings")
+            dry.stderr shouldContain "+++ b/om/db.ttrm\n"
+            dry.stderr shouldContain "+def table orders { description: \"One checkout (header).\",\n"
+        }
+
+        test("R6 (✅R330-E): --overlay with a profile that declares an overlay is a usage error naming both") {
+            val root = workspace()
+            val profile = root.resolve("profiles/curated.yaml").also { it.parent.createDirectories() }
+            root.resolve("profiles/curated-overlay.yaml").writeText("om.db.dbo.orders:\n  description: Curated.\n")
+            profile.writeText(
+                "profile: curated/1\ngrammar: '>=0.22 <1.0'\nextends: om-tables/1\noverlay: ./curated-overlay.yaml\noperations: []\n",
+            )
+            val cli = root.resolve("oq.yaml").also { it.writeText("om.db.dbo.customers:\n  description: CLI.\n") }
+            val out = root.resolve("fresh")
+
+            fun run(vararg extra: String) =
+                runMetadataCommand(
+                    listOf(
+                        "import-schema",
+                        "--from",
+                        "file:${root.resolve("sources/shop-tables.json")}",
+                        "--profile",
+                        "$profile",
+                        "--out",
+                        "$out",
+                    ) + extra,
+                )
+            run("--overlay", "$cli").let {
+                it.exitCode shouldBe 2
+                it.stderr shouldContain "--overlay $cli cannot be combined with the overlay"
+                it.stderr shouldContain "${root.toRealPath().resolve("profiles/curated-overlay.yaml")}"
+            }
+            out.exists() shouldBe false
+            // The profile's own overlay alone, and --overlay with om-tables/1 (none declared), both work.
+            run().exitCode shouldBe 0
+            out.resolve("om/db.ttrm").readText() shouldContain "def table orders { description: \"Curated.\""
+            import(root, "--overlay", "$cli").exitCode shouldBe 0
+        }
+
+        test("R7: an unwritable --out is a usage error and writes nothing (directories are made before any file)") {
+            val root = workspace()
+            val out = root.resolve("o9")
+            out.resolve("om").also { it.parent.createDirectories() }.writeText("a file where a directory goes")
+            importArgs(root, out).let {
+                it.exitCode shouldBe 2
+                it.stderr shouldStartWith
+                    "ttr-metadata: --out $out: cannot write om/db.ttrm (FileAlreadyExistsException"
+            }
+            out.resolve("om.sources.json").exists() shouldBe false
+            out.resolve("report.json").exists() shouldBe false
+        }
     })

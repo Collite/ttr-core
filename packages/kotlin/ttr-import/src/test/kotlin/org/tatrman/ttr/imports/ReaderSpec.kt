@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.imports
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainExactly
@@ -19,6 +20,7 @@ import org.tatrman.ttr.metadata.model.DbSchema
 import org.tatrman.ttr.metadata.source.BuiltinStockSource
 import org.tatrman.ttr.metadata.source.FileBasedSource
 import org.tatrman.ttr.metadata.source.LocalFsStorage
+import org.tatrman.ttr.profile.ProfileException
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
@@ -224,5 +226,113 @@ class ReaderSpec :
             markdown shouldContain
                 "| `shop.db.dbo.orders` | description | `\"One checkout: the order header.\"` | " +
                 "`\"The order header (curated).\"` |"
+        }
+
+        val shipped = Path.of("../../../profiles/om-tables/1.yaml").toAbsolutePath().normalize()
+
+        fun runWith(
+            profile: ImportProfile,
+            root: Path,
+            vararg inputs: Path = arrayOf(root.resolve("sources/shop-tables.json")),
+            overlay: Path? = null,
+            packageName: String? = null,
+        ) = Reader.run(
+            JsonFrontEnd,
+            profile,
+            ReaderRequest(
+                inputs.toList(),
+                root.resolve("model"),
+                "0.0.1-LOCAL",
+                overlay = overlay,
+                packageName = packageName,
+            ),
+        )
+
+        test("R1: --package replaces every file-scoped package operation, in the profile or its parent") {
+            val root = workspace()
+            val scoped =
+                shipped.readText().replace(
+                    "  - {op: package, mapping: {}, default: om}\n",
+                    "  - {op: package, files: ['a*.json'], mapping: {}, default: pa}\n" +
+                        "  - {op: package, files: ['shop*.json'], mapping: {}, default: pb}\n",
+                )
+            val parent =
+                root.resolve("parent.yaml").also {
+                    it.writeText(scoped.replace("profile: om-tables/1", "profile: scoped/1"))
+                }
+            ImportProfile.resolve("$parent").let { profile ->
+                runWith(profile, root).files.keys shouldBe setOf("pb/db.ttrm")
+                runWith(profile, root, packageName = "shop").let {
+                    it.files.keys shouldBe setOf("shop/db.ttrm")
+                    it.sidecars.keys shouldBe setOf("shop.sources.json")
+                }
+            }
+            val child = root.resolve("child.yaml")
+            child.writeText("profile: child/1\ngrammar: '>=0.22 <1.0'\nextends: ./parent.yaml\noperations: []\n")
+            runWith(ImportProfile.resolve("$child"), root, packageName = "shop").files.keys shouldBe
+                setOf("shop/db.ttrm")
+        }
+
+        test("R2 (✅R330-A): an overlay keyed by an OM FQN applies on the first import, with no model root") {
+            val root = workspace()
+            val overlay = root.resolve("fqn.yaml")
+            overlay.writeText("demo_pg.shop.public.customers:\n  description: Curated customers.\n")
+            val generated = runWith(requireNotNull(ImportProfile.shipped("om-tables/1")), root, overlay = overlay)
+            generated.files.getValue("om/db.ttrm") shouldContain
+                "def table customers { description: \"Curated customers.\""
+            generated.report.overridden.map { it.qname to it.property } shouldBe
+                listOf("om.db.dbo.customers" to "description")
+        }
+
+        test("R5 (✅R330-B): a user profile extends the shipped om-tables/1 and inherits its sourceName") {
+            val root = workspace()
+            val source = root.resolve("sources/shop-tables.json")
+            source.writeText(
+                source.readText().replace(
+                    "\"tableType\": \"Regular\",",
+                    "\"tableType\": \"Regular\", \"sourceHash\": \"x\",",
+                ),
+            )
+            val child = root.resolve("mine.yaml")
+            child.writeText(
+                "profile: mine/1\ngrammar: '>=0.22 <1.0'\nextends: om-tables/1\noperations:\n" +
+                    "  - {op: ignore, in: table, at: /sourceHash, reason: OM bookkeeping}\n",
+            )
+            val profile = ImportProfile.resolve("$child")
+            profile.identity shouldBe "mine/1"
+            profile.options shouldBe ReaderOptions(sourceName = "/fullyQualifiedName")
+            val generated = runWith(profile, root)
+            requireNotNull(GeneratedHeader.read(generated.files.getValue("om/db.ttrm"))).profile shouldBe "mine/1"
+            generated.sidecars.getValue("om.sources.json") shouldContain "\"sourceName\":\"demo_pg.shop.public.orders\""
+        }
+
+        test("R9, R10: one input only; an input over the reader budget is refused before it is decoded") {
+            val root = workspace()
+            val other = root.resolve("sources/other.json").also { it.writeText("{\"data\": []}") }
+            val profile = requireNotNull(ImportProfile.shipped("om-tables/1"))
+            shouldThrow<ReaderInputException> {
+                runWith(profile, root, root.resolve("sources/shop-tables.json"), other)
+            }.message shouldContain "takes one input file; 2 given"
+
+            val big = root.resolve("sources/big.json")
+            Files.newOutputStream(big).use { out ->
+                out.write("{\"data\": [], \"pad\": \"".toByteArray())
+                val chunk = ByteArray(1 shl 20) { 'x'.code.toByte() }
+                repeat(25) { out.write(chunk) }
+                out.write("\"}".toByteArray())
+            }
+            shouldThrow<ProfileException> { runWith(profile, root, big) }.let {
+                it.location.file shouldBe "big.json"
+                it.detail shouldContain "Input exceeds"
+            }
+            val bad =
+                root.resolve("sources/bad.json").also {
+                    Files.write(it, "{\"data\": [],\n \"x\": \"\u00ff\"}".toByteArray(Charsets.ISO_8859_1))
+                }
+            shouldThrow<ProfileException> { runWith(profile, root, bad) }.let {
+                it.location.file shouldBe "bad.json"
+                it.location.line shouldBe 2
+                it.detail shouldContain "Malformed UTF-8"
+            }
         }
     })

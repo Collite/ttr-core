@@ -593,14 +593,24 @@ internal fun strictUtf8Decoder(): java.nio.charset.CharsetDecoder =
         .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
 
 /** Bounded, strict UTF-8 input for profiles; I/O failures remain the caller's responsibility. */
-fun readProfileYaml(path: java.nio.file.Path): String {
+fun readProfileYaml(path: java.nio.file.Path): String = readBoundedYaml(path, "Profile")
+
+/**
+ * Bounded (4 × [MAX_YAML_CODE_POINTS] bytes, refused before decoding), strict UTF-8 input for a YAML or JSON file the
+ * caller names [what] in its messages (`Profile`, `Input`); malformed UTF-8 is reported at its line and column. I/O
+ * failures remain the caller's responsibility.
+ */
+fun readBoundedYaml(
+    path: java.nio.file.Path,
+    what: String,
+): String {
     val limit = 4 * MAX_YAML_CODE_POINTS
     val bytes =
         java.nio.file.Files
             .newInputStream(path)
             .use { it.readNBytes(limit + 1) }
     val file = path.toString()
-    if (bytes.size > limit) throw CanonicalYamlException(file, 1, 1, "Profile exceeds $limit bytes")
+    if (bytes.size > limit) throw CanonicalYamlException(file, 1, 1, "$what exceeds $limit bytes")
     val input = java.nio.ByteBuffer.wrap(bytes)
     val output = java.nio.CharBuffer.allocate(bytes.size)
     val decoder = strictUtf8Decoder()
@@ -612,7 +622,7 @@ fun readProfileYaml(path: java.nio.file.Path): String {
             val reader = StreamReader(LoadSettings.builder().setBufferSize(source.length + 1).build(), "$source ")
             reader.forward(source.codePointCount(0, source.length))
             val mark = reader.mark.orElseThrow()
-            throw CanonicalYamlException(file, mark.line + 1, mark.column + 1, "Malformed UTF-8 in profile")
+            throw CanonicalYamlException(file, mark.line + 1, mark.column + 1, "Malformed UTF-8 in ${what.lowercase()}")
         } catch (error: ReaderException) {
             throw readerFailure(source, file, error)
         }

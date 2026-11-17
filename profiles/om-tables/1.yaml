@@ -13,6 +13,10 @@
 # - foreign keys and composite keys: OM lists them, unnamed, in each table's `tableConstraints`; a `def fk` is a
 #   top-level db definition with a name, which no operation can lift from a nested list.
 # - owners: the db grammar has no `owner` property (0.22).
+#
+# Scope (review-330): v1 is written against the invented fixture (tests/conformance/readers/om-tables); MW-P5 S5.5
+# certifies it against real OM payloads (✅R330-C). One export file holds one OM database schema; the schema is not
+# part of the qname (every table is `<pkg>.db.dbo.<name>`), so a snapshot maps one file to one package (✅R330-D).
 profile: om-tables/1
 grammar: '>=0.22 <1.0'
 sourceName: /fullyQualifiedName
