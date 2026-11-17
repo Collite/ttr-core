@@ -13,7 +13,8 @@ import io.kotest.matchers.shouldBe
  */
 class LatestOwnDateSpec :
     FunSpec({
-        val source =
+        /** The candidates, a `stock_at_center` context of [ctx], and a decision reading it per line. */
+        fun recipe(ctx: String): String =
             """
             uses world "hartland.worlds.demo"
             import hartland.*
@@ -26,16 +27,7 @@ class LatestOwnDateSpec :
                     WHERE  l.state = 'received'
                 ${"\"\"\""}
                 context stock_at_center(in lines, out rows) target erp {
-                    stock = load(er.entity.inventory)
-                    lines -> join(right: load(er.entity.customer), kind: inner, on: relation rel_line_customer)
-                          -> join(right: stock, kind: left, on: left.item = right.item and customer.center = right.warehouse)
-                          -> latest(by: as_of_date, per: line_id)
-                          -> calc(item_on_hand = coalesce(stock.quantity_on_hand, 0))
-                          -> join(right: stock, kind: left, on: left.requested_variant = right.item and customer.center = right.warehouse)
-                          -> latest(by: as_of_date, per: line_id)
-                          -> calc(variant_on_hand = coalesce(stock.quantity_on_hand, 0))
-                          -> select(line_id, item_on_hand, variant_on_hand)
-                          -> rows
+            CTX
                 }
                 decision way(in lines, in stock_at_center) {
                     v = lines -> join(right: stock_at_center, kind: left, on: left.line_id = right.line_id)
@@ -49,7 +41,41 @@ class LatestOwnDateSpec :
                     way.refund_after_return -> set_state { line: line_id, to: awaiting_goods, way: refund_after_return }
                 }
             }
-            """.trimIndent()
+            """.trimIndent().replace("CTX", ctx.trimIndent().prependIndent("        "))
+
+        // hartland's `stock_at_center` (D-153): the second inventory on the RIGHT of the second join
+        val twice =
+            recipe(
+                """
+                stock = load(er.entity.inventory)
+                lines -> join(right: load(er.entity.customer), kind: inner, on: relation rel_line_customer)
+                      -> join(right: stock, kind: left, on: left.item = right.item and customer.center = right.warehouse)
+                      -> latest(by: as_of_date, per: line_id)
+                      -> calc(item_on_hand = coalesce(stock.quantity_on_hand, 0))
+                      -> join(right: stock, kind: left, on: left.requested_variant = right.item and customer.center = right.warehouse)
+                      -> latest(by: as_of_date, per: line_id)
+                      -> calc(variant_on_hand = coalesce(stock.quantity_on_hand, 0))
+                      -> select(line_id, item_on_hand, variant_on_hand)
+                      -> rows
+                """,
+            )
+
+        // review-352 R1: the second inventory on the LEFT of the second join (only lines with a variant: an inner join)
+        val swapped =
+            recipe(
+                """
+                stock = load(er.entity.inventory)
+                first = lines -> join(right: load(er.entity.customer), kind: inner, on: relation rel_line_customer)
+                      -> join(right: stock, kind: left, on: left.item = right.item and customer.center = right.warehouse)
+                      -> latest(by: as_of_date, per: line_id)
+                      -> calc(item_on_hand = coalesce(stock.quantity_on_hand, 0))
+                stock -> join(right: first, kind: inner, on: left.item = right.requested_variant and left.warehouse = right.center)
+                      -> latest(by: as_of_date, per: line_id)
+                      -> calc(variant_on_hand = coalesce(quantity_on_hand, 0))
+                      -> select(line_id, item_on_hand, variant_on_hand)
+                      -> rows
+                """,
+            )
 
         // A third (older) date for items 101 and 102 at center 1, and two older ones for 103 (the sample's 11-02: 0).
         fun sk(date: String) = "(DATE '$date' - DATE '1900-01-02') + 2415022"
@@ -68,6 +94,7 @@ class LatestOwnDateSpec :
         fun run(
             engine: String,
             more: String = "",
+            source: String = twice,
         ): Map<String, List<Map<String, Any?>>> {
             val scripts = RecipePlanted.scripts + extra + listOfNotNull(more.takeIf { it.isNotBlank() })
             val e =
@@ -118,6 +145,14 @@ class LatestOwnDateSpec :
                         )
                     }
                 routed.sorted() shouldBe lines
+            }
+
+            test("$engine: the second inventory on the LEFT of the join reduces by its own date too (review-352 R1)") {
+                val rows = run(engine, source = swapped).getValue("stock_at_center.rows")
+                // 904 alone asks for a variant: once, at 103's latest date (0 on hand), not its 10-19 or 10-26 (7, 5)
+                rows.map { it.int("line_id") } shouldBe listOf(904)
+                rows.single().int("variant_on_hand") shouldBe 0
+                rows.single().int("item_on_hand") shouldBe 3
             }
 
             test("$engine: a line whose item has no stock at its center keeps its row — latest of no date (S2.4e)") {
