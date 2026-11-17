@@ -15,6 +15,9 @@ kotlin {
     jvmToolchain(21)
 }
 
+// AU-export S1.5.9: `ttr.runtimeClasspath` for RuntimeClasspathSpec (no CLI rides a library).
+apply(from = rootProject.file("gradle/runtime-classpath-components.gradle.kts"))
+
 tasks.test {
     useJUnitPlatform()
     // Golden AST snapshots: run with `-DupdateSnapshots=true` to (re)write the
@@ -25,17 +28,6 @@ tasks.test {
     val cnHartland = rootProject.file("packages/kotlin/ttr-concept/src/test/resources/worlds/hartland")
     inputs.dir(cnHartland).withPropertyName("cnHartland")
     systemProperty("cnHartland", cnHartland.absolutePath)
-    // AU-export S1.5.9 T1 (c): the published runtimeClasspath's components for RuntimeClasspathSpec (no CLI rides a
-    // library). Resolved when the test runs; the classpath is an input, so a dependency change re-runs the spec.
-    val runtime = configurations.runtimeClasspath
-    val components =
-        runtime.flatMap { it.incoming.artifacts.resolvedArtifacts }.map { artifacts ->
-            artifacts.map { it.id.componentIdentifier.displayName }.distinct().sorted()
-        }
-    inputs.files(runtime).withPropertyName("runtimeClasspath")
-    jvmArgumentProviders.add(
-        CommandLineArgumentProvider { listOf("-Dttrp.runtimeClasspath=${components.get().joinToString(",")}") },
-    )
 }
 
 // The canonical TTR-P grammar lives in the pnpm workspace beside TTR.g4; the
