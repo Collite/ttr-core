@@ -20,10 +20,10 @@ export function parseYamlDocument(text: string, uri = '<yaml>'): YamlParseResult
     for (const path of input.pl) if (!writer.embedded.has(path)) throw new YamlFailure(path,'!pl is allowed only at an embedded-block position');
     const native = parseString(bridge.text,uri);
     const locations = new YamlLocations(input,bridge,diagnostics);
-    for (const error of native.errors) diagnostics.push({...error, code: error.severity === 'error' ? DiagnosticCode.YamlValue : error.code, source: locations.source(error.source)});
-    if (!native.ast || diagnostics.some((d) => d.severity === 'error')) return {diagnostics, errors: diagnostics, sourceFile: uri};
+    for (const error of native.errors) diagnostics.push({...error, code: error.severity === 'error' && (!error.code || error.code === DiagnosticCode.ParseError) ? DiagnosticCode.YamlValue : error.code, source: locations.source(error.source)});
+    if (!native.ast || diagnostics.some((d) => d.severity === 'error' && d.code?.startsWith('ys/'))) return {diagnostics, errors: diagnostics, sourceFile: uri};
     const ast = locations.copy(native.ast);
-    return {ast: diagnostics.some((d) => d.severity === 'error') ? undefined : ast, diagnostics, errors: diagnostics, sourceFile: uri};
+    return {ast, diagnostics, errors: diagnostics, sourceFile: uri};
   } catch (error) {
     if (!(error instanceof YamlFailure)) throw error;
     const [start,end] = error.span ?? [0,Math.min(text.length,1)];

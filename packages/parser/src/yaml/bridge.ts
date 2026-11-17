@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Internal syntax projection, as in Kotlin TtrText: the existing walker remains
 // the single constructor of the native AST. No generated coordinates escape.
+import { CharStream, CommonTokenStream, Token } from 'antlr4ng';
+import { TTRLexer } from '../generated/TTRLexer.js';
+import { TTRParser } from '../generated/TTRParser.js';
 import { canonicalMetadata } from '../generated/canonical-yaml.js';
 import { encodeTtrString } from '../strings.js';
 import { list, record, pointer, YamlFailure, type Json, type RecordValue, type YamlInput } from './input.js';
@@ -240,7 +243,7 @@ export class YamlBridge {
         if (this.genericRecord(r)) return this.generic(value,path,'value');
         return this.render('membersBlock',value,path);
       }
-      case 'calcRef': return join([field('name'), '(', join(Object.entries(record(r!.args)).map(([key,v]) => mark(raw(`${key}: ${string(v)}`),pointer(pointer(path,'args'),key))),', '), ')']);
+      case 'calcRef': return join([field('name'), '(', join(Object.entries(record(r!.args)).map(([key,v]) => mark(raw(`${key}: ${this.retained(v, pointer(pointer(path,'args'),key))}`),pointer(pointer(path,'args'),key))),', '), ')']);
       case 'levelEntry': return join([field('attribute'), ...(r!.via === undefined ? [] : [' via ',field('via')])]);
       case 'matchMethodValue': return join([field('name'), ...(r!.argument === undefined ? [] : ['(',field('argument','NUMBER_LITERAL'),')'])]);
       case 'parameterDefList': return this.array(value,path,(v,p) => this.body('parameterInline',v,p));
@@ -259,6 +262,30 @@ export class YamlBridge {
         return this.expr(e,value,path);
       }
     }
+  }
+  private retained(value: Json, path: string): string {
+    const source = string(value);
+    let invalid = false;
+    const listener = {syntaxError() { invalid = true; }, reportAmbiguity() {}, reportAttemptingFullContext() {}, reportContextSensitivity() {}};
+    const lexer = new TTRLexer(CharStream.fromString(source));
+    lexer.removeErrorListeners(); lexer.addErrorListener(listener);
+    const tokens = new CommonTokenStream(lexer);
+    tokens.fill();
+    let depth = 0;
+    const stack: number[] = [];
+    const pairs = new Map([[TTRLexer.LBRACE,TTRLexer.RBRACE], [TTRLexer.LBRACK,TTRLexer.RBRACK], [TTRLexer.LPAREN,TTRLexer.RPAREN]]);
+    for (const token of tokens.getTokens()) {
+      if (token.channel !== Token.DEFAULT_CHANNEL) invalid = true;
+      const closer = pairs.get(token.type);
+      if (closer !== undefined) { stack.push(closer); if (++depth > 64) throw new YamlFailure(path,'Retained value nesting too deep (limit 64)'); }
+      else if ([...pairs.values()].includes(token.type)) { if (stack.pop() !== token.type) invalid = true; depth--; }
+    }
+    if (invalid || stack.length) throw new YamlFailure(path,'Calc argument must contain exactly one retained TTR value');
+    const parser = new TTRParser(tokens);
+    parser.removeErrorListeners(); parser.addErrorListener(listener);
+    parser.value();
+    if (invalid || parser.getCurrentToken().type !== Token.EOF) throw new YamlFailure(path,'Calc argument must contain exactly one retained TTR value');
+    return source;
   }
   private genericRecord(r: RecordValue): boolean {
     return Object.keys(r).length === 1 && (typeof r.ref === 'string' || typeof r.triple === 'string') || Object.keys(r).length === 2 && typeof r.call === 'string' && Array.isArray(r.args);

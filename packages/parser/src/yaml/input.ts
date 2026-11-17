@@ -100,7 +100,9 @@ export class YamlInput {
     // Prefer the most specific vocabulary error over the enclosing union failures.
     const errors = validator.errors ?? [];
     const error = [...errors].sort((a,b) => this.errorPath(b).length - this.errorPath(a).length)[0];
-    throw new YamlFailure(error ? this.errorPath(error) : '', error?.message ?? 'Invalid canonical document', DiagnosticCode.YamlSchema);
+    const path = error ? this.errorPath(error) : '';
+    const range = error?.keyword === 'additionalProperties' ? this.keys.get(path)?.range : undefined;
+    throw new YamlFailure(path, error?.message ?? 'Invalid canonical document', DiagnosticCode.YamlSchema, range ? [range[0],range[1]] : undefined);
   }
   private errorPath(error: ErrorObject): string {
     return error.keyword === 'additionalProperties' ? pointer(error.instancePath, String(error.params.additionalProperty)) : error.instancePath;

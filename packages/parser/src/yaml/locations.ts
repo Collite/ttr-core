@@ -49,13 +49,13 @@ export class YamlLocations {
     if (!value || typeof value !== 'object') return value;
     if (Array.isArray(value)) return value.map((v) => this.copy(v)) as T;
     const original = value as Record<string,unknown>;
-    const src = original.source as SourceLocation | undefined;
+    const src = isLocation(original.source) ? original.source : undefined;
     const p = src ? this.projection(src) : undefined;
     const literal = src ? this.projection(src,true) : undefined;
     const result: Record<string,unknown> = {};
     for (const [key,child] of Object.entries(original)) {
-      if (['leadingTrivia','trailingTrivia'].includes(key)) continue;
-      if (child && ['source','tagSource','valueSource','textSource'].includes(key)) result[key] = this.source(child as SourceLocation);
+      if (src && ['leadingTrivia','trailingTrivia'].includes(key)) continue;
+      if (isLocation(child) && ['source','tagSource','valueSource','textSource'].includes(key)) result[key] = this.source(child as SourceLocation);
       else result[key] = this.copy(child);
     }
     if (src && literal) {
@@ -105,4 +105,10 @@ export class YamlLocations {
     }
     return result as T;
   }
+}
+
+function isLocation(value: unknown): value is SourceLocation {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string,unknown>;
+  return typeof v.file === 'string' && ['line','column','endLine','endColumn','offsetStart','offsetEnd'].every((key) => typeof v[key] === 'number');
 }
