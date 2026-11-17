@@ -22,7 +22,10 @@ data class OverlayEntry(
     val valueLocation: ProfileSpan,
 )
 
-/** The PR body's `overridden[]`: a property both the transform and the overlay supplied; the overlay won. */
+/**
+ * The PR body's `overridden[]`: a property the overlay set — [from] is the transform's value, `JsonNull` when the overlay
+ * added it (S5.2b) — or, with [property] `kind`, a re-kinded definition's old and new keyword.
+ */
 data class Overridden(
     val qname: String,
     val property: String,
@@ -170,7 +173,10 @@ object OverlayLoader {
 }
 
 internal object OverlayApplier {
-    /** After every transform, before rendering: the overlay wins; a key naming no record is `xm/overlay-orphan`. */
+    /**
+     * After every transform, before rendering: the overlay wins; a key naming no record is `xm/overlay-orphan`. S5.2b
+     * (✅D-MW-84): `kind: <a canonical kind of the record's model>` re-kinds the definition; any other `kind:` is a property.
+     */
     fun apply(
         entries: List<OverlayEntry>,
         index: LinkIndex,
@@ -182,9 +188,16 @@ internal object OverlayApplier {
         val overridden = mutableListOf<Overridden>()
         entries.forEach { entry ->
             val target = record(entry, index, renames)
+            val rekinded = if (entry.property == "kind") builder.rekind(target.record!!, entry.value) else null
+            if (rekinded != null) {
+                if (JsonPrimitive(rekinded) != entry.value) {
+                    overridden += Overridden(target.qname, "kind", JsonPrimitive(rekinded), entry.value)
+                }
+                return@forEach
+            }
             val previous = builder.overlay(target.record!!, entry.property, entry.value, entry.valueLocation)
-            if (previous != null && previous != entry.value) {
-                overridden += Overridden(target.qname, entry.property, previous, entry.value)
+            if (previous != entry.value) {
+                overridden += Overridden(target.qname, entry.property, previous ?: JsonNull, entry.value)
             }
         }
         return overridden

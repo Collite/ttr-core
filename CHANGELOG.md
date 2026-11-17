@@ -6,6 +6,19 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Changed — an overlay re-kinds a definition; `overridden[]` reports additions (MW-P5 S5.2b, ✅D-MW-84)
+
+- An overlay entry's `kind: <value>` re-kinds a top-level definition when the value is a canonical kind of the
+  record's model. Those are the top-level kinds of that model, and in `cn` also `role` (`kind`, `subkind`, `variant`,
+  `role`, `event`, `phase`, `quality`, `relation_type`). Only the emitted keyword changes (`def kind Customer` →
+  `def role Customer`). The document, the qname (`overridden[]`, the `.sources.json` sidecar, links) and the identity
+  checks keep the transform's kind. It is reported as `{qname, property: "kind", from: <old kind>, to: <new kind>}`; a
+  re-kind to the current kind changes and reports nothing. Any other `kind:` value is a property, as before (the cn
+  stereotype reference `kind: Invoice`).
+- `overridden[]` now also lists every property the overlay **added**, with `from: null`. Before, only replaced values
+  were listed. `Overridden.from` is `JsonNull` for an addition. A report with an overlay that only adds properties is
+  therefore no longer byte-identical.
+
 ### Changed — ttr-emit-camunda: the approval row's answer is decided at its Open (ttr-server D-159/D-228/D-233; AU-export S1.5.7)
 
 - The process-engine approval row's answer Open is its one call to the Server, which decides the approved key and

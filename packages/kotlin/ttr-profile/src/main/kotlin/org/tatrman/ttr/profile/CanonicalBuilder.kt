@@ -52,6 +52,18 @@ internal object ProfileVocabulary {
 
     fun semanticsKind(kind: String): String = if (kind in conceptKinds) "concept" else kind
 
+    private val topLevelKinds = metadata.getValue("kinds").jsonArray.map { it.jsonObject.string("kind") }
+    private val modelKinds = ConcurrentHashMap<String, Set<String>>()
+
+    /**
+     * S5.2b (✅D-MW-84): the def keywords a top-level definition of [model] may carry — every top-level kind whose model
+     * it is, and in `cn` also `role` (one `def role` production, read by the file's model: a cn role is a concept).
+     */
+    fun canonicalKinds(model: String): Set<String> =
+        modelKinds.getOrPut(model) {
+            topLevelKinds.filter { model(it) == model }.toSet() + (if (model == "cn") setOf("role") else emptySet())
+        }
+
     fun model(kind: String): String {
         val ast =
             when (kind) {
@@ -159,6 +171,9 @@ internal class CanonicalBuilder(
     private val perFile: Boolean = false,
 ) {
     private val properties = mutableMapOf<Record, MutableMap<String, JsonElement>>()
+
+    /** S5.2b: the keyword an overlay re-kinded a definition to; identity, qname and document stay the transform's. */
+    private val rekinds = mutableMapOf<Record, String>()
     private val children = mutableMapOf<Record, MutableMap<String, MutableList<Record>>>()
 
     /** The dialect trees by label, built once: relocation looks a span's file up for every emitted document (F9). */
@@ -287,6 +302,25 @@ internal class CanonicalBuilder(
         imports.getOrPut(group(plan, record)) { sortedSetOf() } += "$pkg.*"
     }
 
+    /**
+     * S5.2b (✅D-MW-84): an overlay `kind:` naming a canonical kind of a top-level record's model re-kinds the emitted
+     * definition. Returns the replaced keyword, or null when [kind] is no such kind (the caller writes it as a property).
+     */
+    fun rekind(
+        record: Record,
+        kind: JsonElement,
+    ): String? {
+        val keyword = (kind as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
+        if (record.parent != null ||
+            keyword !in ProfileVocabulary.canonicalKinds(ProfileVocabulary.model(record.kind))
+        ) {
+            return null
+        }
+        val previous = rekinds[record] ?: record.kind
+        if (keyword == record.kind) rekinds.remove(record) else rekinds[record] = keyword
+        return previous
+    }
+
     /** Overlay values bypass the conflict ledger: the overlay wins. Returns the transform's value, if any. */
     fun overlay(
         record: Record,
@@ -394,7 +428,7 @@ internal class CanonicalBuilder(
                     if (!nested ||
                         (member != null && !ProfileVocabulary.storageMember(record))
                     ) {
-                        put("kind", record.kind)
+                        put("kind", rekinds[record] ?: record.kind)
                     }
                     if (member?.get("named")?.jsonPrimitive?.boolean != false) put("id", record.id)
                     put(propertyKey, JsonObject(props))

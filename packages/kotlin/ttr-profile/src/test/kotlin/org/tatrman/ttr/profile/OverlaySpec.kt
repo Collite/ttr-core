@@ -28,7 +28,7 @@ class OverlaySpec :
         fun apply(vararg chain: ProfileDefinition) =
             ProfileEngine.apply(listOf(ForeignTree.read(source, "one.yaml")), chain.toList())
 
-        test("inline overlay by qname or sourceName wins; overridden[] lists only properties both sides supplied") {
+        test("inline overlay by qname or sourceName wins; overridden[] lists replaced and added properties (S5.2b)") {
             val result =
                 apply(
                     profile(
@@ -41,7 +41,11 @@ class OverlaySpec :
                     Json.parseToJsonElement("""{"description":"Overlay B"}"""),
                 )
             result.report.overridden shouldBe
-                listOf(Overridden("demo.er.entity.A", "description", JsonPrimitive("Áčko"), JsonPrimitive("Overlay A")))
+                listOf(
+                    Overridden("demo.er.entity.A", "description", JsonPrimitive("Áčko"), JsonPrimitive("Overlay A")),
+                    Overridden("demo.er.entity.A", "tags", JsonNull, JsonArray(listOf(JsonPrimitive("x")))),
+                    Overridden("demo.er.entity.B", "description", JsonNull, JsonPrimitive("Overlay B")),
+                )
         }
         test("a path overlay resolves relative to its profile; ancestor first, so a child entry wins") {
             val root = Files.createTempDirectory("s33-overlay")
