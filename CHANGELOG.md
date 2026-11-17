@@ -23,6 +23,20 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   anything else refuses. An approval action with another native sink, or none, is performed as before. Customer
   `camunda_7`/`camunda_8` exports are unchanged.
 
+### Fixed — ttrp-frontend no longer depends on ttr-metadata-cli (AU-export S1.5.9, MW S4.1 fat-jar failure)
+
+- `ttrp-frontend` no longer depends on `ttr-metadata-cli`. At 0.22.6 every reader of the model carried the CLI's
+  runtime (clikt, mordant, jna, `slf4j-nop`, ttr-import), and ttr-server's automation `shadowJar` failed with
+  `Zip64RequiredException`. `ttrp-frontend`'s runtime dependency report shrinks from 138 to 98 lines.
+- The `[packages]` manifest read now lives in `ttr-metadata`: `PackagesManifest.read(path)` returns the layout and the
+  manifest's issues. The outcomes are unchanged: a missing key is `flexible`, an unknown value warns, a malformed or
+  unreadable file is `manifest-invalid`. `MetadataLoadCli.readManifest` delegates to it. `ttr-metadata` now takes
+  `org.tomlj:tomlj` as a runtime dependency.
+- A build guard, `libraryCliEdges` in the root `check`, fails when a non-`*-cli` module depends on a `*-cli` module, and
+  names the edge. There are two named allowances: `ttrp-lsp → ttrp-cli` (the LSP launcher is an application) and
+  `ttr-concept → ttr-metadata-cli` (the `ttr` launcher still lives in the published library). The guard also fails when
+  an allowance is no longer needed.
+
 ### Added — the reader harness: `ttr-import` and `import-schema --from file:` (MW-P5 S5.1)
 
 - New module `org.tatrman:ttr-import` (grammar bundle): a `FrontEnd` (pure parser → located `ForeignTree`s), the
