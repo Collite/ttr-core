@@ -50,7 +50,7 @@ object MetadataLoadCli {
         if (!Files.isRegularFile(project.resolve("modeler.toml"))) {
             return CliOutcome(3, "", "ttr-metadata: no modeler.toml under $project\n")
         }
-        val (packageLayout, manifestIssues) = readManifest(project.resolve("modeler.toml"))
+        val (packageLayout, manifestIssues) = PackagesManifest.read(project.resolve("modeler.toml"))
         val modelRoot = project.resolve("model")
         if (!Files.isDirectory(modelRoot)) {
             return render(project, version, noModelDir(modelRoot, manifestIssues), json, failed = true)
@@ -96,9 +96,14 @@ object MetadataLoadCli {
     }
 
     /**
-     * `[packages].layout` of a `modeler.toml` and the manifest's own issues — [PackagesManifest.read], the library's one
-     * reading of the rule (moved there in AU-export S1.5.9, D-235, so `ttrp-frontend` reads it without this CLI).
+     * `[packages].layout` of a `modeler.toml` and the manifest's own issues — [PackagesManifest.read], the library's
+     * one reading of the rule (moved there in AU-export S1.5.9, D-235, so `ttrp-frontend` reads it without this CLI).
+     * Kept for callers of the published `ttr-metadata-cli` API; the CLI itself calls the library (review-340 N3).
      */
+    @Deprecated(
+        "Read it in the library",
+        ReplaceWith("PackagesManifest.read(manifest)", "org.tatrman.ttr.metadata.PackagesManifest"),
+    )
     fun readManifest(manifest: Path): Pair<PackageLayout, List<LoadReportIssue>> = PackagesManifest.read(manifest)
 
     private fun render(

@@ -10,9 +10,10 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * AU-export S1.5.9 T1 (b) (D-235): `[packages].layout` of a `modeler.toml`, read by the library. The outcomes are the ones
- * `MetadataLoadCli.readManifest` gave before the move (captured from its code at `f6b92ec`): a missing key is `flexible`,
- * an unknown value warns on its line and falls back to `flexible`, a malformed or unreadable file is an error.
+ * AU-export S1.5.9 T1 (b) (D-235): `[packages].layout` of a `modeler.toml`, read by the library. The outcomes are the
+ * ones `MetadataLoadCli.readManifest` gave before the move (captured from its code at `f6b92ec`): a missing key is
+ * `flexible`, an unknown value warns on its line and falls back to `flexible`, a malformed or unreadable file is an
+ * error.
  */
 class PackagesManifestSpec :
     StringSpec({

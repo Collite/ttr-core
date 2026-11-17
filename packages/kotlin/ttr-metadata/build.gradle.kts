@@ -40,8 +40,8 @@ dependencies {
     implementation(libs.jgrapht.core)
     implementation(libs.slf4j.api)
     implementation(libs.kotlinx.coroutines.core) // MetadataRefresher (M1.2)
-    // AU-export S1.5.9 (D-235): `PackagesManifest` reads `[packages].layout` of a `modeler.toml` here, so a model reader
-    // (ttrp-frontend) never needs ttr-metadata-cli for it. tomlj pulls antlr4-runtime (already here via ttr-parser).
+    // AU-export S1.5.9 (D-235): `PackagesManifest` reads `[packages].layout` of a `modeler.toml` here, so a model
+    // reader (ttrp-frontend) never needs ttr-metadata-cli for it. tomlj pulls antlr4-runtime (here via ttr-parser).
     implementation(libs.tomlj)
 
     testImplementation(libs.bundles.kotest)

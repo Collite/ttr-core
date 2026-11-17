@@ -6,9 +6,9 @@ import java.nio.file.Path
 
 /**
  * `[packages].layout` of a `modeler.toml` and the manifest's own issues: the one reading of the rule, shared by the
- * `ttr-metadata` CLI (`load`, `lint`, `export`) and `ttrp emit` / `ttrp check` (AU-export S1.5.4, D-173). It lives in the
- * library since S1.5.9 (D-235), so a model reader never needs the CLI to read it. A missing key is `flexible`; an unknown
- * value warns and falls back to `flexible`; an unreadable or malformed file is an error.
+ * `ttr-metadata` CLI (`load`, `lint`, `export`) and `ttrp emit` / `ttrp check` (AU-export S1.5.4, D-173). It lives in
+ * the library since S1.5.9 (D-235), so a model reader never needs the CLI to read it. A missing key is `flexible`; an
+ * unknown value warns and falls back to `flexible`; an unreadable or malformed file is an error.
  */
 object PackagesManifest {
     fun read(manifest: Path): Pair<PackageLayout, List<LoadReportIssue>> {
