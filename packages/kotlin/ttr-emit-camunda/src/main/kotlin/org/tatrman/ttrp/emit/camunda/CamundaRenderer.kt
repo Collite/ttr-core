@@ -98,8 +98,8 @@ internal class CamundaRenderer(
         run: String = "ttrRunId",
         query: String? = null,
         asyncBefore: Boolean = true,
-        // false: a 409 refuses like any other 4xx (TTR_REFUSED, with the Server's body) instead of TTR_STALE.
-        conflictIsStale: Boolean = true,
+        // The answer Open (D-233): see [Dialect.rest].
+        answer: Boolean = false,
     ): BpmnModel.Node {
         var path = graph.runApi.basePath.trimEnd('/') + graph.runApi.calls.getValue(call)
         (args + ("recipe" to graph.recipe.name)).forEach { (key, value) ->
@@ -141,7 +141,7 @@ internal class CamundaRenderer(
                 result,
                 budget(graph),
                 bearer = !engine,
-                conflictIsStale = conflictIsStale,
+                answer = answer,
             )
         if (d == Dialect.C7 && asyncBefore) {
             task.attrs["camunda:asyncBefore"] = "true"
@@ -269,9 +269,7 @@ internal class CamundaRenderer(
         }
         if (d == Dialect.C8) inputs["ttrStepAt"] = stepClock(graph, first)
         inputs["ttrOpenBody"] = openBody(graph, name, first)
-        // C7 runs output mappings on cancellation too, including an Open that threw before returning a handle.
-        val runId = d.string("ttrOpen", "runId")
-        val openedRun = expr("execution.getVariable('ttrOpen') != null ? $runId : null", runId)
+        val openedRun = guardedString("ttrOpen", "runId")
         val outputs = linkedMapOf("ttrPreviousRunId" to openedRun)
         if (first) outputs["ttrAnchor"] = openedRun
         sub.extensions += d.mapping(inputs, outputs)
@@ -285,7 +283,7 @@ internal class CamundaRenderer(
         scope.link(codes, end, "200 replayed", d.and(eq("ttrOpenCode", "200"), d.bool("ttrOpen", "replayed")))
         val fresh = scope.node("exclusiveGateway", "claimed run")
         scope.link(codes, fresh, "201 claimed", eq("ttrOpenCode", "201"))
-        val awaiting = awaitHandle(scope, graph, codes, refused, "ttrOpen")
+        val awaiting = awaitHandle(scope, graph, codes, refused)
         val restart = scope.node("exclusiveGateway", "bounded restart")
         scope.link(awaiting, restart)
         scope.link(restart, end, "closed or waiting", d.or(state("ttrHandle", "closed"), state("ttrHandle", "waiting")))
@@ -364,7 +362,7 @@ internal class CamundaRenderer(
                 last = decision
             }
         }
-        evaluateUntilReady(evaluation, graph, last, "ttrEvaluation", "ttrRunId")
+        evaluateUntilReady(evaluation, graph, last)
         val statusActions = http(work, graph, "selected actions", "status", "ttrStatus")
         work.link(boundedEvaluation, statusActions)
         val valid = work.node("exclusiveGateway", "per-key actions required")
@@ -385,7 +383,8 @@ internal class CamundaRenderer(
         val close = http(work, graph, "close", "close", "ttrClosed")
         val wend = work.node("endEvent", "evaluation ended")
         work.link(joinRoutes, close)
-        work.link(close, wend)
+        val asking = graph.routes.filterNot { it.isNone }.filter { wired(graph, it).any { (_, a) -> asksApproval(a) } }
+        if (asking.isEmpty()) work.link(close, wend) else approvals(work, graph, asking, close, wend, wfail)
         scope.link(decide, end)
         val evalBound =
             boundary(
@@ -402,21 +401,21 @@ internal class CamundaRenderer(
     }
 
     /**
-     * A run's Open answered 202: another execution holds it. Poll its status (honouring Retry-After) until terminal, within
-     * the budget; the budget's boundary refuses. Links `202 handle` from [codes] and refuses every other code by default.
+     * The step's Open (`ttrOpen`) answered 202: another execution holds the run. Poll its status (honouring Retry-After)
+     * until terminal, within the budget; the budget's boundary refuses. Links `202 handle` from [codes] and refuses every
+     * other code by default.
      */
     private fun awaitHandle(
         scope: BpmnModel.Scope,
         graph: RecipeGraph,
         codes: BpmnModel.Node,
         refused: BpmnModel.Node,
-        open: String,
     ): BpmnModel.Node {
         val handle = BpmnModel.Scope(stableId("${scope.id}/handle"))
         val awaiting = scope.node("subProcess", "await other execution", child = handle)
         awaiting.extensions +=
-            d.mapping(mapOf("ttrHandleRetryAfter" to "${open}RetryAfter"), mapOf("ttrHandle" to "ttrHandle"))
-        scope.link(codes, awaiting, "202 handle", eq("${open}Code", "202"))
+            d.mapping(mapOf("ttrHandleRetryAfter" to "ttrOpenRetryAfter"), mapOf("ttrHandle" to "ttrHandle"))
+        scope.link(codes, awaiting, "202 handle", eq("ttrOpenCode", "202"))
         scope.default(codes, refused)
         val hstart = handle.node("startEvent", "handle start")
         val hend = handle.node("endEvent", "handle settled")
@@ -431,7 +430,7 @@ internal class CamundaRenderer(
                     ),
                 ),
             )
-        val status = http(handle, graph, "handle status", "status", "ttrHandle", run = d.string(open, "runId"))
+        val status = http(handle, graph, "handle status", "status", "ttrHandle", run = d.string("ttrOpen", "runId"))
         val settled = handle.node("exclusiveGateway", "handle terminal")
         handle.link(hstart, pause)
         handle.link(pause, status)
@@ -454,17 +453,17 @@ internal class CamundaRenderer(
     }
 
     /**
-     * Evaluate [run] after [last] and read its status (RunProgress: a synchronous EvaluationResult has no status) until the
-     * verdict is ready, honouring Retry-After. Failed or abandoned evidence refuses. [result] holds the last status read.
+     * Evaluate the step's run (`ttrRunId`) after [last] and read its status (RunProgress: a synchronous EvaluationResult
+     * has no status) until the verdict is ready, honouring Retry-After. Failed or abandoned evidence refuses.
+     * `ttrEvaluation` holds the last status read.
      */
     private fun evaluateUntilReady(
         evaluation: BpmnModel.Scope,
         graph: RecipeGraph,
         last: BpmnModel.Node,
-        result: String,
-        run: String,
     ) {
-        val evaluate = http(evaluation, graph, "evaluate", "evaluate", result, run = run)
+        val result = "ttrEvaluation"
+        val evaluate = http(evaluation, graph, "evaluate", "evaluate", result)
         evaluation.link(last, evaluate)
         val evaluated = evaluation.node("exclusiveGateway", "evaluation complete")
         val poll =
@@ -478,7 +477,7 @@ internal class CamundaRenderer(
                     ),
                 ),
             )
-        val progress = http(evaluation, graph, "evaluation status", "status", result, run = run)
+        val progress = http(evaluation, graph, "evaluation status", "status", result)
         evaluation.default(evaluated, poll)
         evaluation.link(evaluate, progress)
         evaluation.link(poll, progress)
@@ -520,6 +519,239 @@ internal class CamundaRenderer(
     private fun rowKeyObject(graph: RecipeGraph): String =
         d.objectValue(rowKeyFields(graph).associateWith(::rowKeyValue))
 
+    /**
+     * D-229: C7 runs output mappings on cancellation too, before [variable] holds a response, so [path] is read only once
+     * it is set. [shaped]: the response may also lack the path or carry another type (a 2xx that does not decide), so
+     * each step is checked as well. C8 reads the path as is.
+     */
+    private fun guardedString(
+        variable: String,
+        vararg path: String,
+        shaped: Boolean = false,
+    ): String {
+        val nodes = path.toList().runningFold(variable, d::field)
+        val value = d.string(nodes[path.size - 1], path.last())
+        val checks =
+            listOf("execution.getVariable('$variable') != null") +
+                if (shaped) {
+                    path.mapIndexed { i, name -> "${nodes[i]}.isObject() && ${nodes[i]}.hasProp(${quote(name)})" } +
+                        "${nodes.last()}.isString()"
+                } else {
+                    emptyList()
+                }
+        return expr("${checks.joinToString(" && ")} ? $value : null", value)
+    }
+
+    /**
+     * ✅R336-A/R2: the engine asks for an approval-required action only when the Server holds its rows, which it does for
+     * an action whose native sink is one of its held sinks ([HELD_SINKS]). Those rows are held at the root close.
+     */
+    private fun asksApproval(action: ActionMeta): Boolean =
+        engine && action.approval == "required" && action.sinks["native"] in HELD_SINKS
+
+    /** The actions wired on [route]'s rows, once each. */
+    private fun wired(
+        graph: RecipeGraph,
+        route: RouteMeta,
+    ): List<Pair<WiringMeta, ActionMeta>> =
+        graph.wirings
+            .filter { it.routes.any { r -> r.substringAfterLast('.') == route.name } }
+            .distinctBy { it.action }
+            .map { it to graph.actions.getValue(it.action) }
+
+    private fun expectedRows(route: RouteMeta): String {
+        val verdictRoutes = d.field(d.field("ttrEvaluation", "verdict"), "routes")
+        return expr(
+            "$verdictRoutes.prop(${quote(route.name)}).prop('rowCount').numberValue()",
+            "get value($verdictRoutes,${quote(route.name)}).rowCount",
+        )
+    }
+
+    /** A sequential multi-instance over the route rows paged into [rows], each as `ttrRow`. */
+    private fun rowsLoop(rows: String): Xml {
+        val collection = expr("$rows.elements()", rows)
+        return if (d == Dialect.C7) {
+            Xml(
+                "bpmn:multiInstanceLoopCharacteristics",
+                mapOf(
+                    "isSequential" to "true",
+                    "camunda:collection" to d.condition(collection),
+                    "camunda:elementVariable" to "ttrRow",
+                ),
+            )
+        } else {
+            Xml(
+                "bpmn:multiInstanceLoopCharacteristics",
+                mapOf("isSequential" to "true"),
+                listOf(
+                    Xml(
+                        "bpmn:extensionElements",
+                        children =
+                            listOf(
+                                Xml(
+                                    "zeebe:loopCharacteristics",
+                                    mapOf("inputCollection" to d.condition(collection), "inputElement" to "ttrRow"),
+                                ),
+                            ),
+                    ),
+                ),
+            )
+        }
+    }
+
+    /**
+     * ✅R336-A: the root close holds the asking actions' rows and leaves the run `waiting`; only then can an answer find
+     * a held key. `closed` (nothing held: a dry run, or no asking action selected) ends the evaluation, `waiting` asks
+     * per row of each route in [routes], anything else refuses.
+     */
+    private fun approvals(
+        work: BpmnModel.Scope,
+        graph: RecipeGraph,
+        routes: List<RouteMeta>,
+        close: BpmnModel.Node,
+        end: BpmnModel.Node,
+        refused: BpmnModel.Node,
+    ) {
+        val outcome = work.node("exclusiveGateway", "close outcome")
+        work.link(close, outcome)
+        work.link(outcome, end, "closed", state("ttrClosed", "closed"))
+        val fork = work.node("inclusiveGateway", "approvals")
+        val join = work.node("inclusiveGateway", "approvals complete")
+        work.link(outcome, fork, "waiting", state("ttrClosed", "waiting"))
+        work.default(outcome, refused)
+        work.default(fork, join)
+        routes.forEach { route ->
+            val rowScope = BpmnModel.Scope(stableId("${work.id}/ask/${route.name}"))
+            val each = work.node("subProcess", "ask each ${route.name} row", child = rowScope)
+            // Row-local (R323-4): the answer's identity and decision never reach the process instance.
+            each.extensions +=
+                d.mapping(
+                    listOf("ttrTaskId", "ttrAnsweredBy", "ttrAnswerRunId", "ttrAnswerStatus", "ttrAnswerDecision")
+                        .associateWith { "null" },
+                )
+            each.tail += rowsLoop("ttrRows_${stableId(route.name)}")
+            work.link(fork, each, "ask ${route.name}", "${expectedRows(route)} > 0")
+            work.link(each, join)
+            var last = rowScope.node("startEvent", "ask row start")
+            wired(graph, route).filter { (_, action) -> asksApproval(action) }.forEach { (wiring, action) ->
+                last = ask(rowScope, graph, wiring, action, last)
+            }
+            rowScope.link(last, rowScope.node("endEvent", "ask row complete"))
+        }
+        work.link(join, end)
+    }
+
+    /**
+     * One row's approval: user task → `complete` listener → the answer Open → the decision. D-233: the answer Open is the
+     * row's one call; the Server decides and closes the answer run there, and its response is the decision.
+     */
+    private fun ask(
+        rowScope: BpmnModel.Scope,
+        graph: RecipeGraph,
+        wiring: WiringMeta,
+        action: ActionMeta,
+        last: BpmnModel.Node,
+    ): BpmnModel.Node {
+        val (gate, done) = selectedAndWet(rowScope, graph, wiring.action, last)
+        val task = approvalTask(rowScope, wiring.action, action, graph)
+        rowScope.link(
+            gate,
+            task,
+            "${wiring.action} selected and wet",
+            d.and(wet(graph), selected(graph, wiring.action)),
+        )
+        task.extensions +=
+            Xml(
+                "camunda:taskListener",
+                mapOf("event" to "complete"),
+                listOf(
+                    Xml(
+                        "camunda:script",
+                        mapOf("scriptFormat" to "groovy"),
+                        text =
+                            """
+                            if (!task.assignee?.trim()) throw new IllegalStateException('approval task must be claimed before it is completed')
+                            task.execution.setVariable('ttrTaskId', task.id)
+                            task.execution.setVariable('ttrAnsweredBy', task.assignee)
+                            """.trimIndent(),
+                    ),
+                ),
+            )
+        val answerScope = BpmnModel.Scope(stableId("${task.id}/answer"))
+        val answerStep = rowScope.node("subProcess", "answer ${wiring.action} step", child = answerScope)
+        answerStep.extensions +=
+            d.mapping(
+                linkedMapOf("ttrAnswerOpenBody" to openBody(graph, "answer", first = false, answer = true)) +
+                    listOf("", "Code", "Headers", "RetryAfter").associate { "ttrAnswerOpen$it" to "null" },
+                linkedMapOf(
+                    "ttrAnswerRunId" to guardedString("ttrAnswerOpen", "runId", shaped = true),
+                    "ttrAnswerStatus" to guardedString("ttrAnswerOpen", "status", shaped = true),
+                    "ttrAnswerDecision" to guardedString("ttrAnswerOpen", "answer", "decision", shaped = true),
+                ),
+            )
+        val answer =
+            http(
+                answerScope,
+                graph,
+                "answer ${wiring.action}",
+                "open",
+                "ttrAnswerOpen",
+                body = "ttrAnswerOpenBody",
+                asyncBefore = false,
+                answer = true,
+            )
+        answerScope.link(answerScope.node("startEvent", "answer start"), answer)
+        answerScope.link(answer, answerScope.node("endEvent", "answer opened"))
+        rowScope.link(task, answerStep)
+        val decided = rowScope.node("exclusiveGateway", "answer ${wiring.action} decided")
+        rowScope.link(answerStep, decided)
+        rowScope.link(
+            decided,
+            done,
+            "closed and committed",
+            d.and(eq("ttrAnswerStatus", quote("closed")), eq("ttrAnswerDecision", quote("commit"))),
+        )
+        rowScope.default(decided, error(rowScope, "answer ${wiring.action} refused", "run_refused"))
+        return done
+    }
+
+    /** The `<action> selected and wet` gate after [last] and its `<action> complete` join; unselected rows skip. */
+    private fun selectedAndWet(
+        rowScope: BpmnModel.Scope,
+        graph: RecipeGraph,
+        action: String,
+        last: BpmnModel.Node,
+    ): Pair<BpmnModel.Node, BpmnModel.Node> {
+        val gate = rowScope.node("exclusiveGateway", "$action selected and wet")
+        val done = rowScope.node("exclusiveGateway", "$action complete")
+        rowScope.link(last, gate)
+        rowScope.default(gate, done)
+        return gate to done
+    }
+
+    private fun approvalTask(
+        rowScope: BpmnModel.Scope,
+        name: String,
+        action: ActionMeta,
+        graph: RecipeGraph,
+    ): BpmnModel.Node {
+        val task = rowScope.node("userTask", "approve $name")
+        task.extensions += d.mapping(mapOf("ttrAction" to quote(name), "ttrKey" to rowKey(graph)))
+        if (d == Dialect.C8) task.extensions += Xml("zeebe:userTask")
+        action.by?.let { role ->
+            val group =
+                requireNotNull(action.candidateGroup?.takeIf { it.isNotBlank() }) {
+                    "TTRP-EXPORT-ROLE: action $name: $role has no Keycloak group"
+                }
+            if (d == Dialect.C7) {
+                task.attrs["camunda:candidateGroups"] = group
+            } else {
+                task.extensions += Xml("zeebe:assignmentDefinition", mapOf("candidateGroups" to "=[${quote(group)}]"))
+            }
+        }
+        return task
+    }
+
     private fun route(
         scope: BpmnModel.Scope,
         graph: RecipeGraph,
@@ -528,12 +760,7 @@ internal class CamundaRenderer(
         join: BpmnModel.Node,
     ) {
         val rows = "ttrRows_${stableId(route.name)}"
-        val verdictRoutes = d.field(d.field("ttrEvaluation", "verdict"), "routes")
-        val expected =
-            expr(
-                "$verdictRoutes.prop(${quote(route.name)}).prop('rowCount').numberValue()",
-                "get value($verdictRoutes,${quote(route.name)}).rowCount",
-            )
+        val expected = expectedRows(route)
         val paging = BpmnModel.Scope(stableId("${scope.id}/pages/${route.name}"))
         val pages = scope.node("subProcess", "page ${route.name} rows", child = paging)
         pages.extensions +=
@@ -638,181 +865,34 @@ internal class CamundaRenderer(
         paging.default(complete, truncated)
         val rowScope = BpmnModel.Scope(stableId("${scope.id}/route/${route.name}"))
         val each = scope.node("subProcess", "each ${route.name} row", child = rowScope)
-        if (engine) {
-            each.extensions +=
-                d.mapping(
-                    listOf("ttrTaskId", "ttrAnsweredBy", "ttrAnswerRunId", "ttrAnswerStatus", "ttrAnswerDecision")
-                        .associateWith { "null" },
-                )
-        }
-        val collection = expr("$rows.elements()", rows)
-        each.tail +=
-            if (d ==
-                Dialect.C7
-            ) {
-                Xml(
-                    "bpmn:multiInstanceLoopCharacteristics",
-                    mapOf(
-                        "isSequential" to "true",
-                        "camunda:collection" to d.condition(collection),
-                        "camunda:elementVariable" to "ttrRow",
-                    ),
-                )
-            } else {
-                Xml(
-                    "bpmn:multiInstanceLoopCharacteristics",
-                    mapOf("isSequential" to "true"),
-                    listOf(
-                        Xml(
-                            "bpmn:extensionElements",
-                            children =
-                                listOf(
-                                    Xml(
-                                        "zeebe:loopCharacteristics",
-                                        mapOf(
-                                            "inputCollection" to d.condition(collection),
-                                            "inputElement" to "ttrRow",
-                                        ),
-                                    ),
-                                ),
-                        ),
-                    ),
-                )
-            }
+        each.tail += rowsLoop(rows)
         scope.link(pages, each)
         scope.link(each, join)
         var last = rowScope.node("startEvent", "row start")
-        graph.wirings
-            .filter {
-                it.routes.any { r ->
-                    r.substringAfterLast('.') == route.name
-                }
-            }.distinctBy { it.action }
-            .forEach { wiring ->
-                val action = graph.actions.getValue(wiring.action)
+        wired(graph, route)
+            .forEach { (wiring, action) ->
                 val sink =
                     action.sinks[graph.deployment.type] ?: action.sinks["camunda"] ?: action.sinks["native"]
                         ?: error("missing Camunda sink for ${wiring.action}")
                 when {
-                    // D-230: the engine target asks for an approval-required action the Server performs (door or writer
-                    // sinks), never performing it directly; the Server applies it once the answer is verified. Customer
-                    // targets keep the explicit user-task sinks.
-                    sink == "user task" ||
-                        action.approval == "required" &&
-                        (action.sinks["native"] == "task" || engine && sink in SERVER_PERFORMED) -> {
-                        val gate = rowScope.node("exclusiveGateway", "${wiring.action} selected and wet")
-                        val done = rowScope.node("exclusiveGateway", "${wiring.action} complete")
-                        rowScope.link(last, gate)
-                        rowScope.default(gate, done)
-                        val task = rowScope.node("userTask", "approve ${wiring.action}")
-                        task.extensions +=
-                            d.mapping(mapOf("ttrAction" to quote(wiring.action), "ttrKey" to rowKey(graph)))
-                        if (d == Dialect.C8) task.extensions += Xml("zeebe:userTask")
-                        action.by?.let { role ->
-                            val group =
-                                requireNotNull(action.candidateGroup?.takeIf { it.isNotBlank() }) {
-                                    "TTRP-EXPORT-ROLE: action ${wiring.action}: $role has no Keycloak group"
-                                }
-                            if (d == Dialect.C7) {
-                                task.attrs["camunda:candidateGroups"] = group
-                            } else {
-                                task.extensions +=
-                                    Xml("zeebe:assignmentDefinition", mapOf("candidateGroups" to "=[${quote(group)}]"))
-                            }
-                        }
+                    // ✅R336-A: the engine asks after the root close (approvals), never performing the action directly;
+                    // the Server applies it once the answer is verified.
+                    asksApproval(action) -> Unit
+                    // An explicit user-task sink (customer targets, or an approval the Server holds no rows for).
+                    sink == "user task" || (action.approval == "required" && action.sinks["native"] == "task") -> {
+                        val (gate, done) = selectedAndWet(rowScope, graph, wiring.action, last)
+                        val task = approvalTask(rowScope, wiring.action, action, graph)
                         rowScope.link(
                             gate,
                             task,
                             "${wiring.action} selected and wet",
                             d.and(wet(graph), selected(graph, wiring.action)),
                         )
-                        if (engine) {
-                            task.extensions +=
-                                Xml(
-                                    "camunda:taskListener",
-                                    mapOf("event" to "complete"),
-                                    listOf(
-                                        Xml(
-                                            "camunda:script",
-                                            mapOf("scriptFormat" to "groovy"),
-                                            text =
-                                                """
-                                                if (!task.assignee?.trim()) throw new IllegalStateException('approval task must be claimed before it is completed')
-                                                task.execution.setVariable('ttrTaskId', task.id)
-                                                task.execution.setVariable('ttrAnsweredBy', task.assignee)
-                                                """.trimIndent(),
-                                        ),
-                                    ),
-                                )
-                            val answerScope = BpmnModel.Scope(stableId("${task.id}/answer"))
-                            val answerStep =
-                                rowScope.node(
-                                    "subProcess",
-                                    "answer ${wiring.action} step",
-                                    child = answerScope,
-                                )
-                            // D-233: the answer Open is the row's one call. The Server decides and closes the answer run
-                            // there; its response is the decision. C7 runs these outputs on cancellation too (D-229).
-                            val opened = "execution.getVariable('ttrAnswerOpen') != null"
-
-                            fun text(vararg path: String): String {
-                                var node = "ttrAnswerOpen"
-                                val checks = mutableListOf(opened)
-                                path.forEach {
-                                    checks += "$node.isObject() && $node.hasProp(${quote(it)})"
-                                    node = "$node.prop(${quote(it)})"
-                                }
-                                checks += "$node.isString()"
-                                return "${checks.joinToString(" && ")} ? $node.stringValue() : null"
-                            }
-                            answerStep.extensions +=
-                                d.mapping(
-                                    linkedMapOf(
-                                        "ttrAnswerOpenBody" to openBody(graph, "answer", first = false, answer = true),
-                                    ) +
-                                        listOf("", "Code", "Headers", "RetryAfter").associate {
-                                            "ttrAnswerOpen$it" to
-                                                "null"
-                                        },
-                                    linkedMapOf(
-                                        "ttrAnswerRunId" to text("runId"),
-                                        "ttrAnswerStatus" to text("status"),
-                                        "ttrAnswerDecision" to text("answer", "decision"),
-                                    ),
-                                )
-                            val answer =
-                                http(
-                                    answerScope,
-                                    graph,
-                                    "answer ${wiring.action}",
-                                    "open",
-                                    "ttrAnswerOpen",
-                                    body = "ttrAnswerOpenBody",
-                                    asyncBefore = false,
-                                    conflictIsStale = false,
-                                )
-                            answerScope.link(answerScope.node("startEvent", "answer start"), answer)
-                            answerScope.link(answer, answerScope.node("endEvent", "answer opened"))
-                            rowScope.link(task, answerStep)
-                            val decided = rowScope.node("exclusiveGateway", "answer ${wiring.action} decided")
-                            rowScope.link(answerStep, decided)
-                            rowScope.link(
-                                decided,
-                                done,
-                                "closed and committed",
-                                d.and(eq("ttrAnswerStatus", quote("closed")), eq("ttrAnswerDecision", quote("commit"))),
-                            )
-                            rowScope.default(decided, error(rowScope, "answer ${wiring.action} refused", "run_refused"))
-                        } else {
-                            rowScope.link(task, done)
-                        }
+                        rowScope.link(task, done)
                         last = done
                     }
                     sink == "send task" -> {
-                        val gate = rowScope.node("exclusiveGateway", "${wiring.action} selected and wet")
-                        val done = rowScope.node("exclusiveGateway", "${wiring.action} complete")
-                        rowScope.link(last, gate)
-                        rowScope.default(gate, done)
+                        val (gate, done) = selectedAndWet(rowScope, graph, wiring.action, last)
                         val columns = action.columns.filter { it.value == "role" || it.key == "to" && '.' in it.value }
                         require(columns.size == 1) { "mail ${wiring.action} needs exactly one address column" }
                         val (column, type) = columns.entries.single()
@@ -1009,7 +1089,8 @@ internal class CamundaRenderer(
                 "${root.program.name} run refused",
                 Xml(
                     "bpmn:errorEventDefinition",
-                    // The engine keeps the refusal's message (the Server's status and body) for the person who inspects it.
+                    // The engine keeps a non-2xx refusal's message (the Server's status and body) for the person
+                    // who inspects it; a 2xx that does not commit has none.
                     mapOf("errorRef" to "run_refused") +
                         if (engine) mapOf("camunda:errorMessageVariable" to "ttrRefusedReason") else emptyMap(),
                 ),
@@ -1049,12 +1130,16 @@ internal class CamundaRenderer(
         The engine templates also retain ttrInput.at in keyed ports; batch ports remain {none: true}.
         Approval completion captures task.id/assignee; its answer Open additionally carries engine.taskId and
         engine.answeredBy, with idempotencyKey = ttrAnchor + ':answer:' + ttrTaskId and the approved row's key.
-        An approval-required action the Server performs becomes this user task; the engine never performs it directly.
-        The answer Open is the row's one call. It runs within task completion (no asyncBefore); a transient failure
-        rolls back completion and the user completes again. Its port.key is the row's key as a column-named object.
-        The Server decides the approved key and closes the answer run at that Open. The row continues only when the
-        response says status closed and answer.decision commit; anything else (waiting, 409, another 4xx) reaches
-        run refused, with the Server's message in ttrRefusedReason, and is never counted as decided. The row reads no
+        An approval-required action whose rows the Server holds (native sink transition, writer or obligation) becomes
+        this user task; the engine never performs it directly. The Server holds those rows at the run's close, so the
+        engine asks after the close: closed ends the evaluation, waiting asks each row whose key has the action
+        selected, anything else refuses. The answer Open is the row's one call. It runs within task completion (no
+        asyncBefore); a transient failure, or a 202 for the same key still in flight, rolls back completion and the
+        user completes again. Its port.key is the row's key as a column-named object. The Server decides the approved
+        key and closes the answer run at that Open. The row continues only when the response says status closed and
+        answer.decision commit; anything else (waiting, 409, another 4xx) reaches run refused and is never counted as
+        decided. A non-2xx refusal keeps the Server's status and body in ttrRefusedReason; a 2xx that does not commit
+        leaves it null, and the answer's status is the row-local ttrAnswerStatus in the history. The row reads no
         route again, so the approval is never asked twice. ttrAnswerRunId, ttrAnswerStatus and ttrAnswerDecision are
         row-local. Only the engine client may assert an answer.
         Deploy: `ttrp emit --deployment ${root.deployment.name} --deploy` posts this BPMN and the DMN files as one engine
@@ -1166,5 +1251,12 @@ internal class CamundaRenderer(
         /** Sinks whose action the row hands to the Server's `perform` (the engine performs no writer action itself). */
         val SERVER_PERFORMED =
             setOf("door", "service task", "transition", "writer", "obligation", "task", "message", "start", "http")
+
+        /**
+         * The native sinks whose `approval: required` rows the Server holds at close for an answer: a local copy of the
+         * Server's `ApplyPlanner.HELD_SINKS` (ttr-server, automation). An approval action with another native sink, or
+         * none, has nothing held, so the engine never asks for it.
+         */
+        val HELD_SINKS = setOf("transition", "writer", "obligation")
     }
 }

@@ -118,8 +118,9 @@ internal enum class Dialect(
         retryBudgetSeconds: Long,
         // The process engine's egress injects the bearer (D-158): its HTTP steps carry none.
         bearer: Boolean = true,
-        // false (C7): a 409 refuses like any other 4xx, with the response body, instead of raising TTR_STALE.
-        conflictIsStale: Boolean = true,
+        // The answer Open (C7, D-233): a 409 (answer-unmatched, *-stale) refuses like any other 4xx, with the response
+        // body, instead of raising TTR_STALE; a 202 (the same key still in flight) rolls back like a 5xx.
+        answer: Boolean = false,
     ): List<Xml> =
         if (this == C7) {
             listOf(
@@ -183,7 +184,7 @@ internal enum class Dialect(
                                                             """
                                                             ${C7Runtime.bpmnError}
                                                             def code = ((Number) statusCode).intValue()
-                                                            ${if (conflictIsStale) STALE_ON_CONFLICT else ""}
+                                                            ${if (answer) ANSWER_IN_FLIGHT else STALE_ON_CONFLICT}
                                                             if (code >= 400 && code < 500 && code != 408 && code != 429) throw BpmnError.getConstructor(String, String).newInstance('TTR_REFUSED', 'run API HTTP ' + code + ': ' + response.toString().take(256))
                                                             if (code < 200 || code >= 300) throw new IllegalStateException('run API HTTP ' + code)
                                                             ${C7Runtime.spin}
@@ -233,7 +234,7 @@ internal enum class Dialect(
                 ),
             )
         } else {
-            require(conflictIsStale) { "a C8 HTTP step raises TTR_STALE on 409" }
+            require(!answer) { "the answer Open is a process-engine (C7) step" }
             listOf(
                 Xml("zeebe:taskDefinition", mapOf("type" to "io.camunda:http-json:1", "retries" to "3")),
                 Xml(
@@ -303,6 +304,9 @@ internal enum class Dialect(
         }
 
     private companion object {
+        const val ANSWER_IN_FLIGHT =
+            "if (code == 202) throw new IllegalStateException('run API HTTP 202: the answer is still in flight')"
+
         const val STALE_ON_CONFLICT =
             "if (code == 409) throw BpmnError.getConstructor(String, String).newInstance('TTR_STALE', 'run API fingerprint refused')"
     }
