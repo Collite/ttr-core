@@ -820,6 +820,26 @@ export function createSchemas(metadata) {
     { type: 'object', additionalProperties: ref('profileTemplate'), not: { required: ['input'] } },
     object({ input: pointer }, ['input'])
   );
+  // ✅D-MW-81 (S5.2a): an `each` template is a `shape` template whose inputs may also read the list element —
+  // `$item` itself or `$item/<pointer>`; a plain pointer reads the record.
+  defs.eachTemplate = any(
+    string,
+    number,
+    boolean,
+    { type: 'null' },
+    array(ref('eachTemplate')),
+    { type: 'object', additionalProperties: ref('eachTemplate'), not: { required: ['input'] } },
+    object(
+      {
+        input: {
+          type: 'string',
+          // `\x24` is `$`: emitted patterns carry no literal `$` (portable end anchors).
+          pattern: anchoredPattern('(?:\\x24item)?(?:/(?:[^~/]|~[01])*)*'),
+        },
+      },
+      ['input']
+    )
+  );
   const files = array({ type: 'string', minLength: 1 }, 1);
   const selectors = { at: pointer, files };
   const canonicalKind = { enum: [...new Set(targetKinds.map((k) => k.kind))] };
@@ -834,9 +854,10 @@ export function createSchemas(metadata) {
           ...recordSelectors,
           kind: pointer,
           id: pointer,
+          // ✅D-MW-81 (S5.2a): a `null` kind skips the record into ignored[].
           mapping: {
             type: 'object',
-            additionalProperties: canonicalKind,
+            additionalProperties: any(canonicalKind, { type: 'null' }),
           },
         },
         ['at', 'mapping']
@@ -894,6 +915,12 @@ export function createSchemas(metadata) {
       },
       ['in', 'at', 'to']
     ),
+    // ✅D-MW-81 (S5.2a, P-8 amended to eleven): a list → one `shape` per element; `key` makes it an object.
+    operation(
+      'each',
+      { ...recordSelectors, to: ref('propertyTarget'), shape: ref('eachTemplate'), key: pointer },
+      ['in', 'at', 'to', 'shape']
+    ),
   ];
   // Group endpoint selectors by their value type. Repeating a full nested
   // value schema at every path causes eager validators to expand it thousands
@@ -925,9 +952,20 @@ export function createSchemas(metadata) {
   operations.push({
     ...operation(
       'values',
-      { ...recordSelectors, to: ref('propertyTarget'), mapping: { type: 'object' }, default: data },
-      ['in', 'at', 'to', 'mapping']
+      {
+        ...recordSelectors,
+        to: ref('propertyTarget'),
+        mapping: { type: 'object' },
+        default: data,
+        // A blank or empty separator splits on whitespace runs (contracts §3; review-338 B3).
+        split: { type: 'string' },
+      },
+      ['in', 'at', 'to']
     ),
+    // ✅D-MW-81 (S5.2a): `split` turns a string into its parts — no `mapping`, no `default`; without it, `mapping` is required.
+    if: { required: ['split'] },
+    then: { not: { anyOf: [{ required: ['mapping'] }, { required: ['default'] }] } },
+    else: { required: ['mapping'] },
     anyOf: [...typeGroups.values()].map(({ value, targets }) => ({
       properties: {
         to: any(targets),
@@ -974,6 +1012,9 @@ export function createSchemas(metadata) {
                 template: ref('profileTemplate'),
                 reason: string,
                 by: string,
+                shape: ref('eachTemplate'),
+                key: pointer,
+                split: string,
               },
               ['op']
             ),

@@ -1,0 +1,12 @@
+# S5.2a (✅D-MW-81): a glossary-like list — `kinds` skips the draft term (`navrh: null`), `each` keys the
+# [{@value, @language}] labels into a description language map, `split` reads a multi-valued cell into tags.
+pojmy:
+  Smlouva:
+    stav: schvaleno
+    popisy:
+      - {'@value': Smlouva, '@language': cs}
+      - {'@value': Contract, '@language': en}
+    znacky: 'pravo; obchod'
+  Koncept:
+    stav: navrh
+    poznamka: rozpracováno

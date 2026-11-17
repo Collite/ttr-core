@@ -82,6 +82,27 @@ object DiagnosticCodes {
                 "A file read as canonical YAML is not valid canonical YAML",
                 "ttr-yaml CanonicalYaml via ttr-metadata YamlFileSource",
             ),
+            // MW-P5 S5.2a (✅D-MW-81): the `each` op and the `split` operand of `values`.
+            DiagnosticCode(
+                "ys/each-not-a-list",
+                "An each op's `at` selects something other than a list",
+                "ttr-profile ValueOps (each)",
+            ),
+            DiagnosticCode(
+                "ys/each-missing-key",
+                "A list element has no string at the each op's `key`",
+                "ttr-profile ValueOps (each with key:, at the element)",
+            ),
+            DiagnosticCode(
+                "ys/each-duplicate-key",
+                "Two list elements have the same string at the each op's `key`",
+                "ttr-profile ValueOps (each with key:, at the later element)",
+            ),
+            DiagnosticCode(
+                "ys/split-not-a-string",
+                "A values op with `split` selects something other than a string",
+                "ttr-profile ValueOps (values with split:)",
+            ),
             DiagnosticCode(
                 "xm/link-unresolved",
                 "A link names nothing in the run or its sidecars",

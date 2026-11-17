@@ -2092,6 +2092,220 @@
     }
   },
   {
+    "group": "profile shapes and targets",
+    "name": "each (S5.2a)",
+    "schema": "profile",
+    "valid": true,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "each",
+          "in": "relation",
+          "at": "/spojeni",
+          "to": {
+            "kind": "relation",
+            "property": "join"
+          },
+          "shape": {
+            "from": {
+              "ref": {
+                "input": "$item/z"
+              }
+            },
+            "to": {
+              "ref": {
+                "input": "/cil"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "each keyed (S5.2a)",
+    "schema": "profile",
+    "valid": true,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "each",
+          "in": "entity",
+          "at": "/popisy",
+          "to": {
+            "kind": "entity",
+            "property": "description"
+          },
+          "key": "/@language",
+          "shape": {
+            "input": "$item/@value"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "each no at",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "each",
+          "in": "relation",
+          "to": {
+            "kind": "relation",
+            "property": "join"
+          },
+          "shape": {
+            "from": {
+              "ref": {
+                "input": "$item/z"
+              }
+            },
+            "to": {
+              "ref": {
+                "input": "/cil"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "shape reads no $item",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "shape",
+          "in": "entity",
+          "at": "",
+          "to": {
+            "kind": "entity",
+            "property": "description"
+          },
+          "template": {
+            "input": "$item"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "values split (S5.2a)",
+    "schema": "profile",
+    "valid": true,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "values",
+          "in": "query",
+          "at": "/vzory",
+          "to": {
+            "kind": "query",
+            "path": [
+              "search",
+              "patterns"
+            ]
+          },
+          "split": ";"
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "values split with mapping",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "values",
+          "in": "query",
+          "at": "/vzory",
+          "to": {
+            "kind": "query",
+            "path": [
+              "search",
+              "patterns"
+            ]
+          },
+          "split": ";",
+          "mapping": {
+            "a": [
+              "b"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "values no split no mapping",
+    "schema": "profile",
+    "valid": false,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "values",
+          "in": "query",
+          "at": "/vzory",
+          "to": {
+            "kind": "query",
+            "path": [
+              "search",
+              "patterns"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "group": "profile shapes and targets",
+    "name": "kinds null kind skips (S5.2a)",
+    "schema": "profile",
+    "valid": true,
+    "value": {
+      "profile": "demo/1",
+      "grammar": ">=0.21 <1.0",
+      "operations": [
+        {
+          "op": "kinds",
+          "at": "/pojmy",
+          "kind": "/stav",
+          "mapping": {
+            "Approved": "kind",
+            "Draft": null
+          }
+        }
+      ]
+    }
+  },
+  {
     "group": "exact vocabulary and nested types",
     "name": "lexical policy rejects boolean",
     "value": {

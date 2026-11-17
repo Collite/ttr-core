@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 export enum DiagnosticCode {
+  YamlSyntax = 'ys/yaml-syntax',
+  YamlSchema = 'ys/schema',
+  YamlValue = 'ys/value',
   ParseError = 'ttr/parse-error',
   ParseRecoveryInfo = 'ttr/parse-recovery-info',
   UnknownProperty = 'ttr/unknown-property',

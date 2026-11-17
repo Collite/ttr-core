@@ -24,9 +24,14 @@ data class EmittedDocument(
     fun write(): String = CanonicalYaml.write(canonical)
 }
 
+/**
+ * One `ignored[]` entry. [record] is set when a whole record was skipped by a `kinds` mapping value `null`
+ * (✅D-MW-81, S5.2a): the id the record would have had, or null when it has no string id.
+ */
 data class Ignored(
     val location: ProfileSpan,
     val reason: String?,
+    val record: String? = null,
 )
 
 data class ApplyReport(
@@ -79,6 +84,7 @@ data class ApplyResult(
                         put("line", item.location.line)
                         put("column", item.location.column)
                         put("path", item.location.path)
+                        item.record?.let { put("record", it) }
                         put("reason", item.reason)
                     }
                 }

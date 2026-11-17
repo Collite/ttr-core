@@ -6,11 +6,11 @@ import type { Trivia } from './cst/trivia.js';
  *
  * Conventions (match ANTLR's TokenStream, not LSP):
  *   - `line` and `endLine` are 1-indexed.
- *   - `column` and `endColumn` are 0-indexed (column of the first character of the token / one past the last).
- *   - `offsetStart` and `offsetEnd` are 0-indexed byte offsets into the source file;
+ *   - `column` and `endColumn` are 0-indexed Unicode code-point columns (first character / one past the last).
+ *   - `offsetStart` and `offsetEnd` are 0-indexed Unicode code-point offsets into the source file;
  *     `offsetEnd` is exclusive.
  *
- * LSP consumers must subtract 1 from `line`/`endLine` to produce LSP positions.
+ * LSP consumers subtract 1 from `line`/`endLine` and convert columns to UTF-16 units.
  */
 export interface SourceLocation {
   file: string;
@@ -1621,6 +1621,10 @@ export interface EmbeddedBlock {
    * escaped (two characters in the file, one in `text`). Positions count code points.
    */
   escapes?: number[];
+  /** YAML scalars can encode a character with more than two source characters.
+   * Decoded code-point boundaries map to authored code-point offsets; line starts
+   * cover the physical scalar. The authored form remains independent of this map. */
+  textMapping?: { offsets: number[]; lineStarts: number[]; startLine: number };
   /** The whole literal. */
   source: SourceLocation;
   leadingTrivia?: Trivia[];

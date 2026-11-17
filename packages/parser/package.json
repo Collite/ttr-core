@@ -16,14 +16,16 @@
     }
   },
   "scripts": {
-    "prebuild": "bash ../grammar/scripts/generate-typescript-parser.sh",
+    "prebuild": "bash ../grammar/scripts/generate-typescript-parser.sh && node scripts/generate-yaml-resources.mjs",
     "build": "tsc && node ../../scripts/prepare-ts-package.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint src"
   },
   "dependencies": {
-    "antlr4ng": "^3.0.0"
+    "antlr4ng": "^3.0.0",
+    "yaml": "2.9.1",
+    "ajv": "^8.20.0"
   },
   "devDependencies": {
     "@tatrman/grammar": "workspace:*",
