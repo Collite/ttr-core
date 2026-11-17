@@ -138,6 +138,108 @@ class RecipeRows(
         return right + left
     }
 
+    // ---- join entry (S2.4e, ⚑R352-A) ---------------------------------------------------------------------------
+
+    /**
+     * The column of a name a bare `latest(by:)` reads: its [type], its provenance ([origin]), and the [join] where it
+     * entered the chain (null: not yet) — [JoinEntry]'s rule.
+     */
+    data class Entry(
+        val type: TtrpType?,
+        val origin: String?,
+        val join: String?,
+    )
+
+    private val entryMemo = HashMap<PortRef, Map<String, Entry>?>()
+    private val entryVisiting = HashSet<PortRef>()
+
+    /** Per column name of the row [ref] carries, the one with the most recent [JoinEntry]. */
+    fun entries(ref: PortRef): Map<String, Entry>? {
+        if (ref in entryMemo) return entryMemo[ref]
+        if (!entryVisiting.add(ref)) return null
+        val e = computeEntries(ref)
+        entryVisiting.remove(ref)
+        entryMemo[ref] = e
+        return e
+    }
+
+    /** [entries] of the row entering [nodeId]'s in-port [port]. */
+    fun inputEntries(
+        nodeId: String,
+        port: String = PortNames.IN,
+    ): Map<String, Entry>? = feed(PortRef(nodeId, port))?.let { entries(it) }
+
+    /** [ref]'s row with nothing entered yet. */
+    private fun fresh(ref: PortRef): Map<String, Entry>? {
+        val o = origin(ref)
+        return of(ref)?.mapValues { (name, type) -> Entry(type, o[name], null) }
+    }
+
+    private fun computeEntries(ref: PortRef): Map<String, Entry>? {
+        val node = graph.nodes[ref.nodeId] ?: return null
+        if (node is Container) {
+            val port = node.declaredPorts.firstOrNull { it.name == ref.port }
+            // A container's input starts afresh (the emitter reads it as an upstream relation).
+            if (port?.direction == PortDirection.IN) return feed(ref)?.let { fresh(it) }
+            node.portMapping[ref.port]?.let { return entries(it) }
+            return fresh(ref)
+        }
+        return when (node) {
+            is Filter, is Sort, is Limit, is Distinct, is Branch, is Switch, is TimeSugar -> inputEntries(node.id)
+            is Join -> joinEntries(node)
+            is Project, is Select, is Calc -> {
+                val inp = inputEntries(node.id) ?: return fresh(ref)
+                val row = of(ref) ?: return null
+                val o = origin(ref)
+                row.mapValues { (name, type) ->
+                    // A column passed under its own name keeps its entry; a computed or renamed one has none.
+                    if (carries(node, name)) inp[name] ?: Entry(type, o[name], null) else Entry(type, o[name], null)
+                }
+            }
+            else -> fresh(ref)
+        }
+    }
+
+    /** True when [node] passes its input column [name] through under that name. */
+    private fun carries(
+        node: Node,
+        name: String,
+    ): Boolean =
+        when (node) {
+            is Project -> {
+                val i = node.columns.indices.firstOrNull { node.aliasOf(it) == name }
+                if (i == null) {
+                    node.passthrough || node.columns.any { it is ColumnRef && it.column == "*" }
+                } else {
+                    (node.columns[i] as? ColumnRef)?.let { it.port == null && it.column == name } == true
+                }
+            }
+            is Select -> name in node.columns && node.renames[name].let { it == null || it == name }
+            is Calc -> {
+                val a = node.assignments.firstOrNull { it.name == name }
+                a == null || (a.value as? ColumnRef)?.let { it.port == null && it.column == name } == true
+            }
+            else -> false
+        }
+
+    private fun joinEntries(node: Join): Map<String, Entry>? {
+        val left = inputEntries(node.id, PortNames.LEFT) ?: return null
+        if (node.type == JoinType.SEMI || node.type == JoinType.ANTI) return left
+        val right = inputEntries(node.id, PortNames.RIGHT) ?: return null
+        val stamp = JoinEntry.stamps(node)
+
+        fun entered(e: Entry) = if (stamp && e.join == null) e.copy(join = node.id) else e
+        val l = left.mapValues { entered(it.value) }
+        val r = right.mapValues { entered(it.value) }
+        val out = LinkedHashMap<String, Entry>(l)
+        for ((name, re) in r) {
+            val le = l[name]
+            // The right one only when it enters here and the left one entered upstream; else LEFT.
+            if (le == null || (re.join == node.id && le.join != node.id)) out[name] = re
+        }
+        return out
+    }
+
     // ---- provenance ----------------------------------------------------------------------------------------
 
     /** [ref]'s columns that are plain copies of a model attribute → that attribute (`entity.attribute`). */

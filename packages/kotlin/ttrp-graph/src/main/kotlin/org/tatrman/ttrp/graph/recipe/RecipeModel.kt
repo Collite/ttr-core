@@ -63,6 +63,8 @@ data class RecipeModel(
     val kinds: List<String> = emptyList(),
     val candidateKind: String? = null,
     val implicitLatestDates: Map<String, String> = emptyMap(),
+    /** S2.4e (⚑R352-A): per `latest` with a bare `by:`, the join its date entered at — [RecipeTime.latestDateEntries]. */
+    val latestDateEntries: Map<String, String> = emptyMap(),
     /** AU-core-P2: the switch ends `else: none` — its untaken rows get no verdict row (manifest `elseRoute: "none"`). */
     val elseNone: Boolean = false,
     /** AU-core-P2: every `+`/`-` with a date operand, by location — [RecipeTime.dateArithmetic]. */

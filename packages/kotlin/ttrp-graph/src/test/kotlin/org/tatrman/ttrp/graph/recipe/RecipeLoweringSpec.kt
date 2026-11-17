@@ -195,7 +195,7 @@ class RecipeLoweringSpec :
                 )
         }
 
-        "`latest(by:, per:)` → max per group + a semi join of the rows back, a NULL `per:` its own group" {
+        "`latest(by:, per:)` → max per group, rows joined to it on the keys, the max kept; NULL `per:` own group" {
             val r = context("load(er.entity.inventory) -> latest(by: as_of_date, per: item, warehouse) -> rows")
             r.ok shouldBe true
             val g = r.graph!!
@@ -212,10 +212,18 @@ class RecipeLoweringSpec :
             g.nodes.values
                 .filterIsInstance<org.tatrman.ttrp.graph.model.Project>()
                 .any { p -> max.groupBy.all { it in p.aliases } } shouldBe true
+            // an equi join of the rows to their group's max on the keys (S2.4e: no semi join, no text of the date) …
+            val join =
+                g.nodes.values
+                    .filterIsInstance<Join>()
+                    .single { it.id.endsWith("~latest") }
+            join.type shouldBe JoinType.INNER
+            join.on.shouldNotBeNull()
+            // … and the rows at the max kept — or every row of a group with no date at all (`m is null`)
             g.nodes.values
-                .filterIsInstance<Join>()
-                .single { it.type == JoinType.SEMI }
-                .on
+                .filterIsInstance<org.tatrman.ttrp.graph.model.Filter>()
+                .single { it.label == "latest" || it.id == join.id.removeSuffix("~latest") }
+                .predicate
                 .shouldNotBeNull()
         }
 
