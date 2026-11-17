@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.imports
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContain
@@ -13,6 +14,7 @@ import org.tatrman.ttr.metadata.source.BuiltinStockSource
 import org.tatrman.ttr.metadata.source.FileBasedSource
 import org.tatrman.ttr.metadata.source.LocalFsStorage
 import org.tatrman.ttr.profile.ForeignTree
+import org.tatrman.ttr.profile.ProfileException
 import org.tatrman.ttr.profile.ProfileEngine
 import org.tatrman.ttr.profile.ProfileReader
 import java.nio.file.Files
@@ -100,6 +102,24 @@ class GenericGlossarySpec :
                     "Untyped" to "kind missing (/rdf:type/*/@local)",
                 )
             loadsStrict(root, generated)
+        }
+
+        test("✅R350-C: a 20,000-item member list ends the import in a located error, never a StackOverflowError") {
+            val members = (0 until 20_000).joinToString(" ") { "g:C$it" }
+            // Its subject map (20,000 blank list cells) is over the reader's tree budget: refused, located, at the file.
+            shouldThrow<ProfileException> {
+                run(
+                    RdfFrontEnd.TURTLE,
+                    "g.ttl",
+                    prefixes + "g:Party a s:Concept ; s:prefLabel \"party\"@en .\n" +
+                        "g:List a s:OrderedCollection ; s:memberList ( $members ) .\n",
+                    "skos/1",
+                )
+            }.let {
+                it.code shouldBe "ys/profile-invalid"
+                it.location.file shouldBe "g.ttl#subjects"
+                it.detail shouldContain "exceeds the limit"
+            }
         }
 
         test("skos/1: an untagged label is English with a warning; a repeated language keeps the bytewise-first") {

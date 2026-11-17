@@ -92,11 +92,11 @@ class RdfFrontEnd private constructor(
         val graph = Graph(triples, label)
         val subjects = TreeMap<String, JsonObject>(Bytewise)
         for (subject in graph.subjects) {
-            val id = graph.term(subject, emptyList())
+            val id = graph.term(subject)
             subjects[id] =
                 JsonObject(
                     reference(id) +
-                        graph.properties(subject, emptyList()).mapValues { (_, objects) ->
+                        graph.properties(subject).mapValues { (_, objects) ->
                             JsonArray(objects.toList())
                         },
                 )
@@ -110,7 +110,8 @@ class RdfFrontEnd private constructor(
      * SHA-256 of its content — its predicates in bytewise IRI order, each with its objects in [objectOrder], a blank
      * object by its own label — so the label is the same whatever the syntax or the statement order. Two blank nodes with
      * the same content get one label (one subject in the tree; their objects are a set). A blank node met again on its own
-     * path has no content label: `ys/profile-invalid`, naming the predicates of the cycle.
+     * path has no content label: `ys/profile-invalid`, naming the predicates of the cycle. Labelling is iterative
+     * (✅R350-C), so a long RDF list does not overflow the call stack.
      */
     private class Graph(
         triples: List<Triple>,
@@ -121,47 +122,83 @@ class RdfFrontEnd private constructor(
         private val labels = HashMap<Node, String>()
         val subjects: Set<Node> = bySubject.keys
 
-        /** [path]: the blank nodes being labelled, outermost first, each with the predicate that leads on. */
-        fun term(
-            node: Node,
-            path: List<Pair<Node, String>>,
-        ): String {
-            if (!node.isBlank) return node.uri
-            labels[node]?.let { return it }
-            val start = path.indexOfFirst { it.first == node }
-            if (start >= 0) {
-                val cycle = path.drop(start).joinToString(" → ") { it.second }
-                throw ProfileException(
-                    "ys/profile-invalid",
-                    ProfileSpan("$label$TREE", 1, 1, 1, 1, "/subjects"),
-                    "blank nodes in a cycle ($cycle) have no content label; give one of them an IRI",
-                )
-            }
-            val content =
-                properties(node, path).entries.joinToString("\n") { (key, objects) ->
-                    "${full(key)} ${JsonArray(objects.toList())}"
-                }
-            val digest = MessageDigest.getInstance("SHA-256").digest(content.toByteArray(Charsets.UTF_8))
-            return "_:${digest.joinToString("") { "%02x".format(it) }.take(16)}".also { labels[node] = it }
+        /** A blank node being labelled, its blank objects still to visit, and the predicate that led on from it. */
+        private class Frame(
+            val node: Node,
+            val children: Iterator<Pair<Node, String>>,
+        ) {
+            var via: String = ""
         }
 
+        /** A node's term; a blank node's label is computed first, for it and every blank node it reaches. */
+        fun term(node: Node): String {
+            if (!node.isBlank) return node.uri
+            labels[node]?.let { return it }
+            label(node)
+            return labels.getValue(node)
+        }
+
+        /**
+         * ✅R350-C: labels [root] and the blank nodes it reaches with an explicit stack, children before parents, so an
+         * RDF list of any length (`skos:memberList`, a chain of `rdf:rest` blank nodes) needs no call stack. A blank node
+         * met again on the current path is a cycle.
+         */
+        private fun label(root: Node) {
+            val stack = ArrayList<Frame>()
+            val onPath = HashSet<Node>()
+
+            fun push(node: Node) {
+                val children =
+                    bySubject[node]
+                        .orEmpty()
+                        .filter { it.`object`.isBlank }
+                        .map { it.`object` to key(it.predicate.uri) }
+                        .iterator()
+                stack += Frame(node, children)
+                onPath += node
+            }
+            push(root)
+            while (stack.isNotEmpty()) {
+                val top = stack.last()
+                if (top.children.hasNext()) {
+                    val (child, via) = top.children.next()
+                    if (child in labels) continue
+                    top.via = via
+                    if (child in onPath) {
+                        val cycle = stack.drop(stack.indexOfFirst { it.node == child }).joinToString(" → ") { it.via }
+                        throw ProfileException(
+                            "ys/profile-invalid",
+                            ProfileSpan("$label$TREE", 1, 1, 1, 1, "/subjects"),
+                            "blank nodes in a cycle ($cycle) have no content label; give one of them an IRI",
+                        )
+                    }
+                    push(child)
+                } else {
+                    // Every blank object of this node has its label now, so its content reads them without recursion.
+                    val content =
+                        properties(top.node).entries.joinToString("\n") { (key, objects) ->
+                            "${full(key)} ${JsonArray(objects.toList())}"
+                        }
+                    val digest = MessageDigest.getInstance("SHA-256").digest(content.toByteArray(Charsets.UTF_8))
+                    labels[top.node] = "_:${digest.joinToString("") { "%02x".format(it) }.take(16)}"
+                    onPath -= top.node
+                    stack.removeAt(stack.lastIndex)
+                }
+            }
+        }
+
+        private fun key(predicate: String) = keys.getOrPut(predicate) { compact(predicate) }
+
         /** [subject]'s predicates (keys in bytewise order of the full IRI) and their objects in [objectOrder]. */
-        fun properties(
-            subject: Node,
-            path: List<Pair<Node, String>>,
-        ): Map<String, Set<JsonObject>> {
+        fun properties(subject: Node): Map<String, Set<JsonObject>> {
             val grouped = TreeMap<String, MutableSet<JsonObject>>(compareBy(Bytewise) { full(it) })
             for (triple in bySubject[subject].orEmpty()) {
-                val key = keys.getOrPut(triple.predicate.uri) { compact(triple.predicate.uri) }
-                grouped.getOrPut(key) { sortedSetOf(objectOrder) } += value(triple.`object`, path + (subject to key))
+                grouped.getOrPut(key(triple.predicate.uri)) { sortedSetOf(objectOrder) } += value(triple.`object`)
             }
             return grouped
         }
 
-        private fun value(
-            node: Node,
-            path: List<Pair<Node, String>>,
-        ): JsonObject =
+        private fun value(node: Node): JsonObject =
             if (node.isLiteral) {
                 JsonObject(
                     buildMap {
@@ -175,7 +212,7 @@ class RdfFrontEnd private constructor(
                     },
                 )
             } else {
-                reference(term(node, path))
+                reference(term(node))
             }
     }
 

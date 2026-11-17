@@ -167,6 +167,24 @@ class RdfFrontEndSpec :
             }
         }
 
+        test("✅R350-C: a 20,000-item RDF list (skos:memberList) labels its blank nodes without overflowing the stack") {
+            val members = (0 until 20_000).joinToString(" ") { "g:C$it" }
+            val tree =
+                RdfFrontEnd.TURTLE.tree(
+                    "@prefix s: <http://www.w3.org/2004/02/skos/core#> .\n@prefix g: <https://example.org/g/> .\n" +
+                        "g:List a s:OrderedCollection ; s:memberList ( $members ) .\n",
+                    "list.ttl",
+                )
+            val subjects =
+                Json
+                    .parseToJsonElement(tree)
+                    .jsonObject
+                    .getValue("subjects")
+                    .jsonObject
+            subjects.keys.count { it.startsWith("_:") } shouldBe 20_000
+            subjects.keys.filter { it.startsWith("_:") }.all { Regex("_:[0-9a-f]{16}").matches(it) } shouldBe true
+        }
+
         test("a language tag is written in the TTR locale form: en-GB → en_gb, zh-Hans → zh_hans (✅D-MW-87 item 5)") {
             val tree =
                 RdfFrontEnd.TURTLE.tree(
