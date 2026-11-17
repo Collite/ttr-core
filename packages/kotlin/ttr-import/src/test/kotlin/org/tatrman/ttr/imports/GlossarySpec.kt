@@ -7,9 +7,8 @@ import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.tatrman.ttr.metadata.LoadOptions
 import org.tatrman.ttr.metadata.MetadataLoader
 import org.tatrman.ttr.metadata.source.BuiltinStockSource
@@ -74,6 +73,26 @@ class GlossarySpec :
                     }.joinToString("\n")
             }
 
+        /** [generated] written under `<root>/model` beside the authored core package loads strict, with no error. */
+        fun loadsStrict(
+            root: Path,
+            generated: GeneratedPackage,
+        ) {
+            val model = root.resolve("model")
+            generated.files.forEach { (path, text) ->
+                model.resolve(path).also { it.parent.createDirectories() }.writeText(text)
+            }
+            model.resolve("glossary/core.ttrm").writeText(fixture.resolve("authored/glossary/core.ttrm").readText())
+            val loaded =
+                MetadataLoader(
+                    listOf(BuiltinStockSource(), FileBasedSource("glossary", 100, LocalFsStorage("glossary", model))),
+                ).load(LoadOptions(strict = true))
+            withClue(loaded.issues.joinToString("\n")) {
+                loaded.report?.ok shouldBe true
+                loaded.errors shouldBe emptyList()
+            }
+        }
+
         test(
             "SKOS Turtle → a cn skeleton and one lexicon per locale, byte-equal to the committed expectation, strict",
         ) {
@@ -95,19 +114,7 @@ class GlossarySpec :
                 listOf("glossary/cn.ttrm" to 12, "glossary/lexicon.cs.ttrm" to 7, "glossary/lexicon.en.ttrm" to 8)
 
             // The skeleton loads strict beside the authored core package that declares `relation_type related`.
-            val model = root.resolve("model")
-            generated.files.forEach { (path, text) ->
-                model.resolve(path).also { it.parent.createDirectories() }.writeText(text)
-            }
-            model.resolve("glossary/core.ttrm").writeText(fixture.resolve("authored/glossary/core.ttrm").readText())
-            val loaded =
-                MetadataLoader(
-                    listOf(BuiltinStockSource(), FileBasedSource("glossary", 100, LocalFsStorage("glossary", model))),
-                ).load(LoadOptions(strict = true))
-            withClue(loaded.issues.joinToString("\n")) {
-                loaded.report?.ok shouldBe true
-                loaded.errors shouldBe emptyList()
-            }
+            loadsStrict(root, generated)
         }
 
         test("the same glossary as RDF/XML yields the same packages, byte for byte below the header") {
@@ -167,29 +174,30 @@ class GlossarySpec :
                 "\"sourceName\":\"https://example.org/trade/Customer\",\"locator\":\"Customer\"}"
         }
 
-        test("an overlay keyed by a term's IRI applies after the profile and reports overridden[]") {
+        test("an overlay keyed by IRIs turns a term into a role (✅D-MW-84), reports overridden[] and loads strict") {
             val root = workspace()
             val generated = run(root, RdfFrontEnd.TURTLE, "trade.ttl", "skos/1", fixture.resolve("overlay.yaml"))
-            generated.files.getValue("glossary/cn.ttrm") shouldContain
-                "def kind Customer { description: { cs: \"Strana, která od nás aspoň jednou nakoupila.\", " +
-                "en: \"A party that has bought from us at least once.\" }"
-            generated.report.overridden.map { Triple(it.qname, it.property, it.from) } shouldBe
+            val cn = generated.files.getValue("glossary/cn.ttrm").lines()
+            val customer = cn.single { it.startsWith("def role Customer ") }
+            customer shouldContain "of: \"Person\""
+            customer shouldContain "event: Purchase"
+            cn.single { it.startsWith("def event Purchase ") } shouldContain "abstract: true"
+            cn.count { it.startsWith("def kind ") } shouldBe 10
+
+            // The qname, the sidecar and the lexicon keep the transform's kind; only the keyword changes.
+            generated.report.overridden.map { listOf(it.qname, it.property, it.from, it.to) } shouldBe
                 listOf(
-                    Triple(
-                        "glossary.cn.kind.Customer",
-                        "description",
-                        buildJsonObject {
-                            put("cs", "Strana, která od nás nakupuje.")
-                            put("en", "A party that buys from us.")
-                        },
-                    ),
+                    listOf("glossary.cn.kind.Customer", "event", JsonNull, JsonPrimitive("Purchase")),
+                    listOf("glossary.cn.kind.Customer", "kind", JsonPrimitive("kind"), JsonPrimitive("role")),
+                    listOf("glossary.cn.kind.Customer", "of", JsonNull, JsonPrimitive("Person")),
+                    listOf("glossary.cn.kind.Purchase", "kind", JsonPrimitive("kind"), JsonPrimitive("event")),
                 )
-            generated.report.overridden
-                .single()
-                .to shouldBe
-                buildJsonObject {
-                    put("en", JsonPrimitive("A party that has bought from us at least once."))
-                    put("cs", JsonPrimitive("Strana, která od nás aspoň jednou nakoupila."))
-                }
+            generated.sidecars.getValue("glossary.sources.json") shouldContain
+                "{\"qname\":\"glossary.cn.kind.Customer\",\"kind\":\"kind\"," +
+                "\"sourceName\":\"https://example.org/trade/Customer\",\"locator\":\"Customer\"}"
+            generated.files.getValue("glossary/lexicon.en.ttrm") shouldContain
+                "def term Customer_en { for: cn.Customer, forms: [\"buyer\", \"client\"] }"
+
+            loadsStrict(root, generated)
         }
     })
