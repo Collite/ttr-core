@@ -155,6 +155,9 @@ internal class RecordPlan(
 
     init {
         val evaluated = mutableSetOf<Pair<Int, String>>()
+        // Strict refusals wait for the fixpoint: one beneath a null-skip is no error, and the skip may be found later
+        // in either op order (review-338 B1). The first refusal per node is kept, in discovery order.
+        val refusals = linkedMapOf<String, ProfileException>()
         var changed: Boolean
         do {
             changed = false
@@ -171,12 +174,17 @@ internal class RecordPlan(
                         selection.value !is JsonObject &&
                         selection.value !is JsonArray
                     ) {
-                        if (lenient) return@forEach
-                        throw ProfileException(
-                            "ys/profile-invalid",
-                            selection.span(key = true),
-                            "kinds.at must select a sequence or mapping",
-                        )
+                        if (!lenient) {
+                            refusals.putIfAbsent(
+                                selection.path,
+                                ProfileException(
+                                    "ys/profile-invalid",
+                                    selection.span(key = true),
+                                    "kinds.at must select a sequence or mapping",
+                                ),
+                            )
+                        }
+                        return@forEach
                     }
                     val sources = if (op.value.string("at").isEmpty()) listOf(selection) else selection.entries()
                     for (source in sources) {
@@ -184,8 +192,8 @@ internal class RecordPlan(
                             try {
                                 discover(op, source, parent)
                             } catch (e: ProfileException) {
-                                if (lenient) continue
-                                throw e
+                                if (!lenient) refusals.putIfAbsent(source.path, e)
+                                continue
                             } ?: continue
                         found[source.path to record.kind] = record
                         madeBy[record] = index
@@ -195,11 +203,23 @@ internal class RecordPlan(
             }
         } while (changed)
         val recorded = found.keys.map { it.first }.toSet()
+        // Nothing beneath a skipped node is discovered, whichever op ran first (review-338 B1): a record or a nested
+        // skip below it is dropped. A node another `kinds` op made a record of is not skipped.
+        val skippedPaths = skips.keys.filter { it !in recorded }
+
+        fun beneathSkip(path: String) = skippedPaths.any { path.startsWith("$it/") }
+        refusals.entries.firstOrNull { !beneathSkip(it.key) }?.let { throw it.value }
+        found.entries.removeIf { (key, record) ->
+            beneathSkip(key.first).also { if (it) madeBy.remove(record) }
+        }
         skipped =
-            skips.filterKeys { it !in recorded }.values.map { (node, ignored) ->
-                consumption.consume(node)
-                ignored
-            }
+            skips
+                .filterKeys { it in skippedPaths && !beneathSkip(it) }
+                .values
+                .map { (node, ignored) ->
+                    consumption.consume(node)
+                    ignored
+                }
     }
 
     /**

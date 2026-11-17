@@ -88,10 +88,15 @@ try {
   writeFileSync(
     join(scratch, 'consume.mjs'),
     `import assert from 'node:assert/strict';
-import { parseString } from '@tatrman/parser';import * as layout from '@tatrman/parser/layout';
+import { parseString, parseYamlDocument } from '@tatrman/parser';import * as layout from '@tatrman/parser/layout';
 import { renderDataType } from '@tatrman/lsp';import { synthesize, resolveManifest } from '@tatrman/edit';
 import * as tokens from '@tatrman/tokens';
 assert.equal(parseString('model er\\ndef entity customer {}').errors.length,0);
+const yaml = parseYamlDocument('{"ttr":"0.22","model":"er","defs":[{"kind":"entity","id":"customer","properties":{}}]}','model.yaml');
+assert.deepEqual(yaml.diagnostics,[]);
+assert.equal(yaml.ast.definitions[0].name,'customer');
+const badYaml = parseYamlDocument('{"ttr":"0.22","typo":true}');
+assert.equal(badYaml.ast,undefined);assert.ok(badYaml.diagnostics[0].code.startsWith('ys/'));
 assert.equal(typeof renderDataType,'function');assert.equal(typeof synthesize,'function');
 for(const p of [layout,tokens])assert.ok(Object.keys(p).length>0);
 resolveManifest(undefined,'');`
@@ -123,11 +128,13 @@ resolveManifest(undefined,'');`
   assert.ok(typedSubpaths.includes('@tatrman/lsp/browser'), JSON.stringify(typedSubpaths));
   writeFileSync(
     join(scratch, 'type-probe.ts'),
-    `import { parseString } from '@tatrman/parser';
+    `import { parseString, parseYamlDocument } from '@tatrman/parser';
 import { renderDataType } from '@tatrman/lsp';import { createServerConnection } from '@tatrman/lsp/server';
 import { synthesize } from '@tatrman/edit';import * as tokens from '@tatrman/tokens';
 import * as layout from '@tatrman/parser/layout';import type * as browserEntry from '@tatrman/lsp/browser';
 const errors: number = parseString('model er').errors.length;
+const yaml: import('@tatrman/parser').YamlParseResult = parseYamlDocument('{"ttr":"0.22"}');
+void yaml;
 const doc: layout.LayoutDocument | undefined = undefined;
 const write: typeof layout.writeTtrg = layout.writeTtrg;
 const entry: typeof browserEntry | undefined = undefined;

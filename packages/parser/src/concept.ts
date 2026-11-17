@@ -58,6 +58,22 @@ export function embeddedBlockLocation(
   // A string-form block's escapes each take one more character of the file than of `text`: count the
   // ones on this line before the column (`escapes` index the whole text, in code points).
   const lineStart = block.text.split('\n').slice(0, l).reduce((n, s) => n + [...s].length + 1, 0);
+  if (block.textMapping) {
+    const { offsets, lineStarts, startLine } = block.textMapping;
+    const point = (index: number) => {
+      const offset = offsets[Math.max(0, Math.min(index, offsets.length - 1))];
+      let lo = 0, hi = lineStarts.length;
+      while (lo + 1 < hi) {
+        const mid = (lo + hi) >>> 1;
+        if (lineStarts[mid] <= offset) lo = mid;
+        else hi = mid;
+      }
+      return { offset, line: startLine + lo, column: offset - lineStarts[lo] };
+    };
+    const from = point(lineStart + column), to = point(lineStart + column + length);
+    return { file: block.source.file, line: from.line, column: from.column,
+      endLine: to.line, endColumn: to.column, offsetStart: from.offset, offsetEnd: to.offset };
+  }
   const shift = (c: number) => (block.escapes ?? []).filter((e) => e >= lineStart && e < lineStart + c).length;
   const base = l === 0 ? block.textSource.column : block.indentWidth;
   const start = column + shift(column);

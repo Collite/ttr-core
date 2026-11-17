@@ -447,9 +447,15 @@ importers:
 
   packages/parser:
     dependencies:
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
       antlr4ng:
         specifier: ^3.0.0
         version: 3.0.16
+      yaml:
+        specifier: 2.9.1
+        version: 2.9.1
     devDependencies:
       '@tatrman/grammar':
         specifier: workspace:*

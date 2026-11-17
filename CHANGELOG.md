@@ -29,6 +29,23 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   record collection (`/subjects/*/skos:altLabel`) as it folds list indices. `FrontEnd` gains `records` (default
   null) and `ReaderOptions` gains `lexicon`.
 
+### Changed — ttr-emit-camunda: the approval row's answer is decided at its Open (ttr-server D-159/D-228/D-233; AU-export S1.5.7)
+
+- The process-engine approval row's answer Open is its one call to the Server, which decides the approved key and
+  closes the answer run at that Open. The row continues only on `status: closed` with `answer.decision: commit`
+  (201, or 200 replayed). Anything else (`waiting`, `409 answer-unmatched`/`*-stale`, another 4xx) reaches
+  `run refused` and is never counted as decided. A non-2xx refusal keeps the Server's status and body in
+  `ttrRefusedReason`; a 2xx that does not commit leaves it null (the answer's `status` is the row-local
+  `ttrAnswerStatus`, in the history). A `202` (the same key still in flight) rolls the completion back like a 5xx.
+  The answered `port.key` is the column-named key object. `ttrAnswerRunId`, `ttrAnswerStatus` and
+  `ttrAnswerDecision` are row-local.
+- The process-engine target asks for an `approval: required` action whose rows the Server holds (native sink
+  `transition`, `writer` or `obligation`; grammar 0.22: `native: transition`, `process_engine: door`) and never
+  performs it directly; the Server applies it once the answer is verified (D-230). The Server holds those rows at the
+  run's close, so the engine asks after the close: `closed` ends the evaluation, `waiting` asks per selected row, and
+  anything else refuses. An approval action with another native sink, or none, is performed as before. Customer
+  `camunda_7`/`camunda_8` exports are unchanged.
+
 ### Added — `each`, `split` and the `kinds` null-skip in the profile engine (MW-P5 S5.2a, ✅D-MW-81)
 
 - An eleventh operation, `each` (`in`, `at`, `to`, `shape`, optional `key`): the list at `at` → one `shape` template
@@ -36,9 +53,9 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   `key` the result is an object keyed by each element's string at that pointer. New codes `ys/each-not-a-list`,
   `ys/each-missing-key` and `ys/each-duplicate-key` (located at the list or the element).
 - `values` takes a `split: "<separator>"` operand instead of `mapping`/`default`: a string → its trimmed non-empty
-  parts. The separator is matched without surrounding whitespace, and a blank one splits on whitespace runs. A
+  parts. The separator is matched without surrounding whitespace, and an empty or blank one splits on whitespace runs. A
   non-string raises the new `ys/split-not-a-string`.
-- A `kinds` mapping value `null` skips the record (no emission, no error). The record is listed once in `ignored[]`
+- A `kinds` mapping value `null` skips the record (no emission, no error), and nothing beneath it is discovered or refused. The record is listed once in `ignored[]`
   with the new optional `record` field (its id) and `reason: "kind mapping null (<pointer> = <value>)"`. `Ignored`
   gains `record: String?`. Reports without a skip are byte-identical.
 - `profile.schema.json`: the `each` op, the `eachTemplate` definition, `split`, and `null` as a `kinds` mapping value.

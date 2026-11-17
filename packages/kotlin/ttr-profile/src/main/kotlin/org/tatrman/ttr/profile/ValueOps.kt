@@ -210,7 +210,8 @@ internal class EachOp(
                     JsonArray(shaped.mapNotNull { (_, value) -> value as? JsonElement })
                 } else {
                     val keyed = linkedMapOf<String, JsonElement>()
-                    shaped.forEach { (element, value) ->
+                    // An element whose template yields nothing is dropped before its key is checked (review-338 B2).
+                    shaped.filter { (_, value) -> value is JsonElement }.forEach { (element, value) ->
                         val name =
                             (key.resolve(element)?.value as? JsonPrimitive)?.takeIf { it.isString }?.content
                                 ?: throw ProfileException(
@@ -225,7 +226,7 @@ internal class EachOp(
                                 "Duplicate each key $name at ${element.path}",
                             )
                         }
-                        if (value is JsonElement) keyed[name] = value
+                        keyed[name] = value as JsonElement
                     }
                     JsonObject(keyed)
                 }

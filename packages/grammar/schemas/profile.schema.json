@@ -1767,8 +1767,7 @@
                       ]
                     },
                     "split": {
-                      "type": "string",
-                      "minLength": 1
+                      "type": "string"
                     }
                   },
                   "required": [
