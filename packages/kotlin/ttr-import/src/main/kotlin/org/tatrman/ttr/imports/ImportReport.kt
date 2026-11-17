@@ -13,7 +13,7 @@ import org.tatrman.ttr.profile.ApplyResult
 
 /**
  * A reader run's report (contracts §1, XM 06 §2.6): `{ignored[], overridden[], packages[], warnings[]}` — what the source
- * carried that the profile ignored (with the profile's reason), what an overlay overrode, what was generated — written as
+ * carried that the profile ignored (with the profile's reason), what an overlay set (replaced, added, re-kinded), what was generated — written as
  * `report.json` beside the package and rendered by [markdown] as the PR-body section. Entries are sorted; no timestamps.
  */
 data class ImportReport(
@@ -125,7 +125,7 @@ data class ImportReport(
             appendLine("#### Overridden (${overridden.size})")
             appendLine()
             if (overridden.isEmpty()) {
-                appendLine("No overlay entry overrode a generated value.")
+                appendLine("No overlay entry set a value.")
             } else {
                 appendLine("| qname | property | from | to |")
                 appendLine("|---|---|---|---|")

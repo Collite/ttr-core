@@ -132,6 +132,14 @@ class OverlaySpec :
                 .jsonObject
                 .getValue("whereFilter") shouldBe Json.parseToJsonElement("""{"sql":"X"}""")
         }
+        // Review-346 F2: no cn record in the fan-out, so `kind: role` keeps today's choice (the entity) as a property,
+        // and the strict load refuses it at the overlay entry.
+        test("a fan-out with no cn record keeps a kind: role overlay on the entity, as a property") {
+            val error = shouldThrow<ProfileException> { fanout("Odberatel: {kind: role}") }
+            error.code shouldBe "ys/profile-invalid"
+            error.location.file shouldBe demoRoot.resolve("profiles/ov.yaml").toAbsolutePath().toString()
+            error.location.line shouldBe 4
+        }
         test("two primary records with one sourceName stay ambiguous, and the message names both qnames") {
             val chain =
                 profile(
