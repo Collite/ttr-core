@@ -281,44 +281,7 @@ internal class CamundaRenderer(
         scope.link(codes, end, "200 replayed", d.and(eq("ttrOpenCode", "200"), d.bool("ttrOpen", "replayed")))
         val fresh = scope.node("exclusiveGateway", "claimed run")
         scope.link(codes, fresh, "201 claimed", eq("ttrOpenCode", "201"))
-        val handle = BpmnModel.Scope(stableId("${scope.id}/handle"))
-        val awaiting = scope.node("subProcess", "await other execution", child = handle)
-        awaiting.extensions +=
-            d.mapping(mapOf("ttrHandleRetryAfter" to "ttrOpenRetryAfter"), mapOf("ttrHandle" to "ttrHandle"))
-        scope.link(codes, awaiting, "202 handle", eq("ttrOpenCode", "202"))
-        scope.default(codes, refused)
-        val hstart = handle.node("startEvent", "handle start")
-        val hend = handle.node("endEvent", "handle settled")
-        val pause =
-            timer(
-                handle,
-                "honour Retry-After",
-                d.condition(
-                    expr(
-                        "'PT'.concat(ttrHandleRetryAfter.toString()).concat('S')",
-                        "\"PT\" + string(ttrHandleRetryAfter) + \"S\"",
-                    ),
-                ),
-            )
-        val status = http(handle, graph, "handle status", "status", "ttrHandle", run = d.string("ttrOpen", "runId"))
-        val settled = handle.node("exclusiveGateway", "handle terminal")
-        handle.link(hstart, pause)
-        handle.link(pause, status)
-        handle.link(status, settled)
-        val terminal = listOf("closed", "waiting", "abandoned", "failed").map { state("ttrHandle", it) }.reduce(d::or)
-        handle.link(settled, hend, "terminal", terminal)
-        handle.default(settled, pause)
-        val bound =
-            boundary(
-                scope,
-                awaiting,
-                "handle budget exceeded",
-                Xml(
-                    "bpmn:timerEventDefinition",
-                    children = listOf(Xml("bpmn:timeDuration", text = "PT${budget(graph)}S")),
-                ),
-            )
-        scope.link(bound, refused)
+        val awaiting = awaitHandle(scope, graph, codes, refused, "ttrOpen")
         val restart = scope.node("exclusiveGateway", "bounded restart")
         scope.link(awaiting, restart)
         scope.link(restart, end, "closed or waiting", d.or(state("ttrHandle", "closed"), state("ttrHandle", "waiting")))
@@ -397,43 +360,7 @@ internal class CamundaRenderer(
                 last = decision
             }
         }
-        val evaluate = http(evaluation, graph, "evaluate", "evaluate", "ttrEvaluation")
-        evaluation.link(last, evaluate)
-        val evaluated = evaluation.node("exclusiveGateway", "evaluation complete")
-        val poll =
-            timer(
-                evaluation,
-                "evaluation poll",
-                d.condition(
-                    expr(
-                        "'PT'.concat(ttrEvaluationRetryAfter.toString()).concat('S')",
-                        "\"PT\" + string(ttrEvaluationRetryAfter) + \"S\"",
-                    ),
-                ),
-            )
-        val progress = http(evaluation, graph, "evaluation status", "status", "ttrEvaluation")
-        evaluation.default(evaluated, poll)
-        // Synchronous EvaluationResult has no status: use RunProgress on both paths.
-        evaluation.link(evaluate, progress)
-        evaluation.link(poll, progress)
-        evaluation.link(progress, evaluated)
-        val evaluationEnd = evaluation.node("endEvent", "verdict ready")
-        val evaluationFailed = error(evaluation, "evaluation failed or abandoned", "run_refused")
-        evaluation.link(
-            evaluated,
-            evaluationFailed,
-            "failed or abandoned",
-            d.or(state("ttrEvaluation", "failed"), state("ttrEvaluation", "abandoned")),
-        )
-        val ready =
-            d.and(
-                d.exists("ttrEvaluation", "verdict"),
-                expr(
-                    "!(${state("ttrEvaluation", "running")}) && !(${state("ttrEvaluation", "open")})",
-                    "not(${state("ttrEvaluation", "running")}) and not(${state("ttrEvaluation", "open")})",
-                ),
-            )
-        evaluation.link(evaluated, evaluationEnd, "verdict ready", ready)
+        evaluateUntilReady(evaluation, graph, last, "ttrEvaluation", "ttrRunId")
         val statusActions = http(work, graph, "selected actions", "status", "ttrStatus")
         work.link(boundedEvaluation, statusActions)
         val valid = work.node("exclusiveGateway", "per-key actions required")
@@ -468,6 +395,184 @@ internal class CamundaRenderer(
             )
         work.link(evalBound, wfail)
         return sub
+    }
+
+    /**
+     * A run's Open answered 202: another execution holds it. Poll its status (honouring Retry-After) until terminal, within
+     * the budget; the budget's boundary refuses. Links `202 handle` from [codes] and refuses every other code by default.
+     */
+    private fun awaitHandle(
+        scope: BpmnModel.Scope,
+        graph: RecipeGraph,
+        codes: BpmnModel.Node,
+        refused: BpmnModel.Node,
+        open: String,
+    ): BpmnModel.Node {
+        val handle = BpmnModel.Scope(stableId("${scope.id}/handle"))
+        val awaiting = scope.node("subProcess", "await other execution", child = handle)
+        awaiting.extensions +=
+            d.mapping(mapOf("ttrHandleRetryAfter" to "${open}RetryAfter"), mapOf("ttrHandle" to "ttrHandle"))
+        scope.link(codes, awaiting, "202 handle", eq("${open}Code", "202"))
+        scope.default(codes, refused)
+        val hstart = handle.node("startEvent", "handle start")
+        val hend = handle.node("endEvent", "handle settled")
+        val pause =
+            timer(
+                handle,
+                "honour Retry-After",
+                d.condition(
+                    expr(
+                        "'PT'.concat(ttrHandleRetryAfter.toString()).concat('S')",
+                        "\"PT\" + string(ttrHandleRetryAfter) + \"S\"",
+                    ),
+                ),
+            )
+        val status = http(handle, graph, "handle status", "status", "ttrHandle", run = d.string(open, "runId"))
+        val settled = handle.node("exclusiveGateway", "handle terminal")
+        handle.link(hstart, pause)
+        handle.link(pause, status)
+        handle.link(status, settled)
+        val terminal = listOf("closed", "waiting", "abandoned", "failed").map { state("ttrHandle", it) }.reduce(d::or)
+        handle.link(settled, hend, "terminal", terminal)
+        handle.default(settled, pause)
+        val bound =
+            boundary(
+                scope,
+                awaiting,
+                "handle budget exceeded",
+                Xml(
+                    "bpmn:timerEventDefinition",
+                    children = listOf(Xml("bpmn:timeDuration", text = "PT${budget(graph)}S")),
+                ),
+            )
+        scope.link(bound, refused)
+        return awaiting
+    }
+
+    /**
+     * Evaluate [run] after [last] and read its status (RunProgress: a synchronous EvaluationResult has no status) until the
+     * verdict is ready, honouring Retry-After. Failed or abandoned evidence refuses. [result] holds the last status read.
+     */
+    private fun evaluateUntilReady(
+        evaluation: BpmnModel.Scope,
+        graph: RecipeGraph,
+        last: BpmnModel.Node,
+        result: String,
+        run: String,
+        prefix: String = "",
+    ) {
+        val evaluate = http(evaluation, graph, "${prefix}evaluate", "evaluate", result, run = run)
+        evaluation.link(last, evaluate)
+        val evaluated = evaluation.node("exclusiveGateway", "${prefix}evaluation complete")
+        val poll =
+            timer(
+                evaluation,
+                "${prefix}evaluation poll",
+                d.condition(
+                    expr(
+                        "'PT'.concat(${result}RetryAfter.toString()).concat('S')",
+                        "\"PT\" + string(${result}RetryAfter) + \"S\"",
+                    ),
+                ),
+            )
+        val progress = http(evaluation, graph, "${prefix}evaluation status", "status", result, run = run)
+        evaluation.default(evaluated, poll)
+        evaluation.link(evaluate, progress)
+        evaluation.link(poll, progress)
+        evaluation.link(progress, evaluated)
+        val evaluationEnd = evaluation.node("endEvent", "${prefix}verdict ready")
+        val evaluationFailed = error(evaluation, "${prefix}evaluation failed or abandoned", "run_refused")
+        evaluation.link(
+            evaluated,
+            evaluationFailed,
+            "failed or abandoned",
+            d.or(state(result, "failed"), state(result, "abandoned")),
+        )
+        val ready =
+            d.and(
+                d.exists(result, "verdict"),
+                expr(
+                    "!(${state(result, "running")}) && !(${state(result, "open")})",
+                    "not(${state(result, "running")}) and not(${state(result, "open")})",
+                ),
+            )
+        evaluation.link(evaluated, evaluationEnd, "verdict ready", ready)
+    }
+
+    /** The variables an answer step writes; declared on the step so none reaches the process instance (R323-4). */
+    private val answerLocals =
+        listOf("ttrAnswerOpen", "ttrAnswerEvaluation", "ttrAnswerClosed", "ttrHandle").flatMap {
+            listOf(it, "${it}Code", "${it}Headers", "${it}RetryAfter")
+        }
+
+    /**
+     * The answer run (D-228, D-230): the identity Open runs in the completion's transaction (no asyncBefore), then the
+     * answered run is evaluated and closed like any run. The Server decided the held group at the Open, so the run's
+     * actions are not routed again: the row's approval is never re-asked. A close that is not `closed` (the key held
+     * again) refuses rather than counting as decided.
+     */
+    private fun answerRun(
+        scope: BpmnModel.Scope,
+        graph: RecipeGraph,
+        action: String,
+    ) {
+        val run = d.string("ttrAnswerOpen", "runId")
+        val start = scope.node("startEvent", "answer start")
+        val refused = error(scope, "answer refused", "run_refused")
+        val open =
+            http(
+                scope,
+                graph,
+                "answer $action",
+                "open",
+                "ttrAnswerOpen",
+                body = "ttrAnswerOpenBody",
+                asyncBefore = false,
+            )
+        scope.link(start, open)
+        val codes = scope.node("exclusiveGateway", "answer ownership")
+        scope.link(open, codes)
+        val close = http(scope, graph, "answer close", "close", "ttrAnswerClosed", run = run)
+        scope.link(
+            codes,
+            close,
+            "200 replayed",
+            d.and(eq("ttrAnswerOpenCode", "200"), d.bool("ttrAnswerOpen", "replayed")),
+        )
+        val evaluation = BpmnModel.Scope(stableId("${scope.id}/evaluation"))
+        val bounded = scope.node("subProcess", "answer evaluation within budget", child = evaluation)
+        bounded.extensions += d.mapping(outputs = mapOf("ttrAnswerEvaluation" to "ttrAnswerEvaluation"))
+        scope.link(codes, bounded, "201 claimed", eq("ttrAnswerOpenCode", "201"))
+        val awaiting = awaitHandle(scope, graph, codes, refused, "ttrAnswerOpen")
+        val end = scope.node("endEvent", "answer closed")
+        val settled = scope.node("exclusiveGateway", "answer settled")
+        scope.link(awaiting, settled)
+        scope.link(settled, end, "closed", state("ttrHandle", "closed"))
+        scope.default(settled, refused)
+        evaluateUntilReady(
+            evaluation,
+            graph,
+            evaluation.node("startEvent", "answer evaluation start"),
+            "ttrAnswerEvaluation",
+            run,
+            "answer ",
+        )
+        scope.link(bounded, close)
+        val closed = scope.node("exclusiveGateway", "answer run closed")
+        scope.link(close, closed)
+        scope.link(closed, end, "closed", state("ttrAnswerClosed", "closed"))
+        scope.default(closed, refused)
+        val bound =
+            boundary(
+                scope,
+                bounded,
+                "answer evaluation budget exceeded",
+                Xml(
+                    "bpmn:timerEventDefinition",
+                    children = listOf(Xml("bpmn:timeDuration", text = "PT${budget(graph)}S")),
+                ),
+            )
+        scope.link(bound, refused)
     }
 
     private fun budget(graph: RecipeGraph): Long {
@@ -651,7 +756,11 @@ internal class CamundaRenderer(
                     action.sinks[graph.deployment.type] ?: action.sinks["camunda"] ?: action.sinks["native"]
                         ?: error("missing Camunda sink for ${wiring.action}")
                 when {
-                    sink == "user task" || action.approval == "required" && action.sinks["native"] == "task" -> {
+                    // D-230: the engine target asks for every approval-required action, whatever its sink; the Server
+                    // performs it when the answer is verified. Customer targets keep the explicit user-task sinks.
+                    sink == "user task" ||
+                        action.approval == "required" &&
+                        (action.sinks["native"] == "task" || engine) -> {
                         val gate = rowScope.node("exclusiveGateway", "${wiring.action} selected and wet")
                         val done = rowScope.node("exclusiveGateway", "${wiring.action} complete")
                         rowScope.link(last, gate)
@@ -705,22 +814,11 @@ internal class CamundaRenderer(
                                 )
                             answerStep.extensions +=
                                 d.mapping(
-                                    mapOf(
+                                    linkedMapOf(
                                         "ttrAnswerOpenBody" to openBody(graph, "answer", first = false, answer = true),
-                                    ),
+                                    ) + answerLocals.associateWith { "null" },
                                 )
-                            val answer =
-                                http(
-                                    answerScope,
-                                    graph,
-                                    "answer ${wiring.action}",
-                                    "open",
-                                    "ttrAnswerOpen",
-                                    body = "ttrAnswerOpenBody",
-                                    asyncBefore = false,
-                                )
-                            answerScope.link(answerScope.node("startEvent", "answer start"), answer)
-                            answerScope.link(answer, answerScope.node("endEvent", "answer opened"))
+                            answerRun(answerScope, graph, wiring.action)
                             rowScope.link(task, answerStep)
                             rowScope.link(answerStep, done)
                         } else {
@@ -980,9 +1078,14 @@ internal class CamundaRenderer(
         The engine templates also retain ttrInput.at in keyed ports; batch ports remain {none: true}.
         Approval completion captures task.id/assignee; its answer Open additionally carries engine.taskId and
         engine.answeredBy, with idempotencyKey = ttrAnchor + ':answer:' + ttrTaskId and the approved row's key.
-        It runs within task completion (no asyncBefore). This version opens the answer run; it does not yet
-        evaluate or close it. A transient answer Open failure rolls back completion; the user completes again.
-        Only the engine client may assert an answer.
+        Every approval-required action becomes this user task, whatever its sink; the engine never performs it directly.
+        The answer Open runs within task completion (no asyncBefore); a transient failure rolls back completion and the
+        user completes again. The Server decides the approved key's held group at that Open. The row then evaluates
+        and closes the answer run (asyncBefore steps, polled until the verdict is ready, bounded by budget + 2 min);
+        it does not route the run's actions, so the approval is never asked twice. A 200 replay closes the run without
+        evaluating; 202 polls the other execution until closed. A close that is not closed (the key held again)
+        refuses. The ttrAnswer* and ttrHandle variables are local to the answer step. Only the engine client may
+        assert an answer.
         Deploy: `ttrp emit --deployment ${root.deployment.name} --deploy` posts this BPMN and the DMN files as one engine
         deployment named ${root.deployment.name}, with duplicate filtering and deployment-source ttrp:<bundle fingerprint>.
         The bearer comes from TTR_BEARER (or --token-env); it is never written to output or export files.
