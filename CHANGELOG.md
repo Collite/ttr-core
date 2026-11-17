@@ -6,6 +6,22 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — ttr-core: a second latest(...) over the same date column reduces by its own alias (ttr-server#434; AU-core S2.4e)
+
+- A recipe `latest(by: d, per: …)` reduces by the **newest** input column named `d`, which is the date the last join
+  brought. hartland's `stock_at_center` joins the inventory twice (the line's item, then its requested variant) and
+  reduces after each join. Its second `latest` used to reduce by the first inventory's `as_of_date` instead of the
+  variant's `as_of_date0`. It therefore kept every variant snapshot, and the way's routes repeated a line once per
+  snapshot (`route keys must be unique`). A qualified `by:` (`stock.as_of_date`) is unchanged.
+- `latest` is NULL-safe on its date: a group whose `by:` dates are all NULL (a LEFT join that matched nothing) keeps
+  its rows. Before, the alias defect hid this for the second `latest`, but the first one dropped a line with no stock
+  of its item. A NULL date beside a real one is still not the latest. The date meets its group's max as a
+  never-NULL text key (`'n'`, or `'v' || CAST(d AS VARCHAR)`), like the `per:` columns (review-119 M6), so the
+  reduction is still an equi-join.
+- Every bundle with a `latest` changes its SQL text (a `_ttrp_d_*` / `_ttrp_dm_*` key replaces `d = _ttrp_latest_*`)
+  and the hashes and fingerprints derived from it. Rows are unchanged where every group has a date. Rebuild and
+  re-commit recipe bundles.
+
 ### Changed — an overlay re-kinds a definition; `overridden[]` reports additions (MW-P5 S5.2b, ✅D-MW-84)
 
 - An overlay entry's `kind: <value>` re-kinds a top-level **cn** definition when the value is a cn stereotype
