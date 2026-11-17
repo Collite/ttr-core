@@ -101,10 +101,11 @@ describe('YAML authored relocation (review-334)', () => {
     if (entity.kind !== 'entity') throw new Error('entity expected');
     expect(slice(text, entity.attributes![0].source)).toBe('{id: name, properties: {type: text}}');
     at(text, entity.attributes![0].source);
-    for (const suffix of [', unknown: 1', ', broken: [']) {
+    for (const suffix of ['unknown: 1', 'broken: [']) {
       const invalid = 'ttr: "0.22"\ndefs: []\n# 😀😀\n' + suffix;
       const errors = parseYamlDocument(invalid).diagnostics;
       expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].code).toBe(suffix.startsWith('unknown') ? 'ys/schema' : 'ys/yaml-syntax');
       errors.forEach((d) => at(invalid, d.source));
     }
     const embedded = cn('|\n        😀 and wrong');
