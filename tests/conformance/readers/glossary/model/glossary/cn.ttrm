@@ -1,16 +1,16 @@
-// generated-from: ../../sources/trade.ttl@f0b88a72b63605af8a41f8437b009dd60e0141a1b4ade4f1c4570b3c1a811a00 profile skos/1 generator 0.0.1-LOCAL — do not edit
+// generated-from: ../../sources/trade.ttl@86413e05a8dea49a8cc5ae966e4ccf8609ade208f48f2c857c8b2a86553bfbc0 profile skos/1 generator 0.0.1-LOCAL — do not edit
 package glossary
 model cn
 
 def kind Customer { description: { cs: "Strana, která od nás nakupuje.", en: "A party that buys from us." }, label: { cs: "zákazník", en: "customer" }, is_a: ["Party"], abstract: true, relations: [{ to: "Order", type: "related" }] }
 def kind Invoice { description: { cs: "Výzva k zaplacení objednávky.", en: "A demand for payment for an order." }, label: { cs: "faktura", en: "invoice" }, abstract: true, relations: [{ to: "Payment", type: "related" }] }
 def kind Order { description: { cs: "Požadavek zákazníka na nákup produktů.", en: "A customer's request to buy products." }, label: { cs: "objednávka", en: "order" }, abstract: true, relations: [{ to: "Invoice", type: "related" }, { to: "Shipment", type: "related" }] }
-def kind OrderLine { description: { cs: "Jeden produkt a množství v objednávce.", en: "One product and quantity within an order." }, label: { cs: "řádek objednávky", en: "order line" }, abstract: true, relations: [{ to: "Product", type: "related" }] }
 def kind Organisation { description: { cs: "Firma nebo instituce vystupující jako strana.", en: "A company or institution acting as a party." }, label: { cs: "organizace", en: "organisation" }, is_a: ["Party"], abstract: true }
 def kind Party { description: { cs: "Kdokoli, s kým firma jedná.", en: "Anyone the business deals with." }, label: { cs: "strana", en: "party" }, abstract: true }
 def kind Payment { description: { cs: "Peníze přijaté na fakturu.", en: "Money received against an invoice." }, label: { cs: "platba", en: "payment" }, abstract: true }
 def kind Person { description: { cs: "Člověk vystupující jako strana.", en: "A human being acting as a party." }, label: { cs: "osoba", en: "person" }, is_a: ["Party"], abstract: true }
 def kind Product { description: { cs: "Něco, co prodáváme.", en: "Something we sell." }, label: { cs: "produkt", en: "product" }, abstract: true, relations: [{ to: "Warehouse", type: "related" }] }
+def kind Purchase { description: { cs: "Nákup zákazníka: událost, která ze strany dělá zákazníka.", en: "A customer buying from us: the event that makes a party a customer." }, label: { cs: "nákup", en: "purchase" }, abstract: true, relations: [{ to: "Order", type: "related" }] }
 def kind Shipment { description: { cs: "Produkty odeslané zákazníkovi.", en: "Products sent to a customer." }, label: { cs: "zásilka", en: "shipment" }, abstract: true }
 def kind Supplier { description: { cs: "Organizace, od které nakupujeme.", en: "An organisation we buy from." }, label: { cs: "dodavatel", en: "supplier" }, is_a: ["Organisation"], abstract: true, relations: [{ to: "Product", type: "related" }] }
 def kind Warehouse { description: { cs: "Místo, kde jsou uloženy produkty.", en: "A place where products are stored." }, label: { cs: "sklad", en: "warehouse" }, abstract: true }

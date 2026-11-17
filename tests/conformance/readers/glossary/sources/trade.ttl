@@ -52,12 +52,12 @@ t:Order a skos:Concept ;
     skos:definition "A customer's request to buy products."@en, "Požadavek zákazníka na nákup produktů."@cs ;
     skos:related t:Invoice, t:Shipment .
 
-t:OrderLine a skos:Concept ;
+t:Purchase a skos:Concept ;
     skos:inScheme t:Trade ;
-    skos:prefLabel "order line"@en, "řádek objednávky"@cs ;
-    skos:definition "One product and quantity within an order."@en, "Jeden produkt a množství v objednávce."@cs ;
-    skos:related t:Product ;
-    skos:altLabel "položka"@cs .
+    skos:prefLabel "purchase"@en, "nákup"@cs ;
+    skos:definition "A customer buying from us: the event that makes a party a customer."@en, "Nákup zákazníka: událost, která ze strany dělá zákazníka."@cs ;
+    skos:related t:Order ;
+    skos:altLabel "sale"@en, "koupě"@cs .
 
 t:Invoice a skos:Concept ;
     skos:inScheme t:Trade ;

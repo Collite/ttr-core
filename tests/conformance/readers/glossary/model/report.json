@@ -18,7 +18,7 @@
             "package": "glossary",
             "model": "lexicon",
             "file": "glossary/lexicon.en.ttrm",
-            "defs": 7
+            "defs": 8
         }
     ],
     "ignored": [
@@ -103,215 +103,215 @@
             "file": "trade.ttl#subjects",
             "line": 160,
             "column": 13,
-            "path": "/subjects/https:~1~1example.org~1trade~1OrderLine/@id",
+            "path": "/subjects/https:~1~1example.org~1trade~1Organisation/@id",
             "reason": "the sidecar's sourceName"
         },
         {
             "file": "trade.ttl#subjects",
             "line": 162,
             "column": 13,
-            "path": "/subjects/https:~1~1example.org~1trade~1OrderLine/rdf:type",
+            "path": "/subjects/https:~1~1example.org~1trade~1Organisation/rdf:type",
             "reason": "the record kind"
         },
         {
             "file": "trade.ttl#subjects",
             "line": 168,
             "column": 13,
-            "path": "/subjects/https:~1~1example.org~1trade~1OrderLine/skos:altLabel",
-            "reason": "lexicon entries (the reader's lexicon key)"
-        },
-        {
-            "file": "trade.ttl#subjects",
-            "line": 184,
-            "column": 13,
-            "path": "/subjects/https:~1~1example.org~1trade~1OrderLine/skos:inScheme",
-            "reason": "the package is the scheme"
-        },
-        {
-            "file": "trade.ttl#subjects",
-            "line": 208,
-            "column": 13,
-            "path": "/subjects/https:~1~1example.org~1trade~1Organisation/@id",
-            "reason": "the sidecar's sourceName"
-        },
-        {
-            "file": "trade.ttl#subjects",
-            "line": 210,
-            "column": 13,
-            "path": "/subjects/https:~1~1example.org~1trade~1Organisation/rdf:type",
-            "reason": "the record kind"
-        },
-        {
-            "file": "trade.ttl#subjects",
-            "line": 216,
-            "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Organisation/skos:altLabel",
             "reason": "lexicon entries (the reader's lexicon key)"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 242,
+            "line": 194,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Organisation/skos:inScheme",
             "reason": "the package is the scheme"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 260,
+            "line": 212,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Party/@id",
             "reason": "the sidecar's sourceName"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 262,
+            "line": 214,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Party/rdf:type",
             "reason": "the record kind"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 278,
+            "line": 230,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Party/skos:inScheme",
             "reason": "the package is the scheme"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 296,
+            "line": 248,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Payment/@id",
             "reason": "the sidecar's sourceName"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 298,
+            "line": 250,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Payment/rdf:type",
             "reason": "the record kind"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 304,
+            "line": 256,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Payment/skos:altLabel",
             "reason": "lexicon entries (the reader's lexicon key)"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 320,
+            "line": 272,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Payment/skos:inScheme",
             "reason": "the package is the scheme"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 338,
+            "line": 290,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Person/@id",
             "reason": "the sidecar's sourceName"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 340,
+            "line": 292,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Person/rdf:type",
             "reason": "the record kind"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 362,
+            "line": 314,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Person/skos:inScheme",
             "reason": "the package is the scheme"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 380,
+            "line": 332,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Product/@id",
             "reason": "the sidecar's sourceName"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 382,
+            "line": 334,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Product/rdf:type",
             "reason": "the record kind"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 388,
+            "line": 340,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Product/skos:altLabel",
             "reason": "lexicon entries (the reader's lexicon key)"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 412,
+            "line": 364,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Product/skos:inScheme",
             "reason": "the package is the scheme"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 436,
+            "line": 388,
+            "column": 13,
+            "path": "/subjects/https:~1~1example.org~1trade~1Purchase/@id",
+            "reason": "the sidecar's sourceName"
+        },
+        {
+            "file": "trade.ttl#subjects",
+            "line": 390,
+            "column": 13,
+            "path": "/subjects/https:~1~1example.org~1trade~1Purchase/rdf:type",
+            "reason": "the record kind"
+        },
+        {
+            "file": "trade.ttl#subjects",
+            "line": 396,
+            "column": 13,
+            "path": "/subjects/https:~1~1example.org~1trade~1Purchase/skos:altLabel",
+            "reason": "lexicon entries (the reader's lexicon key)"
+        },
+        {
+            "file": "trade.ttl#subjects",
+            "line": 416,
+            "column": 13,
+            "path": "/subjects/https:~1~1example.org~1trade~1Purchase/skos:inScheme",
+            "reason": "the package is the scheme"
+        },
+        {
+            "file": "trade.ttl#subjects",
+            "line": 440,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Shipment/@id",
             "reason": "the sidecar's sourceName"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 438,
+            "line": 442,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Shipment/rdf:type",
             "reason": "the record kind"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 444,
+            "line": 448,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Shipment/skos:altLabel",
             "reason": "lexicon entries (the reader's lexicon key)"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 464,
+            "line": 468,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Shipment/skos:inScheme",
             "reason": "the package is the scheme"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 482,
+            "line": 486,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Supplier/@id",
             "reason": "the sidecar's sourceName"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 484,
+            "line": 488,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Supplier/rdf:type",
             "reason": "the record kind"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 490,
+            "line": 494,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Supplier/skos:altLabel",
             "reason": "lexicon entries (the reader's lexicon key)"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 516,
+            "line": 520,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Supplier/skos:inScheme",
             "reason": "the package is the scheme"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 539,
+            "line": 543,
             "column": 9,
             "path": "/subjects/https:~1~1example.org~1trade~1Trade",
             "record": "Trade",
@@ -319,28 +319,28 @@
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 556,
+            "line": 560,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Warehouse/@id",
             "reason": "the sidecar's sourceName"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 558,
+            "line": 562,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Warehouse/rdf:type",
             "reason": "the record kind"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 564,
+            "line": 568,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Warehouse/skos:altLabel",
             "reason": "lexicon entries (the reader's lexicon key)"
         },
         {
             "file": "trade.ttl#subjects",
-            "line": 580,
+            "line": 584,
             "column": 13,
             "path": "/subjects/https:~1~1example.org~1trade~1Warehouse/skos:inScheme",
             "reason": "the package is the scheme"

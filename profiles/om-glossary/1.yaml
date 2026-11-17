@@ -7,11 +7,10 @@
 # monolingual) → `label`/`description` language maps; `synonyms` → the English lexicon document. The term's sidecar
 # `sourceName` is its name (the CSV carries no FQN column).
 #
-# Not carried by v1 (each listed with its reason in the report — MW-P5 S5.2 Found (i)):
-# - parent → is_a: OpenMetadata writes the parent's FQN (`Trade.Party`); a TTR name is its last part, which no operation
-#   takes (P-8: substitutions only).
-# - relatedTerms → relations: a `;`-separated FQN list; `split` makes a list of strings, but a relation is an object
-#   `{type: related, to: <name>}` per element, which `each` makes only from a list in the source.
+# Not carried yet (each listed with its reason in the report — MW-P5 S5.2 Found (i)): `parent` (the parent's FQN,
+# `Trade.Party`) and `relatedTerms` (a `;`-separated FQN list). A TTR name is an FQN's last part, which no operation takes
+# (P-8), so S5.5's OpenMetadata adapter reshapes the snapshot first (`parentName`, a list of related names), as it lifts
+# OM's foreign keys for om-tables/1; this profile then maps them like skos/1 maps broader/related.
 profile: om-glossary/1
 grammar: '>=0.22 <1.0'
 skeleton: true
@@ -32,8 +31,8 @@ operations:
   - {op: ignore, in: kind, at: /synonyms, reason: lexicon entries (the reader's lexicon key)}
 
   # Not carried by v1 (see the header).
-  - {op: ignore, in: kind, at: /parent, reason: 'the parent FQN; is_a needs its last part, which no operation takes (S5.2 Found (i))'}
-  - {op: ignore, in: kind, at: /relatedTerms, reason: 'a ;-separated FQN list; relations need an object per element (S5.2 Found (i))'}
+  - {op: ignore, in: kind, at: /parent, reason: 'the parent FQN; is_a waits for the S5.5 adapter to give its last part (S5.2 Found (i))'}
+  - {op: ignore, in: kind, at: /relatedTerms, reason: 'a ;-separated FQN list; relations wait for the S5.5 adapter to give a list of names (S5.2 Found (i))'}
 
   # Stewardship and presentation: catalog facts, not model facts.
   - {op: ignore, in: kind, at: /owner, reason: OM owner (no cn property)}

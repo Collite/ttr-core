@@ -92,7 +92,7 @@ class GlossarySpec :
             generated.files.getValue("glossary/lexicon.en.ttrm") shouldContain
                 "def term Customer_en { for: cn.Customer, forms: [\"buyer\", \"client\"] }"
             generated.report.packages.map { it.file to it.definitions } shouldContainExactly
-                listOf("glossary/cn.ttrm" to 12, "glossary/lexicon.cs.ttrm" to 7, "glossary/lexicon.en.ttrm" to 7)
+                listOf("glossary/cn.ttrm" to 12, "glossary/lexicon.cs.ttrm" to 7, "glossary/lexicon.en.ttrm" to 8)
 
             // The skeleton loads strict beside the authored core package that declares `relation_type related`.
             val model = root.resolve("model")
@@ -118,9 +118,26 @@ class GlossarySpec :
         }
 
         test(
-            "a term not Approved (CSV, om-glossary/1) is skipped and listed in ignored[]; so is a SKOS ConceptScheme",
+            "CSV (om-glossary/1) = the same concepts in English; a term not Approved is skipped into ignored[]",
         ) {
             val csv = run(workspace(), CsvFrontEnd, "trade.csv", "om-glossary/1")
+            val turtle = run(workspace(), RdfFrontEnd.TURTLE, "trade.ttl", "skos/1")
+
+            // S5.2 Found (j): OM glossaries are monolingual and carry no is_a/relations until S5.5's adapter (Found (i)), so
+            // the CSV skeleton is the Turtle one without the cs entries, is_a and relations; the en lexicon is the same.
+            fun english(cn: String) =
+                cn
+                    .lines()
+                    .filter { it.startsWith("def ") }
+                    .map {
+                        it
+                            .replace(Regex("""cs: "[^"]*", """), "")
+                            .replace(Regex("""is_a: \[[^\]]*], """), "")
+                            .replace(Regex(""", relations: \[.*] }$"""), " }")
+                    }
+            english(csv.files.getValue("glossary/cn.ttrm")) shouldBe english(turtle.files.getValue("glossary/cn.ttrm"))
+            bodies(csv).getValue("glossary/lexicon.en.ttrm") shouldBe
+                bodies(turtle).getValue("glossary/lexicon.en.ttrm")
             csv.files.values.forEach { it shouldNotContain "Quotation" }
             csv.files
                 .getValue("glossary/cn.ttrm")
@@ -133,7 +150,7 @@ class GlossarySpec :
             csv.files.getValue("glossary/lexicon.en.ttrm") shouldContain
                 "def term Customer_en { for: cn.Customer, forms: [\"buyer\", \"client\"] }"
 
-            val skos = run(workspace(), RdfFrontEnd.TURTLE, "trade.ttl", "skos/1")
+            val skos = turtle
             skos.report.ignored
                 .filter { it.record != null }
                 .map { it.record to it.reason } shouldBe

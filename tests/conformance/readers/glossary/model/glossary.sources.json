@@ -1,15 +1,15 @@
 {
-  "generated-from": "generated-from: ../sources/trade.ttl@f0b88a72b63605af8a41f8437b009dd60e0141a1b4ade4f1c4570b3c1a811a00 profile skos/1 generator 0.0.1-LOCAL — do not edit",
+  "generated-from": "generated-from: ../sources/trade.ttl@86413e05a8dea49a8cc5ae966e4ccf8609ade208f48f2c857c8b2a86553bfbc0 profile skos/1 generator 0.0.1-LOCAL — do not edit",
   "entries": [
     {"qname":"glossary.cn.kind.Customer","kind":"kind","sourceName":"https://example.org/trade/Customer","locator":"Customer"},
     {"qname":"glossary.cn.kind.Invoice","kind":"kind","sourceName":"https://example.org/trade/Invoice","locator":"Invoice"},
     {"qname":"glossary.cn.kind.Order","kind":"kind","sourceName":"https://example.org/trade/Order","locator":"Order"},
-    {"qname":"glossary.cn.kind.OrderLine","kind":"kind","sourceName":"https://example.org/trade/OrderLine","locator":"OrderLine"},
     {"qname":"glossary.cn.kind.Organisation","kind":"kind","sourceName":"https://example.org/trade/Organisation","locator":"Organisation"},
     {"qname":"glossary.cn.kind.Party","kind":"kind","sourceName":"https://example.org/trade/Party","locator":"Party"},
     {"qname":"glossary.cn.kind.Payment","kind":"kind","sourceName":"https://example.org/trade/Payment","locator":"Payment"},
     {"qname":"glossary.cn.kind.Person","kind":"kind","sourceName":"https://example.org/trade/Person","locator":"Person"},
     {"qname":"glossary.cn.kind.Product","kind":"kind","sourceName":"https://example.org/trade/Product","locator":"Product"},
+    {"qname":"glossary.cn.kind.Purchase","kind":"kind","sourceName":"https://example.org/trade/Purchase","locator":"Purchase"},
     {"qname":"glossary.cn.kind.Shipment","kind":"kind","sourceName":"https://example.org/trade/Shipment","locator":"Shipment"},
     {"qname":"glossary.cn.kind.Supplier","kind":"kind","sourceName":"https://example.org/trade/Supplier","locator":"Supplier"},
     {"qname":"glossary.cn.kind.Warehouse","kind":"kind","sourceName":"https://example.org/trade/Warehouse","locator":"Warehouse"}
