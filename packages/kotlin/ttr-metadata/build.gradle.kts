@@ -40,6 +40,9 @@ dependencies {
     implementation(libs.jgrapht.core)
     implementation(libs.slf4j.api)
     implementation(libs.kotlinx.coroutines.core) // MetadataRefresher (M1.2)
+    // AU-export S1.5.9 (D-235): `PackagesManifest` reads `[packages].layout` of a `modeler.toml` here, so a model reader
+    // (ttrp-frontend) never needs ttr-metadata-cli for it. tomlj pulls antlr4-runtime (already here via ttr-parser).
+    implementation(libs.tomlj)
 
     testImplementation(libs.bundles.kotest)
     testImplementation(project(":packages:kotlin:ttr-yaml")) // C-7 canonical YAML fixed point; runtime stays acyclic.
@@ -50,7 +53,6 @@ dependencies {
     }
     // EN-P1.2 — parse the checked-in writability.schema.json fixture for the anti-drift parity spec.
     testImplementation(libs.kotlinx.ser.json)
-    testImplementation(libs.tomlj) // Fixture caller supplies public connection descriptors (XM C-22).
     testImplementation(libs.h2) // S6-A — DbMemberSource unit test (in-memory JDBC, test-only)
 
     // Fixture helper code (MetadataFixtures) references library + parser types.

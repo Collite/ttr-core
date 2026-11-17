@@ -8,10 +8,10 @@ import org.tatrman.ttr.metadata.LoadReport
 import org.tatrman.ttr.metadata.LoadReportIssue
 import org.tatrman.ttr.metadata.PackageLayout
 import org.tatrman.ttr.metadata.MetadataLoader
+import org.tatrman.ttr.metadata.PackagesManifest
 import org.tatrman.ttr.metadata.source.BuiltinStockSource
 import org.tatrman.ttr.metadata.source.FileBasedSource
 import org.tatrman.ttr.metadata.source.LocalFsStorage
-import org.tomlj.Toml
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Properties
@@ -96,60 +96,10 @@ object MetadataLoadCli {
     }
 
     /**
-     * `[packages].layout` of a `modeler.toml` and the manifest's own issues: the one reading of the rule, shared with
-     * `ttrp emit` / `ttrp check` (AU-export S1.5.4, D-173). A missing key is `flexible`; an unknown value warns and
-     * falls back to `flexible`; an unreadable file is an error.
+     * `[packages].layout` of a `modeler.toml` and the manifest's own issues — [PackagesManifest.read], the library's one
+     * reading of the rule (moved there in AU-export S1.5.9, D-235, so `ttrp-frontend` reads it without this CLI).
      */
-    fun readManifest(manifest: Path): Pair<PackageLayout, List<LoadReportIssue>> {
-        val parsed =
-            runCatching { Toml.parse(manifest) }.getOrElse { error ->
-                return PackageLayout.Flexible to
-                    listOf(
-                        LoadReportIssue(
-                            manifest.toString(),
-                            -1,
-                            "manifest-invalid",
-                            LoadIssue.Severity.ERROR,
-                            "cannot read modeler.toml: ${error.message}",
-                        ),
-                    )
-            }
-        if (parsed.hasErrors()) {
-            val error = parsed.errors().first()
-            return PackageLayout.Flexible to
-                listOf(
-                    LoadReportIssue(
-                        manifest.toString(),
-                        error.position().line(),
-                        "manifest-invalid",
-                        LoadIssue.Severity.ERROR,
-                        error.toString(),
-                    ),
-                )
-        }
-        val layout = parsed.get("packages.layout") ?: return PackageLayout.Flexible to emptyList()
-        val policy =
-            when (layout) {
-                "off" -> PackageLayout.Off
-                "strict" -> PackageLayout.Strict
-                "flexible" -> PackageLayout.Flexible
-                else -> null
-            }
-        return if (policy != null) {
-            policy to emptyList()
-        } else {
-            PackageLayout.Flexible to
-                listOf(
-                    LoadReportIssue(
-                        manifest.toString(),
-                        parsed.inputPositionOf("packages.layout")?.line() ?: -1,
-                        "manifest-package-layout",
-                        LoadIssue.Severity.WARNING,
-                        "Unknown [packages].layout value '$layout'; expected flexible, strict, or off. Falling back to flexible.",
-                    ),
-                )
-        }
-    }
+    fun readManifest(manifest: Path): Pair<PackageLayout, List<LoadReportIssue>> = PackagesManifest.read(manifest)
 
     private fun render(
         project: Path,

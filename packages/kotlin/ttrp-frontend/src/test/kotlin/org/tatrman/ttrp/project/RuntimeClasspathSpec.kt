@@ -14,7 +14,9 @@ import io.kotest.matchers.collections.shouldContain
 class RuntimeClasspathSpec :
     StringSpec({
         val components =
-            requireNotNull(System.getProperty("ttrp.runtimeClasspath")) { "the build did not pass ttrp.runtimeClasspath" }
+            requireNotNull(
+                System.getProperty("ttrp.runtimeClasspath"),
+            ) { "the build did not pass ttrp.runtimeClasspath" }
                 .split(',')
                 .filter { it.isNotBlank() }
 
