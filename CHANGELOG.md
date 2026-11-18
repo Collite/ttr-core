@@ -53,6 +53,12 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   `warnings` (in `reportJson()` only when non-empty) and `ApplyResult` gains `origins` (each record's input file and
   node), which the lexicon joins on.
 
+### Fixed — ttr-translator 0.14.4: ragged string literals widen to VARCHAR (ttr-server#428; AU-core S2.4d)
+
+- A CASE/UNION of ragged string literals is VARCHAR, not padded CHAR. SQL validation and plan.v1 REL_NODE
+  decoding use the same type-system rule, preserving exact route strings on PostgreSQL and MSSQL. Equal
+  typed CHAR branches keep their fixed width; datetime precision rules are unchanged.
+
 ### Fixed — ttr-core: a second latest(...) over the same date column reduces by its own alias (ttr-server#434; AU-core S2.4e)
 
 - A bare `latest(by: d, per: …)` now reduces by the `d` of the instance **the last join brought**, whichever side
