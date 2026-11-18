@@ -15,6 +15,7 @@ import org.tatrman.ttr.profile.ForeignTree
 import org.tatrman.ttr.profile.JsonPointer
 import org.tatrman.ttr.profile.ProfileException
 import java.nio.file.Files
+import java.nio.file.Path
 
 /** MW-P5 S5.3 T2 — the `xmi` front-end on small hand-written documents. */
 class XmiFrontEndSpec :
@@ -64,6 +65,9 @@ class XmiFrontEndSpec :
         <style appearance="BackColor=-1"/>
       </element>
     </elements>
+    <connectors>
+      <connector xmi:idref="R"><source xmi:idref="B"/><target xmi:idref="A"/></connector>
+    </connectors>
   </xmi:Extension>
 </xmi:XMI>
 """
@@ -104,7 +108,7 @@ class XmiFrontEndSpec :
                 .getValue("memberEnd")
                 .toString() shouldBe
                 """[{"${'$'}ref":"E1","@name":"beta"},{"${'$'}ref":"E2","@name":"alpha"}]"""
-            // An association is listed on its source (the first end's type) under its first stereotype.
+            // An association is listed on its source (EA's connector source) under its first stereotype.
             elements
                 .getValue("B")
                 .jsonObject
@@ -160,5 +164,119 @@ class XmiFrontEndSpec :
                 it.message.orEmpty() shouldContain "xmi:id M is declared twice"
                 it.location.line shouldBe 4
             }
+        }
+
+        // ---- review-372 ----
+
+        val erd =
+            String(
+                Files.readAllBytes(
+                    Path
+                        .of(
+                            "../../../tests/conformance/readers/xmi/sources/orders-erd.xmi",
+                        ).toAbsolutePath()
+                        .normalize(),
+                ),
+                charset("windows-1252"),
+            )
+
+        fun erdTree(text: String): JsonObject =
+            Json
+                .parseToJsonElement(
+                    XmiFrontEnd.tree(text.toByteArray(charset("windows-1252")), "orders-erd.xmi"),
+                ).jsonObject
+
+        test("F1 ✅R372-B: an association EA's extension does not cover has no ends and is on no @outgoing") {
+            // The hand-written ends carry type="…" attributes: no fallback reads them (EA writes the destination first).
+            val bare = tree(model.replace(Regex("(?s)\\s*<connectors>.*</connectors>"), ""))
+            val elements = bare.getValue("elements").jsonObject
+            val rel = elements.getValue("R").jsonObject
+            rel.containsKey("@source") shouldBe false
+            rel.containsKey("@target") shouldBe false
+            elements.values.none { it.jsonObject.containsKey("@outgoing") } shouldBe true
+            elements.getValue("B").jsonObject.containsKey("@outgoing") shouldBe false
+            // EA's own export without its extension: the same.
+            val erdElements =
+                erdTree(
+                    erd.replace(Regex("(?s)\\s*<xmi:Extension.*</xmi:Extension>"), ""),
+                ).getValue("elements").jsonObject
+            erdElements.values.none {
+                it.jsonObject.containsKey(
+                    "@outgoing",
+                ) ||
+                    it.jsonObject.containsKey("@source")
+            } shouldBe
+                true
+            // With the extension, EA's connector ends are read as before.
+            tree(model)
+                .getValue("elements")
+                .jsonObject
+                .getValue("R")
+                .jsonObject
+                .getValue("@source")
+                .toString() shouldBe
+                """{"${'$'}ref":"B","@name":"Beta"}"""
+        }
+
+        test("F2: a name written both as an attribute and as a child element is a located error, not a duplicate key") {
+            val both =
+                model.replace(
+                    """<ownedAttribute xmi:type="uml:Property" xmi:id="A1" name="x" type="T"/>""",
+                    """<ownedAttribute xmi:type="uml:Property" xmi:id="A1" name="x" type="T"><type xmi:idref="T"/></ownedAttribute>""",
+                )
+            refused(both.toByteArray()).also {
+                it.message.orEmpty() shouldContain "type is written both as an attribute and as a child"
+                it.location.line shouldBe 7
+            }
+        }
+
+        test(
+            "F4: a packagedElement without xmi:id, or an href proxy, is a located error; an EA end without idref is no end",
+        ) {
+            val proxy =
+                model.replace(
+                    """      <packagedElement xmi:type="uml:PrimitiveType" xmi:id="T" name="int"/>""",
+                    """      <packagedElement xmi:type="uml:PrimitiveType" xmi:id="T" name="int"/>
+      <packagedElement xmi:type="uml:Class" href="other.xmi#EAID_X"/>""",
+                )
+            refused(proxy.toByteArray()).also {
+                it.message.orEmpty() shouldContain "cross-file references (href) are not read"
+                it.location.line shouldBe 20
+                it.location.column shouldBe 70
+            }
+            val anonymous = proxy.replace(""" href="other.xmi#EAID_X"""", """ name="Gamma"""")
+            refused(anonymous.toByteArray()).also {
+                it.message.orEmpty() shouldContain "packagedElement has no xmi:id"
+                it.location.line shouldBe 20
+            }
+            val endless = erd.replace(Regex("<source xmi:idref=\"[^\"]+\">"), "<source>")
+            val placed =
+                erdTree(endless)
+                    .getValue("elements")
+                    .jsonObject
+                    .getValue("EAID_5A4D7B6E_BC8F_4E5A_8B6C_7D8E9FA0B105")
+                    .jsonObject
+            placed.containsKey("@source") shouldBe false
+            placed.containsKey("@target") shouldBe true
+        }
+
+        test("F7: a stereotype application wins over EA's tag wherever xmi:Extension sits among the root's children") {
+            val applied =
+                model
+                    .replace(
+                        """<p:thing xmi:id="S1" base_Class="A" colour="red" empty=""/>""",
+                        """<p:thing xmi:id="S1" base_Class="A" colour="" empty=""/>""",
+                    )
+            val early =
+                applied.replace(Regex("(?s)(  <p:thing.*?)(  <xmi:Extension.*</xmi:Extension>\n)"), "$2$1")
+            (early != applied) shouldBe true
+            val usual =
+                tree(applied)
+                    .getValue("elements")
+                    .jsonObject
+                    .getValue("A")
+                    .jsonObject
+            usual.getValue("@tags").toString() shouldBe """{"size":"L"}"""
+            tree(early).getValue("elements") shouldBe tree(applied).getValue("elements")
         }
     })

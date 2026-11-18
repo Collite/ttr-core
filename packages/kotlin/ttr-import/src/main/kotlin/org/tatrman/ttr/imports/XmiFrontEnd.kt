@@ -35,19 +35,25 @@ import javax.xml.stream.XMLStreamReader
  * - **References**: an `xmi:idref` (on a child such as `memberEnd`, or `<type xmi:idref=…/>`) and any other attribute whose
  *   whole value is the `xmi:id` of an element anywhere in the document (`type`, `general`, `client`, `supplier`,
  *   `association`) is a `$ref` node `{"$ref": <id>, "@name": <the target's name>}` (`@name` absent when the target has
- *   none or is not in the document), so a profile reads a referenced name without a join.
+ *   none or is not in the document), so a profile reads a referenced name without a join. The attribute form
+ *   (`type="X"`) is one `$ref` object, the child form (`<type xmi:idref="X"/>`) a list of them under the tag; a
+ *   profile reads both (✅R372-A). A name written both ways on one element is `ys/profile-invalid` at the element.
  * - **Stereotypes and tags**: a stereotype application (a child of `xmi:XMI` with a `base_<metaclass>` attribute, such as
  *   `<ttr-mdg:concept base_Class=…/>`) is folded into the element it applies to: its local name joins `@stereotypes` (a
  *   list, document order) and its other attributes join `@tags`. EA's extension adds what it carries for the same
  *   `xmi:idref` (`elements/element`, its `attributes/attribute`, `connectors/connector`): `properties` → `@properties`
  *   (a non-empty `stereotype` also joins `@stereotypes`; a `<documentation value=…>` is `@properties.documentation`),
- *   `tags/tag` → `@tags` (`name` → `value`; a stereotype application's value wins), and a connector's `source`/`target`
+ *   `tags/tag` → `@tags` (`name` → `value`; a stereotype application's value wins, wherever the extension sits — every
+ *   application is read before any extension), and a connector's `source`/`target`
  *   → `@source`/`@target`: the end's `$ref` with `role` (the role's `name`) and `multiplicity` (EA's `type`, or the
  *   role's). EA cannot tell an empty value from none, so an empty tag or property value is absent (as a CSV cell is).
  * - **Outgoing connectors**: each `uml:Association` and `uml:Dependency` element is also listed on its source element's
  *   `@outgoing`, grouped by the connector's first stereotype (else its `xmi:type`), as `{"$ref", "@name", "@tags",
- *   "@target"}`; the source is EA's connector `source`, else the first end's `type` (an association) or the `client`
- *   (a dependency). A profile reads a participant list with `each at: /@outgoing/<stereotype>`.
+ *   "@target"}`; the source is EA's connector `source`, else, for a dependency, its `client` (and the target its
+ *   `supplier`). An association EA's extension does not cover has no source and no ends (✅R372-B: UML's member ends
+ *   carry no direction, and EA writes the destination end first), so it is on no `@outgoing` and has no
+ *   `@source`/`@target`. An EA end without an `xmi:idref` is no end. A profile reads a participant list with
+ *   `each at: /@outgoing/<stereotype>`.
  * - **Not read**: diagrams (EA's `diagrams/diagram` → `@diagrams` stubs `{"@id", name}`, which a profile ignores so the
  *   report lists them), everything else in `xmi:Extension` (layout, styles, project data, EA's primitive-type package —
  *   whose types still name `$ref`s), and `xmi:Documentation`.
@@ -57,7 +63,8 @@ import javax.xml.stream.XMLStreamReader
  * sibling group that starts above an earlier one's last line keeps that line). The XML is read with StAX, no DTD and no
  * external entities, in the encoding its declaration names (EA writes `windows-1252`); the input is refused above 4 ×
  * the reader budget in bytes before parsing, and the tree is held to the budget again. Malformed XML, a root that is
- * not `xmi:XMI` or an `xmi:id` declared twice is `ys/profile-invalid` at its line and column.
+ * not `xmi:XMI`, an `xmi:id` declared twice or a non-package `packagedElement` without one (a cross-file `href` proxy
+ * included: other files are not read) is `ys/profile-invalid` at its line and column.
  */
 object XmiFrontEnd : FrontEnd {
     override val name = "xmi"
@@ -201,23 +208,34 @@ object XmiFrontEnd : FrontEnd {
         private val tags = HashMap<String, LinkedHashMap<String, String>>()
         private val applied = HashMap<String, MutableSet<String>>()
         private val properties = HashMap<String, LinkedHashMap<String, String>>()
-        private val ends = HashMap<String, LinkedHashMap<String, XNode>>()
-        private val outgoing = LinkedHashMap<String, LinkedHashMap<String, MutableList<XNode>>>()
+        private val ends = HashMap<String, LinkedHashMap<String, End>>()
+        private val outgoing = LinkedHashMap<String, LinkedHashMap<String, MutableList<Element>>>()
         private val diagrams = mutableListOf<XNode>()
         private val model: XNode?
-        private val elements = mutableListOf<Pair<XNode, String>>()
+        private val elements = mutableListOf<Element>()
+
+        /** A collected `packagedElement`: its `xmi:id`, node and package path. */
+        private class Element(
+            val id: String,
+            val node: XNode,
+            val pkg: String,
+        )
+
+        /** An EA connector end that names its element. */
+        private class End(
+            val ref: String,
+            val node: XNode,
+        )
 
         init {
             index(root)
             model = root.children.firstOrNull { it.name == "uml:Model" }
             model?.let { collect(it, emptyList()) }
-            for (child in root.children) {
-                when {
-                    child.name == "xmi:Extension" -> extension(child)
-                    child.name == "uml:Model" || child.name == "xmi:Documentation" -> Unit
-                    else -> application(child)
-                }
-            }
+            // Every stereotype application before any extension, so an application's value wins wherever EA put its
+            // extension (review-372 F7).
+            val others = root.children.filter { it.name != "uml:Model" && it.name != "xmi:Documentation" }
+            others.filter { it.name != "xmi:Extension" }.forEach(::application)
+            others.filter { it.name == "xmi:Extension" }.forEach(::extension)
             connectors()
         }
 
@@ -237,7 +255,20 @@ object XmiFrontEnd : FrontEnd {
                 if (child.attr("xmi:type") == "uml:Package") {
                     collect(child, packages + (child.attr("name") ?: ""))
                 } else {
-                    elements += child to packages.joinToString("/")
+                    val id =
+                        child.id ?: fail(
+                            label,
+                            child.line,
+                            child.column,
+                            if (child.attr("href") != null) {
+                                "packagedElement ${child.attr(
+                                    "href",
+                                )} has no xmi:id: cross-file references (href) are not read"
+                            } else {
+                                "packagedElement has no xmi:id"
+                            },
+                        )
+                    elements += Element(id, child, packages.joinToString("/"))
                 }
             }
         }
@@ -300,43 +331,39 @@ object XmiFrontEnd : FrontEnd {
                         child.attr("value")?.takeIf { it.isNotEmpty() }?.let {
                             properties.getOrPut(id) { LinkedHashMap() }.putIfAbsent("documentation", it)
                         }
-                    "source", "target" -> ends.getOrPut(id) { LinkedHashMap() }[child.name] = child
+                    // An end without an idref names no element: no end (review-372 F4).
+                    "source", "target" ->
+                        child.attr("xmi:idref")?.takeIf { it.isNotEmpty() }?.let {
+                            ends.getOrPut(id) { LinkedHashMap() }[child.name] = End(it, child)
+                        }
                     else -> Unit
                 }
             }
         }
 
-        /** The source of each association/dependency element, for `@outgoing`. */
+        /**
+         * The source of each association/dependency element, for `@outgoing`: EA's connector source, else a dependency's
+         * `client`. An association EA does not cover has none (✅R372-B).
+         */
         private fun connectors() {
-            for ((node, _) in elements) {
-                val type = node.attr("xmi:type")
+            for (element in elements) {
+                val type = element.node.attr("xmi:type")
                 if (type != "uml:Association" && type != "uml:Dependency") continue
-                val id = node.id ?: continue
-                val source =
-                    ends[id]?.get("source")?.attr("xmi:idref")
-                        ?: if (type == "uml:Dependency") {
-                            node.attr("client")
-                        } else {
-                            node.children.firstOrNull { it.name == "ownedEnd" }?.attr("type")
-                        }
-                if (source == null || source !in byId) continue
-                val group = stereotypes[id]?.firstOrNull() ?: type
-                outgoing.getOrPut(source) { LinkedHashMap() }.getOrPut(group) { mutableListOf() } += node
+                val source = end(element, "source", "client") ?: continue
+                if (source !in byId) continue
+                val group = stereotypes[element.id]?.firstOrNull() ?: type
+                outgoing.getOrPut(source) { LinkedHashMap() }.getOrPut(group) { mutableListOf() } += element
             }
         }
 
-        private fun target(connector: XNode): String? {
-            val id = connector.id ?: return null
-            return ends[id]?.get("target")?.attr("xmi:idref")
-                ?: if (connector.attr("xmi:type") == "uml:Dependency") {
-                    connector.attr("supplier")
-                } else {
-                    connector.children
-                        .filter { it.name == "ownedEnd" }
-                        .getOrNull(1)
-                        ?.attr("type")
-                }
-        }
+        /** EA's connector [end] of [connector], else a dependency's [dependency] attribute (`client`/`supplier`). */
+        private fun end(
+            connector: Element,
+            end: String,
+            dependency: String,
+        ): String? =
+            ends[connector.id]?.get(end)?.ref
+                ?: connector.node.attr(dependency).takeIf { connector.node.attr("xmi:type") == "uml:Dependency" }
 
         // ---- JSON text, positioned ----
 
@@ -384,11 +411,11 @@ object XmiFrontEnd : FrontEnd {
             out.append("}, ")
             key("elements")
             out.append("{")
-            elements.forEachIndexed { i, (node, pkg) ->
+            elements.forEachIndexed { i, e ->
                 if (i > 0) out.append(", ")
-                at(node.line)
-                key(requireNotNull(node.id) { "a packagedElement without xmi:id" })
-                element(node, pkg)
+                at(e.node.line)
+                key(e.id)
+                element(e.node, e.pkg)
             }
             out.append("}")
             if (diagrams.isNotEmpty()) {
@@ -462,10 +489,10 @@ object XmiFrontEnd : FrontEnd {
                 }
                 ends[id]?.let { e ->
                     for (end in listOf("source", "target")) {
-                        val endNode = e[end] ?: continue
+                        val found = e[end] ?: continue
                         sep()
                         key("@$end")
-                        end(endNode)
+                        end(found)
                     }
                 }
                 outgoing[id]?.let { groups ->
@@ -513,6 +540,10 @@ object XmiFrontEnd : FrontEnd {
             val groups = LinkedHashMap<String, MutableList<XNode>>()
             node.children.forEach { groups.getOrPut(it.name) { mutableListOf() } += it }
             for ((name, children) in groups) {
+                // One key per name: the attribute and the child form of one reference cannot both be kept (review-372 F2).
+                if (node.attr(name) != null) {
+                    fail(label, node.line, node.column, "$name is written both as an attribute and as a child")
+                }
                 sep()
                 key(name)
                 out.append("[")
@@ -538,11 +569,12 @@ object XmiFrontEnd : FrontEnd {
             out.append("}")
         }
 
-        private fun end(node: XNode) {
+        private fun end(found: End) {
+            val node = found.node
             out.append("{")
             key("\$ref")
-            string(node.attr("xmi:idref") ?: "")
-            node.attr("xmi:idref")?.let { byId[it]?.attr("name") }?.let {
+            string(found.ref)
+            byId[found.ref]?.attr("name")?.let {
                 out.append(", ")
                 key("@name")
                 string(it)
@@ -566,8 +598,9 @@ object XmiFrontEnd : FrontEnd {
             out.append("}")
         }
 
-        private fun connector(node: XNode) {
-            val id = requireNotNull(node.id)
+        private fun connector(element: Element) {
+            val id = element.id
+            val node = element.node
             out.append("{")
             key("\$ref")
             string(id)
@@ -581,7 +614,7 @@ object XmiFrontEnd : FrontEnd {
                 key("@tags")
                 map(it)
             }
-            target(node)?.let { t ->
+            end(element, "target", "supplier")?.let { t ->
                 out.append(", ")
                 key("@target")
                 ref(t)
