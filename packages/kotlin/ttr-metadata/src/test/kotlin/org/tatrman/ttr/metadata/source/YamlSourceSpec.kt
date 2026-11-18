@@ -427,6 +427,26 @@ class YamlSourceSpec :
             } shouldContainExactly listOf("$x ys/value-unmapped: Unmapped package key x")
         }
 
+        test(
+            "review-361 F1: the engine's warnings are the loader's WARNINGs; an `unknown: ignore` key loads without it",
+        ) {
+            val root =
+                tree(
+                    "p/d.yaml" to
+                        profile.replace("operations:", "unknown: ignore\noperations:") +
+                        "  - {op: rename, in: entity, at: /popis, to: {kind: entity, property: description}}\n",
+                    "model.ignore" to "p/\n",
+                    "ttr.yaml" to "profile: ./p/d.yaml\ngrammar: '>=0.22 <1.0'\n",
+                    "a.yaml" to "entity:\n  Good: {popis: A, navic: 1}\n  Fine: {popis: B, navic: 2}\n",
+                )
+            val a = root.resolve("a.yaml").toString()
+            val result = MetadataLoader(listOf(BuiltinStockSource(), yaml(root))).load(LoadOptions(strict = true))
+            result.errors.filter { it.category != LoadIssue.Category.PACKAGE_MISMATCH } shouldBe emptyList()
+            result.warnings.map { "${it.file}:${it.line}:${it.column} ${it.message}" } shouldContainExactly
+                listOf("$a:2:20 not in this profile: /navic in entity (2 records)")
+            names(yaml(root)) shouldContainExactly listOf("Fine", "Good")
+        }
+
         test("§4 (c): a file with a canonical version header loads as canonical inside a dialect tree") {
             val root = declaredTree("profile: ./p/d.yaml\ngrammar: '>=0.22 <1.0'\n")
             root.resolve("c.yaml").writeText(entity.format("Canon"))

@@ -30,7 +30,7 @@ import java.util.TreeMap
  * What `profile apply` writes (contracts §5), by output path: one canonical document per package and model of a dialect
  * run (`<package>/<model>.yaml`, the package's dots as directories), each canonical input file under its own path, one
  * `<package>.sources.json` sidecar per package (S3.6 fills its entries) and `report.json` (`documents[]`, `ignored[]`,
- * `overridden[]`). [conflicts] are the outputs two
+ * `overridden[]`, and `warnings[]` when a run warned). [conflicts] are the outputs two
  * inputs would both write, anchored on the second writer's storage path. [problems] are the errors the grouped run
  * recorded (a file it dropped); the plan's are the loader's to report, so they are not repeated here (review-269 F1).
  */
@@ -117,6 +117,7 @@ object ProfileApply {
         val documents = mutableListOf<JsonObject>()
         val ignored = mutableListOf<JsonObject>()
         val overridden = mutableListOf<JsonObject>()
+        val warnings = mutableListOf<JsonObject>()
         val generated = TreeMap<String, CanonicalDocument>()
         val generatedBy = TreeMap<String, String>()
         val sources = TreeMap<String, MutableList<SourceEntry>>()
@@ -228,6 +229,12 @@ object ProfileApply {
                 ignored += JsonObject(entry + ("file" to JsonPrimitive(relative[file] ?: file)))
             }
             overridden += report.getValue("overridden").jsonArray.map { it.jsonObject }
+            // review-361 F1: the engine's warnings, `file` root-relative as `ignored[]`'s.
+            report["warnings"]?.jsonArray?.forEach { item ->
+                val entry = item.jsonObject
+                val file = entry["file"]?.jsonPrimitive?.content
+                warnings += JsonObject(entry + ("file" to JsonPrimitive(relative[file] ?: file)))
+            }
         }
         // Every package with a document gets its sidecar; a dialect run's records are its entries (S3.6 T4).
         sources.forEach { (pkg, entries) ->
@@ -258,6 +265,23 @@ object ProfileApply {
                         "overridden",
                         array(overridden.sortedWith(compareBy({ it.text("qname") }, { it.text("property") }))),
                     )
+                    // Written only when a run warned, so a report without warnings keeps its bytes (review-361 F1).
+                    if (warnings.isNotEmpty()) {
+                        put(
+                            "warnings",
+                            array(
+                                warnings.sortedWith(
+                                    compareBy(
+                                        { it.text("file") },
+                                        { it.number("line") },
+                                        { it.number("column") },
+                                        { it.text("path") },
+                                        { it.text("message") },
+                                    ),
+                                ),
+                            ),
+                        )
+                    }
                 },
             ) + "\n"
         return ProfileApplyResult(

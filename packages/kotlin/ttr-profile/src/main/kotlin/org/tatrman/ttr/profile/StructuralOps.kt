@@ -111,6 +111,7 @@ internal object StructuralExecutor {
         root: Path? = null,
         perFile: Boolean = false,
         sourceName: JsonPointer? = null,
+        unknown: UnknownKeys = UnknownKeys.ERROR,
     ): ApplyResult {
         val ops = operations.map(::PlannedOp)
         val ignored = mutableListOf<Ignored>()
@@ -190,7 +191,7 @@ internal object StructuralExecutor {
                     }
                 implementation?.apply(plan, builder, ignored)
             }
-            plan.consumption.check(plan.tree.root)
+            plan.warnings += plan.dropped(plan.consumption.check(plan.tree.root, unknown))
         }
         val overridden = OverlayApplier.apply(overlay, index, builder, root)
         return ApplyResult(

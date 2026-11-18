@@ -12,6 +12,7 @@ import org.tatrman.ttr.metadata.export.GeneratedInputs
 import org.tatrman.ttr.parser.model.Definition
 import org.tatrman.ttr.profile.Bytewise
 import org.tatrman.ttr.profile.ProfileEngine
+import org.tatrman.ttr.profile.ProfileWarning
 import org.tatrman.ttr.profile.SourcesJsonWriter
 import org.tatrman.ttr.writer.TtrRenderer
 import org.tatrman.ttr.yaml.CanonicalDocument
@@ -105,11 +106,8 @@ object Reader {
         // ✅D-MW-87: the engine's warnings (an `each` key missing or repeated) first, then the reader's own.
         val warnings =
             result.report.warnings
-                .map {
-                    "${it.record?.let { id ->
-                        "$id: "
-                    } ?: ""}${it.message} — ${it.location.file} ${it.location.path}"
-                }.toMutableList()
+                .map(::warning)
+                .toMutableList()
         // T4: synonyms → one `lexicon` document per package and locale, beside the engine's documents.
         val grammar =
             result.documents
@@ -153,6 +151,12 @@ object Reader {
                 "a reader run takes one input file; ${inputs.size} given (a multi-input snapshot is not specified yet)",
             )
         }
+
+    /**
+     * One report line for an engine warning: `<record>: <message> — <file> <path>`; a key `unknown: ignore` dropped
+     * (✅D-MW-89) reads `not in this profile: <key> in <kind> (<n> records) — <file> <first occurrence>`.
+     */
+    private fun warning(it: ProfileWarning): String = "${it.describe()} — ${it.location.file} ${it.location.path}"
 
     /**
      * D-14: every definition of a generated `cn` document is `abstract: true` (a skeleton the authored core package
