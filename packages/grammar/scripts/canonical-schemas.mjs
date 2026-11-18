@@ -1003,6 +1003,10 @@ export function createSchemas(metadata) {
             additionalProperties: { type: 'object', additionalProperties: data },
           }),
           writable: { ...boolean, default: false },
+          // MW-P5 S5.2c (✅D-MW-89, contracts §2): what a run does with a key no operation consumes — `error` is
+          // `ys/unknown-key` (the P3 invariant); `ignore` drops it and reports it once per (file, record kind, key path)
+          // in warnings[]. The nearest profile of a chain that declares it decides.
+          unknown: { enum: ['error', 'ignore'], default: 'error' },
           // MW-P5 S5.1 (contracts §1, D-14): reader emission data, read by ttr-import only — profile-level flags, not
           // operations. `skeleton` marks every generated cn definition `abstract: true`; `sourceName` is a pointer,
           // relative to each record, whose string is the record's sidecar `sourceName` (default: the record id).

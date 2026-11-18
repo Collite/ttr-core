@@ -19,6 +19,21 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   `cn-from-uml`. The report gains `delta.renamed`: the sidecar diff by foreign id against the previous generation.
 - `ttr-metadata import-xmi --from <file> --profile ttr-mdg/1|ea-erd/1 --package <name> --out <dir>`.
 
+### Added — profile `unknown: error | ignore`; `skos/1` and `om-glossary/1` drop what they do not map (MW-P5 S5.2c)
+
+- A profile header takes `unknown: error | ignore` (schema-checked; default `error`, the P3 invariant: an unconsumed
+  key is `ys/unknown-key`). The nearest profile of a chain that declares it decides, so a reader's overlay or `--package`
+  child inherits it and a child declaring `error` restores the invariant (✅D-MW-89, profiles contracts §2).
+- With `ignore`, a key no operation consumes is dropped whole and reported once per (file, record kind, key path) in
+  `warnings[]` as `{file, line, column, path, in, key, count, message: "not in this profile"}`: located at the first
+  occurrence; `in` the record kind (absent for a file-scoped key); `key` the pointer relative to the record with list
+  indices as `*`; `count` the records it was dropped from (a file-scoped key: its occurrences). Other warnings keep
+  their bytes. `ttr-profile`: `UnknownKeys`, `ProfileDefinition.unknown`, `ProfileWarning.scope/key/count`.
+- `skos/1` and `om-glossary/1` set `unknown: ignore`: a SKOS export's `dct:created`, `rdfs:label`, `owl:sameAs` or
+  SKOS-XL labels, or a column outside OM's glossary export, no longer stop the import (✅R350-D). `import-glossary`
+  prints each as `not in this profile: <key> in <kind> (<n> records)`. What still errors: unreadable input, a record
+  without an id. `om-tables/1` and every other profile are unchanged.
+
 ### Added — `import-glossary`: the `turtle`, `rdfxml` and `csv` front-ends, `skos/1`, `om-glossary/1`, lexicon emission (MW-P5 S5.2)
 
 - `ttr-import` gains three front-ends. `turtle`/`rdfxml` parse with Jena RIOT (`org.apache.jena:jena-arq` 5.6.0 is now
@@ -50,6 +65,12 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   `ys/each-missing-key` and `ys/each-duplicate-key` are retired from the diagnostic catalogue. `ApplyReport` gains
   `warnings` (in `reportJson()` only when non-empty) and `ApplyResult` gains `origins` (each record's input file and
   node), which the lexicon joins on.
+
+### Fixed — ttr-translator 0.14.4: ragged string literals widen to VARCHAR (ttr-server#428; AU-core S2.4d)
+
+- A CASE/UNION of ragged string literals is VARCHAR, not padded CHAR. SQL validation and plan.v1 REL_NODE
+  decoding use the same type-system rule, preserving exact route strings on PostgreSQL and MSSQL. Equal
+  typed CHAR branches keep their fixed width; datetime precision rules are unchanged.
 
 ### Fixed — ttr-core: a second latest(...) over the same date column reduces by its own alias (ttr-server#434; AU-core S2.4e)
 

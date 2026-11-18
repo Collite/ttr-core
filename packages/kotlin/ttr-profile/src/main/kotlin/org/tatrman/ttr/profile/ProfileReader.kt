@@ -41,8 +41,29 @@ data class ProfileDefinition(
     val locations: Map<String, ProfileSpan>,
     /** The key spans of an inline `overlay:`'s entries, by path: an orphan is reported at its key (S3.6 Found (f)). */
     val keyLocations: Map<String, ProfileSpan> = emptyMap(),
+    /**
+     * ✅D-MW-89 (S5.2c): the header's `unknown:` as declared, null when this profile does not declare it — the nearest
+     * profile of a chain that does decides ([UnknownKeys.of]).
+     */
+    val unknown: UnknownKeys? = null,
 ) {
     val file: String get() = locations.getValue("").file
+}
+
+/**
+ * ✅D-MW-89 (S5.2c, profiles contracts §2): what a run does with a key no operation consumes. [ERROR] (the default, the
+ * P3 invariant) is `ys/unknown-key`; [IGNORE] drops it and reports it once per (file, record kind, key path) in
+ * `warnings[]` — for generic readers (`skos/1`, `om-glossary/1`), which skip what they do not understand and say so.
+ */
+enum class UnknownKeys {
+    ERROR,
+    IGNORE,
+    ;
+
+    companion object {
+        /** The chain's mode: the nearest profile (child first) that declares `unknown:`, else [ERROR]. */
+        fun of(chain: List<ProfileDefinition>): UnknownKeys = chain.lastOrNull { it.unknown != null }?.unknown ?: ERROR
+    }
 }
 
 data class ProfileDeclaration(
@@ -161,6 +182,7 @@ object ProfileReader {
                 },
                 locations,
                 data.paths.filter { it.startsWith("/overlay/") }.associateWith { data.span(it, key = true) },
+                value["unknown"]?.jsonPrimitive?.content?.let { UnknownKeys.valueOf(it.uppercase()) },
             )
         }
 }

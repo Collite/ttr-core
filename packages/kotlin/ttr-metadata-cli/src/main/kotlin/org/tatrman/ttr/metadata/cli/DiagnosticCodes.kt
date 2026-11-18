@@ -48,7 +48,7 @@ object DiagnosticCodes {
             ),
             DiagnosticCode(
                 "ys/unknown-key",
-                "An authored foreign key was neither consumed nor ignored",
+                "An authored foreign key was neither consumed nor ignored (profile `unknown: error`, the default; under `unknown: ignore` it is a `not in this profile` warning)",
                 "ttr-profile RecordPlan",
             ),
             DiagnosticCode("ys/unknown-kind", "A record discriminator has no kind mapping", "ttr-profile RecordPlan"),

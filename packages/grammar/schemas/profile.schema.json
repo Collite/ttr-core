@@ -64,6 +64,13 @@
           "type": "boolean",
           "default": false
         },
+        "unknown": {
+          "enum": [
+            "error",
+            "ignore"
+          ],
+          "default": "error"
+        },
         "skeleton": {
           "type": "boolean",
           "default": false

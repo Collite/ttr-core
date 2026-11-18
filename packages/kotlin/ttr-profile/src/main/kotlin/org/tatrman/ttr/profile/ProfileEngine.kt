@@ -43,12 +43,37 @@ data class ApplyReport(
 /**
  * ✅D-MW-87: a report warning — the run went on, and [message] says what the engine did with input a generic profile did
  * not expect (`each key missing → en`, `each key repeated (en)`). [record] is the record's id; [location] the element.
+ *
+ * ✅D-MW-89 (S5.2c): under `unknown: ignore`, one warning per (file, [scope], [key]) for the keys no operation consumed —
+ * [message] `not in this profile`, [location] the first occurrence, [scope] the record kind they were dropped from (null
+ * for a file-scoped key), [key] their pointer relative to that record (relative to the file when file-scoped) with list
+ * indices as `*`, and [count] the records they were dropped from (a file-scoped key's occurrences).
  */
 data class ProfileWarning(
     val location: ProfileSpan,
     val message: String,
     val record: String? = null,
-)
+    val scope: String? = null,
+    val key: String? = null,
+    val count: Int? = null,
+) {
+    /**
+     * The warning as one line, without its location: `<record>: <message>`, or for a dropped key (✅D-MW-89)
+     * `not in this profile: <key> in <kind> (<n> records)` — `(<n> occurrences)` when file-scoped. The reader's report
+     * and the loader's WARNINGs both say it this way (review-361 F1).
+     */
+    fun describe(): String =
+        when {
+            key == null -> "${record?.let { "$it: " } ?: ""}$message"
+            scope == null -> "$message: $key (${plural(count, "occurrence")})"
+            else -> "$message: $key in $scope (${plural(count, "record")})"
+        }
+
+    private fun plural(
+        count: Int?,
+        noun: String,
+    ) = if (count == 1) "1 $noun" else "$count ${noun}s"
+}
 
 /**
  * One `<package>.sources.json` entry (contracts §6, XM D-9): a record of the run by its [qname], with the foreign names
@@ -133,6 +158,10 @@ data class ApplyResult(
                             put("column", item.location.column)
                             put("path", item.location.path)
                             item.record?.let { put("record", it) }
+                            // ✅D-MW-89: a dropped key's aggregate; absent on other warnings, which keep their bytes.
+                            item.scope?.let { put("in", it) }
+                            item.key?.let { put("key", it) }
+                            item.count?.let { put("count", it) }
                             put("message", item.message)
                         }
                     }
@@ -175,5 +204,6 @@ object ProfileEngine {
             root,
             perFile,
             sourceName?.let(::JsonPointer),
+            UnknownKeys.of(profile),
         )
 }
