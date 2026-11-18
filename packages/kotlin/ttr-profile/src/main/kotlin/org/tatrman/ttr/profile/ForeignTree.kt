@@ -2,6 +2,7 @@
 package org.tatrman.ttr.profile
 
 import kotlinx.serialization.json.*
+import org.tatrman.ttr.yaml.MAX_YAML_CODE_POINTS
 import org.tatrman.ttr.yaml.YamlData
 
 /**
@@ -21,12 +22,28 @@ class ForeignTree private constructor(
             file: String = "<yaml>",
         ): ForeignTree = read(source, file, file)
 
-        /** MW S3.4: a loader labels spans with the storage path, as `.ttrm` diagnostics are. */
+        /**
+         * MW S3.4: a loader labels spans with the storage path, as `.ttrm` diagnostics are.
+         *
+         * MW S4.2a (✅D-MW-96): an input over [MAX_YAML_CODE_POINTS] code points is refused here, before it is decoded
+         * and before any profile runs, with the canonical budget's code and message at 1:1 of [label]: its canonical
+         * output is at least as large, so nothing that could pass is refused. The budget is per file, never a sum over
+         * a run; a loader drops the file and runs the rest.
+         */
         fun read(
             source: String,
             file: String,
             label: String,
-        ): ForeignTree = profileRead { ForeignTree(YamlData.read(source, label), file, label) }
+        ): ForeignTree {
+            if (source.codePointCount(0, source.length) > MAX_YAML_CODE_POINTS) {
+                throw ProfileException(
+                    "ys/profile-invalid",
+                    ProfileSpan(label, 1, 1, 1, 1, ""),
+                    "Canonical document $label exceeds $MAX_YAML_CODE_POINTS code points",
+                )
+            }
+            return profileRead { ForeignTree(YamlData.read(source, label), file, label) }
+        }
     }
 }
 

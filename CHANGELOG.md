@@ -6,6 +6,27 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — the YAML schemas no longer hold ~240 MB for the life of the process; an over-budget dialect file is refused before the engine; `whereFilter` on the typed mapping (MW-P4 S4.2a)
+
+- `ttr-yaml`: `model-yaml.schema.json` and `profile.schema.json` are built with networknt `preloadJsonSchema(false)`:
+  a validator is built when a document first reaches it. Before, every `$def` was preloaded, about 142 000
+  `JsonSchema` and 2.85 M regex nodes. Heap retained after one `yaml` load and a full GC (SerialGC):
+  - canonical demo-cs: 236 → 16 MB;
+  - the dialect demo-cs tree: out of memory at 256 MB → 51 MB;
+  - a 48-file dialect tree (about 330 k code points): 400 → 57 MB, and it loads faster.
+
+  Validation outcomes are unchanged (the full `ttr-yaml` and `ttr-profile` suites).
+- `ttr-profile`: `ForeignTree.read` refuses a dialect file of more than `MAX_YAML_CODE_POINTS` code points before it
+  is decoded and before any profile runs. The refusal is `ys/profile-invalid` "Canonical document <label> exceeds
+  6000000 code points" at 1:1 of the file's label; before, the reader refused it as "The incoming YAML document exceeds
+  the limit". The budget is per file: files that each fit run whatever their total. A `yaml` source drops the refused
+  file and loads the rest. `report.json` is unchanged.
+- `ttr-metadata`: `Er2DbEntityMapping.whereFilter: WhereFilter?` is the explicit `def er2db_entity`'s `whereFilter`
+  with its authored line and column: `WhereFilter.Sql` for `{sql: …}`, `WhereFilter.Fields` for any other map.
+  Additive; null when absent and on inline mappings. A server serves it as `<entity>__filter` (✅D-MW-67 (c′)).
+- `ttr-metadata`: a `def er2db_attribute` whose target is a bare column now anchors under the standalone
+  `er2db_entity`'s table, as the inline spelling does. Before, it dangled as `db.dbo.<COL>` (review-245 Found (d)).
+
 ### Added — profile `unknown: error | ignore`; `skos/1` and `om-glossary/1` drop what they do not map (MW-P5 S5.2c)
 
 - A profile header takes `unknown: error | ignore` (schema-checked; default `error`, the P3 invariant: an unconsumed
