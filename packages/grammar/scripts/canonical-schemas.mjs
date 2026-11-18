@@ -869,15 +869,22 @@ export function createSchemas(metadata) {
       if: { properties: { mapping: { minProperties: 2 } } },
       then: { required: ['kind'] },
     },
-    operation(
-      'package',
-      {
-        ...selectors,
-        mapping: { type: 'object', additionalProperties: identifier },
-        default: identifier,
-      },
-      ['mapping']
-    ),
+    // ✅D-MW-91 (S5.3a): `verbatim: true` — the string at `at` is the package path (`/` → `.`), no mapping or default.
+    {
+      ...operation(
+        'package',
+        {
+          ...selectors,
+          mapping: { type: 'object', additionalProperties: identifier },
+          default: identifier,
+          verbatim: { const: true },
+        },
+        []
+      ),
+      if: { required: ['verbatim'] },
+      then: { required: ['at'], not: { anyOf: [{ required: ['mapping'] }, { required: ['default'] }] } },
+      else: { required: ['mapping'] },
+    },
     operation('rename', { ...recordSelectors, to: ref('propertyTarget') }, ['in', 'at', 'to']),
     operation('shape', { ...recordSelectors, to: { type: 'object' }, template: ref('profileTemplate') }, [
       'at',
@@ -1061,6 +1068,7 @@ export function createSchemas(metadata) {
                 split: string,
                 unmapped: string,
                 missing: string,
+                verbatim: { type: 'boolean' },
               },
               ['op']
             ),

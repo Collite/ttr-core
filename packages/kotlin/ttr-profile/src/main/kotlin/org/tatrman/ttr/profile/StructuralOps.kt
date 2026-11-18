@@ -18,6 +18,7 @@ internal class PackageOp(
     fun select(plan: RecordPlan): String {
         val selected = if ("at" in op.value) op.at.resolve(plan.tree.root, includeNull = true) else null
         selected?.let(plan.consumption::consume)
+        if (op.value["verbatim"] == JsonPrimitive(true)) return verbatim(plan, selected)
         val key =
             if ("at" in op.value) {
                 (selected?.value as? JsonPrimitive)?.takeIf { it.isString }?.content
@@ -43,6 +44,38 @@ internal class PackageOp(
                     "Unmapped package key $key"
                 },
             )
+    }
+
+    /**
+     * `verbatim: true` (✅D-MW-91, MW-P5 S5.3a): the string at `at` is the package path as written; its `/` separators
+     * (the `xmi` front-end's UML package path) become `.`, the only change. A path that is then no TTR package path
+     * (`[a-z][a-z0-9_]*(.[a-z][a-z0-9_]*)*`), or no string, is `ys/package-invalid` at the tree's first record; a tree
+     * that holds no record names no package (`""`, as with no `package` operation).
+     */
+    private fun verbatim(
+        plan: RecordPlan,
+        selected: ForeignNode?,
+    ): String {
+        if (plan.records.isEmpty()) return ""
+        val written = (selected?.value as? JsonPrimitive)?.takeIf { it.isString }?.content
+        val path = written?.replace('/', '.')
+        if (path != null && PACKAGE_PATH.matches(path)) return path
+        throw ProfileException(
+            "ys/package-invalid",
+            plan.records
+                .first()
+                .source
+                .span(key = true),
+            if (written == null) {
+                "no package path at ${op.value.string("at")}"
+            } else {
+                "\"$written\" is no TTR package path (verbatim: lower-case names, `/` → `.`)"
+            },
+        )
+    }
+
+    private companion object {
+        val PACKAGE_PATH = Regex("[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*")
     }
 }
 

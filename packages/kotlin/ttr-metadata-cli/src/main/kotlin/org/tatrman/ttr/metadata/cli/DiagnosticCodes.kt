@@ -63,6 +63,11 @@ object DiagnosticCodes {
                 "ttr-profile StructuralOps, ValueOps",
             ),
             DiagnosticCode(
+                "ys/package-invalid",
+                "A `package: {verbatim: true}` path is no TTR package path, or there is no string at `at`",
+                "ttr-profile StructuralOps (at the tree's first record)",
+            ),
+            DiagnosticCode(
                 "ys/profile-duplicate",
                 "Two catalogue profiles declare one identity: left out of the catalog (a warning); usage for a run naming it",
                 "ttr-metadata-cli lint, profile check|apply (the catalog read)",

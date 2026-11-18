@@ -11,6 +11,7 @@ names the profile that fails:
 | `not-found.yaml` → `profiles/missing.yaml` | `ys/profile-not-found` |
 | `cycle.yaml` → `profiles/cycle-a.yaml` ↔ `cycle-b.yaml` | `ys/profile-cycle` |
 | `unmapped.yaml` (tree profile) | `ys/value-unmapped` (`faktura` has no mapping and no default) |
+| `package-invalid.yaml` → `profiles/verbatim.yaml` | `ys/package-invalid` (`package: {verbatim: true}` reads `Prodej`, no TTR package path; MW-P5 S5.3a) |
 | `canonical-bad.yaml` | `ys/canonical-invalid` (`defs: 5`) |
 | `profiles/dup-1.yaml` + `dup-2.yaml` | `ys/profile-duplicate` (a warning: both declare `demo-dup/1`) |
 

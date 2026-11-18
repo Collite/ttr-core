@@ -437,6 +437,9 @@
               },
               "missing": {
                 "type": "string"
+              },
+              "verbatim": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -695,13 +698,44 @@
                     },
                     "default": {
                       "$ref": "#/$defs/identifier"
+                    },
+                    "verbatim": {
+                      "const": true
                     }
                   },
                   "required": [
-                    "op",
-                    "mapping"
+                    "op"
                   ],
-                  "additionalProperties": false
+                  "additionalProperties": false,
+                  "if": {
+                    "required": [
+                      "verbatim"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "at"
+                    ],
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "mapping"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "default"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "else": {
+                    "required": [
+                      "mapping"
+                    ]
+                  }
                 }
               },
               {

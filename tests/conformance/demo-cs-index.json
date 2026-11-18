@@ -29,6 +29,7 @@
     {"code": "ys/profile-not-found", "lint": "dialect-negative/demo-cs-profiles/tree", "at": "not-found.yaml:1"},
     {"code": "ys/profile-cycle", "lint": "dialect-negative/demo-cs-profiles/tree", "at": "profiles/cycle-b.yaml:3"},
     {"code": "ys/value-unmapped", "lint": "dialect-negative/demo-cs-profiles/tree", "at": "unmapped.yaml:2"},
+    {"code": "ys/package-invalid", "lint": "dialect-negative/demo-cs-profiles/tree", "at": "package-invalid.yaml:4"},
     {"code": "ys/canonical-invalid", "lint": "dialect-negative/demo-cs-profiles/tree", "at": "canonical-bad.yaml:4"},
     {"code": "ys/profile-duplicate", "lint": "dialect-negative/demo-cs-profiles/tree", "at": "profiles/dup-1.yaml:1"},
     {"code": "ys/unknown-key", "lint": "dialect-negative/demo-cs/tree", "at": "unknown-key.yaml:3"},
