@@ -339,4 +339,31 @@ class XmiReaderSpec :
             (tree.getValue("elements") as JsonObject).size shouldBe 6
             (diagrams as JsonArray).size shouldBe 1
         }
+
+        // ---- review-372 ----
+
+        /** The AST dump of each generated model, and the semantics dump of all of them. */
+        fun dumps(generated: GeneratedPackage): Pair<Map<String, Any>, Any> {
+            val asts =
+                generated.files.toSortedMap().mapValues { (path, text) ->
+                    CanonicalYaml.fromTtr(body(text), path.substringAfterLast('/')).ast
+                }
+            return asts.mapValues { ConformanceDump.dumpTree(it.value) } to
+                SemanticsConformanceDump.dumpDocs(asts.map { SemanticsConformanceDump.DocInput(it.key, it.value) })
+        }
+
+        test("F2 ✅R372-A: EA's child-form attribute types read as the attribute form, dump-equal") {
+            val root = workspace()
+            val text = root.resolve("sources/shop.xmi").readText()
+            val attribute = Regex("""(<ownedAttribute [^>]*?) type="([^"]+)"/>""")
+            attribute.findAll(text).count() shouldBe 9
+            val child =
+                attribute.replace(text) {
+                    "${it.groupValues[1]}><type xmi:idref=\"${it.groupValues[2]}\"/></ownedAttribute>"
+                }
+            root.resolve("sources/child.xmi").writeText(child)
+            val asAttributes = run(root, "shop.xmi", "ttr-mdg/1", "shop")
+            val asChildren = run(root, "child.xmi", "ttr-mdg/1", "shop")
+            dumps(asChildren) shouldBe dumps(asAttributes)
+        }
     })
