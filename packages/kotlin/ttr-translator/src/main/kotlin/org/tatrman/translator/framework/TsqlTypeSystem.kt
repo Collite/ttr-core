@@ -15,6 +15,9 @@ object TsqlTypeSystem : RelDataTypeSystemImpl() {
     /** T-SQL `datetime2(7)` / `time(7)`. */
     private const val MAX_FRACTIONAL_SECOND_PRECISION = 7
 
+    // D-231: CASE/UNION of differently sized literals is text, not CHAR(max) with padded values.
+    override fun shouldConvertRaggedUnionTypesToVarying(): Boolean = true
+
     override fun getMaxPrecision(typeName: SqlTypeName): Int =
         when (typeName) {
             SqlTypeName.TIME, SqlTypeName.TIMESTAMP -> MAX_FRACTIONAL_SECOND_PRECISION
