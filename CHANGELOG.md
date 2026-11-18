@@ -6,6 +6,21 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — profile `unknown: error | ignore`; `skos/1` and `om-glossary/1` drop what they do not map (MW-P5 S5.2c)
+
+- A profile header takes `unknown: error | ignore` (schema-checked; default `error`, the P3 invariant: an unconsumed
+  key is `ys/unknown-key`). The nearest profile of a chain that declares it decides, so a reader's overlay or `--package`
+  child inherits it and a child declaring `error` restores the invariant (✅D-MW-89, profiles contracts §2).
+- With `ignore`, a key no operation consumes is dropped whole and reported once per (file, record kind, key path) in
+  `warnings[]` as `{file, line, column, path, in, key, count, message: "not in this profile"}`: located at the first
+  occurrence; `in` the record kind (absent for a file-scoped key); `key` the pointer relative to the record with list
+  indices as `*`; `count` the records it was dropped from (a file-scoped key: its occurrences). Other warnings keep
+  their bytes. `ttr-profile`: `UnknownKeys`, `ProfileDefinition.unknown`, `ProfileWarning.scope/key/count`.
+- `skos/1` and `om-glossary/1` set `unknown: ignore`: a SKOS export's `dct:created`, `rdfs:label`, `owl:sameAs` or
+  SKOS-XL labels, or a column outside OM's glossary export, no longer stop the import (✅R350-D). `import-glossary`
+  prints each as `not in this profile: <key> in <kind> (<n> records)`. What still errors: unreadable input, a record
+  without an id. `om-tables/1` and every other profile are unchanged.
+
 ### Added — `import-glossary`: the `turtle`, `rdfxml` and `csv` front-ends, `skos/1`, `om-glossary/1`, lexicon emission (MW-P5 S5.2)
 
 - `ttr-import` gains three front-ends. `turtle`/`rdfxml` parse with Jena RIOT (`org.apache.jena:jena-arq` 5.6.0 is now

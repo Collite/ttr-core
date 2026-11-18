@@ -235,7 +235,8 @@ class GenericGlossarySpec :
                         "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n" +
                         "@prefix skosxl: <http://www.w3.org/2008/05/skos-xl#> .\n" +
                         "g:Party a s:Concept ; s:prefLabel \"party\"@en ; dct:created \"2024-01-01\" ; " +
-                        "rdfs:label \"Party\" ; skosxl:prefLabel [ a skosxl:Label ; skosxl:literalForm \"party\"@en ] .\n" +
+                        "rdfs:label \"Party\" ; " +
+                        "skosxl:prefLabel [ a skosxl:Label ; skosxl:literalForm \"party\"@en ] .\n" +
                         "g:Agent a s:Concept ; s:prefLabel \"agent\"@en ; dct:created \"2024-01-02\" .\n",
                     "skos/1",
                 )

@@ -104,7 +104,10 @@ object Reader {
             packages += ImportReport.Package(pkg, model, path, canonical.ast.definitions.size)
         }
         // ✅D-MW-87: the engine's warnings (an `each` key missing or repeated) first, then the reader's own.
-        val warnings = result.report.warnings.map(::warning).toMutableList()
+        val warnings =
+            result.report.warnings
+                .map(::warning)
+                .toMutableList()
         // T4: synonyms → one `lexicon` document per package and locale, beside the engine's documents.
         val grammar =
             result.documents

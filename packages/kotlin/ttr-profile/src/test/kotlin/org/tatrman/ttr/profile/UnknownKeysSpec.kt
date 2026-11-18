@@ -62,28 +62,28 @@ class UnknownKeysSpec :
             val result = ProfileEngine.apply(trees(), listOf(profile("ignore")))
             result.defs().map { it.getValue("id").jsonPrimitive.content } shouldBe listOf("A", "B", "C")
             result.report.warnings.map {
-                listOf(it.location.file, it.location.path, it.scope, it.key, it.count, it.message, it.record)
+                "${it.location.file} ${it.location.path} ${it.scope} ${it.key} ${it.count}"
             } shouldBe
                 listOf(
-                    listOf("one.yaml", "/entity/A/dct:created", "entity", "/dct:created", 2, "not in this profile", null),
-                    listOf("one.yaml", "/entity/A/rdfs:label", "entity", "/rdfs:label", 1, "not in this profile", null),
-                    listOf(
-                        "one.yaml",
-                        "/entity/A/skosxl:prefLabel",
-                        "entity",
-                        "/skosxl:prefLabel",
-                        1,
-                        "not in this profile",
-                        null,
-                    ),
+                    "one.yaml /entity/A/dct:created entity /dct:created 2",
+                    "one.yaml /entity/A/rdfs:label entity /rdfs:label 1",
+                    "one.yaml /entity/A/skosxl:prefLabel entity /skosxl:prefLabel 1",
                     // Three dropped elements, two records: the count is records, not occurrences.
-                    listOf("one.yaml", "/entity/A/stitky/1", "entity", "/stitky/*", 2, "not in this profile", null),
+                    "one.yaml /entity/A/stitky/1 entity /stitky/* 2",
                     // A file-scoped key: no record kind; the count is its occurrences.
-                    listOf("one.yaml", "/meta", null, "/meta", 1, "not in this profile", null),
-                    listOf("two.yaml", "/entity/C/dct:created", "entity", "/dct:created", 1, "not in this profile", null),
+                    "one.yaml /meta null /meta 1",
+                    "two.yaml /entity/C/dct:created entity /dct:created 1",
                 )
+            result.report.warnings
+                .map { it.message to it.record }
+                .distinct() shouldBe
+                listOf("not in this profile" to null)
             // The report's warnings[] carries the aggregate (contracts §2): `in`, `key` and `count` beside the location.
-            result.reportJson().getValue("warnings").jsonArray.first() shouldBe
+            result
+                .reportJson()
+                .getValue("warnings")
+                .jsonArray
+                .first() shouldBe
                 buildJsonObject {
                     put("file", "one.yaml")
                     put("line", 4)
@@ -105,7 +105,9 @@ class UnknownKeysSpec :
         test("(c) without the key a profile is `error`; in a chain the nearest profile that declares it decides") {
             unknownKey(listOf(profile(null)))
             // A child that does not declare it inherits its ancestor's (a reader's overlay or package child, say) …
-            ProfileEngine.apply(trees(), listOf(profile("ignore"), child(null))).report.warnings.size shouldBe 6
+            ProfileEngine
+                .apply(trees(), listOf(profile("ignore"), child(null)))
+                .report.warnings.size shouldBe 6
             // … and a child that declares it wins.
             unknownKey(listOf(profile("ignore"), child("error")))
         }
