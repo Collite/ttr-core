@@ -12,6 +12,8 @@ class ForeignTree private constructor(
     internal val data: YamlData,
     val file: String,
     val label: String,
+    /** MW S4.2a: the input's size in code points, for the run's input budget ([ProfileEngine.apply]). */
+    val codePoints: Int,
 ) {
     val root: ForeignNode get() = ForeignNode(this, data.value, "")
 
@@ -26,7 +28,15 @@ class ForeignTree private constructor(
             source: String,
             file: String,
             label: String,
-        ): ForeignTree = profileRead { ForeignTree(YamlData.read(source, label), file, label) }
+        ): ForeignTree =
+            profileRead {
+                ForeignTree(
+                    YamlData.read(source, label),
+                    file,
+                    label,
+                    source.codePointCount(0, source.length),
+                )
+            }
     }
 }
 

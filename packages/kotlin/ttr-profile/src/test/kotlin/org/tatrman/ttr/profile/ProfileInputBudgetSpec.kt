@@ -34,7 +34,10 @@ class ProfileInputBudgetSpec :
             val half = MAX_YAML_CODE_POINTS / 2
             val error =
                 shouldThrow<ProfileException> {
-                    ProfileEngine.apply(listOf(input("small.yaml", half), input("large.yaml", half + 1)), listOf(profile))
+                    ProfileEngine.apply(
+                        listOf(input("small.yaml", half), input("large.yaml", half + 1)),
+                        listOf(profile),
+                    )
                 }
             error.code shouldBe "ys/profile-invalid"
             error.location.file shouldBe "large.yaml"
