@@ -221,4 +221,52 @@ class GenericGlossarySpec :
             }
             result.origins.map { it.pkg to it.file } shouldContain ("alfa" to "alfa.csv")
         }
+
+        test(
+            "S5.2c (d): the shipped generic profiles drop keys they do not map — one warning per key, records counted",
+        ) {
+            // ✅R350-D's probe: Dublin Core, RDFS and a SKOS-XL label on concepts, as real SKOS exports carry them.
+            val (skosRoot, skos) =
+                run(
+                    RdfFrontEnd.TURTLE,
+                    "probe.ttl",
+                    prefixes +
+                        "@prefix dct: <http://purl.org/dc/terms/> .\n" +
+                        "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n" +
+                        "@prefix skosxl: <http://www.w3.org/2008/05/skos-xl#> .\n" +
+                        "g:Party a s:Concept ; s:prefLabel \"party\"@en ; dct:created \"2024-01-01\" ; " +
+                        "rdfs:label \"Party\" ; skosxl:prefLabel [ a skosxl:Label ; skosxl:literalForm \"party\"@en ] .\n" +
+                        "g:Agent a s:Concept ; s:prefLabel \"agent\"@en ; dct:created \"2024-01-02\" .\n",
+                    "skos/1",
+                )
+            skos.files
+                .getValue("glossary/cn.ttrm")
+                .lines()
+                .filter { it.startsWith("def ") }
+                .map { it.split(' ')[2] } shouldBe listOf("Agent", "Party")
+            skos.report.warnings.map { it.substringBefore(" — ") } shouldBe
+                listOf(
+                    "not in this profile: /dct:created in kind (2 records)",
+                    "not in this profile: /rdfs:label in kind (1 record)",
+                    "not in this profile: /skosxl:prefLabel in kind (1 record)",
+                )
+            // The SKOS-XL label resource itself is a subject of a type skos/1 does not name: skipped, as before.
+            skos.report.ignored.map { it.reason } shouldContain "kind unmapped (Label)"
+            loadsStrict(skosRoot, skos)
+
+            // A column outside OM's export: dropped from the Approved terms; a Draft term is skipped whole, so not counted.
+            val (omRoot, om) =
+                run(
+                    CsvFrontEnd,
+                    "terms.csv",
+                    "name*,displayName,description,synonyms,glossaryStatus,customField\n" +
+                        "Customer,customer,A party that buys.,buyer,Approved,x\n" +
+                        "Supplier,supplier,A party we buy from.,,Approved,y\n" +
+                        "Prospect,prospect,Not yet.,,Draft,z\n",
+                    "om-glossary/1",
+                )
+            om.report.warnings.map { it.substringBefore(" — ") } shouldBe
+                listOf("not in this profile: /customField in kind (2 records)")
+            loadsStrict(omRoot, om)
+        }
     })

@@ -43,11 +43,19 @@ data class ApplyReport(
 /**
  * ✅D-MW-87: a report warning — the run went on, and [message] says what the engine did with input a generic profile did
  * not expect (`each key missing → en`, `each key repeated (en)`). [record] is the record's id; [location] the element.
+ *
+ * ✅D-MW-89 (S5.2c): under `unknown: ignore`, one warning per (file, [scope], [key]) for the keys no operation consumed —
+ * [message] `not in this profile`, [location] the first occurrence, [scope] the record kind they were dropped from (null
+ * for a file-scoped key), [key] their pointer relative to that record (relative to the file when file-scoped) with list
+ * indices as `*`, and [count] the records they were dropped from (a file-scoped key's occurrences).
  */
 data class ProfileWarning(
     val location: ProfileSpan,
     val message: String,
     val record: String? = null,
+    val scope: String? = null,
+    val key: String? = null,
+    val count: Int? = null,
 )
 
 /**
