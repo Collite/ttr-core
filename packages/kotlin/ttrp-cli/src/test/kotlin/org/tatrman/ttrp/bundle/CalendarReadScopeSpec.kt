@@ -183,6 +183,63 @@ class CalendarReadScopeSpec :
                 listOf("er.entity.business_calendar", "er.entity.order")
         }
 
+        // AU S2.4f (D-249): a `due` in working days is computed by the Server over the governed calendar.
+        val dueActions =
+            """
+            package hartland.automation
+            model automation
+            def parameter settle { type: working_days, value: 5 }
+            def parameter remind { type: days, value: 14 }
+            def action chase {
+                columns: [def column order { type: order.order_number }, def column kind { type: text },
+                          def column due { type: date }]
+                sinks: { native: obligation }
+                approval: none
+            }
+            def action confirm {
+                columns: [def column order { type: order.order_number }]
+                sinks: { hebe: task }
+                approval: required
+                by: role.sales_manager
+                due: 2 working_days
+            }
+            """.trimIndent()
+
+        fun dueRecipe(wiring: String) =
+            source
+                .replace("as of: now", "as of: now parameters: [settle, remind]")
+                .replace(
+                    "notify_customer { customer: 42, to: 'customer-42@customers.hartland.example', template: VALUE }",
+                    wiring,
+                )
+
+        for ((name, wiring) in listOf(
+            "(a) a wiring `due: working_days(:p)`" to
+                "chase { order: order_number, kind: 'refund', due: working_days(:settle) }",
+            "(b) a wiring `due: 3 working_days`" to
+                "chase { order: order_number, kind: 'refund', due: 3 working_days }",
+            "(c) an action-default `due: 2 working_days` with no wiring `due`" to "confirm { order: order_number }",
+            "(e) a `when:`-selected wiring `due: working_days(:p)`" to
+                "chase { order: order_number, kind: 'refund', due: working_days(:settle) } when: order_number > 0",
+        )) {
+            "$name declares the model calendar" {
+                assertCalendar(build(dueRecipe(wiring), extra = dueActions))
+            }
+        }
+
+        for ((name, wiring) in listOf(
+            "(d) a wiring `due: days(:p)`" to "chase { order: order_number, kind: 'refund', due: days(:remind) }",
+            "(d) a wiring `due: 2 days`" to "chase { order: order_number, kind: 'refund', due: 2 days }",
+            "(d) a wiring `due: weeks(1)`" to "chase { order: order_number, kind: 'refund', due: weeks(1) }",
+            "(d) a wiring `due: 2 days` over an action-default in working days" to
+                "confirm { order: order_number, due: 2 days }",
+        )) {
+            "$name does not declare the calendar" {
+                build(dueRecipe(wiring), extra = dueActions).manifest.recipe!!.objectsRead shouldContainExactly
+                    listOf("er.entity.order")
+            }
+        }
+
         "a malformed direct writer default is refused at its wiring instead of using a partial parse" {
             val root = project(extra = stamp.replace("cast(age(since: placed) as text)", "age(since: placed) trailing"))
             val plan =
