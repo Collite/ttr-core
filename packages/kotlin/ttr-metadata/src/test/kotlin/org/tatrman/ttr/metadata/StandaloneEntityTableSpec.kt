@@ -179,6 +179,34 @@ class StandaloneEntityTableSpec :
             ).shouldContainExactlyInAnyOrder("er.entity.E.id" to "db.dbo.U.ID", "er.entity.E.nazev" to "db.dbo.U.NAZEV")
         }
 
+        // MW S4.2a T3b (review-245 Found (d), ⚑MW-P4-S42-2): the explicit spelling of the same binding — a
+        // `def er2db_attribute` with a bare column — anchors under the standalone er2db_entity too (both orders).
+        val erUnbound =
+            """
+            model er
+
+            def entity E {
+                attributes: [
+                    def attribute id { type: int },
+                    def attribute nazev { type: string, binding: NAZEV }
+                ]
+            }
+            """.trimIndent()
+        val explicitId =
+            "model binding\n\ndef er2db_attribute E_id {\n    attribute: er.entity.E.id\n    target: { column: ID }\n}\n"
+        listOf("a-binding.ttrm" to "b-er.ttrm", "b-binding.ttrm" to "a-er.ttrm").forEach { (bindingFile, erFile) ->
+            "an explicit er2db_attribute with a bare column takes the standalone table ($bindingFile, $erFile)" {
+                columnTargets(
+                    mapOf(
+                        "db.ttrm" to db,
+                        erFile to erUnbound,
+                        bindingFile to binding,
+                        "c-attribute.ttrm" to explicitId,
+                    ),
+                ).shouldContainExactlyInAnyOrder(tTargets)
+            }
+        }
+
         "an entity with neither an inline block nor an er2db_entity keeps the bare ref, as before" {
             columnTargets(mapOf("db.ttrm" to db, "er.ttrm" to er))
                 .shouldContainExactlyInAnyOrder(

@@ -20,6 +20,7 @@ import org.tatrman.ttr.metadata.model.AttributeMappingTarget
 import org.tatrman.ttr.metadata.model.LocalizedText
 import org.tatrman.ttr.metadata.model.LocalizedTextList
 import org.tatrman.ttr.metadata.model.MappingSource
+import org.tatrman.ttr.metadata.model.WhereFilter
 import org.tatrman.ttr.metadata.model.MappingTarget
 import org.tatrman.ttr.metadata.model.Query
 import org.tatrman.ttr.metadata.model.QueryParameterDef
@@ -1161,6 +1162,7 @@ class FileBasedSource(
                         sourceFile = sourceFile,
                         entity = def.entity?.path?.let { Reference.toQname(it, "er", "entity") } ?: return,
                         target = target,
+                        whereFilter = def.whereFilter?.let(::whereFilterOf),
                     )
             }
             is Er2DbAttributeDef -> {
@@ -1519,7 +1521,7 @@ class FileBasedSource(
         mappings: MutableList<org.tatrman.ttr.metadata.model.Mapping>,
         unanchoredColumns: Map<String, QualifiedName>,
     ) {
-        if (unanchoredColumns.isEmpty()) return
+        if (unanchoredColumns.isEmpty() && mappings.none { explicitBareAttributeEntity(it) != null }) return
         val explicitTable = mutableMapOf<QualifiedName, QualifiedName>()
         for (m in mappings) {
             if (m !is Er2DbEntityMapping || m.mappingSource != MappingSource.Explicit) continue
@@ -1532,11 +1534,57 @@ class FileBasedSource(
             explicitTable.putIfAbsent(m.entity.copy(`package` = ""), table)
         }
         mappings.replaceAll { m ->
-            val entity = unanchoredColumns[m.internalId] ?: return@replaceAll m
+            val entity = unanchoredColumns[m.internalId] ?: explicitBareAttributeEntity(m) ?: return@replaceAll m
             val table = explicitTable[entity] ?: return@replaceAll m
             (m as Er2DbAttributeMapping).copy(target = canonicaliseColumnTarget(m.target, table))
         }
     }
+
+    /**
+     * MW S4.2a T3b (review-245 Found (d), ⚑MW-P4-S42-2): the explicit spelling of a bare attribute binding — a
+     * `def er2db_attribute` whose `attribute:` is `<entity>.<attribute>` and whose target is a bare column — anchors
+     * like the inline one: the entity (package-less, as [anchorToStandaloneEntityTables] keys it), else null.
+     */
+    private fun explicitBareAttributeEntity(m: org.tatrman.ttr.metadata.model.Mapping): QualifiedName? {
+        if (m !is Er2DbAttributeMapping ||
+            m.mappingSource != MappingSource.Explicit ||
+            !isBareColumn(m.target)
+        ) {
+            return null
+        }
+        val name = m.attribute.name
+        if (!name.contains('.')) return null
+        return m.attribute.copy(name = name.substringBeforeLast('.'), `package` = "")
+    }
+
+    /**
+     * MW S4.2a T3b — an `er2db_entity`'s `whereFilter` object as the typed model keeps it: `{sql: <text>}` is
+     * [WhereFilter.Sql]; any other object is [WhereFilter.Fields], each entry's scalar text by key.
+     */
+    private fun whereFilterOf(value: PropertyValue.ObjectValue): WhereFilter {
+        val line = value.source.line
+        val column = value.source.column + 1
+        val sql = value.entries["sql"]
+        if (value.entries.size == 1 && sql != null) {
+            scalarText(sql)?.let { return WhereFilter.Sql(it, line, column) }
+        }
+        return WhereFilter.Fields(value.entries.mapValues { (_, v) -> scalarText(v) ?: v.toString() }, line, column)
+    }
+
+    private fun scalarText(value: PropertyValue): String? =
+        when (value) {
+            is PropertyValue.StringValue -> value.raw
+            is PropertyValue.TripleStringValue -> value.raw
+            is PropertyValue.NumberValue ->
+                if (value.raw % 1.0 == 0.0 && kotlin.math.abs(value.raw) < 1e15) {
+                    value.raw.toLong().toString()
+                } else {
+                    value.raw.toString()
+                }
+            is PropertyValue.BoolValue -> value.raw.toString()
+            is PropertyValue.IdValue -> value.ref.path
+            else -> null
+        }
 
     private fun isBareColumn(target: AttributeMappingTarget): Boolean =
         target is AttributeMappingTarget.Column && !target.qname.name.contains('.')

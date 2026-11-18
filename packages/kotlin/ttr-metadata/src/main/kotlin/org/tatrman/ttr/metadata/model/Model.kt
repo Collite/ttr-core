@@ -623,8 +623,32 @@ data class Er2DbEntityMapping(
     override val mappingSource: MappingSource = MappingSource.Explicit,
     val entity: QualifiedName,
     val target: MappingTarget,
+    /** MW S4.2a (✅D-MW-67 (c′)): an explicit mapping's `whereFilter`; null when it has none, and on inline mappings. */
+    val whereFilter: WhereFilter? = null,
 ) : Mapping {
     override val kind: String = "er2db_entity_mapping"
+}
+
+/**
+ * MW S4.2a (⚑MW-P4-S42-2) — an `er2db_entity`'s row filter as authored. [Sql] is the `{sql: <condition>}` form a
+ * server serves as the query `<entity>__filter` (✅D-MW-67 (c′)); [Fields] is any other form, its entries' scalar text
+ * by key, which a server must name with a located warning. [line]/[column] are the authored `whereFilter` object's.
+ */
+sealed interface WhereFilter {
+    val line: Int
+    val column: Int
+
+    data class Sql(
+        val sql: String,
+        override val line: Int,
+        override val column: Int,
+    ) : WhereFilter
+
+    data class Fields(
+        val fields: Map<String, String>,
+        override val line: Int,
+        override val column: Int,
+    ) : WhereFilter
 }
 
 data class Er2DbAttributeMapping(
