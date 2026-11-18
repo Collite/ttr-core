@@ -2,6 +2,7 @@
 package org.tatrman.ttr.imports
 
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -26,12 +27,18 @@ import java.nio.file.Path
  * ttr-import only; the engine ignores them. [skeleton]: every generated `cn` definition is `abstract: true`.
  * [sourceName]: a JSON Pointer relative to each record whose string is the record's sidecar `sourceName` (an OM FQN,
  * an IRI's label); without it, or where it selects no string, the sidecar keeps the record id. [lexicon]: the synonym
- * rules [Lexicon] emits `lexicon` documents by (MW-P5 S5.2 T4). A child wins, key by key.
+ * rules [Lexicon] emits `lexicon` documents by (MW-P5 S5.2 T4). [foreignId] (MW-P5 S5.3): a JSON Pointer relative to each
+ * record whose string is the record's sidecar `foreignId` (the `xmi` front-end's `/@xmi/uuid`). [cnFromUml] (`cn-from-uml`,
+ * S5.3, XM 06 §3): where a profile declares it `false` (`ea-erd/1`), [ImportProfile.chain] drops the profile's cn
+ * operations, so a plain UML/ERD export makes no cn definitions unless a child profile opts in with `true`; undeclared,
+ * nothing is dropped. A child wins, key by key.
  */
 data class ReaderOptions(
     val skeleton: Boolean = false,
     val sourceName: String? = null,
     val lexicon: List<LexiconRule> = emptyList(),
+    val foreignId: String? = null,
+    val cnFromUml: Boolean? = null,
 )
 
 /**
@@ -57,7 +64,8 @@ class ImportProfile internal constructor(
         overlay: Path?,
         packageName: String?,
     ): List<ProfileDefinition> {
-        val chain = packageName?.let { withPackage(it) } ?: chain
+        val packaged = packageName?.let { withPackage(it) } ?: chain
+        val chain = if (options.cnFromUml == false) withoutCn(packaged) else packaged
         if (overlay == null) return chain
         refuseOverlay(overlay)
         val leaf = chain.last()
@@ -155,6 +163,24 @@ class ImportProfile internal constructor(
             leaf.copy(operations = leaf.operations + LocatedOp(op, leaf.locations.getValue(""), emptyMap()))
     }
 
+    /**
+     * A declared `cn-from-uml: false` (MW-P5 S5.3): every operation that only makes or fills cn definitions is dropped — one whose `in`
+     * is a cn kind, and a `kinds` op whose every non-null `mapping` value is one. A profile that declares no cn operation is
+     * unchanged.
+     */
+    private fun withoutCn(chain: List<ProfileDefinition>): List<ProfileDefinition> {
+        fun text(value: JsonElement?) = (value as? JsonPrimitive)?.contentOrNull
+
+        fun cn(op: LocatedOp): Boolean {
+            val value = op.value
+            if (text(value["in"]) in CN_KINDS) return true
+            if (text(value["op"]) != "kinds") return false
+            val targets = (value["mapping"] as? JsonObject)?.values?.mapNotNull { text(it) }.orEmpty()
+            return targets.isNotEmpty() && targets.all { it in CN_KINDS }
+        }
+        return chain.map { profile -> profile.copy(operations = profile.operations.filterNot(::cn)) }
+    }
+
     /** The overlay a header names: [cli] when given, else the nearest file profile's path overlay or inline overlay. */
     internal fun overlayInput(cli: Path?): Path? {
         cli?.let { return it.toAbsolutePath().normalize() }
@@ -167,6 +193,9 @@ class ImportProfile internal constructor(
     }
 
     companion object {
+        /** The cn stereotypes (contracts profiles §3, ✅D-MW-84): the kinds `cn-from-uml: false` drops operations for. */
+        private val CN_KINDS = setOf("kind", "subkind", "variant", "role", "event", "phase", "quality", "relation_type")
+
         /** The resource directory of the profiles ttr-core ships (`<repo>/profiles/<name>/<major>.yaml`). */
         private const val SHIPPED = "/profiles"
 
@@ -232,6 +261,8 @@ class ImportProfile internal constructor(
                     (value["skeleton"] as? JsonPrimitive)?.booleanOrNull ?: options.skeleton,
                     (value["sourceName"] as? JsonPrimitive)?.contentOrNull ?: options.sourceName,
                     (value["lexicon"] as? JsonArray)?.map { lexiconRule(it as JsonObject) } ?: options.lexicon,
+                    (value["foreignId"] as? JsonPrimitive)?.contentOrNull ?: options.foreignId,
+                    (value["cn-from-uml"] as? JsonPrimitive)?.booleanOrNull ?: options.cnFromUml,
                 )
             }
     }

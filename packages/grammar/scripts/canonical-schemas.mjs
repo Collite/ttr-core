@@ -1008,6 +1008,11 @@ export function createSchemas(metadata) {
           // relative to each record, whose string is the record's sidecar `sourceName` (default: the record id).
           skeleton: { ...boolean, default: false },
           sourceName: pointer,
+          // MW-P5 S5.3 (readers contracts §1, as built): `foreignId` is a pointer, relative to each record, whose string
+          // is the record's sidecar `foreignId` (the `xmi` front-end's `/@xmi/uuid`, a UUIDv5 of the element's xmi:id);
+          // `cn-from-uml` (`ea-erd/1`) keeps the profile's cn operations, which ttr-import drops while it is false.
+          foreignId: pointer,
+          'cn-from-uml': { ...boolean, default: false },
           // MW-P5 S5.2 T4 (⚑MW-P5-S52-1 (d) → ✅D-MW-81): synonyms → `lexicon` documents, one per locale, emitted by
           // ttr-import beside the engine's output. Each entry reads the records at `at` (ids at `id`), keeps those the
           // run emitted as `target`, and turns the elements at `terms` (a list, or a string cut at `split`) into the forms of
