@@ -17,6 +17,7 @@ import org.tatrman.ttr.profile.ForeignTree
 import org.tatrman.ttr.profile.ProfileException
 import org.tatrman.ttr.profile.ProfileEngine
 import org.tatrman.ttr.profile.ProfileReader
+import org.tatrman.ttr.yaml.MAX_YAML_CODE_POINTS
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
@@ -106,7 +107,8 @@ class GenericGlossarySpec :
 
         test("✅R350-C: a 20,000-item member list ends the import in a located error, never a StackOverflowError") {
             val members = (0 until 20_000).joinToString(" ") { "g:C$it" }
-            // Its subject map (20,000 blank list cells) is over the reader's tree budget: refused, located, at the file.
+            // Its subject map (20,000 blank list cells) is over the reader's tree budget: refused, located, at the file
+            // (MW S4.2a, ✅D-MW-96: `ForeignTree.read` refuses it with the canonical budget's message).
             shouldThrow<ProfileException> {
                 run(
                     RdfFrontEnd.TURTLE,
@@ -118,7 +120,7 @@ class GenericGlossarySpec :
             }.let {
                 it.code shouldBe "ys/profile-invalid"
                 it.location.file shouldBe "g.ttl#subjects"
-                it.detail shouldContain "exceeds the limit"
+                it.detail shouldBe "Canonical document g.ttl#subjects exceeds $MAX_YAML_CODE_POINTS code points"
             }
         }
 

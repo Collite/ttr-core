@@ -4,7 +4,6 @@ package org.tatrman.ttr.profile
 import kotlinx.serialization.json.*
 import org.tatrman.ttr.yaml.CanonicalDocument
 import org.tatrman.ttr.yaml.CanonicalYaml
-import org.tatrman.ttr.yaml.MAX_YAML_CODE_POINTS
 import java.nio.file.Path
 
 /** [file] is the dialect file the document came from when the run grouped documents per file (MW S3.4). */
@@ -197,9 +196,8 @@ object ProfileEngine {
         root: Path?,
         perFile: Boolean,
         sourceName: String? = null,
-    ): ApplyResult {
-        checkInputBudget(tree)
-        return StructuralExecutor.apply(
+    ): ApplyResult =
+        StructuralExecutor.apply(
             tree,
             profile.flatMap { it.operations },
             profile.flatMap { OverlayLoader.load(it, root) },
@@ -208,21 +206,4 @@ object ProfileEngine {
             sourceName?.let(::JsonPointer),
             UnknownKeys.of(profile),
         )
-    }
-
-    /**
-     * MW S4.2a T3 (✅D-MW-93, S4.2 Found (b)): the canonical budget ([MAX_YAML_CODE_POINTS]) is checked on the output
-     * only after the engine ran, and the engine holds ~500 B of heap per input code point, so a run whose inputs alone
-     * exceed the budget is refused before it starts: `ys/profile-invalid` with the budget's message, at 1:1 of the
-     * largest input (a loader drops that file and runs the rest, as for any profile error naming one of its files).
-     */
-    private fun checkInputBudget(tree: List<ForeignTree>) {
-        if (tree.sumOf { it.codePoints.toLong() } <= MAX_YAML_CODE_POINTS) return
-        val largest = tree.maxBy { it.codePoints }
-        throw ProfileException(
-            "ys/profile-invalid",
-            ProfileSpan(largest.label, 1, 1, 1, 1, ""),
-            "Canonical document ${largest.label} exceeds $MAX_YAML_CODE_POINTS code points",
-        )
-    }
 }

@@ -29,7 +29,8 @@ class WhereFilterMappingSpec :
             )
             Files.writeString(
                 root.resolve("er.ttrm"),
-                "model er\n\ndef entity A { attributes: [] }\ndef entity B { attributes: [] }\ndef entity C { attributes: [] }\n" +
+                "model er\n\ndef entity A { attributes: [] }\ndef entity B { attributes: [] }\n" +
+                    "def entity C { attributes: [] }\n" +
                     "def entity D { binding: { target: { table: db.dbo.T } }, attributes: [] }\n",
             )
             Files.writeString(
