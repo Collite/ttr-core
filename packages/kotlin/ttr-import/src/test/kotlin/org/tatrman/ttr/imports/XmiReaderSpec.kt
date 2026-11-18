@@ -446,4 +446,45 @@ class XmiReaderSpec :
             body(opted.files.getValue("orders/cn.ttrm")) shouldContain
                 "def kind Customer { description: { en: \"A person or company that places orders.\" }, abstract: true }"
         }
+
+        test(
+            "N1 ✅R372-D: a child restating cn-from-uml: false drops its ancestors' cn operations; only a profile below errs",
+        ) {
+            val root = workspace()
+
+            fun profile(
+                name: String,
+                extends: String,
+                flag: String,
+                operations: String = " []",
+            ) = root.resolve("$name.yaml").also {
+                it.writeText(
+                    "profile: $name/1\ngrammar: '>=0.22 <1.0'\nextends: $extends\n$flag\noperations:$operations\n",
+                )
+            }
+
+            fun bodies(generated: GeneratedPackage) = generated.files.mapValues { body(it.value) }
+            val restated = profile("restated", "ea-erd/1", "cn-from-uml: false")
+            val plain = run(root, "orders-erd.xmi", "ea-erd/1", "orders", out = "a")
+            bodies(run(root, "orders-erd.xmi", restated.toString(), "orders", out = "b")) shouldBe bodies(plain)
+
+            val described =
+                "\n  - {op: shape, in: kind, to: {kind: kind, property: description}, at: /@properties, " +
+                    "template: {en: {input: /documentation}}}"
+            val grandchild = profile("grandchild", "./restated.yaml", "", described)
+            val refused =
+                shouldThrow<ProfileException> {
+                    run(root, "orders-erd.xmi", grandchild.toString(), "orders", out = "c")
+                }
+            refused.code shouldBe "ys/profile-invalid"
+            refused.location.file shouldBe grandchild.toRealPath().toString()
+            refused.location.line shouldBe 6
+            refused.message.orEmpty() shouldContain "the chain inherits false from restated/1"
+
+            val reopened = profile("reopened", "./restated.yaml", "cn-from-uml: true", described)
+            body(
+                run(root, "orders-erd.xmi", reopened.toString(), "orders", out = "d").files.getValue("orders/cn.ttrm"),
+            ) shouldContain
+                "def kind Customer { description: { en: \"A person or company that places orders.\" }, abstract: true }"
+        }
     })
