@@ -12,6 +12,7 @@ import org.tatrman.ttr.metadata.export.GeneratedInputs
 import org.tatrman.ttr.parser.model.Definition
 import org.tatrman.ttr.profile.Bytewise
 import org.tatrman.ttr.profile.ForeignTree
+import org.tatrman.ttr.profile.holding
 import org.tatrman.ttr.profile.JsonPointer
 import org.tatrman.ttr.profile.ProfileEngine
 import org.tatrman.ttr.profile.ProfileWarning
@@ -159,9 +160,8 @@ object Reader {
     ): List<SourceEntry> {
         if (pointer == null) return sources
         check(sources.size == origins.size) { "the engine's sources and origins differ in length" }
-        val byLabel = trees.associateBy { it.label }
         return sources.zip(origins).map { (entry, origin) ->
-            val tree = byLabel[origin.file] ?: return@map entry
+            val tree = trees.holding(origin.file, origin.path) ?: return@map entry
             val node = JsonPointer(origin.path + pointer).resolve(tree.root)?.value as? JsonPrimitive
             node?.takeIf { it.isString }?.let { entry.copy(foreignId = it.content) } ?: entry
         }

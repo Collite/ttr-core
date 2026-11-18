@@ -279,4 +279,56 @@ class XmiFrontEndSpec :
             usual.getValue("@tags").toString() shouldBe """{"size":"L"}"""
             tree(early).getValue("elements") shouldBe tree(applied).getValue("elements")
         }
+
+        test("S5.3a: one tree per UML package that holds an element, model.package its path, its own elements only") {
+            val source = Path.of("../../../tests/conformance/readers/xmi/sources/sales-billing.xmi").toAbsolutePath()
+            val trees = XmiFrontEnd.parse(listOf(source))
+            trees.map { it.file to it.label } shouldBe
+                listOf(
+                    "sales-billing/sales" to "sales-billing.xmi",
+                    "sales-billing/sales/billing" to "sales-billing.xmi",
+                )
+            val names =
+                trees.map { tree ->
+                    val root = tree.root.value.jsonObject
+                    root
+                        .getValue("model")
+                        .jsonObject["package"]
+                        ?.jsonPrimitive
+                        ?.content to
+                        root.getValue("elements").jsonObject.values.map {
+                            it.jsonObject
+                                .getValue("name")
+                                .jsonPrimitive.content
+                        }
+                }
+            names shouldBe
+                listOf(
+                    "sales" to listOf("Customer", "Order", "placed_by"),
+                    "sales/billing" to listOf("Invoice", "billed_to"),
+                )
+            // A cross-package reference still names its target, and an element keeps its XML line.
+            val billed =
+                trees[1]
+                    .root.value.jsonObject
+                    .getValue("elements")
+                    .jsonObject.values
+                    .last()
+                    .jsonObject
+            billed
+                .getValue("@target")
+                .jsonObject
+                .getValue("@name")
+                .jsonPrimitive.content shouldBe "Customer"
+            JsonPointer("/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13")
+                .resolve(trees[1].root)!!
+                .span()
+                .line shouldBe 31
+            // Package paths in document order, a dotted name one segment; a document with no element is one tree.
+            XmiFrontEnd.trees(model.toByteArray(), "m.xmi").map { it.first } shouldBe
+                listOf("db.retail/sub", "db.retail")
+            XmiFrontEnd
+                .trees((head + "  <uml:Model xmi:id=\"M\" name=\"w\"/>\n</xmi:XMI>\n").toByteArray(), "m.xmi")
+                .map { it.first } shouldBe listOf(null)
+        }
     })

@@ -70,6 +70,21 @@ data class ForeignNode internal constructor(
         }
 }
 
+/**
+ * The tree of [this] labelled [label] that holds [path] (a JSON Pointer), else the first so labelled. A front-end may read
+ * one input as several trees under its one label (the `xmi` front-end's tree per UML package, MW-P5 S5.3a): their record
+ * paths are disjoint, and a path they share sits on the same input line in each.
+ */
+fun List<ForeignTree>.holding(
+    label: String,
+    path: String,
+): ForeignTree? {
+    val labelled = filter { it.label == label }
+    if (labelled.size < 2) return labelled.firstOrNull()
+    val pointer = runCatching { JsonPointer(path) }.getOrNull() ?: return labelled.first()
+    return labelled.firstOrNull { pointer.resolve(it.root, includeNull = true) != null } ?: labelled.first()
+}
+
 internal fun escapePointer(key: String) = key.replace("~", "~0").replace("/", "~1")
 
 /** RFC 6901, with the record's mapping entry name available only as `/$key`. */

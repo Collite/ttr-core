@@ -22,9 +22,14 @@ import javax.xml.stream.XMLStreamReader
  * `xmi:Extension`) becomes the tree
  *
  * ```
- * {model: {"@id", name, …}, elements: {<xmi:id>: <element>, …}, "@diagrams": [{"@id", name}, …]}
+ * {model: {"@id", name, …, package}, elements: {<xmi:id>: <element>, …}, "@diagrams": [{"@id", name}, …]}
  * ```
  *
+ * - **One tree per UML package** (MW-P5 S5.3a, ✅D-MW-91) that holds at least one element, in document order: its file
+ *   is `<stem>/<package path>`, its `model.package` the package path (the `name`s of the packages below the model,
+ *   `/`-joined, as `@xmi.package`; absent for elements right below the model), its `elements` that package's own.
+ *   A profile's `package: {at: /model/package, verbatim: true}` makes each its own TTR package. References and
+ *   `@outgoing` still resolve across the whole document; `@diagrams` ride on the first tree.
  * - **elements**: every `packagedElement` that is not a `uml:Package`, at any package depth, keyed by its `xmi:id`, in
  *   document order. Packages are not elements; an element names its enclosing packages in `@xmi.package`.
  * - **An element** (and, recursively, each child element: `ownedAttribute`, `ownedEnd`, `generalization`, `lowerValue`,
@@ -78,8 +83,18 @@ object XmiFrontEnd : FrontEnd {
      */
     val NAMESPACE: UUID = Uuid5.of(Uuid5.URL, "http://tatrman.org/ns/ttr-import/xmi-id")
 
+    /**
+     * One tree per UML package that holds at least one element (MW-P5 S5.3a, ✅D-MW-91), in document order: the tree's
+     * file is `<stem>/<package path>` (so a profile's file-scoped `package` operation applies per package), its label
+     * the input's name (so a diagnostic names the XMI file and line). A document with no element is one tree, `<stem>`.
+     */
     override fun parse(files: List<Path>): List<ForeignTree> =
-        labelled(files).map { (file, name) -> ForeignTree.read(tree(bytes(file), name), name, name) }
+        labelled(files).flatMap { (file, name) ->
+            val stem = name.substringBeforeLast('.', name)
+            trees(bytes(file), name).map { (pkg, json) ->
+                ForeignTree.read(json, if (pkg == null) stem else "$stem/$pkg", name)
+            }
+        }
 
     /** The raw bytes, refused above 4 × the reader budget before anything is decoded. */
     internal fun bytes(file: Path): ByteArray {
@@ -116,11 +131,25 @@ object XmiFrontEnd : FrontEnd {
         val id: String? get() = attr("xmi:id")
     }
 
-    /** The tree of [bytes] as JSON text. */
+    /** The whole document as one tree, JSON text: every element, `model` without `package` (a view for specs). */
     internal fun tree(
         bytes: ByteArray,
         label: String,
-    ): String = Builder(read(bytes, label), label).json()
+    ): String = Builder(read(bytes, label), label).json(null)
+
+    /**
+     * One JSON tree per UML package path that holds an element, in document order, each `model` with `package` (absent
+     * for the elements right below the model: path `""`); `@diagrams` ride on the first. No element → one tree, path null.
+     */
+    internal fun trees(
+        bytes: ByteArray,
+        label: String,
+    ): List<Pair<String?, String>> {
+        val builder = Builder(read(bytes, label), label)
+        val packages = builder.packages()
+        if (packages.isEmpty()) return listOf(null to builder.json(null))
+        return packages.mapIndexed { i, pkg -> pkg to builder.json(pkg, diagrams = i == 0) }
+    }
 
     private fun read(
         bytes: ByteArray,
@@ -384,18 +413,30 @@ object XmiFrontEnd : FrontEnd {
             out.append(": ")
         }
 
-        fun json(): String {
+        /** The package paths that hold an element, in document order. */
+        fun packages(): List<String> = elements.map { it.pkg }.distinct()
+
+        /**
+         * The tree as JSON text: with [pkg], only that package's elements and `model.package` = [pkg] (none for `""`);
+         * null, every element and no `model.package`. `@diagrams` only with [diagrams].
+         */
+        fun json(
+            pkg: String?,
+            diagrams: Boolean = true,
+        ): String {
+            out.setLength(0)
+            line = 1
             out.append("{")
             key("model")
             out.append("{")
             var first = true
+
+            fun sep() {
+                if (!first) out.append(", ")
+                first = false
+            }
             model?.let { m ->
                 at(m.line)
-
-                fun sep() {
-                    if (!first) out.append(", ")
-                    first = false
-                }
                 m.id?.let {
                     sep()
                     key("@id")
@@ -408,16 +449,22 @@ object XmiFrontEnd : FrontEnd {
                     string(v)
                 }
             }
+            if (!pkg.isNullOrEmpty()) {
+                sep()
+                key("package")
+                string(pkg)
+            }
             out.append("}, ")
             key("elements")
             out.append("{")
-            elements.forEachIndexed { i, e ->
+            elements.filter { pkg == null || it.pkg == pkg }.forEachIndexed { i, e ->
                 if (i > 0) out.append(", ")
                 at(e.node.line)
                 key(e.id)
                 element(e.node, e.pkg)
             }
             out.append("}")
+            val diagrams = if (diagrams) this.diagrams else emptyList()
             if (diagrams.isNotEmpty()) {
                 out.append(", ")
                 at(diagrams.first().line)

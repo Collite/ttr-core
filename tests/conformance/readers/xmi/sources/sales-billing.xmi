@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="windows-1252"?>
+<xmi:XMI xmi:version="2.1" xmlns:uml="http://schema.omg.org/spec/UML/2.1" xmlns:xmi="http://schema.omg.org/spec/XMI/2.1">
+	<xmi:Documentation exporter="Enterprise Architect" exporterVersion="6.5" exporterID="1628"/>
+	<uml:Model xmi:type="uml:Model" name="EA_Model" visibility="public">
+		<packagedElement xmi:type="uml:Package" xmi:id="EAPK_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D01" name="sales" visibility="public">
+			<packagedElement xmi:type="uml:Class" xmi:id="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11" name="Customer" visibility="public">
+				<ownedAttribute xmi:type="uml:Property" xmi:id="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D21" name="id" visibility="private" isStatic="false" isReadOnly="false" isDerived="false" isOrdered="false" isUnique="true" isDerivedUnion="false">
+					<lowerValue xmi:type="uml:LiteralInteger" xmi:id="EAID_LI000101_4F5A_4B6C_8D7E_9F0A1B2C3D21" value="1"/>
+					<upperValue xmi:type="uml:LiteralInteger" xmi:id="EAID_LI000102_4F5A_4B6C_8D7E_9F0A1B2C3D21" value="1"/>
+					<type xmi:idref="EAJava_int"/>
+				</ownedAttribute>
+			</packagedElement>
+			<packagedElement xmi:type="uml:Class" xmi:id="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12" name="Order" visibility="public">
+				<ownedAttribute xmi:type="uml:Property" xmi:id="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D22" name="order_no" visibility="private" isStatic="false" isReadOnly="false" isDerived="false" isOrdered="false" isUnique="true" isDerivedUnion="false">
+					<lowerValue xmi:type="uml:LiteralInteger" xmi:id="EAID_LI000103_4F5A_4B6C_8D7E_9F0A1B2C3D22" value="1"/>
+					<upperValue xmi:type="uml:LiteralInteger" xmi:id="EAID_LI000104_4F5A_4B6C_8D7E_9F0A1B2C3D22" value="1"/>
+					<type xmi:idref="EAJava_String"/>
+				</ownedAttribute>
+			</packagedElement>
+			<packagedElement xmi:type="uml:Association" xmi:id="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31" name="placed_by" visibility="public">
+				<memberEnd xmi:idref="EAID_dst1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31"/>
+				<memberEnd xmi:idref="EAID_src1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31"/>
+				<ownedEnd xmi:type="uml:Property" xmi:id="EAID_dst1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31" visibility="public" association="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31" isStatic="false" isReadOnly="false" isDerived="false" isOrdered="false" isUnique="true" isDerivedUnion="false" aggregation="none">
+					<type xmi:idref="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11"/>
+				</ownedEnd>
+				<ownedEnd xmi:type="uml:Property" xmi:id="EAID_src1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31" visibility="public" association="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31" isStatic="false" isReadOnly="false" isDerived="false" isOrdered="false" isUnique="true" isDerivedUnion="false" aggregation="none">
+					<type xmi:idref="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12"/>
+				</ownedEnd>
+			</packagedElement>
+			<packagedElement xmi:type="uml:Package" xmi:id="EAPK_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D02" name="billing" visibility="public">
+				<packagedElement xmi:type="uml:Class" xmi:id="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13" name="Invoice" visibility="public">
+					<ownedAttribute xmi:type="uml:Property" xmi:id="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D23" name="total" visibility="private" isStatic="false" isReadOnly="false" isDerived="false" isOrdered="false" isUnique="true" isDerivedUnion="false">
+						<lowerValue xmi:type="uml:LiteralInteger" xmi:id="EAID_LI000105_4F5A_4B6C_8D7E_9F0A1B2C3D23" value="1"/>
+						<upperValue xmi:type="uml:LiteralInteger" xmi:id="EAID_LI000106_4F5A_4B6C_8D7E_9F0A1B2C3D23" value="1"/>
+						<type xmi:idref="EAJava_BigDecimal"/>
+					</ownedAttribute>
+				</packagedElement>
+				<packagedElement xmi:type="uml:Association" xmi:id="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32" name="billed_to" visibility="public">
+					<memberEnd xmi:idref="EAID_dst1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32"/>
+					<memberEnd xmi:idref="EAID_src1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32"/>
+					<ownedEnd xmi:type="uml:Property" xmi:id="EAID_dst1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32" visibility="public" association="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32" isStatic="false" isReadOnly="false" isDerived="false" isOrdered="false" isUnique="true" isDerivedUnion="false" aggregation="none">
+						<type xmi:idref="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11"/>
+					</ownedEnd>
+					<ownedEnd xmi:type="uml:Property" xmi:id="EAID_src1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32" visibility="public" association="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32" isStatic="false" isReadOnly="false" isDerived="false" isOrdered="false" isUnique="true" isDerivedUnion="false" aggregation="none">
+						<type xmi:idref="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13"/>
+					</ownedEnd>
+				</packagedElement>
+			</packagedElement>
+		</packagedElement>
+	</uml:Model>
+	<xmi:Extension extender="Enterprise Architect" extenderID="6.5">
+		<elements>
+			<element xmi:idref="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11" xmi:type="uml:Class" name="Customer" scope="public">
+				<model package="EAPK_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D01" tpos="0" ea_localid="41" ea_eleType="element"/>
+				<properties documentation="A buyer of record." isSpecification="false" sType="Class" nType="0" scope="public" isRoot="false" isLeaf="false" isAbstract="false" isActive="false"/>
+				<attributes>
+					<attribute xmi:idref="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D21" name="id" scope="Private">
+						<model ea_localid="51" ea_guid="{7B1C2D3E-4F5A-4B6C-8D7E-9F0A1B2C3D21}"/>
+						<properties type="int" derived="0" collection="false" duplicates="0" changeability="changeable"/>
+					</attribute>
+				</attributes>
+			</element>
+			<element xmi:idref="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12" xmi:type="uml:Class" name="Order" scope="public">
+				<model package="EAPK_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D01" tpos="0" ea_localid="42" ea_eleType="element"/>
+				<properties isSpecification="false" sType="Class" nType="0" scope="public" isRoot="false" isLeaf="false" isAbstract="false" isActive="false"/>
+				<attributes>
+					<attribute xmi:idref="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D22" name="order_no" scope="Private">
+						<model ea_localid="52" ea_guid="{7B1C2D3E-4F5A-4B6C-8D7E-9F0A1B2C3D22}"/>
+						<properties type="String" derived="0" collection="false" duplicates="0" changeability="changeable"/>
+					</attribute>
+				</attributes>
+			</element>
+			<element xmi:idref="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13" xmi:type="uml:Class" name="Invoice" scope="public">
+				<model package="EAPK_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D02" tpos="0" ea_localid="43" ea_eleType="element"/>
+				<properties documentation="What a customer owes for an order." isSpecification="false" sType="Class" nType="0" scope="public" isRoot="false" isLeaf="false" isAbstract="false" isActive="false"/>
+				<attributes>
+					<attribute xmi:idref="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D23" name="total" scope="Private">
+						<model ea_localid="53" ea_guid="{7B1C2D3E-4F5A-4B6C-8D7E-9F0A1B2C3D23}"/>
+						<properties type="BigDecimal" derived="0" collection="false" duplicates="0" changeability="changeable"/>
+					</attribute>
+				</attributes>
+			</element>
+		</elements>
+		<connectors>
+			<connector xmi:idref="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31">
+				<source xmi:idref="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12">
+					<model ea_localid="42" type="Class" name="Order"/>
+					<role visibility="Public" targetScope="instance"/>
+					<type multiplicity="0..*" aggregation="none" containment="Unspecified"/>
+				</source>
+				<target xmi:idref="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11">
+					<model ea_localid="41" type="Class" name="Customer"/>
+					<role visibility="Public" targetScope="instance"/>
+					<type multiplicity="1" aggregation="none" containment="Unspecified"/>
+				</target>
+				<model ea_localid="61"/>
+				<properties ea_type="Association" direction="Source -&gt; Destination"/>
+				<labels mt="placed_by"/>
+			</connector>
+			<connector xmi:idref="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32">
+				<source xmi:idref="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13">
+					<model ea_localid="43" type="Class" name="Invoice"/>
+					<role visibility="Public" targetScope="instance"/>
+					<type multiplicity="0..*" aggregation="none" containment="Unspecified"/>
+				</source>
+				<target xmi:idref="EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11">
+					<model ea_localid="41" type="Class" name="Customer"/>
+					<role visibility="Public" targetScope="instance"/>
+					<type multiplicity="1" aggregation="none" containment="Unspecified"/>
+				</target>
+				<model ea_localid="62"/>
+				<properties ea_type="Association" direction="Source -&gt; Destination"/>
+				<documentation value="Every invoice is billed to one customer, across packages."/>
+				<labels mt="billed_to"/>
+			</connector>
+		</connectors>
+		<primitivetypes>
+			<packagedElement xmi:type="uml:Package" xmi:id="EAPrimitiveTypesPackage" name="EA_PrimitiveTypes_Package" visibility="public">
+				<packagedElement xmi:type="uml:Package" xmi:id="EAJavaTypesPackage" name="EA_Java_Types_Package" visibility="public">
+					<packagedElement xmi:type="uml:PrimitiveType" xmi:id="EAJava_int" name="int" visibility="public"/>
+					<packagedElement xmi:type="uml:PrimitiveType" xmi:id="EAJava_String" name="String" visibility="public"/>
+					<packagedElement xmi:type="uml:PrimitiveType" xmi:id="EAJava_BigDecimal" name="BigDecimal" visibility="public"/>
+				</packagedElement>
+			</packagedElement>
+		</primitivetypes>
+	</xmi:Extension>
+</xmi:XMI>
