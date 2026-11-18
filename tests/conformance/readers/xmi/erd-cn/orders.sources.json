@@ -1,0 +1,21 @@
+{
+  "generated-from": "generated-from: ../sources/orders-erd.xmi@5689ef4d2432cf6bd5d4ba89d9f34b8ba73ea14cf6949bb9bc115b302643e098 profile orders-erd/1 generator 0.0.1-LOCAL — do not edit",
+  "entries": [
+    {"qname":"orders.cn.kind.Customer","kind":"kind","foreignId":"1be6a70e-fc42-566f-a2db-ec05bbd3320b","sourceName":"EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01","locator":"Customer"},
+    {"qname":"orders.cn.kind.KeyAccount","kind":"kind","foreignId":"df4c5f30-d22b-5ba2-af3d-ab18465b072a","sourceName":"EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E02","locator":"KeyAccount"},
+    {"qname":"orders.cn.kind.Order","kind":"kind","foreignId":"571d7032-3b04-5a4b-a1f6-7174cdf3b97c","sourceName":"EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03","locator":"Order"},
+    {"qname":"orders.cn.kind.Product","kind":"kind","foreignId":"be898ca8-b86b-5025-b1ed-c33847c475ed","sourceName":"EAID_4F3C6A5D_AB7E_4D4F_9A5B_6C7D8E9FA004","locator":"Product"},
+    {"qname":"orders.er.entity.Customer","kind":"entity","foreignId":"1be6a70e-fc42-566f-a2db-ec05bbd3320b","sourceName":"EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01","locator":"Customer"},
+    {"qname":"orders.er.entity.Customer.email","kind":"attribute","foreignId":"fc47a728-c9df-5dd2-83af-0ee222771107","sourceName":"EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D12","locator":"Customer/email"},
+    {"qname":"orders.er.entity.Customer.id","kind":"attribute","foreignId":"639499de-65d8-5390-8c3c-9d55d3c5b629","sourceName":"EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D11","locator":"Customer/id"},
+    {"qname":"orders.er.entity.KeyAccount","kind":"entity","foreignId":"df4c5f30-d22b-5ba2-af3d-ab18465b072a","sourceName":"EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E02","locator":"KeyAccount"},
+    {"qname":"orders.er.entity.KeyAccount.discount","kind":"attribute","foreignId":"33a9771f-66e4-5938-9946-f36a6d1c0473","sourceName":"EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E12","locator":"KeyAccount/discount"},
+    {"qname":"orders.er.entity.Order","kind":"entity","foreignId":"571d7032-3b04-5a4b-a1f6-7174cdf3b97c","sourceName":"EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03","locator":"Order"},
+    {"qname":"orders.er.entity.Order.order_no","kind":"attribute","foreignId":"dcaedf1f-384e-5963-bfd0-22c8b73f4732","sourceName":"EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F13","locator":"Order/order_no"},
+    {"qname":"orders.er.entity.Order.placed","kind":"attribute","foreignId":"49b7d65f-cf5a-52de-a31f-119dc100ea51","sourceName":"EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F14","locator":"Order/placed"},
+    {"qname":"orders.er.entity.Product","kind":"entity","foreignId":"be898ca8-b86b-5025-b1ed-c33847c475ed","sourceName":"EAID_4F3C6A5D_AB7E_4D4F_9A5B_6C7D8E9FA004","locator":"Product"},
+    {"qname":"orders.er.entity.Product.sku","kind":"attribute","foreignId":"b16fe185-90e5-5306-9f09-47c5090726f7","sourceName":"EAID_4F3C6A5D_AB7E_4D4F_9A5B_6C7D8E9FA014","locator":"Product/sku"},
+    {"qname":"orders.er.relation.lists","kind":"relation","foreignId":"5b93e437-3455-5b90-a797-74861500f236","sourceName":"EAID_6B5E8C7F_CD9A_4F6B_9C7D_8E9FA0B1C206","locator":"lists"},
+    {"qname":"orders.er.relation.placed_by","kind":"relation","foreignId":"6c4de245-fbf0-5f71-a92e-d6a8fb2d72ef","sourceName":"EAID_5A4D7B6E_BC8F_4E5A_8B6C_7D8E9FA0B105","locator":"placed_by"}
+  ]
+}

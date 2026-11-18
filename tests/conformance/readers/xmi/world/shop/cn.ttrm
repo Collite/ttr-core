@@ -1,0 +1,9 @@
+package shop
+model cn
+
+def kind Organisation { is_a: [Party] }
+def kind Party { description: { en: "A trading party" } }
+def kind Product { description: { en: "Something we sell" } }
+def kind Prospect { is_a: [Party], abstract: true }
+def event Purchase { extent: instantaneous, involves: [Party as buyer, Product as item] }
+def relation_type recommends {}

@@ -1,0 +1,730 @@
+{
+    "frontEnd": "xmi",
+    "profile": "ea-erd/1",
+    "packages": [
+        {
+            "package": "orders",
+            "model": "er",
+            "file": "orders/er.ttrm",
+            "defs": 6
+        }
+    ],
+    "ignored": [
+        {
+            "file": "orders-erd.xmi",
+            "line": 1,
+            "column": 2,
+            "path": "/model",
+            "reason": "the EA model root (the package is --package)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 6,
+            "column": 47,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 6,
+            "column": 198,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 6,
+            "column": 456,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 7,
+            "column": 2,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/0/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 7,
+            "column": 135,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/0/@properties",
+            "reason": "EA's attribute properties (type and documentation are read)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 7,
+            "column": 270,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/0/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 7,
+            "column": 295,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/0/isStatic",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 7,
+            "column": 316,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/0/isReadOnly",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 7,
+            "column": 339,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/0/isDerived",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 7,
+            "column": 361,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/0/isOrdered",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 7,
+            "column": 383,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/0/isUnique",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 7,
+            "column": 403,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/0/isDerivedUnion",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 7,
+            "column": 430,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/0/lowerValue",
+            "reason": "optional: the lower bound"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 8,
+            "column": 157,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/0/upperValue",
+            "reason": "a single-valued attribute"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 9,
+            "column": 157,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/0/type",
+            "reason": "the UML type (EA's type name is read)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 12,
+            "column": 2,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/1/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 12,
+            "column": 135,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/1/@properties",
+            "reason": "EA's attribute properties (type and documentation are read)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 12,
+            "column": 326,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/1/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 12,
+            "column": 351,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/1/isStatic",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 12,
+            "column": 372,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/1/isReadOnly",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 12,
+            "column": 395,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/1/isDerived",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 12,
+            "column": 417,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/1/isOrdered",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 12,
+            "column": 439,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/1/isUnique",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 12,
+            "column": 459,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/1/isDerivedUnion",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 12,
+            "column": 486,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/1/lowerValue",
+            "reason": "optional: the lower bound"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 13,
+            "column": 157,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/1/upperValue",
+            "reason": "a single-valued attribute"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 14,
+            "column": 157,
+            "path": "/elements/EAID_1C0F3D2A_7E4B_4A1C_8D2E_3F4A5B6C7D01/ownedAttribute/1/type",
+            "reason": "the UML type (EA's type name is read)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 18,
+            "column": 47,
+            "path": "/elements/EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E02/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 18,
+            "column": 198,
+            "path": "/elements/EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E02/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 18,
+            "column": 398,
+            "path": "/elements/EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E02/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 18,
+            "column": 422,
+            "path": "/elements/EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E02/generalization",
+            "reason": "an er entity has no is_a (cn is_a only with cn-from-uml: true)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 20,
+            "column": 2,
+            "path": "/elements/EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E02/ownedAttribute/0/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 20,
+            "column": 135,
+            "path": "/elements/EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E02/ownedAttribute/0/@properties",
+            "reason": "EA's attribute properties (type and documentation are read)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 20,
+            "column": 283,
+            "path": "/elements/EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E02/ownedAttribute/0/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 20,
+            "column": 308,
+            "path": "/elements/EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E02/ownedAttribute/0/isStatic",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 20,
+            "column": 329,
+            "path": "/elements/EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E02/ownedAttribute/0/isReadOnly",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 20,
+            "column": 352,
+            "path": "/elements/EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E02/ownedAttribute/0/isDerived",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 20,
+            "column": 374,
+            "path": "/elements/EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E02/ownedAttribute/0/isOrdered",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 20,
+            "column": 396,
+            "path": "/elements/EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E02/ownedAttribute/0/isUnique",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 20,
+            "column": 416,
+            "path": "/elements/EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E02/ownedAttribute/0/isDerivedUnion",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 20,
+            "column": 443,
+            "path": "/elements/EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E02/ownedAttribute/0/lowerValue",
+            "reason": "optional: the lower bound"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 21,
+            "column": 157,
+            "path": "/elements/EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E02/ownedAttribute/0/upperValue",
+            "reason": "a single-valued attribute"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 22,
+            "column": 157,
+            "path": "/elements/EAID_2D1A4E3B_8F5C_4B2D_9E3F_4A5B6C7D8E02/ownedAttribute/0/type",
+            "reason": "the UML type (EA's type name is read)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 26,
+            "column": 47,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 26,
+            "column": 198,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 26,
+            "column": 431,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/@outgoing",
+            "reason": "associations are their own elements"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 26,
+            "column": 807,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 27,
+            "column": 2,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/0/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 27,
+            "column": 135,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/0/@properties",
+            "reason": "EA's attribute properties (type and documentation are read)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 27,
+            "column": 279,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/0/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 27,
+            "column": 304,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/0/isStatic",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 27,
+            "column": 325,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/0/isReadOnly",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 27,
+            "column": 348,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/0/isDerived",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 27,
+            "column": 370,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/0/isOrdered",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 27,
+            "column": 392,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/0/isUnique",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 27,
+            "column": 412,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/0/isDerivedUnion",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 27,
+            "column": 439,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/0/lowerValue",
+            "reason": "optional: the lower bound"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 28,
+            "column": 157,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/0/upperValue",
+            "reason": "a single-valued attribute"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 29,
+            "column": 157,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/0/type",
+            "reason": "the UML type (EA's type name is read)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 32,
+            "column": 2,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/1/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 32,
+            "column": 135,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/1/@properties",
+            "reason": "EA's attribute properties (type and documentation are read)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 32,
+            "column": 275,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/1/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 32,
+            "column": 300,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/1/isStatic",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 32,
+            "column": 321,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/1/isReadOnly",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 32,
+            "column": 344,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/1/isDerived",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 32,
+            "column": 366,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/1/isOrdered",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 32,
+            "column": 388,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/1/isUnique",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 32,
+            "column": 408,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/1/isDerivedUnion",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 32,
+            "column": 435,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/1/lowerValue",
+            "reason": "optional: the lower bound"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 33,
+            "column": 157,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/1/upperValue",
+            "reason": "a single-valued attribute"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 34,
+            "column": 157,
+            "path": "/elements/EAID_3E2B5F4C_9A6D_4C3E_8F4A_5B6C7D8E9F03/ownedAttribute/1/type",
+            "reason": "the UML type (EA's type name is read)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 38,
+            "column": 47,
+            "path": "/elements/EAID_4F3C6A5D_AB7E_4D4F_9A5B_6C7D8E9FA004/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 38,
+            "column": 198,
+            "path": "/elements/EAID_4F3C6A5D_AB7E_4D4F_9A5B_6C7D8E9FA004/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 38,
+            "column": 395,
+            "path": "/elements/EAID_4F3C6A5D_AB7E_4D4F_9A5B_6C7D8E9FA004/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 39,
+            "column": 2,
+            "path": "/elements/EAID_4F3C6A5D_AB7E_4D4F_9A5B_6C7D8E9FA004/ownedAttribute/0/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 39,
+            "column": 135,
+            "path": "/elements/EAID_4F3C6A5D_AB7E_4D4F_9A5B_6C7D8E9FA004/ownedAttribute/0/@properties",
+            "reason": "EA's attribute properties (type and documentation are read)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 39,
+            "column": 274,
+            "path": "/elements/EAID_4F3C6A5D_AB7E_4D4F_9A5B_6C7D8E9FA004/ownedAttribute/0/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 39,
+            "column": 299,
+            "path": "/elements/EAID_4F3C6A5D_AB7E_4D4F_9A5B_6C7D8E9FA004/ownedAttribute/0/isStatic",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 39,
+            "column": 320,
+            "path": "/elements/EAID_4F3C6A5D_AB7E_4D4F_9A5B_6C7D8E9FA004/ownedAttribute/0/isReadOnly",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 39,
+            "column": 343,
+            "path": "/elements/EAID_4F3C6A5D_AB7E_4D4F_9A5B_6C7D8E9FA004/ownedAttribute/0/isDerived",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 39,
+            "column": 365,
+            "path": "/elements/EAID_4F3C6A5D_AB7E_4D4F_9A5B_6C7D8E9FA004/ownedAttribute/0/isOrdered",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 39,
+            "column": 387,
+            "path": "/elements/EAID_4F3C6A5D_AB7E_4D4F_9A5B_6C7D8E9FA004/ownedAttribute/0/isUnique",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 39,
+            "column": 407,
+            "path": "/elements/EAID_4F3C6A5D_AB7E_4D4F_9A5B_6C7D8E9FA004/ownedAttribute/0/isDerivedUnion",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 39,
+            "column": 434,
+            "path": "/elements/EAID_4F3C6A5D_AB7E_4D4F_9A5B_6C7D8E9FA004/ownedAttribute/0/lowerValue",
+            "reason": "optional: the lower bound"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 40,
+            "column": 157,
+            "path": "/elements/EAID_4F3C6A5D_AB7E_4D4F_9A5B_6C7D8E9FA004/ownedAttribute/0/upperValue",
+            "reason": "a single-valued attribute"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 41,
+            "column": 157,
+            "path": "/elements/EAID_4F3C6A5D_AB7E_4D4F_9A5B_6C7D8E9FA004/ownedAttribute/0/type",
+            "reason": "the UML type (EA's type name is read)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 45,
+            "column": 47,
+            "path": "/elements/EAID_5A4D7B6E_BC8F_4E5A_8B6C_7D8E9FA0B105/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 45,
+            "column": 204,
+            "path": "/elements/EAID_5A4D7B6E_BC8F_4E5A_8B6C_7D8E9FA0B105/@properties",
+            "reason": "EA's connector properties (documentation is the description)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 45,
+            "column": 364,
+            "path": "/elements/EAID_5A4D7B6E_BC8F_4E5A_8B6C_7D8E9FA0B105/@source/$ref",
+            "reason": "from: the end name"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 45,
+            "column": 472,
+            "path": "/elements/EAID_5A4D7B6E_BC8F_4E5A_8B6C_7D8E9FA0B105/@target/$ref",
+            "reason": "to: the end name"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 45,
+            "column": 589,
+            "path": "/elements/EAID_5A4D7B6E_BC8F_4E5A_8B6C_7D8E9FA0B105/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 45,
+            "column": 613,
+            "path": "/elements/EAID_5A4D7B6E_BC8F_4E5A_8B6C_7D8E9FA0B105/memberEnd",
+            "reason": "the association ends: from, to and cardinality come from EA"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 47,
+            "column": 58,
+            "path": "/elements/EAID_5A4D7B6E_BC8F_4E5A_8B6C_7D8E9FA0B105/ownedEnd",
+            "reason": "the association ends: from, to and cardinality come from EA"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 55,
+            "column": 47,
+            "path": "/elements/EAID_6B5E8C7F_CD9A_4F6B_9C7D_8E9FA0B1C206/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 55,
+            "column": 204,
+            "path": "/elements/EAID_6B5E8C7F_CD9A_4F6B_9C7D_8E9FA0B1C206/@properties",
+            "reason": "EA's connector properties (documentation is the description)"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 55,
+            "column": 297,
+            "path": "/elements/EAID_6B5E8C7F_CD9A_4F6B_9C7D_8E9FA0B1C206/@source/$ref",
+            "reason": "from: the end name"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 55,
+            "column": 405,
+            "path": "/elements/EAID_6B5E8C7F_CD9A_4F6B_9C7D_8E9FA0B1C206/@target/$ref",
+            "reason": "to: the end name"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 55,
+            "column": 520,
+            "path": "/elements/EAID_6B5E8C7F_CD9A_4F6B_9C7D_8E9FA0B1C206/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 55,
+            "column": 544,
+            "path": "/elements/EAID_6B5E8C7F_CD9A_4F6B_9C7D_8E9FA0B1C206/memberEnd",
+            "reason": "the association ends: from, to and cardinality come from EA"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 57,
+            "column": 58,
+            "path": "/elements/EAID_6B5E8C7F_CD9A_4F6B_9C7D_8E9FA0B1C206/ownedEnd",
+            "reason": "the association ends: from, to and cardinality come from EA"
+        },
+        {
+            "file": "orders-erd.xmi",
+            "line": 192,
+            "column": 1,
+            "path": "/@diagrams",
+            "reason": "diagrams are not model facts"
+        }
+    ],
+    "overridden": [],
+    "warnings": []
+}

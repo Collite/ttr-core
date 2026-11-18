@@ -20,6 +20,9 @@ dependencies {
         exclude(group = "com.google.protobuf")
     }
     testImplementation(libs.bundles.kotest)
+    // MW-P5 S5.3: the XMI round trip compares the parser's AST dump and the semantics dump (the P2 oracle).
+    testImplementation(testFixtures(project(":packages:kotlin:ttr-parser")))
+    testImplementation(testFixtures(project(":packages:kotlin:ttr-semantics")))
 }
 
 // MW-P5 S5.1 (contracts §3): the profiles ttr-core ships live in the repository's top-level `profiles/` and are bundled
@@ -33,6 +36,8 @@ tasks.test {
     useJUnitPlatform()
     inputs.dir(shippedProfiles)
     inputs.file("../../grammar/schemas/profile.schema.json")
+    // The reader fixtures the specs read in place (tests/conformance/readers), so an edited fixture reruns them.
+    inputs.dir("../../../tests/conformance/readers")
 }
 
 mavenPublishing {

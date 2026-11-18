@@ -1,0 +1,28 @@
+// generated-from: ../../sources/shop.xmi@596bb18e4d92e603447e043f7c1d9f479ac14000451791922297609128d1484b profile ttr-mdg/1 generator 0.0.1-LOCAL — do not edit
+package shop
+model er
+
+def entity customer { description: "A buyer of record",
+    attributes: [
+        def attribute id { type: int, },
+        def attribute name { type: text, optional: true, },
+    ]
+}
+
+def entity product {
+    attributes: [
+        def attribute id { type: int, },
+    ]
+}
+
+def entity sale {
+    attributes: [
+        def attribute amount { type: decimal, },
+        def attribute customer_id { type: int, },
+        def attribute id { type: int, },
+    ]
+}
+
+def relation sale_customer { from: sale, to: customer, cardinality: { from: "0..*", to: "1" },
+}
+

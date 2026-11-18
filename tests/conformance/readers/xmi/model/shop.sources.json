@@ -1,0 +1,29 @@
+{
+  "generated-from": "generated-from: ../sources/shop.xmi@596bb18e4d92e603447e043f7c1d9f479ac14000451791922297609128d1484b profile ttr-mdg/1 generator 0.0.1-LOCAL — do not edit",
+  "entries": [
+    {"qname":"shop.cn.event.Purchase","kind":"event","foreignId":"c28414e1-9751-57d2-a386-2095c169460e","sourceName":"EAID_61E96A30_FA45_5E84_B73A_9156CDDD72FD","locator":"Purchase"},
+    {"qname":"shop.cn.kind.Organisation","kind":"kind","foreignId":"806cd566-e13a-5cd9-9407-80312f4b42c9","sourceName":"EAID_67C028CF_83B6_51DB_9D1E_34ECC7E37C06","locator":"Organisation"},
+    {"qname":"shop.cn.kind.Party","kind":"kind","foreignId":"17165ab3-e48c-5746-a0c3-eb28d3cbab6a","sourceName":"EAID_56671BEF_64D9_52DE_9D78_636CF27B856A","locator":"Party"},
+    {"qname":"shop.cn.kind.Product","kind":"kind","foreignId":"0662e03a-48cb-5f48-a34a-335190a4ded3","sourceName":"EAID_F77489C6_6A70_5D18_BEDF_498CB3022253","locator":"Product"},
+    {"qname":"shop.cn.kind.Prospect","kind":"kind","foreignId":"de4ba8ab-3ad5-5256-9483-8d967ee6e537","sourceName":"EAID_36A36FEF_A4E9_5CB7_91A5_B202BD65590E","locator":"Prospect"},
+    {"qname":"shop.cn.relation_type.recommends","kind":"relation_type","foreignId":"c0b995d4-aac7-5b46-8288-97af7c915c1d","sourceName":"EAID_0425E2A2_62A1_5AB7_83FB_8B3C9052B1C7","locator":"recommends"},
+    {"qname":"shop.er.entity.customer","kind":"entity","foreignId":"4adb4d66-900f-5510-a6f1-cb7cbfad82cd","sourceName":"EAID_EBD35E19_11DD_53DB_8D38_33B8C3645DC9","locator":"customer"},
+    {"qname":"shop.er.entity.customer.id","kind":"attribute","foreignId":"6a0704d7-878c-5f6a-8bbc-c0dfc38d85d0","sourceName":"EAID_973E4788_FBAB_55C7_8F1D_C71A044E1E66","locator":"customer/id"},
+    {"qname":"shop.er.entity.customer.name","kind":"attribute","foreignId":"61b3057d-d153-5ca4-a7a0-c5c774a099f3","sourceName":"EAID_A1B82AB8_859B_5CA8_A7C9_8AC1020E79AD","locator":"customer/name"},
+    {"qname":"shop.er.entity.product","kind":"entity","foreignId":"aae4d8ef-8862-5269-8517-d13b9cb7da8a","sourceName":"EAID_9BA4590D_D6AF_52D1_9DCB_B8D250E25569","locator":"product"},
+    {"qname":"shop.er.entity.product.id","kind":"attribute","foreignId":"8e461f0d-9134-5f33-b7a3-58bfdb659792","sourceName":"EAID_2E926D79_BA6C_5507_84A1_22CFAF0A0A5F","locator":"product/id"},
+    {"qname":"shop.er.entity.sale","kind":"entity","foreignId":"4a801e33-4c71-5344-9eca-697f90e09f13","sourceName":"EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652","locator":"sale"},
+    {"qname":"shop.er.entity.sale.amount","kind":"attribute","foreignId":"b5b49702-90cd-515f-a5c7-f4fe17e756c2","sourceName":"EAID_71126804_5D8B_54C4_9BA8_BF7D75956710","locator":"sale/amount"},
+    {"qname":"shop.er.entity.sale.customer_id","kind":"attribute","foreignId":"2489525a-12b8-5a28-a436-23255a2dae4b","sourceName":"EAID_4E3B2B1D_A58E_5482_BD8B_E4D6E0E22B8E","locator":"sale/customer_id"},
+    {"qname":"shop.er.entity.sale.id","kind":"attribute","foreignId":"87f44032-2a69-5a56-b16f-14ed19f9013a","sourceName":"EAID_0E572B59_93BD_5D79_8E67_B9A50B0207CD","locator":"sale/id"},
+    {"qname":"shop.er.relation.sale_customer","kind":"relation","foreignId":"8ac19394-c2fa-5cb7-96db-1cf2285bcfb8","sourceName":"EAID_F97452C8_15BD_5E58_BA53_A07AD5C5D175","locator":"sale_customer"},
+    {"qname":"shop.md.dimension.Calendar","kind":"dimension","foreignId":"48128a7e-bc2e-57fc-a0a5-d5b2f9221389","sourceName":"EAID_8873EABD_4882_568A_B9AE_E9D1E267FD7D","locator":"Calendar"},
+    {"qname":"shop.md.dimension.Calendar.day","kind":"attribute","foreignId":"c14ed973-b124-5402-8fd9-1b35c5649a74","sourceName":"EAID_7ED1052C_0816_528B_B7E9_402AC11E03BB","locator":"Calendar/day"},
+    {"qname":"shop.md.dimension.Calendar.month","kind":"attribute","foreignId":"87018fb1-4ec9-50df-930f-c180df524681","sourceName":"EAID_18BEDC43_E200_595F_BC47_9B39A78F7EEB","locator":"Calendar/month"},
+    {"qname":"shop.md.dimension.Customer","kind":"dimension","foreignId":"e71b619d-27fb-5742-9fb8-8412b7a9c8f7","sourceName":"EAID_C8CBF0B4_A916_5081_9955_BE5F18E56DEE","locator":"Customer"},
+    {"qname":"shop.md.dimension.Customer.id","kind":"attribute","foreignId":"751cae13-949f-5aa6-8f3d-2b2b087b4196","sourceName":"EAID_51D12287_B545_51C3_BD64_8D8D66FD3BA1","locator":"Customer/id"},
+    {"qname":"shop.md.measure.balance","kind":"measure","foreignId":"518813fb-e5b7-5a32-869b-bee7f1e438b5","sourceName":"EAID_79E12DAC_E428_5E2A_965C_4E2A0EAD4F8A","locator":"balance"},
+    {"qname":"shop.md.measure.revenue","kind":"measure","foreignId":"e3642d84-f61f-5408-9472-1c76f692abec","sourceName":"EAID_EC1824ED_660A_5303_B393_E33781BE190B","locator":"revenue"},
+    {"qname":"shop.md.measure.units","kind":"measure","foreignId":"a436821a-db4a-5c57-8b4e-93e6e9aeb8a3","sourceName":"EAID_C5630BA7_99D2_508C_801A_3052FD2A9620","locator":"units"}
+  ]
+}

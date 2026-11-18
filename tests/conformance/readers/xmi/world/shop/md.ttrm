@@ -1,0 +1,8 @@
+package shop
+model md
+
+def dimension Calendar { key: day, attributes: [def attribute day { type: date }, def attribute month { type: int }] }
+def dimension Customer { key: id, attributes: [def attribute id { type: int }] }
+def measure balance { class: semiAdditive, aggregation: sum, validBy: Calendar.day }
+def measure revenue { description: "Net sales", aggregation: sum }
+def measure units { aggregation: count }

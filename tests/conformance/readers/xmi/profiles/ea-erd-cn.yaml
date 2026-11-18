@@ -1,0 +1,6 @@
+# A user's child of ea-erd/1 that opts into the cn skeleton (XM 06 §3: generalisation → cn is_a only with cn-from-uml).
+profile: orders-erd/1
+grammar: '>=0.22 <1.0'
+extends: ea-erd/1
+cn-from-uml: true
+operations: []

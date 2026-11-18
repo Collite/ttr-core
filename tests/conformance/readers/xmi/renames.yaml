@@ -1,0 +1,2 @@
+# The rename the second snapshot's sidecar diff reports (delta.renamed), recorded for overlays and bindings.
+- {from: shop.cn.kind.Product, to: shop.cn.kind.Article, since: shop-2}
