@@ -4,8 +4,6 @@ package org.tatrman.ttr.yaml
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.networknt.schema.JsonSchemaFactory
 import com.networknt.schema.SpecVersion
-import com.networknt.schema.SchemaValidatorsConfig
-import com.networknt.schema.PathType
 import kotlinx.serialization.json.*
 import org.snakeyaml.engine.v2.api.LoadSettings
 import org.snakeyaml.engine.v2.api.lowlevel.Compose
@@ -447,7 +445,7 @@ internal class YamlNodes(
                 .getInstance(SpecVersion.VersionFlag.V202012)
                 .getSchema(
                     CanonicalGrammar.resource("model-yaml.schema.json"),
-                    SchemaValidatorsConfig.builder().pathType(PathType.JSON_POINTER).build(),
+                    SCHEMA_VALIDATORS_CONFIG,
                 )
     }
 }

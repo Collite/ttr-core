@@ -4,8 +4,6 @@ package org.tatrman.ttr.yaml
 import com.networknt.schema.JsonSchema
 import java.util.concurrent.ConcurrentHashMap
 import com.networknt.schema.JsonSchemaFactory
-import com.networknt.schema.PathType
-import com.networknt.schema.SchemaValidatorsConfig
 import com.networknt.schema.SpecVersion
 import kotlinx.serialization.json.*
 import org.tatrman.ttr.parser.model.SourceLocation
@@ -44,7 +42,7 @@ class YamlData private constructor(
                 val selected = root.getValue("oneOf").jsonArray[index].jsonObject
                 JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012).getSchema(
                     JsonObject(root.filterKeys { it != "oneOf" } + selected).toString(),
-                    SchemaValidatorsConfig.builder().pathType(PathType.JSON_POINTER).build(),
+                    SCHEMA_VALIDATORS_CONFIG,
                 )
             }
         nodes.validate(value, schema) { path, message ->
