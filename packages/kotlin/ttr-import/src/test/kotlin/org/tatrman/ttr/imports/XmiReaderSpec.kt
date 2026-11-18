@@ -366,4 +366,60 @@ class XmiReaderSpec :
             val asChildren = run(root, "child.xmi", "ttr-mdg/1", "shop")
             dumps(asChildren) shouldBe dumps(asAttributes)
         }
+
+        fun renames(generated: GeneratedPackage): List<Pair<String, String>> =
+            report(generated)["delta"]
+                ?.jsonObject
+                ?.getValue("renamed")
+                ?.jsonArray
+                ?.map {
+                    it.jsonObject
+                        .getValue("from")
+                        .jsonPrimitive.content to
+                        it.jsonObject
+                            .getValue("to")
+                            .jsonPrimitive.content
+                }.orEmpty()
+
+        test("F3: the rename delta pairs qnames within a kind; a kind that appears or goes is no rename") {
+            val root = workspace()
+            val renamed =
+                root
+                    .resolve(
+                        "sources/orders-erd.xmi",
+                    ).readText(charset("windows-1252"))
+                    .replace("name=\"Customer\"", "name=\"Client\"")
+            root.resolve("sources/orders-client.xmi").writeText(renamed, charset("windows-1252"))
+            // Run 1 with the cn skeleton (cn + er), run 2 without it (er only), one class renamed in between.
+            write(
+                root,
+                "f",
+                run(root, "orders-erd.xmi", fixture.resolve("profiles/ea-erd-cn.yaml").toString(), "orders", out = "f"),
+            )
+            renames(run(root, "orders-client.xmi", "ea-erd/1", "orders", out = "f")) shouldBe
+                listOf(
+                    "orders.er.entity.Customer" to "orders.er.entity.Client",
+                    "orders.er.entity.Customer.email" to "orders.er.entity.Client.email",
+                    "orders.er.entity.Customer.id" to "orders.er.entity.Client.id",
+                )
+        }
+
+        test("F3: a foreign id with one qname on each side is a rename even when its kind changed") {
+            val dir = Files.createTempDirectory("s53-delta")
+            val previous = dir.resolve("p.sources.json")
+            previous.writeText(
+                """{"entries": [{"qname": "p.er.entity.X", "kind": "entity", "foreignId": "u1"}, """ +
+                    """{"qname": "p.er.entity.Y", "kind": "entity", "foreignId": "u2"}, """ +
+                    """{"qname": "p.cn.kind.Y", "kind": "kind", "foreignId": "u2"}]}""",
+            )
+            SidecarDelta.renamed(
+                previous,
+                listOf(
+                    org.tatrman.ttr.profile
+                        .SourceEntry("p.md.dimension.X", "dimension", "p", "u1", null, null),
+                    org.tatrman.ttr.profile
+                        .SourceEntry("p.md.dimension.Y", "dimension", "p", "u2", null, null),
+                ),
+            ) shouldBe listOf(ImportReport.Renamed("p.er.entity.X", "p.md.dimension.X", "u1"))
+        }
     })
