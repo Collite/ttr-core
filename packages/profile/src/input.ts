@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { isAlias, isMap, isNode, isScalar, isSeq, parseAllDocuments, type Node } from 'yaml';
+import { Composer, Parser, isAlias, isMap, isNode, isScalar, isSeq, type Node } from 'yaml';
 import { ProfileException, type ProfileSpan } from './loading.js';
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
@@ -9,6 +9,8 @@ export const pointer = (parent: string, key: string | number): string =>
   `${parent}/${escapePointer(String(key))}`;
 export const isRecord = (value: unknown): value is RecordValue =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
+const propertyStart = (tokens?: readonly { type: string; offset: number }[]): number | undefined =>
+  tokens?.find((token) => token.type === 'anchor' || token.type === 'tag')?.offset;
 
 /** SourceLocation-compatible positions: one-based lines, zero-based code-point columns and offsets. */
 export interface SourcePosition {
@@ -28,6 +30,7 @@ export class Coordinates {
     readonly text: string,
     readonly uri: string
   ) {
+    text = this.text = text.replace(/\r(?!\n)/g, '\n');
     this.points = new Uint32Array(text.length + 1);
     let unit = 0,
       point = 0;
@@ -80,8 +83,10 @@ export class ForeignData {
   constructor(
     readonly text: string,
     readonly file: string,
-    tagScope = ''
+    tagScope = '',
+    allowNonMappingRoot = false
   ) {
+    text = this.text = text.replace(/\r(?!\n)/g, '\n');
     // Refuse oversized inputs before allocating a coordinate table or invoking the parser.
     if (text.length > 12_000_000 || [...text].length > 6_000_000)
       throw new ProfileException(
@@ -94,18 +99,28 @@ export class ForeignData {
     const control = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x84\x86-\x9f\ufffe\uffff]/u.exec(text);
     if (control)
       this.fail('', 'Non-printable character in YAML input', [control.index, control.index + 1]);
-    const docs = parseAllDocuments(text, {
-      version: '1.2',
-      schema: 'core',
-      uniqueKeys: false,
-      keepSourceTokens: true,
-      customTags: [{ tag: '!pl', resolve: (value: string) => value }],
-    });
+    const tokens = new Parser().parse(text);
+    let rootProperties: number | undefined;
+    function* locatedTokens() {
+      for (const token of tokens) {
+        if (token.type === 'document') rootProperties = propertyStart(token.start);
+        yield token;
+      }
+    }
+    const docs = [
+      ...new Composer({
+        version: '1.2',
+        schema: 'core',
+        uniqueKeys: false,
+        keepSourceTokens: true,
+        customTags: [{ tag: '!pl', resolve: (value: string) => value }],
+      }).compose(locatedTokens()),
+    ];
     if (docs.length !== 1) this.fail('', 'Expected exactly one YAML document', docs[1]?.range);
     const doc = docs[0];
     if (doc.directives?.yaml.version !== '1.2') this.fail('', 'Only YAML 1.2 is supported');
     // Convert before reporting parser diagnostics so safety failures retain their full key path.
-    this.value = this.convert(doc.contents, '', 0, tagScope);
+    this.value = this.convert(doc.contents, '', 0, tagScope, rootProperties);
     const error = doc.errors[0] ?? doc.warnings[0];
     if (error) {
       const offset = error.pos[0];
@@ -124,6 +139,19 @@ export class ForeignData {
       }
       this.fail(path, error.message, error.pos);
     }
+    if (!allowNonMappingRoot && !isRecord(this.value))
+      throw new ProfileException(
+        'ys/profile-invalid',
+        {
+          file,
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 1,
+          path: '',
+        },
+        'Expected a canonical document mapping'
+      );
   }
   private fail(path: string, detail: string, range?: readonly number[] | null): never {
     const source = range ? this.coordinates.span([range[0], range[1]]) : this.source(path, true);
@@ -133,14 +161,21 @@ export class ForeignData {
       detail
     );
   }
-  private convert(node: unknown, path: string, depth: number, tagScope: string): Json {
+  private convert(
+    node: unknown,
+    path: string,
+    depth: number,
+    tagScope: string,
+    properties?: number
+  ): Json {
     if (!isNode(node)) {
       // Empty YAML values and empty documents are JSON null.
       return null;
     }
     this.nodes.set(path, node);
+    const nodeRange = node.range ? [properties ?? node.range[0], node.range[1]] : undefined;
     if (isAlias(node) || ('anchor' in node && node.anchor))
-      this.fail(path, 'Anchors and aliases are not supported');
+      this.fail(path, 'Anchors and aliases are not supported', nodeRange);
     const inScope = !tagScope || path === tagScope || path.startsWith(`${tagScope}/`);
     const allowed = isMap(node)
       ? ['tag:yaml.org,2002:map']
@@ -154,7 +189,7 @@ export class ForeignData {
             'tag:yaml.org,2002:float',
           ];
     if (node.tag && !(node.tag === '!pl' && !inScope) && !allowed.includes(node.tag))
-      this.fail(path, `Unsupported YAML tag ${node.tag}`);
+      this.fail(path, `Unsupported YAML tag ${node.tag}`, nodeRange);
     if ((isMap(node) || isSeq(node)) && depth >= 64)
       this.fail(path, 'YAML nesting too deep (limit 64)');
     if (isMap(node)) {
@@ -173,25 +208,40 @@ export class ForeignData {
         const key = pair.key.value as string,
           child = pointer(path, key);
         if (pair.key.anchor || (pair.key.tag && pair.key.tag !== 'tag:yaml.org,2002:str'))
-          this.fail(child, 'Anchors and non-string tags on keys are not supported', pair.key.range);
+          this.fail(
+            child,
+            'Anchors and non-string tags on keys are not supported',
+            pair.key.range
+              ? [propertyStart(pair.srcToken?.start) ?? pair.key.range[0], pair.key.range[1]]
+              : undefined
+          );
         this.keys.set(child, pair.key);
         order.push(key);
         if (key === '<<') this.fail(child, 'Merge keys are not supported', pair.key.range);
         if (Object.hasOwn(out, key))
           this.fail(child, `Duplicate mapping key ${key}`, pair.key.range);
-        out[key] = this.convert(pair.value, child, depth + 1, tagScope);
+        out[key] = this.convert(
+          pair.value,
+          child,
+          depth + 1,
+          tagScope,
+          propertyStart(pair.srcToken?.sep)
+        );
         // Null values have no node, but must still have an authored position.
         if (!this.nodes.has(child)) this.nodes.set(child, pair.key);
       }
       return out;
     }
-    if (isSeq(node))
+    if (isSeq(node)) {
+      const token = node.srcToken;
+      const items = token && 'items' in token ? token.items : [];
       return node.items.map((item, i) => {
         const child = pointer(path, i),
-          value = this.convert(item, child, depth + 1, tagScope);
+          value = this.convert(item, child, depth + 1, tagScope, propertyStart(items[i]?.start));
         if (!this.nodes.has(child)) this.nodes.set(child, node);
         return value;
       });
+    }
     if (!isScalar(node)) this.fail(path, 'Unsupported YAML value');
     const value: unknown = node.value;
     if (node.tag === '!pl' && !inScope) return { block: String(value), tag: 'pl' };

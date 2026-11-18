@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-import { readdirSync, readFileSync, realpathSync, existsSync, statSync } from 'node:fs';
+import { readdirSync, realpathSync, existsSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
-import { ForeignTree, JsonPointer, type Json } from './input.js';
+import { ForeignData, ForeignTree, JsonPointer, type Json } from './input.js';
+import { readProfileFile } from './file-input.js';
 import { ProfileException, type ProfileSpan, type ProfileDefinition } from './loading.js';
 import type { Record, RecordPlan, CanonicalBuilder, SourceEntry } from './engine.js';
 import { ProfileVocabulary } from './vocabulary.js';
@@ -103,7 +104,7 @@ export const SourcesJsonReader = {
       };
       let value: Json;
       try {
-        value = JSON.parse(readFileSync(resolve(top, file), 'utf8')) as Json;
+        value = JSON.parse(readProfileFile(resolve(top, file), file)) as Json;
       } catch (error) {
         return invalid(`Cannot read sidecar JSON: ${String(error)}`);
       }
@@ -220,8 +221,9 @@ export const Renames = {
     if (!existsSync(file) || !statSync(file).isFile()) return [];
     let source: string;
     try {
-      source = readFileSync(file, 'utf8');
-    } catch {
+      source = readProfileFile(file, 'renames.yaml');
+    } catch (error) {
+      if (error instanceof ProfileException) throw error;
       throw new ProfileException(
         'ys/profile-invalid',
         span('renames.yaml'),
@@ -229,14 +231,14 @@ export const Renames = {
       );
     }
     // Empty/comment-only ledgers contain no document and therefore no renames.
-    if (source.split(/\r?\n/).every((line) => /^\s*(?:#.*)?$/.test(line))) return [];
-    const tree = ForeignTree.read(source, 'renames.yaml');
+    if (source.split(/\r\n?|\n/).every((line) => /^\s*(?:#.*)?$/.test(line))) return [];
+    const data = new ForeignData(source, 'renames.yaml', '', true);
     const invalid = (path: string, detail: string): never => {
       throw new ProfileException('ys/profile-invalid', span('renames.yaml', path), detail);
     };
-    if (tree.root.value === null) return [];
-    if (!Array.isArray(tree.root.value)) return invalid('', 'renames.yaml must be a list');
-    return tree.root.value.map((entry, i) => {
+    if (data.value === null) return [];
+    if (!Array.isArray(data.value)) return invalid('', 'renames.yaml must be a list');
+    return data.value.map((entry, i) => {
       if (!object(entry) || Object.keys(entry).sort().join(',') !== 'from,since,to')
         return invalid(`/${i}`, 'rename requires from, to, since');
       const text = (key: string): string =>
@@ -381,8 +383,14 @@ export const OverlayLoader = {
           location(prefix, false),
           'Overlay must be a mapping'
         );
-      return Object.entries(value).flatMap(([key, properties]) => {
-        const escape = (s: string) => s.replace(/~/g, '~0').replace(/\//g, '~1');
+      const escape = (s: string) => s.replace(/~/g, '~0').replace(/\//g, '~1');
+      const authoredEntries = (mapping: { [key: string]: Json }, at: string) =>
+        Object.entries(mapping).sort(([a], [b]) => {
+          const first = location(`${at}/${escape(a)}`, true);
+          const second = location(`${at}/${escape(b)}`, true);
+          return first.line - second.line || first.column - second.column;
+        });
+      return authoredEntries(value, prefix).flatMap(([key, properties]) => {
         const keyPath = `${prefix}/${escape(key)}`;
         if (!object(properties))
           throw new ProfileException(
@@ -390,7 +398,7 @@ export const OverlayLoader = {
             location(keyPath, false),
             `Overlay entry ${key} must be a mapping`
           );
-        return Object.entries(properties).map(([property, value]) => ({
+        return authoredEntries(properties, keyPath).map(([property, value]) => ({
           key,
           property,
           value,
@@ -437,8 +445,9 @@ export const OverlayLoader = {
       );
     let source: string;
     try {
-      source = readFileSync(file, 'utf8');
-    } catch {
+      source = readProfileFile(file);
+    } catch (error) {
+      if (error instanceof ProfileException) throw error;
       throw new ProfileException('ys/profile-not-found', at, `Overlay not found: ${overlay}`);
     }
     const tree = ForeignTree.read(source, file);

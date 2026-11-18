@@ -910,7 +910,7 @@ describe('S5.2 glossary engine boundary (GlossarySpec / GenericGlossarySpec)', (
   });
 });
 
-describe('generated profile resources drift', () => {
+describe('generated profile resource staleness', () => {
   test('diagnosticCodes equals the authoritative CLI catalogue, including metadata', () => {
     expect(resources.diagnosticCodes).toEqual(
       json(

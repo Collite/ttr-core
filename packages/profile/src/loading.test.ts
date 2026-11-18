@@ -41,14 +41,12 @@ function failure(run: () => unknown, path?: string, code = 'ys/profile-invalid')
 }
 
 describe('profile loading contract', () => {
-  it('reads arbitrary JSON roots and retains pointers, key order and code-point source coordinates', () => {
-    for (const [source, value] of [
-      ['[1, null, true]', [1, null, true]],
-      ['42', 42],
-      ['null', null],
-      ['hello', 'hello'],
-    ] as const)
-      expect(ForeignTree.read(source).root.value).toEqual(value);
+  it('requires a mapping root and retains pointers, key order and code-point source coordinates', () => {
+    for (const source of ['[1, null, true]', '42', 'null', 'hello'])
+      expect(failure(() => ForeignTree.read(source), '').location).toMatchObject({
+        line: 1,
+        column: 1,
+      });
     const tree = ForeignTree.read(
       'records:\n  odd/key:\n    a~b: [value, null]\n',
       'relative.yaml',
@@ -222,7 +220,7 @@ describe('profile loading contract', () => {
     );
     failure(() => DeclarationReader.header('ttr: []'), '/ttr');
     expect(DeclarationReader.header('ttr: null')).toEqual({ type: 'absent' });
-    expect(DeclarationReader.header('[1, 2]')).toEqual({ type: 'absent' });
+    failure(() => DeclarationReader.header('[1, 2]'), '');
     expect(DeclarationReader.header("ttr: '0.22'\nbody: !pl hello").type).toBe('canonical');
   });
 

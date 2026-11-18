@@ -14,5 +14,7 @@ for (const document of result.documents) console.log(document.write());
 
 The shared dialect fixtures and glossary profile vectors are the Kotlin parity oracle.
 Run `pnpm --filter @tatrman/profile test`, `typecheck`, and `lint` after building
-workspace dependencies. `scripts/generate-resources.mjs --check` checks copied grammar
-resources and the diagnostic catalogue without changing them.
+workspace dependencies. `scripts/generate-resources.mjs --check` is a local staleness
+guard for copied grammar resources and the diagnostic catalogue. CI regenerates them
+in `prebuild`, so this does not detect cross-engine drift; shared fixture parity
+provides the cross-engine evidence.

@@ -32,6 +32,7 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter '@tatrman/profile...' build
+      # Local staleness guard; prebuild above already regenerated these resources.
       - run: node packages/profile/scripts/generate-resources.mjs --check
       - run: pnpm --filter @tatrman/profile test
       - run: pnpm --filter @tatrman/profile typecheck

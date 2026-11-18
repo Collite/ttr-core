@@ -116,7 +116,7 @@ export class ConsumptionLedger {
       let owner: Record | undefined;
       for (const record of records)
         if (
-          (node.path === record.source.path || node.path.startsWith(record.source.path + '/')) &&
+          node.path.startsWith(record.source.path + '/') &&
           (!owner || record.source.path.length > owner.source.path.length)
         )
           owner = record;
@@ -142,7 +142,7 @@ export class ConsumptionLedger {
       let group = groups.get(id);
       if (!group) {
         const warning: ProfileWarning = {
-          location: node.span(key),
+          location: node.span(node.mappingKey !== undefined),
           message: 'not in this profile',
           ...(owner ? { in: owner.kind } : {}),
           key: normalized,
@@ -227,14 +227,15 @@ export class RecordPlan {
           this.consumption.open(selection);
           if (selection.value === null) continue;
           if (op.value.at !== '' && typeof selection.value !== 'object') {
-            refusals.set(
-              selection.path,
-              new ProfileException(
-                'ys/profile-invalid',
-                selection.span(true),
-                'kinds.at must select a sequence or mapping'
-              )
-            );
+            if (!refusals.has(selection.path))
+              refusals.set(
+                selection.path,
+                new ProfileException(
+                  'ys/profile-invalid',
+                  selection.span(true),
+                  'kinds.at must select a sequence or mapping'
+                )
+              );
             continue;
           }
           for (const source of op.value.at === '' ? [selection] : selection.entries()) {
@@ -786,6 +787,7 @@ export class ProfileEngine {
     perFile = false,
     sourceName?: string
   ): ApplyResult {
+    const overlays = profile.flatMap((p) => OverlayLoader.load(p, root));
     const ops = profile.flatMap((p) => p.operations).map((op) => new PlannedOp(op));
     const ignored: Ignored[] = [];
     const codes: { [key: string]: string } = {};
@@ -810,7 +812,7 @@ export class ProfileEngine {
       const plan = new RecordPlan(tree, ops);
       const value = object(tree.root.value);
       if (
-        Object.keys(value)[0] === 'ttr' &&
+        tree.root.entries()[0]?.mappingKey === 'ttr' &&
         value.ttr !== null &&
         typeof value.ttr === 'object' &&
         !Array.isArray(value.ttr)
@@ -939,7 +941,6 @@ export class ProfileEngine {
       }
       plan.warnings.push(...plan.consumption.check(plan.tree.root, plan.records, unknown));
     }
-    const overlays = profile.flatMap((p) => OverlayLoader.load(p, root));
     const overridden = OverlayApplier.apply(overlays, index, builder, root);
     return new ApplyResult(
       builder.documents(),

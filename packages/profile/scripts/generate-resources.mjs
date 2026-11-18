@@ -21,7 +21,7 @@ const metadata = JSON.parse(readFileSync(new URL(resources[2][1], import.meta.ur
 text += `export const runningGrammar = ${JSON.stringify(metadata.version)};\n`;
 if (process.argv.includes('--check')) {
   if (readFileSync(output, 'utf8') !== text)
-    throw new Error('Profile resources drifted; run prebuild');
+    throw new Error('Profile resources are stale; run prebuild');
 } else {
   mkdirSync(new URL('../src/generated/', import.meta.url), { recursive: true });
   writeFileSync(output, text);

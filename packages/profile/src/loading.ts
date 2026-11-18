@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-import { readFileSync, realpathSync, statSync } from 'node:fs';
+import { realpathSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import Ajv2020Module from 'ajv/dist/2020.js';
 import type { ErrorObject, ValidateFunction } from 'ajv';
 import { ForeignData, isRecord, pointer, type Json, type RecordValue } from './input.js';
+import { readProfileFile } from './file-input.js';
 import {
   profileSchema,
   runningGrammar,
@@ -147,7 +148,7 @@ function validate(
         ? pointer(e.instancePath, String(e.params.additionalProperty))
         : e.instancePath;
     const error = [...(validator.errors ?? [])].sort(
-      (a, b) => errorPath(b).length - errorPath(a).length
+      (a, b) => b.instancePath.length - a.instancePath.length
     )[0];
     invalid(data, prefix + (error ? errorPath(error) : ''), error?.message ?? 'Invalid profile');
   }
@@ -427,14 +428,9 @@ export class ProfileResolver {
       else {
         let source: string;
         try {
-          const bytes = readFileSync(path!);
-          if (bytes.length > 24_000_000)
-            throw new ProfileException('ys/profile-invalid', at, 'Profile exceeds byte budget');
-          source = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+          source = readProfileFile(path!);
         } catch (error) {
           if (error instanceof ProfileException) throw error;
-          if (error instanceof TypeError)
-            throw new ProfileException('ys/profile-invalid', at, 'Invalid UTF-8 profile');
           throw new ProfileException('ys/profile-not-found', at, `Cannot read profile ${ref}`);
         }
         profile = ProfileReader.read(source, path!);
@@ -489,7 +485,8 @@ export class FileSelector {
           regex: new RegExp(
             (pattern.startsWith('/') || body.includes('/') ? '^' : '^(?:.*/)?') +
               FileSelector.glob(body) +
-              '$'
+              '$',
+            'u'
           ),
           directory,
         },
@@ -532,8 +529,9 @@ export class FileSelector {
           negate = '';
         if (body.startsWith('!') || body.startsWith('^')) {
           negate = '^';
-          body = body.slice(1);
+          body = body.replace(/^!/, '').replace(/^\^/, '');
         }
+        if (!body.length) throw new Error('Empty glob character class');
         out += `(?=[^/])[${negate}${body.replace(/\\/g, '\\\\')}]`;
         i = end + 1;
       } else out += escape(c);
