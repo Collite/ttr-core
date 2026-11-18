@@ -13,7 +13,7 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   `JsonSchema` and 2.85 M regex nodes. Heap retained after one `yaml` load and a full GC (SerialGC):
   - canonical demo-cs: 236 → 16 MB;
   - the dialect demo-cs tree: out of memory at 256 MB → 51 MB;
-  - a dfp-sized dialect tree: about 390 → 56 MB, and it loads faster.
+  - a 48-file dialect tree (about 330 k code points): 400 → 57 MB, and it loads faster.
 
   Validation outcomes are unchanged (the full `ttr-yaml` and `ttr-profile` suites).
 - `ttr-profile`: `ProfileEngine.apply` refuses a run whose dialect inputs total more than `MAX_YAML_CODE_POINTS` code
