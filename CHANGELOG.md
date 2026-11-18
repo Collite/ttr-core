@@ -6,6 +6,19 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — `import-xmi`: the `xmi` front-end, `ttr-mdg/1`, `ea-erd/1`, the sidecar rename diff (MW-P5 S5.3)
+
+- `ttr-import` gains the `xmi` front-end: XMI 2.1 (Enterprise Architect flavour) through StAX, no DTD or external
+  entities, in the declared encoding. Every non-package element is keyed by its `xmi:id`; references are `{"$ref",
+  "@name"}`; stereotype applications and EA's extension (properties, tags, connector ends) fold into the element;
+  diagrams are stubs a profile ignores; element objects sit on their XML lines, so diagnostics carry real positions.
+- Two shipped profiles. `ttr-mdg/1` reads back what `ttr-metadata export xmi` writes (cn, er, md); on an invented world
+  the round trip is AST- and semantics-dump-equal and the re-export byte-equal. `ea-erd/1` turns a plain ERD into an er
+  package, and a cn skeleton with `is_a` only for a child declaring `cn-from-uml: true`.
+- Reader-level profile keys `foreignId` (the sidecar's `foreignId`; for XMI a UUIDv5 of the `xmi:id`) and
+  `cn-from-uml`. The report gains `delta.renamed`: the sidecar diff by foreign id against the previous generation.
+- `ttr-metadata import-xmi --from <file> --profile ttr-mdg/1|ea-erd/1 --package <name> --out <dir>`.
+
 ### Added — `import-glossary`: the `turtle`, `rdfxml` and `csv` front-ends, `skos/1`, `om-glossary/1`, lexicon emission (MW-P5 S5.2)
 
 - `ttr-import` gains three front-ends. `turtle`/`rdfxml` parse with Jena RIOT (`org.apache.jena:jena-arq` 5.6.0 is now

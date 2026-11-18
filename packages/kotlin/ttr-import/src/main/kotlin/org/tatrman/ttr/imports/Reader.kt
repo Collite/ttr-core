@@ -11,7 +11,11 @@ import org.tatrman.ttr.metadata.export.GeneratedHeader
 import org.tatrman.ttr.metadata.export.GeneratedInputs
 import org.tatrman.ttr.parser.model.Definition
 import org.tatrman.ttr.profile.Bytewise
+import org.tatrman.ttr.profile.ForeignTree
+import org.tatrman.ttr.profile.JsonPointer
 import org.tatrman.ttr.profile.ProfileEngine
+import org.tatrman.ttr.profile.RecordOrigin
+import org.tatrman.ttr.profile.SourceEntry
 import org.tatrman.ttr.profile.SourcesJsonWriter
 import org.tatrman.ttr.writer.TtrRenderer
 import org.tatrman.ttr.yaml.CanonicalDocument
@@ -130,15 +134,39 @@ object Reader {
             }
         }
         val sidecars = TreeMap<String, String>(Bytewise)
-        result.sources.groupBy { it.pkg }.forEach { (pkg, entries) ->
+        val renamed = mutableListOf<ImportReport.Renamed>()
+        val sources = foreignIds(result.sources, result.origins, trees, profile.options.foreignId)
+        sources.groupBy { it.pkg }.forEach { (pkg, entries) ->
             val name = "$pkg.sources.json"
             sidecars[name] = SourcesJsonWriter.write(header.header(name).text, entries)
+            renamed += SidecarDelta.renamed(request.out.resolve(name), entries)
         }
         return GeneratedPackage(
             files,
             sidecars,
-            ImportReport.of(frontEnd.name, profile.identity, result, packages, warnings, frontEnd.records),
+            ImportReport.of(frontEnd.name, profile.identity, result, packages, warnings, frontEnd.records, renamed),
         )
+    }
+
+    /**
+     * MW-P5 S5.3: with a `foreignId` pointer, each record's sidecar entry takes the string the pointer selects in the
+     * record's own node (its input tree and path, [RecordOrigin]; the engine's sources and origins are both in record
+     * order); a record where it selects no string keeps none.
+     */
+    private fun foreignIds(
+        sources: List<SourceEntry>,
+        origins: List<RecordOrigin>,
+        trees: List<ForeignTree>,
+        pointer: String?,
+    ): List<SourceEntry> {
+        if (pointer == null) return sources
+        check(sources.size == origins.size) { "the engine's sources and origins differ in length" }
+        val byLabel = trees.associateBy { it.label }
+        return sources.zip(origins).map { (entry, origin) ->
+            val tree = byLabel[origin.file] ?: return@map entry
+            val node = JsonPointer(origin.path + pointer).resolve(tree.root)?.value as? JsonPrimitive
+            node?.takeIf { it.isString }?.let { entry.copy(foreignId = it.content) } ?: entry
+        }
     }
 
     /**
