@@ -254,12 +254,13 @@ internal class YamlTreeReader(
         val plan = plan(listed, storage, sourceId)
         val problems = plan.problems
         val parsed = plan.canonical.mapNotNull { (file, text) -> canonical(file, text, problems) }.toMutableList()
+        val warnings = mutableListOf<LoadWarning>()
         // A dialect chain exists only once a resolver did, and a resolver only over an on-disk root.
         plan.dialect.forEach { (chain, files) ->
             parsed +=
-                apply(requireNotNull(plan.root), chain, files, problems)
+                apply(requireNotNull(plan.root), chain, files, problems, warnings)
         }
-        return ReadFiles(parsed.sortedBy { it.file.path }, problems.errors, dropped = problems.dropped)
+        return ReadFiles(parsed.sortedBy { it.file.path }, problems.errors, warnings, problems.dropped)
     }
 
     /** The walk (C-4) and each content file's declaration; files that fail either are dropped into the problems. */
@@ -473,9 +474,16 @@ internal class YamlTreeReader(
         chain: List<ProfileDefinition>,
         files: List<Pair<StorageFile, String>>,
         problems: Problems,
+        warnings: MutableList<LoadWarning>,
     ): List<ParsedFile> {
         val (result, kept) = run(root, chain, files, problems, perFile = true) ?: return emptyList()
         val byFile = kept.associate { (file, tree) -> tree.file to file }
+        // review-361 F1: the engine's warnings (✅D-MW-87's `each`, ✅D-MW-89's dropped keys) are the load's WARNINGs;
+        // a span names its tree by the storage path, as an error's does.
+        warnings +=
+            result.report.warnings.map {
+                LoadWarning(problems.sourceId, it.location.file, it.location.line, it.location.column, it.describe())
+            }
         return result.documents.groupBy { requireNotNull(it.file) }.flatMap { (relative, documents) ->
             val file = byFile.getValue(relative)
             documents.mapIndexed { i, document ->

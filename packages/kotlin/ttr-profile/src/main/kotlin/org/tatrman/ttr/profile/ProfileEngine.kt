@@ -56,7 +56,24 @@ data class ProfileWarning(
     val scope: String? = null,
     val key: String? = null,
     val count: Int? = null,
-)
+) {
+    /**
+     * The warning as one line, without its location: `<record>: <message>`, or for a dropped key (✅D-MW-89)
+     * `not in this profile: <key> in <kind> (<n> records)` — `(<n> occurrences)` when file-scoped. The reader's report
+     * and the loader's WARNINGs both say it this way (review-361 F1).
+     */
+    fun describe(): String =
+        when {
+            key == null -> "${record?.let { "$it: " } ?: ""}$message"
+            scope == null -> "$message: $key (${plural(count, "occurrence")})"
+            else -> "$message: $key in $scope (${plural(count, "record")})"
+        }
+
+    private fun plural(
+        count: Int?,
+        noun: String,
+    ) = if (count == 1) "1 $noun" else "$count ${noun}s"
+}
 
 /**
  * One `<package>.sources.json` entry (contracts §6, XM D-9): a record of the run by its [qname], with the foreign names

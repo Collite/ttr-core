@@ -5,6 +5,12 @@ import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 import org.tatrman.ttr.metadata.LoadOptions
 import org.tatrman.ttr.metadata.MetadataLoader
 import org.tatrman.ttr.metadata.PackageLayout
@@ -119,6 +125,49 @@ class ProfileApplySpec :
             // A plan-phase drop is the loader's, never repeated here.
             tree.resolve("c.yaml").writeText("ttr: {profile: ./profiles/missing.yaml, grammar: '>=0.22 <1.0'}\n")
             apply(tree).problems.none { "c.yaml" in it.file } shouldBe true
+        }
+
+        test("review-361 F1: an `unknown: ignore` drop reaches report.json's warnings[]; a run without one has no key") {
+            fun tree(unknown: String?, extra: String) =
+                Files.createTempDirectory("r361-apply").also { tree ->
+                    tree.resolve("profiles").createDirectories()
+                    tree.resolve("profiles/p.yaml").writeText(
+                        listOfNotNull(
+                            "profile: grp/1",
+                            "grammar: '>=0.22 <1.0'",
+                            unknown?.let { "unknown: $it" },
+                            "operations:",
+                            "  - {op: package, mapping: {}, default: demo}",
+                            "  - {op: kinds, at: /entity, mapping: {entita: entity}}",
+                            "  - {op: rename, in: entity, at: /popis, to: {kind: entity, property: description}}",
+                        ).joinToString("\n", postfix = "\n"),
+                    )
+                    tree.resolve("ttr.yaml").writeText("profile: ./profiles/p.yaml\ngrammar: '>=0.22 <1.0'\n")
+                    tree.resolve("model.ignore").writeText("profiles/\n")
+                    tree.resolve("a.yaml").writeText("entity:\n  X: {popis: A$extra}\n  Y: {popis: B$extra}\n")
+                }
+
+            fun report(root: Path) =
+                Json.parseToJsonElement(apply(root).files.getValue("report.json")).jsonObject
+
+            report(tree("ignore", ", navic: 1")).getValue("warnings") shouldBe
+                buildJsonArray {
+                    add(
+                        buildJsonObject {
+                            put("file", "a.yaml")
+                            put("line", 2)
+                            put("column", 17)
+                            put("path", "/entity/X/navic")
+                            put("in", "entity")
+                            put("key", "/navic")
+                            put("count", 2)
+                            put("message", "not in this profile")
+                        },
+                    )
+                }
+            // Nothing dropped (or the default `error` mode): report.json keeps its bytes, with no `warnings` key.
+            report(tree("ignore", "")).keys shouldBe setOf("documents", "ignored", "overridden")
+            report(tree(null, "")).keys shouldBe setOf("documents", "ignored", "overridden")
         }
 
         test("review-269 F4: a conflict names the storage file and the dialect file the document came from") {

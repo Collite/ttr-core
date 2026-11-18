@@ -156,20 +156,7 @@ object Reader {
      * One report line for an engine warning: `<record>: <message> — <file> <path>`; a key `unknown: ignore` dropped
      * (✅D-MW-89) reads `not in this profile: <key> in <kind> (<n> records) — <file> <first occurrence>`.
      */
-    private fun warning(it: ProfileWarning): String {
-        val what =
-            when {
-                it.key == null -> "${it.record?.let { id -> "$id: " } ?: ""}${it.message}"
-                it.scope == null -> "${it.message}: ${it.key} (${plural(it.count, "occurrence")})"
-                else -> "${it.message}: ${it.key} in ${it.scope} (${plural(it.count, "record")})"
-            }
-        return "$what — ${it.location.file} ${it.location.path}"
-    }
-
-    private fun plural(
-        count: Int?,
-        noun: String,
-    ) = if (count == 1) "1 $noun" else "$count ${noun}s"
+    private fun warning(it: ProfileWarning): String = "${it.describe()} — ${it.location.file} ${it.location.path}"
 
     /**
      * D-14: every definition of a generated `cn` document is `abstract: true` (a skeleton the authored core package
