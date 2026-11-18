@@ -23,7 +23,10 @@ class WhereFilterMappingSpec :
     StringSpec({
         "whereFilter reaches the typed er2db_entity mapping: the sql form, the map form, none" {
             val root = Files.createTempDirectory("where-filter")
-            Files.writeString(root.resolve("db.ttrm"), "model db schema dbo\n\ndef table T { columns: [ def column STAV { type: int } ] }\n")
+            Files.writeString(
+                root.resolve("db.ttrm"),
+                "model db schema dbo\n\ndef table T { columns: [ def column STAV { type: int } ] }\n",
+            )
             Files.writeString(
                 root.resolve("er.ttrm"),
                 "model er\n\ndef entity A { attributes: [] }\ndef entity B { attributes: [] }\ndef entity C { attributes: [] }\n" +
