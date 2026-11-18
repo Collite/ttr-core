@@ -20,6 +20,23 @@ on:
     branches: [master, main, v0]
 
 jobs:
+  # MW P7 S7.2: every profile fixture is a required PR check, without path filters.
+  profile-ts-fixtures:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter '@tatrman/profile...' build
+      - run: node packages/profile/scripts/generate-resources.mjs --check
+      - run: pnpm --filter @tatrman/profile test
+      - run: pnpm --filter @tatrman/profile typecheck
+      - run: pnpm --filter @tatrman/profile lint
+
   # MW P7 S7.1: blocking on every PR, with no path filters or skipped twins.
   conformance-ts-yaml:
     runs-on: ubuntu-latest

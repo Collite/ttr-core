@@ -1,0 +1,39 @@
+{
+  "name": "@tatrman/profile",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Located YAML dialect profile engine, sharing the Kotlin profile contract",
+  "license": "Apache-2.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "prebuild": "node scripts/generate-resources.mjs",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/generate-resources.mjs --check && vitest run",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@tatrman/parser": "workspace:*",
+    "@tatrman/semantics": "workspace:*",
+    "yaml": "2.9.1",
+    "ajv": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.6"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "sideEffects": false
+}
