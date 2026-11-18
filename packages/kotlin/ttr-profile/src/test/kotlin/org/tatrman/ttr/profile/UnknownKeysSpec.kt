@@ -20,13 +20,18 @@ class UnknownKeysSpec :
                 "- {op: rename, in: entity, at: /nazev, to: {kind: entity, property: description}}\n" +
                 "- {op: ignore, in: entity, at: /stitky/0, reason: the first tag only}\n"
 
-        fun profile(unknown: String?) =
-            ProfileReader.read(
-                "profile: demo-cs/1\ngrammar: '>=0.22 <1.0'\n" +
-                    (unknown?.let { "unknown: $it\n" } ?: "") +
-                    "operations:\n$operations\n",
-                "profile.yaml",
-            )
+        fun profile(
+            unknown: String?,
+            body: String = operations,
+        ) = ProfileReader.read(
+            "profile: demo-cs/1\ngrammar: '>=0.22 <1.0'\n" +
+                (unknown?.let { "unknown: $it\n" } ?: "") +
+                "operations:\n$body\n",
+            "profile.yaml",
+        )
+
+        // A child's operations append to its ancestor's: this one adds an ignore that selects nothing.
+        fun child(unknown: String?) = profile(unknown, "- {op: ignore, in: entity, at: /none}\n")
 
         // ✅R350-D's three predicates, on two records; a list the profile reads one element of; a file-scoped key.
         val one =
@@ -100,9 +105,9 @@ class UnknownKeysSpec :
         test("(c) without the key a profile is `error`; in a chain the nearest profile that declares it decides") {
             unknownKey(listOf(profile(null)))
             // A child that does not declare it inherits its ancestor's (a reader's overlay or package child, say) …
-            ProfileEngine.apply(trees(), listOf(profile("ignore"), profile(null))).report.warnings.size shouldBe 6
+            ProfileEngine.apply(trees(), listOf(profile("ignore"), child(null))).report.warnings.size shouldBe 6
             // … and a child that declares it wins.
-            unknownKey(listOf(profile("ignore"), profile("error")))
+            unknownKey(listOf(profile("ignore"), child("error")))
         }
 
         test("(e) the schema takes `error` and `ignore` only") {

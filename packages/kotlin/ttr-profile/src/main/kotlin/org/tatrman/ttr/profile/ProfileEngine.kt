@@ -141,6 +141,10 @@ data class ApplyResult(
                             put("column", item.location.column)
                             put("path", item.location.path)
                             item.record?.let { put("record", it) }
+                            // ✅D-MW-89: a dropped key's aggregate; absent on other warnings, which keep their bytes.
+                            item.scope?.let { put("in", it) }
+                            item.key?.let { put("key", it) }
+                            item.count?.let { put("count", it) }
                             put("message", item.message)
                         }
                     }
@@ -183,5 +187,6 @@ object ProfileEngine {
             root,
             perFile,
             sourceName?.let(::JsonPointer),
+            UnknownKeys.of(profile),
         )
 }

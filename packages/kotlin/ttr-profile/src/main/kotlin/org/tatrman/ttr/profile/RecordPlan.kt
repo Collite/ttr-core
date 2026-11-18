@@ -33,27 +33,51 @@ internal class ConsumptionLedger {
         if (!node.keySelection) consumed += node.path
     }
 
-    fun check(root: ForeignNode) {
-        fun visit(node: ForeignNode) {
+    /**
+     * [UnknownKeys.ERROR]: the first unconsumed key or value is `ys/unknown-key`. [UnknownKeys.IGNORE] (✅D-MW-89): every
+     * unconsumed node, in source order — each dropped whole, nothing beneath it visited — with its pointer segments,
+     * list indices as `*`.
+     */
+    fun check(
+        root: ForeignNode,
+        unknown: UnknownKeys = UnknownKeys.ERROR,
+    ): List<Pair<ForeignNode, List<String>>> {
+        val dropped = mutableListOf<Pair<ForeignNode, List<String>>>()
+
+        fun visit(
+            node: ForeignNode,
+            shape: List<String>,
+        ) {
             if (node.path in consumed) return
             when (node.value) {
                 is JsonObject ->
                     node.entries().forEach { child ->
+                        val childShape = shape + escapePointer(child.mappingKey!!)
                         if (child.path !in consumed && child.path !in opened) {
-                            throw ProfileException(
-                                "ys/unknown-key",
-                                child.span(key = true),
-                                "Unconsumed key ${child.mappingKey}",
-                            )
+                            if (unknown == UnknownKeys.ERROR) {
+                                throw ProfileException(
+                                    "ys/unknown-key",
+                                    child.span(key = true),
+                                    "Unconsumed key ${child.mappingKey}",
+                                )
+                            }
+                            dropped += child to childShape
+                        } else {
+                            visit(child, childShape)
                         }
-                        visit(child)
                     }
-                is JsonArray -> node.entries().forEach(::visit)
+                is JsonArray -> node.entries().forEach { visit(it, shape + "*") }
                 JsonNull -> Unit
-                else -> throw ProfileException("ys/unknown-key", node.span(), "Unconsumed value ${node.path}")
+                else ->
+                    if (unknown == UnknownKeys.ERROR) {
+                        throw ProfileException("ys/unknown-key", node.span(), "Unconsumed value ${node.path}")
+                    } else {
+                        dropped += node to shape
+                    }
             }
         }
-        visit(root)
+        visit(root, emptyList())
+        return dropped
     }
 }
 
@@ -131,6 +155,40 @@ internal class RecordPlan(
 
     /** ✅D-MW-87: the warnings the operations of this tree raised, in order (one per record and message). */
     val warnings = mutableListOf<ProfileWarning>()
+
+    /**
+     * ✅D-MW-89 (S5.2c): the keys [ConsumptionLedger.check] dropped under `unknown: ignore`, as one warning per (record
+     * kind, key path) — the path relative to the innermost record (to the file when none holds it), list indices as `*`;
+     * located at the first occurrence; counting the records it was dropped from (a file-scoped key: its occurrences).
+     */
+    fun dropped(nodes: List<Pair<ForeignNode, List<String>>>): List<ProfileWarning> {
+        val byPath = records.groupBy { it.source.path }.mapValues { it.value.first() }
+
+        fun holder(path: String): Record? {
+            var prefix = path
+            while (prefix.isNotEmpty()) {
+                prefix = prefix.substringBeforeLast('/', "")
+                byPath[prefix]?.let { return it }
+            }
+            return null
+        }
+        val groups = linkedMapOf<Pair<String?, String>, Pair<ForeignNode, MutableSet<Any>>>()
+        nodes.forEach { (node, shape) ->
+            val record = holder(node.path)
+            val depth = record?.source?.path?.count { it == '/' } ?: 0
+            val key = shape.drop(depth).joinToString("") { "/$it" }
+            groups.getOrPut(record?.kind to key) { node to mutableSetOf() }.second += record ?: node.path
+        }
+        return groups.map { (group, first) ->
+            ProfileWarning(
+                first.first.span(key = first.first.mappingKey != null),
+                "not in this profile",
+                scope = group.first,
+                key = group.second,
+                count = first.second.size,
+            )
+        }
+    }
 
     /** Source position first; records of one node follow the index of the `kinds` operation that made them. */
     val records: List<Record> by lazy {

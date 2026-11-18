@@ -182,6 +182,7 @@ object ProfileReader {
                 },
                 locations,
                 data.paths.filter { it.startsWith("/overlay/") }.associateWith { data.span(it, key = true) },
+                value["unknown"]?.jsonPrimitive?.content?.let { UnknownKeys.valueOf(it.uppercase()) },
             )
         }
 }
