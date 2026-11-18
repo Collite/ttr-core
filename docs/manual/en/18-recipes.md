@@ -126,6 +126,11 @@ filter and leaves the recipe's existing fingerprint algorithms unchanged. Defaul
 an explicit argument overrides them. Nested action callees and their defaults are outside this direct-action
 contract. The runtime still resolves and guards the auxiliary read in the pinned world.
 
+A `due` in working days declares the calendar too. That covers the wiring's `due:`, literal (`3 working_days`) or a
+parameter (`working_days(:settlement)`), and the action's own `due: 2 working_days` when the wiring has no `due:`.
+The Server counts the due date over that calendar. A `due` in `days` or `weeks` adds no read, and a wiring's
+`due: 2 days` over a working-days default adds none either.
+
 ## Expressions in recipes
 
 - `:name` binds a parameter (`:tolerance`) or a value of the run (`:as_of`), in canonical bodies and in SQL alike —

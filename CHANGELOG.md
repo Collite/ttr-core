@@ -6,6 +6,21 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — 0.22.10: a `working_days` due declares the calendar read (AU-core S2.4f, D-249)
+
+- `ttrp-graph` `ActionCalendarReads`: a wiring's `due:` in working days now makes the recipe read the model calendar.
+  This covers a literal `3 working_days` and a parameter `working_days(:settlement)`, the `expect` column and the
+  approval property alike, and a wiring selected by `when:`. With no wiring `due:`, the action's own
+  `due: <n> working_days` counts. `objectsRead` gains the world's calendar entity (`er.entity.date_dim` on the
+  fixture world), as `working_days(between:, and:)` already did. The Server computes the due date over that governed
+  calendar, so the D-94 declared-scope check now admits it.
+- `days`/`weeks` dues read no calendar, and a wiring's `due: 2 days` over an action default in working days reads
+  none either. Nothing is lowered and no SQL changes.
+- Bundles that move: any recipe with such a `due`. In the fixtures these are release_order (`release_confirmed`,
+  `due: 2 working_days`) and decide_return: `objectsRead`, the README's "What it reads" and the manifest hash.
+  hartland must rebuild and re-approve (`approve-all`): decide_return, release_order and every recipe that wires
+  `decide_way`, `release_confirmed` or `handoff`, each of which has a working-days default `due`.
+
 ### Added — `import-xmi`: the `xmi` front-end, `ttr-mdg/1`, `ea-erd/1`, the sidecar rename diff (MW-P5 S5.3)
 
 - `ttr-import` gains the `xmi` front-end: XMI 2.1 (Enterprise Architect flavour) through StAX, no DTD or external
