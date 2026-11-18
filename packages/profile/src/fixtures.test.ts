@@ -640,6 +640,39 @@ function glossaryOracleBytes(result: Result, englishOnly = false) {
 }
 
 describe('S5.2 glossary engine boundary (GlossarySpec / GenericGlossarySpec)', () => {
+  test('merged generic profile headers drop extension predicates with counted warnings', () => {
+    const rdf = glossary({
+      subjects: {
+        A: subject('A', ['Concept'], { 'dct:created': [{ '@value': '2024-01-01' }] }),
+        B: subject('B', ['Concept'], { 'dct:created': [{ '@value': '2024-01-02' }] }),
+      },
+    });
+    expect(reportOf(rdf).warnings).toEqual([
+      expect.objectContaining({
+        in: 'kind',
+        key: '/dct:created',
+        count: 2,
+        message: 'not in this profile',
+      }),
+    ]);
+    expect(reportOf(rdf).ignored).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: expect.stringContaining('dct:created') }),
+      ])
+    );
+    const csv = glossary(
+      { rows: [{ 'name*': 'A', glossaryStatus: 'Approved', extraColumn: 'x' }] },
+      'om-glossary/1'
+    );
+    expect(reportOf(csv).warnings).toEqual([
+      expect.objectContaining({
+        in: 'kind',
+        key: '/extraColumn',
+        count: 1,
+        message: 'not in this profile',
+      }),
+    ]);
+  });
   test('every SKOS trade concept matches committed cn.ttrm dump bytes and the IRI sidecar', () => {
     const result = glossary(tradeSkos);
     glossaryOracleBytes(result);

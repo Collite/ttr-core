@@ -129,6 +129,10 @@ describe('profile loading contract', () => {
     expect(profile.keyLocations.get('/overlay/Customer')).toMatchObject({ line: 4, column: 11 });
     expect(ProfileReader.read(definition()).writable).toBe(false);
     expect(ProfileReader.read(definition()).unknown).toBeUndefined();
+    for (const policy of ['error', 'ignore'])
+      expect(ProfileReader.read(definition('demo/1', `unknown: ${policy}\n`)).unknown).toBe(policy);
+    for (const policy of ['skip', "'true'", '[ignore]', 'null'])
+      failure(() => ProfileReader.read(definition('demo/1', `unknown: ${policy}\n`)), '/unknown');
     expect(ProfileReader.read(definition('demo/1', 'overlay: ./overlay.yaml\n')).overlay).toBe(
       './overlay.yaml'
     );

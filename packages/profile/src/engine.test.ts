@@ -5,14 +5,15 @@ import { ProfileReader, ProfileException, type ProfileDefinition } from './loadi
 import { ProfileEngine, type ApplyResult } from './engine.js';
 
 type Obj = { [key: string]: Json };
-// Until producer #422 merges, construct the resolved policy separately from the older generated schema.
 const profile = (ops: Json[], unknown?: string): ProfileDefinition =>
-  Object.assign(
-    ProfileReader.read(
-      JSON.stringify({ profile: 'test/1', grammar: '>=0.22 <1.0', operations: ops }),
-      'profile.yaml'
-    ),
-    unknown ? { unknown: unknown as 'error' | 'ignore' } : {}
+  ProfileReader.read(
+    JSON.stringify({
+      profile: 'test/1',
+      grammar: '>=0.22 <1.0',
+      operations: ops,
+      ...(unknown === undefined ? {} : { unknown }),
+    }),
+    'profile.yaml'
   );
 const packageOp = { op: 'package', mapping: {}, default: 'demo' };
 const entities = { op: 'kinds', at: '/entities', mapping: { e: 'entity' } };
@@ -241,6 +242,77 @@ describe('record discovery and structural emission', () => {
 });
 
 describe('null-skip, list kinds, and inherited unknown policy', () => {
+  test('merged Kotlin unknown-key probe matches warning locations, counts and explicit ignores', () => {
+    const ops = [
+      packageOp,
+      entities,
+      write('rename', '/nazev', 'description'),
+      { op: 'ignore', in: 'entity', at: '/stitky/0', reason: 'the first tag only' },
+    ];
+    const trees = [
+      ForeignTree.read(
+        'entities:\n' +
+          '  A:\n' +
+          '    nazev: Strana\n' +
+          "    dct:created: '2024-01-01'\n" +
+          "    rdfs:label: [{'@value': Party}]\n" +
+          "    skosxl:prefLabel: [{'@id': '_:b0'}]\n" +
+          '    stitky: [x, y]\n' +
+          '  B:\n' +
+          '    nazev: Agent\n' +
+          "    dct:created: '2024-01-02'\n" +
+          '    stitky: [p, q, r]\n' +
+          'meta: {exported: today}\n',
+        'one.yaml'
+      ),
+      ForeignTree.read("entities:\n  C: {nazev: Termin, dct:created: '2024-01-03'}\n", 'two.yaml'),
+    ];
+    const result = ProfileEngine.apply(trees, [profile(ops, 'ignore')]);
+    expect(
+      result.report.warnings.map((w) => [w.location.file, w.location.path, w.in, w.key, w.count])
+    ).toEqual([
+      ['one.yaml', '/entities/A/dct:created', 'entity', '/dct:created', 2],
+      ['one.yaml', '/entities/A/rdfs:label', 'entity', '/rdfs:label', 1],
+      ['one.yaml', '/entities/A/skosxl:prefLabel', 'entity', '/skosxl:prefLabel', 1],
+      ['one.yaml', '/entities/A/stitky/1', 'entity', '/stitky/*', 2],
+      ['one.yaml', '/meta', undefined, '/meta', 1],
+      ['two.yaml', '/entities/C/dct:created', 'entity', '/dct:created', 1],
+    ]);
+    expect(result.reportJson().warnings).toEqual(
+      expect.arrayContaining([
+        {
+          file: 'one.yaml',
+          line: 4,
+          column: 5,
+          path: '/entities/A/dct:created',
+          in: 'entity',
+          key: '/dct:created',
+          count: 2,
+          message: 'not in this profile',
+        },
+      ])
+    );
+    expect(result.ignored.map((i) => i.location.path)).toEqual([
+      '/entities/A/stitky/0',
+      '/entities/B/stitky/0',
+    ]);
+    for (const policy of [undefined, 'error']) {
+      expect(errorOf(() => ProfileEngine.apply(trees, [profile(ops, policy)]))).toMatchObject({
+        code: 'ys/unknown-key',
+        location: { file: 'one.yaml', line: 4, column: 5, path: '/entities/A/dct:created' },
+      });
+    }
+    const wholeList = ProfileEngine.apply(trees, [
+      profile([...ops, { op: 'ignore', in: 'entity', at: '/stitky', reason: 'tags' }], 'ignore'),
+    ]);
+    expect(wholeList.report.warnings.map((w) => w.key)).toEqual([
+      '/dct:created',
+      '/rdfs:label',
+      '/skosxl:prefLabel',
+      '/meta',
+      '/dct:created',
+    ]);
+  });
   const kinds = {
     op: 'kinds',
     at: '/items',
