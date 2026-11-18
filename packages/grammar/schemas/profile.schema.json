@@ -84,8 +84,7 @@
           "pattern": "^(?:/(?:[^~/]|~[01])*)*(?![\\s\\S])"
         },
         "cn-from-uml": {
-          "type": "boolean",
-          "default": false
+          "type": "boolean"
         },
         "lexicon": {
           "type": "array",
