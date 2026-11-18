@@ -18,6 +18,10 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - Reader-level profile keys `foreignId` (the sidecar's `foreignId`; for XMI a UUIDv5 of the `xmi:id`) and
   `cn-from-uml`. The report gains `delta.renamed`: the sidecar diff by foreign id against the previous generation.
 - `ttr-metadata import-xmi --from <file> --profile ttr-mdg/1|ea-erd/1 --package <name> --out <dir>`.
+- Edges: a property's `type` is read in both XMI forms (`type="X"` and EA's `<type xmi:idref="X"/>`); an association
+  has `from`/`to` only from EA's connector ends; an element without `xmi:id` (an `href` proxy) is a located error; the
+  rename delta pairs qnames within a kind; a profile's own cn operations under an inherited `cn-from-uml: false` are an
+  error (`cn-from-uml` has no schema default).
 
 ### Added — profile `unknown: error | ignore`; `skos/1` and `om-glossary/1` drop what they do not map (MW-P5 S5.2c)
 
