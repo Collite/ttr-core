@@ -427,7 +427,9 @@ class YamlSourceSpec :
             } shouldContainExactly listOf("$x ys/value-unmapped: Unmapped package key x")
         }
 
-        test("review-361 F1: the engine's warnings are the loader's WARNINGs; an `unknown: ignore` key loads without it") {
+        test(
+            "review-361 F1: the engine's warnings are the loader's WARNINGs; an `unknown: ignore` key loads without it",
+        ) {
             val root =
                 tree(
                     "p/d.yaml" to

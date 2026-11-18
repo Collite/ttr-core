@@ -127,28 +127,31 @@ class ProfileApplySpec :
             apply(tree).problems.none { "c.yaml" in it.file } shouldBe true
         }
 
-        test("review-361 F1: an `unknown: ignore` drop reaches report.json's warnings[]; a run without one has no key") {
-            fun tree(unknown: String?, extra: String) =
-                Files.createTempDirectory("r361-apply").also { tree ->
-                    tree.resolve("profiles").createDirectories()
-                    tree.resolve("profiles/p.yaml").writeText(
-                        listOfNotNull(
-                            "profile: grp/1",
-                            "grammar: '>=0.22 <1.0'",
-                            unknown?.let { "unknown: $it" },
-                            "operations:",
-                            "  - {op: package, mapping: {}, default: demo}",
-                            "  - {op: kinds, at: /entity, mapping: {entita: entity}}",
-                            "  - {op: rename, in: entity, at: /popis, to: {kind: entity, property: description}}",
-                        ).joinToString("\n", postfix = "\n"),
-                    )
-                    tree.resolve("ttr.yaml").writeText("profile: ./profiles/p.yaml\ngrammar: '>=0.22 <1.0'\n")
-                    tree.resolve("model.ignore").writeText("profiles/\n")
-                    tree.resolve("a.yaml").writeText("entity:\n  X: {popis: A$extra}\n  Y: {popis: B$extra}\n")
-                }
+        test(
+            "review-361 F1: an `unknown: ignore` drop reaches report.json's warnings[]; a run without one has no key",
+        ) {
+            fun tree(
+                unknown: String?,
+                extra: String,
+            ) = Files.createTempDirectory("r361-apply").also { tree ->
+                tree.resolve("profiles").createDirectories()
+                tree.resolve("profiles/p.yaml").writeText(
+                    listOfNotNull(
+                        "profile: grp/1",
+                        "grammar: '>=0.22 <1.0'",
+                        unknown?.let { "unknown: $it" },
+                        "operations:",
+                        "  - {op: package, mapping: {}, default: demo}",
+                        "  - {op: kinds, at: /entity, mapping: {entita: entity}}",
+                        "  - {op: rename, in: entity, at: /popis, to: {kind: entity, property: description}}",
+                    ).joinToString("\n", postfix = "\n"),
+                )
+                tree.resolve("ttr.yaml").writeText("profile: ./profiles/p.yaml\ngrammar: '>=0.22 <1.0'\n")
+                tree.resolve("model.ignore").writeText("profiles/\n")
+                tree.resolve("a.yaml").writeText("entity:\n  X: {popis: A$extra}\n  Y: {popis: B$extra}\n")
+            }
 
-            fun report(root: Path) =
-                Json.parseToJsonElement(apply(root).files.getValue("report.json")).jsonObject
+            fun report(root: Path) = Json.parseToJsonElement(apply(root).files.getValue("report.json")).jsonObject
 
             report(tree("ignore", ", navic: 1")).getValue("warnings") shouldBe
                 buildJsonArray {
