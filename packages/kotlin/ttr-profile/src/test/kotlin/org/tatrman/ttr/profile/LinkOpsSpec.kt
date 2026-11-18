@@ -150,10 +150,53 @@ class LinkOpsSpec :
                 entityOps + "- {op: link, in: entity, at: /role, to: {kind: entity, property: roles}, by: sourceName}"
             run("entity:\n  A: {role: [A]}\n", ops, same).properties().getValue("roles") shouldBe
                 JsonArray(listOf(JsonPrimitive("demo.er.entity.A")))
+            // ⚑MW-P5-S53A-1: a reference this run resolves never reads the sidecars; one it does not reads them.
             val bad = sidecarRoot("x/demo.sources.json" to """{"entries": [{"kind": "entity"}]}""")
-            val error = shouldThrow<ProfileException> { run("entity:\n  A: {role: [A]}\n", ops, bad) }
+            run("entity:\n  A: {role: [A]}\n", ops, bad).properties().getValue("roles") shouldBe
+                JsonArray(listOf(JsonPrimitive("demo.er.entity.A")))
+            val error = shouldThrow<ProfileException> { run("entity:\n  A: {role: [B]}\n", ops, bad) }
             error.code shouldBe "ys/profile-invalid"
             error.location.file shouldBe "x/demo.sources.json"
+        }
+
+        test("⚑MW-P5-S53A-1 run-first: a stale sidecar entry with this run's key never shadows the run's record") {
+            // The previous snapshot named the record Customer; this run renamed it Client (same sourceName), and moved
+            // Order to another package (same sourceName, another qname).
+            val previous =
+                sidecarRoot(
+                    "demo.sources.json" to
+                        """{"entries": [{"qname": "demo.er.entity.Customer", "kind": "entity", "sourceName": "G1"},
+                        {"qname": "sklad.er.entity.Order", "kind": "entity", "sourceName": "G2"}]}""",
+                    "sklad.sources.json" to
+                        """{"entries": [{"qname": "sklad.er.entity.Product", "kind": "entity", "sourceName": "G3"}]}""",
+                )
+            val ops =
+                "- {op: package, mapping: {}, default: demo}\n" +
+                    "- {op: kinds, at: /entity, id: /name, mapping: {entita: entity}}\n" +
+                    "- {op: link, in: entity, at: /role, to: {kind: entity, property: roles}, by: sourceName}\n" +
+                    "- {op: ignore, in: entity, at: /guid}"
+            val source =
+                "entity:\n  - {name: Client, guid: G1, role: [G1, G2, G3]}\n  - {name: Order, guid: G2}\n"
+            val result =
+                ProfileEngine.apply(
+                    listOf(ForeignTree.read(source, "one.yaml")),
+                    listOf(recordProfile(ops)),
+                    previous,
+                    sourceName = "/guid",
+                )
+            result.properties().getValue("roles") shouldBe
+                JsonArray(
+                    listOf(
+                        "demo.er.entity.Client",
+                        "demo.er.entity.Order",
+                        "sklad.er.entity.Product",
+                    ).map(::JsonPrimitive),
+                )
+            // Only the sidecar-resolved target (G3) imports its package.
+            result.documents
+                .single()
+                .value
+                .getValue("imports") shouldBe JsonArray(listOf(JsonPrimitive("sklad.*")))
         }
 
         // review-251 F4 (✅R251-C): the sidecar part is read only when a lookup needs it, and never below
