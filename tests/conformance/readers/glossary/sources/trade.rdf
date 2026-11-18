@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The glossary of trade.ttl as RDF/XML (MW-P5 S5.2 T6): the same graph, written in another order. -->
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:skos="http://www.w3.org/2004/02/skos/core#">
+  <skos:Concept rdf:about="https://example.org/trade/Warehouse">
+    <skos:altLabel xml:lang="en">depot</skos:altLabel>
+    <skos:definition xml:lang="cs">Místo, kde jsou uloženy produkty.</skos:definition>
+    <skos:definition xml:lang="en">A place where products are stored.</skos:definition>
+    <skos:prefLabel xml:lang="cs">sklad</skos:prefLabel>
+    <skos:prefLabel xml:lang="en">warehouse</skos:prefLabel>
+    <skos:inScheme rdf:resource="https://example.org/trade/Trade"/>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://example.org/trade/Shipment">
+    <skos:altLabel xml:lang="cs">dodávka</skos:altLabel>
+    <skos:altLabel xml:lang="en">delivery</skos:altLabel>
+    <skos:definition xml:lang="cs">Produkty odeslané zákazníkovi.</skos:definition>
+    <skos:definition xml:lang="en">Products sent to a customer.</skos:definition>
+    <skos:prefLabel xml:lang="cs">zásilka</skos:prefLabel>
+    <skos:prefLabel xml:lang="en">shipment</skos:prefLabel>
+    <skos:inScheme rdf:resource="https://example.org/trade/Trade"/>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://example.org/trade/Payment">
+    <skos:altLabel xml:lang="cs">úhrada</skos:altLabel>
+    <skos:definition xml:lang="cs">Peníze přijaté na fakturu.</skos:definition>
+    <skos:definition xml:lang="en">Money received against an invoice.</skos:definition>
+    <skos:prefLabel xml:lang="cs">platba</skos:prefLabel>
+    <skos:prefLabel xml:lang="en">payment</skos:prefLabel>
+    <skos:inScheme rdf:resource="https://example.org/trade/Trade"/>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://example.org/trade/Invoice">
+    <skos:altLabel xml:lang="en">bill</skos:altLabel>
+    <skos:definition xml:lang="cs">Výzva k zaplacení objednávky.</skos:definition>
+    <skos:definition xml:lang="en">A demand for payment for an order.</skos:definition>
+    <skos:related rdf:resource="https://example.org/trade/Payment"/>
+    <skos:prefLabel xml:lang="cs">faktura</skos:prefLabel>
+    <skos:prefLabel xml:lang="en">invoice</skos:prefLabel>
+    <skos:inScheme rdf:resource="https://example.org/trade/Trade"/>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://example.org/trade/Purchase">
+    <skos:altLabel xml:lang="cs">koupě</skos:altLabel>
+    <skos:altLabel xml:lang="en">sale</skos:altLabel>
+    <skos:definition xml:lang="cs">Nákup zákazníka: událost, která ze strany dělá zákazníka.</skos:definition>
+    <skos:definition xml:lang="en">A customer buying from us: the event that makes a party a customer.</skos:definition>
+    <skos:related rdf:resource="https://example.org/trade/Order"/>
+    <skos:prefLabel xml:lang="cs">nákup</skos:prefLabel>
+    <skos:prefLabel xml:lang="en">purchase</skos:prefLabel>
+    <skos:inScheme rdf:resource="https://example.org/trade/Trade"/>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://example.org/trade/Order">
+    <skos:definition xml:lang="cs">Požadavek zákazníka na nákup produktů.</skos:definition>
+    <skos:definition xml:lang="en">A customer's request to buy products.</skos:definition>
+    <skos:related rdf:resource="https://example.org/trade/Invoice"/>
+    <skos:related rdf:resource="https://example.org/trade/Shipment"/>
+    <skos:prefLabel xml:lang="cs">objednávka</skos:prefLabel>
+    <skos:prefLabel xml:lang="en">order</skos:prefLabel>
+    <skos:inScheme rdf:resource="https://example.org/trade/Trade"/>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://example.org/trade/Product">
+    <skos:altLabel xml:lang="cs">zboží</skos:altLabel>
+    <skos:altLabel xml:lang="en">item</skos:altLabel>
+    <skos:altLabel xml:lang="en">article</skos:altLabel>
+    <skos:definition xml:lang="cs">Něco, co prodáváme.</skos:definition>
+    <skos:definition xml:lang="en">Something we sell.</skos:definition>
+    <skos:related rdf:resource="https://example.org/trade/Warehouse"/>
+    <skos:prefLabel xml:lang="cs">produkt</skos:prefLabel>
+    <skos:prefLabel xml:lang="en">product</skos:prefLabel>
+    <skos:inScheme rdf:resource="https://example.org/trade/Trade"/>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://example.org/trade/Supplier">
+    <skos:altLabel xml:lang="cs">liferant</skos:altLabel>
+    <skos:altLabel xml:lang="en">vendor</skos:altLabel>
+    <skos:definition xml:lang="cs">Organizace, od které nakupujeme.</skos:definition>
+    <skos:definition xml:lang="en">An organisation we buy from.</skos:definition>
+    <skos:related rdf:resource="https://example.org/trade/Product"/>
+    <skos:broader rdf:resource="https://example.org/trade/Organisation"/>
+    <skos:prefLabel xml:lang="cs">dodavatel</skos:prefLabel>
+    <skos:prefLabel xml:lang="en">supplier</skos:prefLabel>
+    <skos:inScheme rdf:resource="https://example.org/trade/Trade"/>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://example.org/trade/Customer">
+    <skos:altLabel xml:lang="cs">klient</skos:altLabel>
+    <skos:altLabel xml:lang="en">client</skos:altLabel>
+    <skos:altLabel xml:lang="en">buyer</skos:altLabel>
+    <skos:definition xml:lang="cs">Strana, která od nás nakupuje.</skos:definition>
+    <skos:definition xml:lang="en">A party that buys from us.</skos:definition>
+    <skos:related rdf:resource="https://example.org/trade/Order"/>
+    <skos:broader rdf:resource="https://example.org/trade/Party"/>
+    <skos:prefLabel xml:lang="cs">zákazník</skos:prefLabel>
+    <skos:prefLabel xml:lang="en">customer</skos:prefLabel>
+    <skos:inScheme rdf:resource="https://example.org/trade/Trade"/>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://example.org/trade/Organisation">
+    <skos:altLabel xml:lang="cs">firma</skos:altLabel>
+    <skos:altLabel xml:lang="en">company</skos:altLabel>
+    <skos:definition xml:lang="cs">Firma nebo instituce vystupující jako strana.</skos:definition>
+    <skos:definition xml:lang="en">A company or institution acting as a party.</skos:definition>
+    <skos:broader rdf:resource="https://example.org/trade/Party"/>
+    <skos:prefLabel xml:lang="cs">organizace</skos:prefLabel>
+    <skos:prefLabel xml:lang="en">organisation</skos:prefLabel>
+    <skos:inScheme rdf:resource="https://example.org/trade/Trade"/>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://example.org/trade/Person">
+    <skos:definition xml:lang="cs">Člověk vystupující jako strana.</skos:definition>
+    <skos:definition xml:lang="en">A human being acting as a party.</skos:definition>
+    <skos:broader rdf:resource="https://example.org/trade/Party"/>
+    <skos:prefLabel xml:lang="cs">osoba</skos:prefLabel>
+    <skos:prefLabel xml:lang="en">person</skos:prefLabel>
+    <skos:inScheme rdf:resource="https://example.org/trade/Trade"/>
+  </skos:Concept>
+  <skos:Concept rdf:about="https://example.org/trade/Party">
+    <skos:definition xml:lang="cs">Kdokoli, s kým firma jedná.</skos:definition>
+    <skos:definition xml:lang="en">Anyone the business deals with.</skos:definition>
+    <skos:prefLabel xml:lang="cs">strana</skos:prefLabel>
+    <skos:prefLabel xml:lang="en">party</skos:prefLabel>
+    <skos:inScheme rdf:resource="https://example.org/trade/Trade"/>
+  </skos:Concept>
+  <rdf:Description rdf:about="https://example.org/trade/Trade">
+    <skos:prefLabel xml:lang="en">Trade glossary</skos:prefLabel>
+    <rdf:type rdf:resource="http://www.w3.org/2004/02/skos/core#ConceptScheme"/>
+  </rdf:Description>
+</rdf:RDF>

@@ -6,6 +6,38 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — `import-glossary`: the `turtle`, `rdfxml` and `csv` front-ends, `skos/1`, `om-glossary/1`, lexicon emission (MW-P5 S5.2)
+
+- `ttr-import` gains three front-ends. `turtle`/`rdfxml` parse with Jena RIOT (`org.apache.jena:jena-arq` 5.6.0 is now
+  a runtime dependency of `ttr-import` only, protobuf excluded, ✅D-MW-81 (a); `ttr-metadata` stays Jena-free) into the
+  subject map `{subjects: {<iri>: {"@id", "@local", <predicate>: [<object>…]}}}`. IRI objects are `{"@id", "@local"}`,
+  literals `{"@value", "@language"|"@type"}`, predicates compacted with a fixed namespace table (`skos:`, `rdf:`, …),
+  everything in bytewise order, so one graph gives one tree in either syntax. A blank node is `_:` + 16 hex digits of
+  its content's SHA-256 (a blank-node cycle is refused); relative IRIs resolve against `file:///` whatever the file is
+  called; language tags are written `en_gb` for `en-GB`. Tree spans are labelled `<file>#subjects`. `csv` reads RFC 4180 into `{rows: [<row>…]}` keyed by the header, an empty cell absent, each row
+  on its CSV line.
+- Shipped profiles `skos/1` (SKOS → a `cn` skeleton: `def kind` per `skos:Concept`, `label`/`description` language
+  maps, `broader` → `is_a`, `related` → `relations: [{type: related, to: …}]`; schemes, collections and subjects
+  with no type it names are skipped into `ignored[]`, an untagged label is English with a warning) and `om-glossary/1`
+  (an OpenMetadata glossary CSV export; non-Approved, unlisted or empty states skipped).
+- A third reader-level profile key, `lexicon: [{target, at, id, terms, form?, language? | locale, split?}]`
+  (schema-checked; ✅D-MW-81 (d)): `Reader` emits one `lexicon` document per package and locale
+  (`<pkg>/lexicon.<locale>.ttrm`, `model lexicon locale <id>`), one `def term <id>_<locale> { for: cn.<id>, forms }`
+  per concept.
+- `ttr-metadata-cli import-glossary --from <file> [--syntax turtle|rdfxml|csv] --profile <p> --out <dir> [--root]
+  [--overlay] [--package] [--dry-run] [--format text|json]`, with the outputs, report and exit codes of
+  `import-schema --from file:`.
+- Report: `ignored[]` entries carry the S5.2a `record` field; the Markdown section folds the key beneath a front-end's
+  record collection (`/subjects/*/skos:altLabel`) as it folds list indices. `FrontEnd` gains `records` (default
+  null) and `ReaderOptions` gains `lexicon`.
+- **Changed in `ttr-profile` (review-350, ✅D-MW-87; profiles contracts §2/§3):** `kinds` takes `unmapped: error | skip`
+  (default `error`, so existing profiles behave as before) and a list-valued kind (`kind: /rdf:type/*/@local`) takes its
+  first element `mapping` names. `each … key:` takes `missing: <literal>`; a missing key without it skips the element,
+  and a repeated key keeps the bytewise-first element — both report warnings, no longer errors, so
+  `ys/each-missing-key` and `ys/each-duplicate-key` are retired from the diagnostic catalogue. `ApplyReport` gains
+  `warnings` (in `reportJson()` only when non-empty) and `ApplyResult` gains `origins` (each record's input file and
+  node), which the lexicon joins on.
+
 ### Fixed — ttr-core: a second latest(...) over the same date column reduces by its own alias (ttr-server#434; AU-core S2.4e)
 
 - A bare `latest(by: d, per: …)` now reduces by the `d` of the instance **the last join brought**, whichever side

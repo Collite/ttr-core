@@ -13,6 +13,12 @@ dependencies {
     // The generated header (GeneratedHeader/GeneratedInputs/Hashes) and, through it, the canonical TtrRenderer.
     api(project(":packages:kotlin:ttr-metadata"))
     api(project(":packages:kotlin:ttr-writer"))
+    // MW-P5 S5.2 (⚑MW-P5-S52-1 (a) → ✅D-MW-81): the `turtle`/`rdfxml` front-ends parse with Jena RIOT. Only ttr-import
+    // takes Jena; ttr-metadata's MD3 ban stands. RDF Protobuf is never read (as ttr-metadata's tests); Thrift stays,
+    // since RIOT's initialisation loads it.
+    implementation(libs.jena.arq) {
+        exclude(group = "com.google.protobuf")
+    }
     testImplementation(libs.bundles.kotest)
 }
 

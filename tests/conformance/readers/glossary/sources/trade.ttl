@@ -1,0 +1,85 @@
+# An invented SKOS glossary (MW-P5 S5.2 T6): twelve trade concepts, cs + en.
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix t: <https://example.org/trade/> .
+
+t:Trade a skos:ConceptScheme ;
+    skos:prefLabel "Trade glossary"@en .
+
+t:Party a skos:Concept ;
+    skos:inScheme t:Trade ;
+    skos:prefLabel "party"@en, "strana"@cs ;
+    skos:definition "Anyone the business deals with."@en, "Kdokoli, s kým firma jedná."@cs .
+
+t:Person a skos:Concept ;
+    skos:inScheme t:Trade ;
+    skos:prefLabel "person"@en, "osoba"@cs ;
+    skos:definition "A human being acting as a party."@en, "Člověk vystupující jako strana."@cs ;
+    skos:broader t:Party .
+
+t:Organisation a skos:Concept ;
+    skos:inScheme t:Trade ;
+    skos:prefLabel "organisation"@en, "organizace"@cs ;
+    skos:definition "A company or institution acting as a party."@en, "Firma nebo instituce vystupující jako strana."@cs ;
+    skos:broader t:Party ;
+    skos:altLabel "company"@en, "firma"@cs .
+
+t:Customer a skos:Concept ;
+    skos:inScheme t:Trade ;
+    skos:prefLabel "customer"@en, "zákazník"@cs ;
+    skos:definition "A party that buys from us."@en, "Strana, která od nás nakupuje."@cs ;
+    skos:broader t:Party ;
+    skos:related t:Order ;
+    skos:altLabel "client"@en, "buyer"@en, "klient"@cs .
+
+t:Supplier a skos:Concept ;
+    skos:inScheme t:Trade ;
+    skos:prefLabel "supplier"@en, "dodavatel"@cs ;
+    skos:definition "An organisation we buy from."@en, "Organizace, od které nakupujeme."@cs ;
+    skos:broader t:Organisation ;
+    skos:related t:Product ;
+    skos:altLabel "vendor"@en, "liferant"@cs .
+
+t:Product a skos:Concept ;
+    skos:inScheme t:Trade ;
+    skos:prefLabel "product"@en, "produkt"@cs ;
+    skos:definition "Something we sell."@en, "Něco, co prodáváme."@cs ;
+    skos:related t:Warehouse ;
+    skos:altLabel "item"@en, "article"@en, "zboží"@cs .
+
+t:Order a skos:Concept ;
+    skos:inScheme t:Trade ;
+    skos:prefLabel "order"@en, "objednávka"@cs ;
+    skos:definition "A customer's request to buy products."@en, "Požadavek zákazníka na nákup produktů."@cs ;
+    skos:related t:Invoice, t:Shipment .
+
+t:Purchase a skos:Concept ;
+    skos:inScheme t:Trade ;
+    skos:prefLabel "purchase"@en, "nákup"@cs ;
+    skos:definition "A customer buying from us: the event that makes a party a customer."@en, "Nákup zákazníka: událost, která ze strany dělá zákazníka."@cs ;
+    skos:related t:Order ;
+    skos:altLabel "sale"@en, "koupě"@cs .
+
+t:Invoice a skos:Concept ;
+    skos:inScheme t:Trade ;
+    skos:prefLabel "invoice"@en, "faktura"@cs ;
+    skos:definition "A demand for payment for an order."@en, "Výzva k zaplacení objednávky."@cs ;
+    skos:related t:Payment ;
+    skos:altLabel "bill"@en .
+
+t:Payment a skos:Concept ;
+    skos:inScheme t:Trade ;
+    skos:prefLabel "payment"@en, "platba"@cs ;
+    skos:definition "Money received against an invoice."@en, "Peníze přijaté na fakturu."@cs ;
+    skos:altLabel "úhrada"@cs .
+
+t:Shipment a skos:Concept ;
+    skos:inScheme t:Trade ;
+    skos:prefLabel "shipment"@en, "zásilka"@cs ;
+    skos:definition "Products sent to a customer."@en, "Produkty odeslané zákazníkovi."@cs ;
+    skos:altLabel "delivery"@en, "dodávka"@cs .
+
+t:Warehouse a skos:Concept ;
+    skos:inScheme t:Trade ;
+    skos:prefLabel "warehouse"@en, "sklad"@cs ;
+    skos:definition "A place where products are stored."@en, "Místo, kde jsou uloženy produkty."@cs ;
+    skos:altLabel "depot"@en .

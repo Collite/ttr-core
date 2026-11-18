@@ -102,12 +102,43 @@ object Reader {
             }
             packages += ImportReport.Package(pkg, model, path, canonical.ast.definitions.size)
         }
+        // ✅D-MW-87: the engine's warnings (an `each` key missing or repeated) first, then the reader's own.
+        val warnings =
+            result.report.warnings
+                .map {
+                    "${it.record?.let { id ->
+                        "$id: "
+                    } ?: ""}${it.message} — ${it.location.file} ${it.location.path}"
+                }.toMutableList()
+        // T4: synonyms → one `lexicon` document per package and locale, beside the engine's documents.
+        val grammar =
+            result.documents
+                .firstOrNull()
+                ?.canonical
+                ?.value
+                ?.text("ttr")
+        if (grammar != null && profile.options.lexicon.isNotEmpty()) {
+            val terms = Lexicon.terms(trees, result.origins, profile.options.lexicon, warnings)
+            Lexicon.documents(terms, grammar).forEach { (path, document) ->
+                if (files.put(path, header.header(path).line(GeneratedHeader.Form.TTRM) + render(document)) != null) {
+                    throw ReaderInputException(
+                        "two generated documents render to $path; the profile's packages collide",
+                    )
+                }
+                packages +=
+                    ImportReport.Package(document.value.text("package"), "lexicon", path, document.ast.definitions.size)
+            }
+        }
         val sidecars = TreeMap<String, String>(Bytewise)
         result.sources.groupBy { it.pkg }.forEach { (pkg, entries) ->
             val name = "$pkg.sources.json"
             sidecars[name] = SourcesJsonWriter.write(header.header(name).text, entries)
         }
-        return GeneratedPackage(files, sidecars, ImportReport.of(frontEnd.name, profile.identity, result, packages))
+        return GeneratedPackage(
+            files,
+            sidecars,
+            ImportReport.of(frontEnd.name, profile.identity, result, packages, warnings, frontEnd.records),
+        )
     }
 
     /**

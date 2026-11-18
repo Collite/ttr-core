@@ -37,11 +37,12 @@ fun runMetadataCommand(args: List<String>): CliOutcome {
             ProfileCommand().subcommands(ProfileApplyCommand { outcome = it }, ProfileCheckCommand { outcome = it }),
             SnapshotCommand { outcome = it },
             ImportSchemaCommand { outcome = it },
+            ImportGlossaryCommand { outcome = it },
         )
     // MW S3.5: `lint` and `profile` exit 2 on usage (contracts §5); the older commands keep 64.
     val usage =
         if (args.firstOrNull { !it.startsWith("-") } in
-            setOf("lint", "profile", "snapshot", "import-schema")
+            setOf("lint", "profile", "snapshot", "import-schema", "import-glossary")
         ) {
             2
         } else {
@@ -171,6 +172,47 @@ class ImportSchemaCommand(
         output(
             ImportSchemaCli.run(
                 from,
+                profile,
+                Path.of(out),
+                root?.let(Path::of),
+                overlay?.let(Path::of),
+                packageName,
+                dryRun,
+                format == "json",
+            ),
+        )
+}
+
+/** MW-P5 S5.2 T5 — `import-glossary`: a SKOS (Turtle/RDF-XML) or OpenMetadata (CSV) glossary → a cn skeleton + lexicon. */
+class ImportGlossaryCommand(
+    private val output: (CliOutcome) -> Unit,
+) : CliktCommand(name = "import-glossary") {
+    override fun help(context: Context) =
+        "Generate a cn skeleton and lexicon from a glossary export: <out>/<package>/cn.ttrm, lexicon.<locale>.ttrm, " +
+            "<package>.sources.json, report.json."
+
+    private val from by option("--from", help = "The glossary file (Turtle, RDF/XML or CSV)").required()
+    private val syntax by option("--syntax", help = "The file's syntax; default from its extension")
+        .choice("turtle", "rdfxml", "csv")
+    private val profile by option("--profile", help = "A shipped profile (skos/1, om-glossary/1) or a profile file")
+        .required()
+    private val out by option("--out", help = "Output directory").required()
+    private val root by option("--root", help = "The model root whose sidecars links and overlays read")
+    private val overlay by option(
+        "--overlay",
+        help = "An authored overlay {<qname|sourceName>: {<property>: <value>}}; refused when the profile declares one",
+    )
+    private val packageName by option("--package", help = "The package every input lands in (replaces the profile's)")
+    private val dryRun by option("--dry-run", help = "Write nothing; print each file's diff against --out").flag()
+    private val format by option("--format", help = "text (the PR-body Markdown) or json (the report)")
+        .choice("text", "json")
+        .default("text")
+
+    override fun run() =
+        output(
+            ImportGlossaryCli.run(
+                from,
+                syntax,
                 profile,
                 Path.of(out),
                 root?.let(Path::of),

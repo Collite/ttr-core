@@ -1,0 +1,9 @@
+# An authored overlay (MW-P5 S5.2 T1, ✅D-MW-84): two terms curated by their IRIs. A customer is a person in the role
+# a purchase gives them (a cn role's base is `of:`; a role needs an `event:` to load strict, CN-D6), and a purchase is
+# that event.
+https://example.org/trade/Customer:
+  kind: role
+  of: Person
+  event: Purchase
+https://example.org/trade/Purchase:
+  kind: event

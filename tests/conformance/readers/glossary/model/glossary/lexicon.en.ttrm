@@ -1,0 +1,12 @@
+// generated-from: ../../sources/trade.ttl@86413e05a8dea49a8cc5ae966e4ccf8609ade208f48f2c857c8b2a86553bfbc0 profile skos/1 generator 0.0.1-LOCAL — do not edit
+package glossary
+model lexicon locale en
+
+def term Customer_en { for: cn.Customer, forms: ["buyer", "client"] }
+def term Invoice_en { for: cn.Invoice, forms: ["bill"] }
+def term Organisation_en { for: cn.Organisation, forms: ["company"] }
+def term Product_en { for: cn.Product, forms: ["article", "item"] }
+def term Purchase_en { for: cn.Purchase, forms: ["sale"] }
+def term Shipment_en { for: cn.Shipment, forms: ["delivery"] }
+def term Supplier_en { for: cn.Supplier, forms: ["vendor"] }
+def term Warehouse_en { for: cn.Warehouse, forms: ["depot"] }

@@ -161,8 +161,10 @@ internal class ShapeOp(
  * `each` (✅D-MW-81, S5.2a; P-8 amended to eleven operations): the list at `at` (relative to the record) → one `shape`
  * template filled per element, in order. An input `$item` or `$item/<pointer>` reads the element; a plain pointer reads
  * the record. An element whose template yields nothing is dropped. Without `key` the result is the list; with `key` (a
- * pointer within the element) it is an object keyed by each element's string there — a duplicate is
- * `ys/each-duplicate-key`, a missing (or non-string) one `ys/each-missing-key`, both at the element. A non-list is
+ * pointer within the element) it is an object keyed by each element's string there. ✅D-MW-87: an element with no
+ * string key takes the literal `missing:` when the op has one, and is skipped when it has not, with the warning
+ * `each key missing → <literal>` (or `→ skipped`); a repeated key keeps the element whose value is bytewise first, with
+ * the warning `each key repeated (<key>)`. Each warning is reported once per record. A non-list is
  * `ys/each-not-a-list`; an empty list writes `[]`/`{}`; a missing or null `at` writes nothing. The list is consumed
  * whole. It walks the list as `link` does (`entries()`, one result per element) and fills as `shape` does
  * ([fillTemplate]); no expressions.
@@ -177,8 +179,8 @@ internal class EachOp(
     ) {
         val path = op.targetPath()
         val template = op.value.getValue("shape")
-        val keyText = op.value.optionalString("key")
-        val key = keyText?.let(::JsonPointer)
+        val key = op.value.optionalString("key")?.let(::JsonPointer)
+        val missing = op.value.optionalString("missing")
         for (record in plan.records.filter { it.kind == op.scope }) {
             val source = op.at.resolve(record.source, includeNull = true) ?: continue
             plan.consumption.consume(source)
@@ -210,23 +212,25 @@ internal class EachOp(
                     JsonArray(shaped.mapNotNull { (_, value) -> value as? JsonElement })
                 } else {
                     val keyed = linkedMapOf<String, JsonElement>()
+
+                    // One warning per record and message: located at the list, so repeats collapse in the report.
+                    fun warn(message: String) {
+                        plan.warnings += ProfileWarning(source.span(key = true), message, record.id)
+                    }
                     // An element whose template yields nothing is dropped before its key is checked (review-338 B2).
                     shaped.filter { (_, value) -> value is JsonElement }.forEach { (element, value) ->
+                        value as JsonElement
                         val name =
                             (key.resolve(element)?.value as? JsonPrimitive)?.takeIf { it.isString }?.content
-                                ?: throw ProfileException(
-                                    "ys/each-missing-key",
-                                    element.span(),
-                                    "each needs a string key at ${element.path}$keyText",
-                                )
-                        if (name in keyed) {
-                            throw ProfileException(
-                                "ys/each-duplicate-key",
-                                element.span(),
-                                "Duplicate each key $name at ${element.path}",
-                            )
+                                ?: missing.also { warn("each key missing → ${it ?: "skipped"}") }
+                                ?: return@forEach
+                        val previous = keyed[name]
+                        if (previous == null) {
+                            keyed[name] = value
+                        } else {
+                            warn("each key repeated ($name)")
+                            if (Bytewise.compare(text(value), text(previous)) < 0) keyed[name] = value
                         }
-                        keyed[name] = value as JsonElement
                     }
                     JsonObject(keyed)
                 }
@@ -236,6 +240,9 @@ internal class EachOp(
 
     private companion object {
         const val ITEM = "\$item"
+
+        /** The value a repeated key compares by: a string's content, any other value's JSON text. */
+        fun text(value: JsonElement) = (value as? JsonPrimitive)?.takeIf { it.isString }?.content ?: value.toString()
     }
 }
 

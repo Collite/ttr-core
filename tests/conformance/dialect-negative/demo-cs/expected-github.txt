@@ -1,8 +1,6 @@
 ::error file=missing-id.yaml,line=2,col=5::ys/record-id-missing Record needs a string id
 ::error file=unknown-kind.yaml,line=2,col=6::ys/unknown-kind Unmapped record kind jiny
 ::error file=conflict.yaml,line=2,col=26::ys/profile-conflict Two operations write entity.Customer/description
-::error file=each-duplicate-key.yaml,line=6,col=9::ys/each-duplicate-key Duplicate each key cs at /pojmy/Dodatek/popisy/1
-::error file=each-missing-key.yaml,line=5,col=9::ys/each-missing-key each needs a string key at /pojmy/Dohoda/popisy/0/@language
 ::error file=each-not-a-list.yaml,line=4,col=5::ys/each-not-a-list each needs a list at /pojmy/Ujednani/popisy
 ::error file=join-pair-shape.yaml,line=4,col=54::xm/join-pair-shape 'Pobocka.id <> Pobocka.nadrizena' in join 'Pobocka.id <> Pobocka.nadrizena' is not `a.x = b.y` (two-part references, equality only)
 ::error file=link-ambiguous.yaml,line=6,col=16::xm/link-ambiguous sourceName Sklad matches demo.er.entity.Sklad, demo.db.dbo.Sklad

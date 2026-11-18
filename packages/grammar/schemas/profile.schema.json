@@ -72,6 +72,132 @@
           "type": "string",
           "pattern": "^(?:/(?:[^~/]|~[01])*)*(?![\\s\\S])"
         },
+        "lexicon": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "target": {
+                "enum": [
+                  "project",
+                  "table",
+                  "view",
+                  "column",
+                  "index",
+                  "constraint",
+                  "fk",
+                  "procedure",
+                  "entity",
+                  "attribute",
+                  "relation",
+                  "er2db_entity",
+                  "er2db_attribute",
+                  "er2db_relation",
+                  "query",
+                  "role",
+                  "er2cnc_role",
+                  "drill_map",
+                  "area",
+                  "schema",
+                  "domain",
+                  "dimension",
+                  "map",
+                  "hierarchy",
+                  "measure",
+                  "cubelet",
+                  "md2db_cubelet",
+                  "md2db_domain",
+                  "md2db_map",
+                  "md2er_dimension",
+                  "md2er_cubelet",
+                  "world",
+                  "term",
+                  "pattern",
+                  "example",
+                  "parameter",
+                  "action",
+                  "service",
+                  "approval",
+                  "program",
+                  "recipe",
+                  "subkind",
+                  "variant",
+                  "kind",
+                  "event",
+                  "phase",
+                  "quality",
+                  "relation_type",
+                  "cn2md_kind",
+                  "cn2md_role",
+                  "cn2md_quality",
+                  "cn2md_event",
+                  "cn2er_kind",
+                  "cn2er_role",
+                  "cn2er_event",
+                  "cn2er_quality",
+                  "cn2er_phase",
+                  "cn2db_concept",
+                  "engine",
+                  "executor",
+                  "storage",
+                  "identity",
+                  "grant",
+                  "deployment",
+                  "process",
+                  "step"
+                ]
+              },
+              "at": {
+                "type": "string",
+                "pattern": "^(?:/(?:[^~/]|~[01])*)*(?![\\s\\S])"
+              },
+              "id": {
+                "type": "string",
+                "pattern": "^(?:/(?:[^~/]|~[01])*)*(?![\\s\\S])"
+              },
+              "terms": {
+                "type": "string",
+                "pattern": "^(?:/(?:[^~/]|~[01])*)*(?![\\s\\S])"
+              },
+              "form": {
+                "type": "string",
+                "pattern": "^(?:/(?:[^~/]|~[01])*)*(?![\\s\\S])"
+              },
+              "language": {
+                "type": "string",
+                "pattern": "^(?:/(?:[^~/]|~[01])*)*(?![\\s\\S])"
+              },
+              "locale": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*(?![\\s\\S])"
+              },
+              "split": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "target",
+              "at",
+              "id",
+              "terms"
+            ],
+            "additionalProperties": false,
+            "oneOf": [
+              {
+                "required": [
+                  "language"
+                ]
+              },
+              {
+                "required": [
+                  "locale"
+                ]
+              }
+            ]
+          },
+          "minItems": 1
+        },
         "operations": {
           "type": "array",
           "items": {
@@ -291,6 +417,12 @@
               },
               "split": {
                 "type": "string"
+              },
+              "unmapped": {
+                "type": "string"
+              },
+              "missing": {
+                "type": "string"
               }
             },
             "required": [
@@ -484,6 +616,12 @@
                           }
                         ]
                       }
+                    },
+                    "unmapped": {
+                      "enum": [
+                        "error",
+                        "skip"
+                      ]
                     }
                   },
                   "required": [
@@ -1513,6 +1651,10 @@
                     "key": {
                       "type": "string",
                       "pattern": "^(?:/(?:[^~/]|~[01])*)*(?![\\s\\S])"
+                    },
+                    "missing": {
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
                   "required": [

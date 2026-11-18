@@ -1,0 +1,50 @@
+# om-glossary/1 — an OpenMetadata glossary CSV export (`parent,name*,displayName,description,synonyms,relatedTerms,…,
+# glossaryStatus,…`) → a TTR cn skeleton package + lexicon (MW-P5 S5.2, contracts §3; XM 06 §3 "glossary → cn skeleton").
+# Shipped with ttr-core: `ttr-metadata import-glossary --from <export.csv> --profile om-glossary/1`.
+#
+# Every Approved term → `def kind <name>` (abstract: true, D-14). Skipped, each listed in the report's ignored[]: a term
+# in another workflow state OM names (Draft, In Review, Rejected, Deprecated: `kind mapping null`, ✅D-MW-81 (b)), in a
+# state this profile does not name (`kind unmapped (<state>)`), or with an empty `glossaryStatus` (`kind missing`,
+# ✅D-MW-87). `displayName`/`description` are English (OpenMetadata's glossaries are
+# monolingual) → `label`/`description` language maps; `synonyms` → the English lexicon document. The term's sidecar
+# `sourceName` is its name (the CSV carries no FQN column).
+#
+# Not carried yet (each listed with its reason in the report — MW-P5 S5.2 Found (i)): `parent` (the parent's FQN,
+# `Trade.Party`) and `relatedTerms` (a `;`-separated FQN list). A TTR name is an FQN's last part, which no operation takes
+# (P-8), so S5.5's OpenMetadata adapter reshapes the snapshot first (`parentName`, a list of related names), as it lifts
+# OM's foreign keys for om-tables/1; this profile then maps them like skos/1 maps broader/related.
+#
+# Errors (the profile's author must act): a column outside OM's glossary export (the header row above) is
+# `ys/unknown-key`; a term with no `name*` is `ys/record-id-missing`.
+profile: om-glossary/1
+grammar: '>=0.22 <1.0'
+skeleton: true
+sourceName: /name*
+lexicon:
+  - {target: kind, at: /rows, id: /name*, terms: /synonyms, split: ';', locale: en}
+operations:
+  - {op: package, mapping: {}, default: glossary}
+  - op: kinds
+    at: /rows
+    id: /name*
+    kind: /glossaryStatus
+    unmapped: skip
+    mapping: {Approved: kind, Draft: null, In Review: null, Rejected: null, Deprecated: null}
+  - {op: rename, in: kind, at: /displayName, to: {kind: kind, path: [label, en]}}
+  - {op: rename, in: kind, at: /description, to: {kind: kind, path: [description, en]}}
+
+  # Read by the reader, not the engine.
+  - {op: ignore, in: kind, at: /synonyms, reason: lexicon entries (the reader's lexicon key)}
+
+  # Not carried by v1 (see the header).
+  - {op: ignore, in: kind, at: /parent, reason: 'the parent FQN; is_a waits for the S5.5 adapter to give its last part (S5.2 Found (i))'}
+  - {op: ignore, in: kind, at: /relatedTerms, reason: 'a ;-separated FQN list; relations wait for the S5.5 adapter to give a list of names (S5.2 Found (i))'}
+
+  # Stewardship and presentation: catalog facts, not model facts.
+  - {op: ignore, in: kind, at: /owner, reason: OM owner (no cn property)}
+  - {op: ignore, in: kind, at: /reviewers, reason: OM reviewers}
+  - {op: ignore, in: kind, at: /tags, reason: OM classification tags}
+  - {op: ignore, in: kind, at: /references, reason: OM external links}
+  - {op: ignore, in: kind, at: /color, reason: OM display colour}
+  - {op: ignore, in: kind, at: /iconURL, reason: OM display icon}
+  - {op: ignore, in: kind, at: /extension, reason: OM custom properties}

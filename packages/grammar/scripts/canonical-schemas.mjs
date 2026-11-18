@@ -852,6 +852,8 @@ export function createSchemas(metadata) {
         'kinds',
         {
           ...recordSelectors,
+          // ✅D-MW-87: a `*` segment reads the pointer after it in each element of the list before it; the first
+          // element `mapping` names is the kind (a pointer selecting a list of strings does the same).
           kind: pointer,
           id: pointer,
           // ✅D-MW-81 (S5.2a): a `null` kind skips the record into ignored[].
@@ -859,6 +861,8 @@ export function createSchemas(metadata) {
             type: 'object',
             additionalProperties: any(canonicalKind, { type: 'null' }),
           },
+          // ✅D-MW-87: `skip` lists a record whose kind is not in `mapping`, or missing, in ignored[] (default `error`).
+          unmapped: { enum: ['error', 'skip'] },
         },
         ['at', 'mapping']
       ),
@@ -916,9 +920,16 @@ export function createSchemas(metadata) {
       ['in', 'at', 'to']
     ),
     // ✅D-MW-81 (S5.2a, P-8 amended to eleven): a list → one `shape` per element; `key` makes it an object.
+    // ✅D-MW-87: `missing` is the key of an element that has none (read with `key` only).
     operation(
       'each',
-      { ...recordSelectors, to: ref('propertyTarget'), shape: ref('eachTemplate'), key: pointer },
+      {
+        ...recordSelectors,
+        to: ref('propertyTarget'),
+        shape: ref('eachTemplate'),
+        key: pointer,
+        missing: { type: 'string', minLength: 1 },
+      },
       ['in', 'at', 'to', 'shape']
     ),
   ];
@@ -997,6 +1008,29 @@ export function createSchemas(metadata) {
           // relative to each record, whose string is the record's sidecar `sourceName` (default: the record id).
           skeleton: { ...boolean, default: false },
           sourceName: pointer,
+          // MW-P5 S5.2 T4 (⚑MW-P5-S52-1 (d) → ✅D-MW-81): synonyms → `lexicon` documents, one per locale, emitted by
+          // ttr-import beside the engine's output. Each entry reads the records at `at` (ids at `id`), keeps those the
+          // run emitted as `target`, and turns the elements at `terms` (a list, or a string cut at `split`) into the forms of
+          // one `def term` per record and locale; the locale is each element's string at `language` or the constant `locale`.
+          lexicon: array(
+            {
+              ...object(
+                {
+                  target: canonicalKind,
+                  at: pointer,
+                  id: pointer,
+                  terms: pointer,
+                  form: pointer,
+                  language: pointer,
+                  locale: { type: 'string', pattern: anchoredPattern('[a-z][a-z0-9_]*') },
+                  split: { type: 'string', minLength: 1 },
+                },
+                ['target', 'at', 'id', 'terms'],
+              ),
+              oneOf: [{ required: ['language'] }, { required: ['locale'] }],
+            },
+            1,
+          ),
           operations: array({
             ...object(
               {
@@ -1015,6 +1049,8 @@ export function createSchemas(metadata) {
                 shape: ref('eachTemplate'),
                 key: pointer,
                 split: string,
+                unmapped: string,
+                missing: string,
               },
               ['op']
             ),

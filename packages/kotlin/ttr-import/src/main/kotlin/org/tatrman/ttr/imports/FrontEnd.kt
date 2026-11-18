@@ -20,7 +20,25 @@ interface FrontEnd {
     /** The name `--from` and the report use (`json`, later `turtle`, `csv`, `xmi`, `pdm`). */
     val name: String
 
+    /**
+     * The pointer of the record collection the front-end's trees put the source's objects under (`/subjects`, `/rows`),
+     * or null; the report folds the key beneath it to a star, so a PR body groups one ignored key over every record.
+     */
+    val records: String? get() = null
+
     fun parse(files: List<Path>): List<ForeignTree>
+}
+
+/**
+ * Each input with the label its tree carries: its file name. Two inputs with one name are refused, since the label is
+ * what spans, the report and a profile's `files` selectors read.
+ */
+internal fun labelled(files: List<Path>): List<Pair<Path, String>> {
+    val names = files.map { it.fileName.toString() }
+    names.groupBy { it }.filterValues { it.size > 1 }.keys.firstOrNull()?.let {
+        throw ReaderInputException("two inputs are named $it; a reader labels each input by its file name")
+    }
+    return files.zip(names)
 }
 
 /** A reader's input problem the caller should show as a usage error (exit 2): no file, unreadable, a name twice. */
@@ -35,13 +53,8 @@ class ReaderInputException(
 object JsonFrontEnd : FrontEnd {
     override val name = "json"
 
-    override fun parse(files: List<Path>): List<ForeignTree> {
-        val names = files.map { it.fileName.toString() }
-        names.groupBy { it }.filterValues { it.size > 1 }.keys.firstOrNull()?.let {
-            throw ReaderInputException("two inputs are named $it; a reader labels each input by its file name")
-        }
-        return files.zip(names).map { (file, name) -> ForeignTree.read(text(file), name, name) }
-    }
+    override fun parse(files: List<Path>): List<ForeignTree> =
+        labelled(files).map { (file, name) -> ForeignTree.read(text(file), name, name) }
 
     /**
      * The file as strict UTF-8, a leading byte-order mark dropped: read through ttr-yaml's bounded reader, so an input

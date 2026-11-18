@@ -112,25 +112,33 @@ class EachSplitSkipSpec :
                 }
         }
 
-        test("each: a duplicate key is ys/each-duplicate-key and a missing one ys/each-missing-key, at the element") {
-            val duplicate =
-                shouldThrow<ProfileException> {
-                    runOps(
-                        "entity:\n  E:\n    popisy:\n" +
-                            "      - {'@value': A, '@language': cs}\n      - {'@value': B, '@language': cs}\n",
-                        descriptions,
-                    )
-                }
-            duplicate.code shouldBe "ys/each-duplicate-key"
-            duplicate.location.path shouldBe "/entity/E/popisy/1"
-            duplicate.location.line shouldBe 5
+        test(
+            "each (✅D-MW-87, was ys/each-duplicate-key / ys/each-missing-key): a repeated key keeps the " +
+                "bytewise-first element, a missing one is skipped; each with one warning per record, at the list",
+        ) {
+            val repeated =
+                runOps(
+                    "entity:\n  E:\n    popisy:\n" +
+                        "      - {'@value': B, '@language': cs}\n      - {'@value': A, '@language': cs}\n" +
+                        "      - {'@value': C, '@language': cs}\n",
+                    descriptions,
+                )
+            repeated.properties().getValue("description") shouldBe buildJsonObject { put("cs", "A") }
+            repeated.report.warnings shouldBe
+                listOf(
+                    ProfileWarning(
+                        ProfileSpan("one.yaml", 3, 5, 3, 11, "/entity/E/popisy"),
+                        "each key repeated (cs)",
+                        "E",
+                    ),
+                )
             val missing =
-                shouldThrow<ProfileException> {
-                    runOps("entity:\n  E:\n    popisy:\n      - {'@value': A}\n", descriptions)
-                }
-            missing.code shouldBe "ys/each-missing-key"
-            missing.location.path shouldBe "/entity/E/popisy/0"
-            missing.location.line shouldBe 4
+                runOps(
+                    "entity:\n  E:\n    popisy:\n      - {'@value': A}\n      - {'@value': B, '@language': en}\n",
+                    descriptions,
+                )
+            missing.properties().getValue("description") shouldBe buildJsonObject { put("en", "B") }
+            missing.report.warnings.map { it.message to it.record } shouldBe listOf("each key missing → skipped" to "E")
         }
 
         test("each: an `at` that is not a list is ys/each-not-a-list at the value") {

@@ -25,6 +25,6 @@ operations:
   - {op: link, in: relation, at: /na, to: {kind: relation, property: to}, by: sourceName, kind: entity, files: [10-vazby.yaml, link-kind-missing.yaml, join-pair-shape.yaml]}
   - {op: join-pairs, in: relation, at: /spojeni, to: {kind: relation, property: join}, files: [10-vazby.yaml, link-kind-missing.yaml, join-pair-shape.yaml]}
   # S5.2a (✅D-MW-81): the `kinds` null-skip, `each` (keyed) and `split` on a glossary-like list, and their negatives.
-  - {op: kinds, at: /pojmy, kind: /stav, mapping: {schvaleno: entity, navrh: null}, files: [11-pojmy.yaml, each-duplicate-key.yaml, each-missing-key.yaml, each-not-a-list.yaml, split-not-a-string.yaml]}
-  - {op: each, in: entity, at: /popisy, to: {kind: entity, property: description}, key: /@language, shape: {input: $item/@value}, files: [11-pojmy.yaml, each-duplicate-key.yaml, each-missing-key.yaml, each-not-a-list.yaml]}
+  - {op: kinds, at: /pojmy, kind: /stav, mapping: {schvaleno: entity, navrh: null}, files: [11-pojmy.yaml, each-not-a-list.yaml, split-not-a-string.yaml]}
+  - {op: each, in: entity, at: /popisy, to: {kind: entity, property: description}, key: /@language, shape: {input: $item/@value}, files: [11-pojmy.yaml, each-not-a-list.yaml]}
   - {op: values, in: entity, at: /znacky, to: {kind: entity, property: tags}, split: ';', files: [11-pojmy.yaml, split-not-a-string.yaml]}

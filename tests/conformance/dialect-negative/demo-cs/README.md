@@ -17,7 +17,8 @@ authored key or record, with the codes and positions `negative/expect.yaml` pins
 only as an entity, linked with `kind: table`) and of `join-pairs` (an inequality); the positive pair is
 `../../dialect/demo-cs/tree/10-vazby.yaml` and its twin.
 
-`each-not-a-list.yaml`, `each-missing-key.yaml`, `each-duplicate-key.yaml` and `split-not-a-string.yaml` (MW-P5 S5.2a,
-✅D-MW-81) are the negatives of the `each` op (keyed by `@language`) and of `values`' `split` operand; the positive is
+`each-not-a-list.yaml` and `split-not-a-string.yaml` (MW-P5 S5.2a, ✅D-MW-81) are the negatives of the `each` op and of
+`values`' `split` operand (a missing or repeated `each` key is no error since ✅D-MW-87: a report warning, so its two
+negatives were retired); the positive is
 `../../dialect/demo-cs/tree/11-pojmy.yaml` and its twin, which also carries the `kinds` null-skip (a `navrh` term is
 skipped into `ignored[]`, never an error).
