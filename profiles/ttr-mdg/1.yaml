@@ -1,6 +1,11 @@
 # ttr-mdg/1 — an XMI 2.1 export carrying our MDG Technology (`ttr-mdg`, XM-P1: `ttr-metadata export xmi`) → TTR cn, er and
 # md packages (MW-P5 S5.3, readers contracts §3; XM 06 §3 "EA"). Shipped with ttr-core:
-# `ttr-metadata import-xmi --from <model.xmi> --profile ttr-mdg/1 --package <name>`.
+# `ttr-metadata import-xmi --from <model.xmi> --profile ttr-mdg/1 [--package <name>]`.
+#
+# Packages (MW-P5 S5.3a, ✅D-MW-91): each UML package is its TTR package, its path as written (`/` → `.`; the XM-P1
+# writer names each UML package by its TTR package, `db.retail` included); `--package` puts every element in one package.
+# A package that holds a record and whose path is no TTR package path is `ys/package-invalid`. References stay by UML
+# name, so a reference across packages does not resolve (S5.3a Found).
 #
 # The inverse of the XM-P1 writer for what that writer carries. Records: every element the `xmi` front-end lists under
 # /elements — a «concept» by its `cnKind` tag (`def kind|role|phase|quality|event|relation_type`), every other element by
@@ -24,7 +29,7 @@ grammar: '>=0.22 <1.0'
 sourceName: /@xmi/id
 foreignId: /@xmi/uuid
 operations:
-  - {op: package, mapping: {}, default: model}
+  - {op: package, at: /model/package, verbatim: true}
   - op: kinds
     at: /elements
     id: /name

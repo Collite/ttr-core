@@ -1,0 +1,19 @@
+// generated-from: ../../sources/sales-billing.xmi@cd784056e9352d385cf1b3aa591ccc43ce79d7a758ded9306a657ddab62f4318 profile ea-erd/1 generator 0.0.1-LOCAL — do not edit
+package sales
+model er
+
+def entity Customer { description: "A buyer of record.",
+    attributes: [
+        def attribute id { type: int, },
+    ]
+}
+
+def entity Order {
+    attributes: [
+        def attribute order_no { type: String, },
+    ]
+}
+
+def relation placed_by { from: Order, to: Customer, cardinality: { from: "0..*", to: "1" },
+}
+

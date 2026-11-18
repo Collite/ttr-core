@@ -15,7 +15,7 @@
             "line": 1,
             "column": 2,
             "path": "/model",
-            "reason": "the EA model root (the package is --package)"
+            "reason": "the EA model root (the package is its package path, or --package)"
         },
         {
             "file": "orders-erd.xmi",

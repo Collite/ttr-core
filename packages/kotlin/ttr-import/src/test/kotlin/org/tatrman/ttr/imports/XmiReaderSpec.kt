@@ -64,7 +64,7 @@ class XmiReaderSpec :
             root: Path,
             input: String,
             profile: String,
-            pkg: String,
+            pkg: String?,
             out: String = "model",
             overlay: Path? = null,
         ) = Reader.run(
@@ -486,5 +486,52 @@ class XmiReaderSpec :
                 run(root, "orders-erd.xmi", reopened.toString(), "orders", out = "d").files.getValue("orders/cn.ttrm"),
             ) shouldContain
                 "def kind Customer { description: { en: \"A person or company that places orders.\" }, abstract: true }"
+        }
+
+        test("S5.3a: one TTR package per UML package (verbatim), each with its own elements") {
+            val root = workspace()
+            val generated = run(root, "sales-billing.xmi", "ea-erd/1", null, out = "multi")
+            matches(generated, "multi")
+            generated.files.keys shouldContainExactly listOf("sales/billing/er.ttrm", "sales/er.ttrm")
+            val billing = body(generated.files.getValue("sales/billing/er.ttrm"))
+            billing shouldContain "package sales.billing"
+            billing shouldContain "def entity Invoice {"
+            billing shouldNotContain "def entity Customer"
+            val sales = body(generated.files.getValue("sales/er.ttrm"))
+            sales shouldContain "package sales"
+            sales shouldContain "from: Order, to: Customer,"
+            sales shouldNotContain "Invoice"
+            report(generated).getValue("packages").jsonArray.map {
+                it.jsonObject
+                    .getValue("package")
+                    .jsonPrimitive.content
+            } shouldBe listOf("sales.billing", "sales") // the report lists packages by file path
+            // billed_to's end Customer is in package sales: by name it does not resolve in sales.billing, and no
+            // `imports:` is written — the link that would resolve it is S5.3a Found (a).
+            // One input, several trees under its one label: an error in the first package's tree names its own XMI line
+            // (placed_by, line 20), not a line of the last tree read.
+            root.resolve("sources/dated.xmi").writeText(
+                root.resolve("sources/sales-billing.xmi").readText().replace("name=\"Order\"", "name=\"date\""),
+            )
+            val dated = shouldThrow<ProfileException> { run(root, "dated.xmi", "ea-erd/1", null, out = "dated") }
+            dated.code shouldBe "ys/profile-invalid"
+            dated.location.file shouldBe "dated.xmi"
+            dated.location.line shouldBe 20
+            // --package still overrides every tree: one package, as before.
+            run(root, "sales-billing.xmi", "ea-erd/1", "orders", out = "one").files.keys shouldContainExactly
+                listOf("orders/er.ttrm")
+            // EA's own root package name (`Orders`) is no TTR package path: located at the first element.
+            val refused =
+                shouldThrow<ProfileException> { run(root, "orders-erd.xmi", "ea-erd/1", null, out = "two") }
+            refused.code shouldBe "ys/package-invalid"
+            refused.location.file shouldBe "orders-erd.xmi"
+            refused.location.line shouldBe 6
+            refused.message.orEmpty() shouldContain "\"Orders\""
+        }
+
+        test("S5.3a: the shop round trip names its package by the UML package, as --package shop did") {
+            val root = workspace()
+            run(root, "shop.xmi", "ttr-mdg/1", null).outputs() shouldBe
+                run(root, "shop.xmi", "ttr-mdg/1", "shop").outputs()
         }
     })
