@@ -17,10 +17,16 @@
 # this profile names (`owl:Ontology`) → `kind unmapped`. The other SKOS properties of a concept are ignored with their
 # reasons below.
 #
-# Errors (the profile's author must act): a concept predicate outside SKOS core and the ones below (`dct:created`,
-# a custom property) is `ys/unknown-key` — extend this profile (a child profile's `ignore`), or curate with an overlay.
+# Dropped, each listed once in the report's warnings[] (`unknown: ignore`, ✅D-MW-89): a concept predicate outside SKOS
+# core — `dct:created`/`modified`, `rdfs:label`/`comment`, `owl:sameAs`, a SKOS-XL label, a custom property — reported
+# once per predicate as `not in this profile`, with the number of concepts it was dropped from. To carry one, extend this
+# profile (a child profile's operation), or curate with an overlay; a child declaring `unknown: error` makes them errors.
+#
+# Errors (malformed structure — the input or the profile's author must act): a file the front-end cannot read, or one
+# over the reader's budget (`ys/profile-invalid`); a concept with no local name (`ys/record-id-missing`).
 profile: skos/1
 grammar: '>=0.22 <1.0'
+unknown: ignore
 skeleton: true
 sourceName: /@id
 lexicon:
