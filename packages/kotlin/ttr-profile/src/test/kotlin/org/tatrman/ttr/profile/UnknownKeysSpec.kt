@@ -98,6 +98,20 @@ class UnknownKeysSpec :
             result.ignored.map { it.location.path } shouldBe listOf("/entity/A/stitky/0", "/entity/B/stitky/0")
         }
 
+        test("review-361 F2: a `*` key is silenced by an ignore of the list itself; the other warnings stay") {
+            val listed = profile("ignore", operations + "- {op: ignore, in: entity, at: /stitky, reason: tags}\n")
+            ProfileEngine.apply(trees(), listOf(listed)).report.warnings.map {
+                "${it.location.file} ${it.scope} ${it.key} ${it.count}"
+            } shouldBe
+                listOf(
+                    "one.yaml entity /dct:created 2",
+                    "one.yaml entity /rdfs:label 1",
+                    "one.yaml entity /skosxl:prefLabel 1",
+                    "one.yaml null /meta 1",
+                    "two.yaml entity /dct:created 1",
+                )
+        }
+
         test("(b) unknown: error on the same input is ys/unknown-key, as before") {
             unknownKey(listOf(profile("error")))
         }

@@ -160,6 +160,8 @@ internal class RecordPlan(
      * ✅D-MW-89 (S5.2c): the keys [ConsumptionLedger.check] dropped under `unknown: ignore`, as one warning per (record
      * kind, key path) — the path relative to the innermost record (to the file when none holds it), list indices as `*`;
      * located at the first occurrence; counting the records it was dropped from (a file-scoped key: its occurrences).
+     * `ignore` has no wildcard: a key with `*` is silenced by an `ignore` of the pointer up to its first `*` (the list,
+     * consumed whole) — a `stitky` element by `at: /stitky` (review-361 F2).
      */
     fun dropped(nodes: List<Pair<ForeignNode, List<String>>>): List<ProfileWarning> {
         val byPath = records.groupBy { it.source.path }.mapValues { it.value.first() }
