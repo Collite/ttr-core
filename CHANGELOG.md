@@ -6,6 +6,18 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — `package: {verbatim: true}`; `import-xmi` makes one TTR package per UML package (MW-P5 S5.3a, ✅D-MW-91)
+
+- The profile engine's `package` op takes `verbatim: true`: the string at `at` is the package path as written, `/` → `.`
+  the only change. Beside `mapping`/`default`, or without `at`, the profile is `ys/profile-invalid`; a path that is no
+  TTR package path is the new `ys/package-invalid`, at the tree's first record.
+- The `xmi` front-end reads one tree per UML package; `ttr-mdg/1` and `ea-erd/1` take the package from it, so
+  `import-xmi` without `--package` writes each UML package as its TTR package (`--package` still puts all in one).
+  An EA root package such as `Orders` is no TTR package path: rename it, or give `--package`.
+- A child profile that restates `cn-from-uml: false` no longer fails inside its parent (review-372 N1).
+- Edges: a relation end in another UML package does not resolve yet (by name), and `ttr-mdg/1` resolves every reference
+  by name, so a multi-package world splits but does not link across packages.
+
 ### Added — `import-xmi`: the `xmi` front-end, `ttr-mdg/1`, `ea-erd/1`, the sidecar rename diff (MW-P5 S5.3)
 
 - `ttr-import` gains the `xmi` front-end: XMI 2.1 (Enterprise Architect flavour) through StAX, no DTD or external
