@@ -6,6 +6,22 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — `import-xmi`: the `xmi` front-end, `ttr-mdg/1`, `ea-erd/1`, the sidecar rename diff (MW-P5 S5.3)
+
+- `ttr-import` gains the `xmi` front-end: XMI 2.1 (Enterprise Architect flavour) through StAX, no DTD or external
+  entities, in the declared encoding. Every non-package element is keyed by its `xmi:id`; references are `{"$ref",
+  "@name"}`; stereotype applications and EA's extension (properties, tags, connector ends) fold into the element;
+  diagrams are stubs a profile ignores; element objects sit on their XML lines, so diagnostics carry real positions.
+- Two shipped profiles. `ttr-mdg/1` reads back what `ttr-metadata export xmi` writes (cn, er, md); on an invented world
+  the round trip is AST- and semantics-dump-equal and the re-export byte-equal. `ea-erd/1` turns a plain ERD into an er
+  package, and a cn skeleton with `is_a` only for a child declaring `cn-from-uml: true`.
+- Reader-level profile keys `foreignId` (the sidecar's `foreignId`; for XMI a UUIDv5 of the `xmi:id`) and
+  `cn-from-uml`. The report gains `delta.renamed`: the sidecar diff by foreign id against the previous generation.
+- `ttr-metadata import-xmi --from <file> --profile ttr-mdg/1|ea-erd/1 --package <name> --out <dir>`.
+- Edges: a property's `type` is read in both XMI forms (`type="X"` and EA's `<type xmi:idref="X"/>`); an association
+  has `from`/`to` only from EA's connector ends; an element without `xmi:id` (an `href` proxy) is a located error; the
+  rename delta pairs qnames within a kind; a profile's own cn operations under an inherited `cn-from-uml: false` are an
+  error (`cn-from-uml` has no schema default).
 ### Fixed — the YAML schemas no longer hold ~240 MB for the life of the process; an over-budget dialect file is refused before the engine; `whereFilter` on the typed mapping (MW-P4 S4.2a)
 
 - `ttr-yaml`: `model-yaml.schema.json` and `profile.schema.json` are built with networknt `preloadJsonSchema(false)`:

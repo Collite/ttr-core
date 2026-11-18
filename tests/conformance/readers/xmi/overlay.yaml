@@ -1,0 +1,2 @@
+# An authored overlay on the generated shop package, keyed by the generated qname.
+shop.cn.kind.Product: {description: {en: "Goods we sell"}}

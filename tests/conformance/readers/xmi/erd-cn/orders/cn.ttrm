@@ -1,0 +1,8 @@
+// generated-from: ../../sources/orders-erd.xmi@5689ef4d2432cf6bd5d4ba89d9f34b8ba73ea14cf6949bb9bc115b302643e098 profile orders-erd/1 generator 0.0.1-LOCAL — do not edit
+package orders
+model cn
+
+def kind Customer { abstract: true }
+def kind KeyAccount { is_a: [Customer], abstract: true }
+def kind Order { abstract: true }
+def kind Product { abstract: true }

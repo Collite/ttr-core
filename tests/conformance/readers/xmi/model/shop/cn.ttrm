@@ -1,0 +1,10 @@
+// generated-from: ../../sources/shop.xmi@596bb18e4d92e603447e043f7c1d9f479ac14000451791922297609128d1484b profile ttr-mdg/1 generator 0.0.1-LOCAL — do not edit
+package shop
+model cn
+
+def kind Organisation { is_a: [Party] }
+def kind Party { description: { en: "A trading party" } }
+def kind Product { description: { en: "Something we sell" } }
+def kind Prospect { is_a: [Party], abstract: true }
+def event Purchase { extent: instantaneous, involves: [Party as buyer, Product as item] }
+def relation_type recommends {}

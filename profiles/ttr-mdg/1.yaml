@@ -1,0 +1,167 @@
+# ttr-mdg/1 — an XMI 2.1 export carrying our MDG Technology (`ttr-mdg`, XM-P1: `ttr-metadata export xmi`) → TTR cn, er and
+# md packages (MW-P5 S5.3, readers contracts §3; XM 06 §3 "EA"). Shipped with ttr-core:
+# `ttr-metadata import-xmi --from <model.xmi> --profile ttr-mdg/1 --package <name>`.
+#
+# The inverse of the XM-P1 writer for what that writer carries. Records: every element the `xmi` front-end lists under
+# /elements — a «concept» by its `cnKind` tag (`def kind|role|phase|quality|event|relation_type`), every other element by
+# its stereotype («entity», «relation», «dimension», «metric» → measure, «domain»); attributes nest under their entity or
+# dimension. Names are the UML names; references are the UML ones (a generalization's `general`, an association's ends,
+# a property's `type`), so the generated package resolves on its own names. A property's `type` is read in both XMI
+# forms, the attribute `type="X"` and EA's child `<type xmi:idref="X"/>` (✅R372-A); a generalization's `general` only in
+# the attribute form, which is the one EA and the XM-P1 writer write (the child form needs an engine operand: S5.3
+# Found (g)). An association needs EA's connector ends (`xmi:Extension`): without them it has no `from`/`to` (✅R372-B). The sidecar keeps each element's xmi:id
+# (`sourceName`) and a UUIDv5 of it (`foreignId`, the xmi front-end's NAMESPACE), so a later snapshot's renames show as a
+# sidecar diff (`delta.renamed`).
+#
+# Not read back (each listed in the report's ignored[] with its reason): what the XM-P1 projection does not carry
+# (a role's/phase's/quality's `of:` and a role's `event:` — supply them with an overlay; labels, iri, `qualities`,
+# a hierarchy's `dimension`, a cubelet's `measures`, a domain's `type`, binding packages and kinds); what the engine cannot
+# decode from the MDG's string encodings (`period` "at=<quality>", `synonyms` "<locale>:<form>;…"); the groundings
+# («grounds» dependencies: their binding kind is not in the export, readers never emit `grounds:`); diagrams; and the
+# MDG's own bookkeeping (`qname`, `tier`, EA's properties). Curated: any other key is `ys/unknown-key`.
+profile: ttr-mdg/1
+grammar: '>=0.22 <1.0'
+sourceName: /@xmi/id
+foreignId: /@xmi/uuid
+operations:
+  - {op: package, mapping: {}, default: model}
+  - op: kinds
+    at: /elements
+    id: /name
+    kind: /@stereotypes
+    unmapped: skip
+    mapping: {entity: entity, relation: relation, dimension: dimension, metric: measure, domain: domain, concept: null, involves: null, grounds: null}
+  - op: kinds
+    at: /elements
+    id: /name
+    kind: /@tags/cnKind
+    unmapped: skip
+    mapping: {kind: kind, role: role, phase: phase, quality: quality, event: event, relation_type: relation_type}
+  - {op: kinds, in: entity, at: /ownedAttribute, id: /name, mapping: {attribute: attribute}}
+  - {op: kinds, in: dimension, at: /ownedAttribute, id: /name, mapping: {attribute: attribute}}
+  - {op: ignore, at: /model, reason: 'the world (its name is not a package)'}
+  - {op: ignore, at: /@diagrams, reason: diagrams are not model facts}
+
+  # cn — one block per concept kind: description, abstract, is_a; an event's participants.
+  - {op: shape, in: kind, to: {kind: kind, property: description}, at: /@properties, template: {en: {input: /documentation}}}
+  - {op: values, in: kind, at: /@tags/abstract, to: {kind: kind, property: abstract}, mapping: {'true': true, 'false': false}}
+  - {op: each, in: kind, at: /generalization, to: {kind: kind, property: is_a}, shape: {ref: {input: $item/general/@name}}}
+  - {op: shape, in: role, to: {kind: role, property: description}, at: /@properties, template: {en: {input: /documentation}}}
+  - {op: each, in: role, at: /generalization, to: {kind: role, property: is_a}, shape: {ref: {input: $item/general/@name}}}
+  - {op: shape, in: phase, to: {kind: phase, property: description}, at: /@properties, template: {en: {input: /documentation}}}
+  - {op: shape, in: quality, to: {kind: quality, property: description}, at: /@properties, template: {en: {input: /documentation}}}
+  - {op: rename, in: quality, at: /@tags/basis, to: {kind: quality, property: basis}}
+  - {op: shape, in: event, to: {kind: event, property: description}, at: /@properties, template: {en: {input: /documentation}}}
+  - {op: rename, in: event, at: /@tags/extent, to: {kind: event, property: extent}}
+  - {op: each, in: event, at: /@outgoing/involves, to: {kind: event, property: involves}, shape: {ref: {input: $item/@target/@name}, as: {input: $item/@tags/label}}}
+  - {op: shape, in: relation_type, to: {kind: relation_type, property: description}, at: /@properties, template: {en: {input: /documentation}}}
+  - {op: ignore, in: event, at: /@tags/period, reason: 'period: the MDG writes it as "at=<quality>", which no operation decodes'}
+  - {op: ignore, in: kind, at: /@tags/synonyms, reason: 'synonyms: the MDG writes "<locale>:<form>;…", which the lexicon rule cannot read'}
+  - {op: ignore, in: role, at: /@tags/synonyms, reason: 'synonyms: the MDG writes "<locale>:<form>;…", which the lexicon rule cannot read'}
+  - {op: ignore, in: event, at: /@tags/synonyms, reason: 'synonyms: the MDG writes "<locale>:<form>;…", which the lexicon rule cannot read'}
+  - {op: ignore, in: kind, at: /@outgoing, reason: groundings and other connectors are their own elements}
+  - {op: ignore, in: role, at: /@outgoing, reason: groundings and other connectors are their own elements}
+  - {op: ignore, in: phase, at: /@outgoing, reason: groundings and other connectors are their own elements}
+  - {op: ignore, in: quality, at: /@outgoing, reason: groundings and other connectors are their own elements}
+  - {op: ignore, in: event, at: /@outgoing, reason: groundings and other connectors are their own elements}
+  - {op: ignore, in: relation_type, at: /@outgoing, reason: groundings and other connectors are their own elements}
+
+  # er — entities, their attributes, relations with cardinality.
+  - {op: rename, in: entity, at: /@properties/documentation, to: {kind: entity, property: description}}
+  # A reference in both XMI forms (✅R372-A): the attribute form `type="X"` and EA's child form `<type xmi:idref="X"/>`.
+  - {op: rename, in: attribute, at: /type/@name, to: {kind: attribute, property: type}}
+  - {op: rename, in: attribute, at: /type/0/@name, to: {kind: attribute, property: type}}
+  - {op: ignore, in: attribute, at: /type/$ref, reason: 'type: the UML type, by name'}
+  - {op: ignore, in: attribute, at: /type/0/$ref, reason: 'type: the UML type, by name'}
+  - {op: values, in: attribute, at: /@tags/nullable, to: {kind: attribute, property: optional}, mapping: {'true': true, 'false': false}}
+  - {op: rename, in: relation, at: /@properties/documentation, to: {kind: relation, property: description}}
+  - {op: shape, in: relation, at: /@source, to: {kind: relation, property: from}, template: {ref: {input: /@name}}}
+  - {op: shape, in: relation, at: /@target, to: {kind: relation, property: to}, template: {ref: {input: /@name}}}
+  - {op: rename, in: relation, at: /@source/multiplicity, to: {kind: relation, path: [cardinality, from]}}
+  - {op: rename, in: relation, at: /@target/multiplicity, to: {kind: relation, path: [cardinality, to]}}
+  - {op: ignore, in: relation, at: /@tags/cardinality, reason: 'cardinality: read from the association ends'}
+  - {op: ignore, in: relation, at: /memberEnd, reason: 'the association ends: from, to and cardinality'}
+  - {op: ignore, in: relation, at: /ownedEnd, reason: 'the association ends: from, to and cardinality'}
+  - {op: ignore, in: entity, at: /@outgoing, reason: relations and groundings are their own elements}
+  - {op: ignore, in: entity, at: /generalization, reason: 'an er entity has no is_a'}
+
+  # md — dimensions and their attributes, measures, domains.
+  - {op: rename, in: dimension, at: /@tags/key, to: {kind: dimension, property: key}}
+  - {op: rename, in: dimension, at: /@properties/documentation, to: {kind: dimension, property: description}}
+  - {op: rename, in: measure, at: /@tags/aggregation, to: {kind: measure, property: aggregation}}
+  - {op: rename, in: measure, at: /@tags/additivity, to: {kind: measure, property: class}}
+  - {op: rename, in: measure, at: /@tags/validBy, to: {kind: measure, property: validBy}}
+  - {op: rename, in: measure, at: /@properties/documentation, to: {kind: measure, property: description}}
+  - {op: rename, in: domain, at: /@properties/documentation, to: {kind: domain, property: description}}
+  - {op: ignore, in: dimension, at: /@outgoing, reason: groundings are their own elements}
+  - {op: ignore, in: measure, at: /@outgoing, reason: groundings are their own elements}
+
+  # The MDG's and the front-end's bookkeeping, on every record kind.
+  - {op: ignore, in: kind, at: /@xmi, reason: 'xmi:id and type (the sidecar keeps the id)'}
+  - {op: ignore, in: role, at: /@xmi, reason: 'xmi:id and type (the sidecar keeps the id)'}
+  - {op: ignore, in: phase, at: /@xmi, reason: 'xmi:id and type (the sidecar keeps the id)'}
+  - {op: ignore, in: quality, at: /@xmi, reason: 'xmi:id and type (the sidecar keeps the id)'}
+  - {op: ignore, in: event, at: /@xmi, reason: 'xmi:id and type (the sidecar keeps the id)'}
+  - {op: ignore, in: relation_type, at: /@xmi, reason: 'xmi:id and type (the sidecar keeps the id)'}
+  - {op: ignore, in: entity, at: /@xmi, reason: 'xmi:id and type (the sidecar keeps the id)'}
+  - {op: ignore, in: attribute, at: /@xmi, reason: 'xmi:id and type (the sidecar keeps the id)'}
+  - {op: ignore, in: relation, at: /@xmi, reason: 'xmi:id and type (the sidecar keeps the id)'}
+  - {op: ignore, in: dimension, at: /@xmi, reason: 'xmi:id and type (the sidecar keeps the id)'}
+  - {op: ignore, in: measure, at: /@xmi, reason: 'xmi:id and type (the sidecar keeps the id)'}
+  - {op: ignore, in: domain, at: /@xmi, reason: 'xmi:id and type (the sidecar keeps the id)'}
+  - {op: ignore, in: kind, at: /@stereotypes, reason: the record kind}
+  - {op: ignore, in: role, at: /@stereotypes, reason: the record kind}
+  - {op: ignore, in: phase, at: /@stereotypes, reason: the record kind}
+  - {op: ignore, in: quality, at: /@stereotypes, reason: the record kind}
+  - {op: ignore, in: event, at: /@stereotypes, reason: the record kind}
+  - {op: ignore, in: relation_type, at: /@stereotypes, reason: the record kind}
+  - {op: ignore, in: attribute, at: /@stereotypes, reason: the record kind}
+  - {op: ignore, in: kind, at: /@tags, reason: 'the MDG bookkeeping (qname, tier)'}
+  - {op: ignore, in: role, at: /@tags, reason: 'the MDG bookkeeping (qname, tier)'}
+  - {op: ignore, in: phase, at: /@tags, reason: 'the MDG bookkeeping (qname, tier)'}
+  - {op: ignore, in: quality, at: /@tags, reason: 'the MDG bookkeeping (qname, tier)'}
+  - {op: ignore, in: event, at: /@tags, reason: 'the MDG bookkeeping (qname, tier)'}
+  - {op: ignore, in: relation_type, at: /@tags, reason: 'the MDG bookkeeping (qname, tier)'}
+  - {op: ignore, in: entity, at: /@tags, reason: 'the MDG bookkeeping (qname)'}
+  - {op: ignore, in: attribute, at: /@tags, reason: 'the MDG bookkeeping (qname; type is the UML type)'}
+  - {op: ignore, in: relation, at: /@tags, reason: 'the MDG bookkeeping (qname)'}
+  - {op: ignore, in: dimension, at: /@tags, reason: 'the MDG bookkeeping (qname)'}
+  - {op: ignore, in: measure, at: /@tags, reason: 'the MDG bookkeeping (qname)'}
+  - {op: ignore, in: domain, at: /@tags, reason: 'the MDG bookkeeping (qname)'}
+  - {op: ignore, in: kind, at: /@properties, reason: "EA's element properties (documentation is the description)"}
+  - {op: ignore, in: role, at: /@properties, reason: "EA's element properties (documentation is the description)"}
+  - {op: ignore, in: phase, at: /@properties, reason: "EA's element properties (documentation is the description)"}
+  - {op: ignore, in: quality, at: /@properties, reason: "EA's element properties (documentation is the description)"}
+  - {op: ignore, in: event, at: /@properties, reason: "EA's element properties (documentation is the description)"}
+  - {op: ignore, in: relation_type, at: /@properties, reason: "EA's element properties (documentation is the description)"}
+  - {op: ignore, in: entity, at: /@properties, reason: "EA's element properties (documentation is the description)"}
+  - {op: ignore, in: attribute, at: /@properties, reason: "EA's element properties"}
+  - {op: ignore, in: relation, at: /@properties, reason: "EA's connector properties (documentation is the description)"}
+  - {op: ignore, in: dimension, at: /@properties, reason: "EA's element properties (documentation is the description)"}
+  - {op: ignore, in: measure, at: /@properties, reason: "EA's element properties (documentation is the description)"}
+  - {op: ignore, in: domain, at: /@properties, reason: "EA's element properties (documentation is the description)"}
+  - {op: ignore, in: kind, at: /visibility, reason: UML visibility}
+  - {op: ignore, in: role, at: /visibility, reason: UML visibility}
+  - {op: ignore, in: phase, at: /visibility, reason: UML visibility}
+  - {op: ignore, in: quality, at: /visibility, reason: UML visibility}
+  - {op: ignore, in: event, at: /visibility, reason: UML visibility}
+  - {op: ignore, in: relation_type, at: /visibility, reason: UML visibility}
+  - {op: ignore, in: entity, at: /visibility, reason: UML visibility}
+  - {op: ignore, in: attribute, at: /visibility, reason: UML visibility}
+  - {op: ignore, in: dimension, at: /visibility, reason: UML visibility}
+  - {op: ignore, in: measure, at: /visibility, reason: UML visibility}
+  - {op: ignore, in: domain, at: /visibility, reason: UML visibility}
+  - {op: ignore, in: kind, at: /isAbstract, reason: 'the abstract tag'}
+  - {op: ignore, in: role, at: /isAbstract, reason: 'the abstract tag'}
+  - {op: ignore, in: phase, at: /isAbstract, reason: 'the abstract tag'}
+  - {op: ignore, in: quality, at: /isAbstract, reason: 'the abstract tag'}
+  - {op: ignore, in: event, at: /isAbstract, reason: 'the abstract tag'}
+  - {op: ignore, in: relation_type, at: /isAbstract, reason: 'the abstract tag'}
+  - {op: ignore, in: entity, at: /isAbstract, reason: 'an er entity is never abstract'}
+  - {op: ignore, in: dimension, at: /isAbstract, reason: 'a dimension is never abstract'}
+  - {op: ignore, in: measure, at: /isAbstract, reason: 'a measure is never abstract'}
+  - {op: ignore, in: domain, at: /isAbstract, reason: 'a domain is never abstract'}
+  - {op: ignore, in: relation, at: /@source/role, reason: 'the role name is the end name'}
+  - {op: ignore, in: relation, at: /@target/role, reason: 'the role name is the end name'}
+  - {op: ignore, in: relation, at: /@source/$ref, reason: 'from: the end name'}
+  - {op: ignore, in: relation, at: /@target/$ref, reason: 'to: the end name'}

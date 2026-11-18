@@ -25,7 +25,20 @@ data class ImportReport(
     val warnings: List<String> = emptyList(),
     /** The front-end's record collection ([FrontEnd.records]); only [markdown]'s folding reads it. */
     val records: String? = null,
+    /**
+     * MW-P5 S5.3 (XM D-9, ⚑XM-31): the sidecar diff against the previous generation — records whose `foreignId` the
+     * previous `<package>.sources.json` under `--out` names with another qname. Written as `delta.renamed` only when
+     * there is one, so a run without renames keeps its bytes.
+     */
+    val renamed: List<Renamed> = emptyList(),
 ) {
+    /** One rename: the record with this foreign id was [from] in the previous generation and is [to] now. */
+    data class Renamed(
+        val from: String,
+        val to: String,
+        val foreignId: String,
+    )
+
     /** One ignored key; [record] names the record a `kinds` null mapping skipped whole (S5.2a). */
     data class Ignored(
         val file: String,
@@ -89,6 +102,22 @@ data class ImportReport(
                     }
                 }
                 putJsonArray("warnings") { warnings.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } }
+                if (renamed.isNotEmpty()) {
+                    put(
+                        "delta",
+                        buildJsonObject {
+                            putJsonArray("renamed") {
+                                renamed.forEach {
+                                    addJsonObject {
+                                        put("from", it.from)
+                                        put("to", it.to)
+                                        put("foreignId", it.foreignId)
+                                    }
+                                }
+                            }
+                        },
+                    )
+                }
             },
         ) + "\n"
 
@@ -142,6 +171,18 @@ data class ImportReport(
                     )
                 }
             }
+            if (renamed.isNotEmpty()) {
+                appendLine()
+                appendLine("#### Renamed since the last generation (${renamed.size})")
+                appendLine()
+                appendLine(
+                    "Add these to `renames.yaml` (with a `since`) so overlays and bindings keyed by the old name follow.",
+                )
+                appendLine()
+                appendLine("| from | to | foreign id |")
+                appendLine("|---|---|---|")
+                renamed.forEach { appendLine("| `${it.from}` | `${it.to}` | `${it.foreignId}` |") }
+            }
             if (warnings.isNotEmpty()) {
                 appendLine()
                 appendLine("#### Warnings (${warnings.size})")
@@ -188,6 +229,7 @@ data class ImportReport(
             packages: List<Package>,
             warnings: List<String> = emptyList(),
             records: String? = null,
+            renamed: List<Renamed> = emptyList(),
         ): ImportReport =
             ImportReport(
                 frontEnd,
@@ -215,6 +257,7 @@ data class ImportReport(
                 packages.sortedWith(compareBy(Bytewise) { it.file }),
                 warnings,
                 records,
+                renamed.sortedWith(compareBy<Renamed, String>(Bytewise) { it.from }.thenBy(Bytewise) { it.to }),
             )
     }
 }

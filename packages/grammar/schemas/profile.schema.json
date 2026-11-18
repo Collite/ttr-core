@@ -79,6 +79,13 @@
           "type": "string",
           "pattern": "^(?:/(?:[^~/]|~[01])*)*(?![\\s\\S])"
         },
+        "foreignId": {
+          "type": "string",
+          "pattern": "^(?:/(?:[^~/]|~[01])*)*(?![\\s\\S])"
+        },
+        "cn-from-uml": {
+          "type": "boolean"
+        },
         "lexicon": {
           "type": "array",
           "items": {

@@ -1,0 +1,1077 @@
+{
+    "frontEnd": "xmi",
+    "profile": "ttr-mdg/1",
+    "packages": [
+        {
+            "package": "shop",
+            "model": "cn",
+            "file": "shop/cn.ttrm",
+            "defs": 6
+        },
+        {
+            "package": "shop",
+            "model": "er",
+            "file": "shop/er.ttrm",
+            "defs": 4
+        },
+        {
+            "package": "shop",
+            "model": "md",
+            "file": "shop/md.ttrm",
+            "defs": 5
+        }
+    ],
+    "ignored": [
+        {
+            "file": "shop.xmi",
+            "line": 1,
+            "column": 2,
+            "path": "/model",
+            "reason": "the world (its name is not a package)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 6,
+            "column": 47,
+            "path": "/elements/EAID_61E96A30_FA45_5E84_B73A_9156CDDD72FD/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 6,
+            "column": 196,
+            "path": "/elements/EAID_61E96A30_FA45_5E84_B73A_9156CDDD72FD/@stereotypes",
+            "reason": "the record kind"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 6,
+            "column": 225,
+            "path": "/elements/EAID_61E96A30_FA45_5E84_B73A_9156CDDD72FD/@tags",
+            "reason": "the MDG bookkeeping (qname, tier)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 6,
+            "column": 328,
+            "path": "/elements/EAID_61E96A30_FA45_5E84_B73A_9156CDDD72FD/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 6,
+            "column": 370,
+            "path": "/elements/EAID_61E96A30_FA45_5E84_B73A_9156CDDD72FD/@outgoing",
+            "reason": "groundings and other connectors are their own elements"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 6,
+            "column": 955,
+            "path": "/elements/EAID_61E96A30_FA45_5E84_B73A_9156CDDD72FD/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 6,
+            "column": 979,
+            "path": "/elements/EAID_61E96A30_FA45_5E84_B73A_9156CDDD72FD/isAbstract",
+            "reason": "the abstract tag"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 8,
+            "column": 47,
+            "path": "/elements/EAID_67C028CF_83B6_51DB_9D1E_34ECC7E37C06/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 8,
+            "column": 196,
+            "path": "/elements/EAID_67C028CF_83B6_51DB_9D1E_34ECC7E37C06/@stereotypes",
+            "reason": "the record kind"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 8,
+            "column": 225,
+            "path": "/elements/EAID_67C028CF_83B6_51DB_9D1E_34ECC7E37C06/@tags",
+            "reason": "the MDG bookkeeping (qname, tier)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 8,
+            "column": 303,
+            "path": "/elements/EAID_67C028CF_83B6_51DB_9D1E_34ECC7E37C06/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 8,
+            "column": 369,
+            "path": "/elements/EAID_67C028CF_83B6_51DB_9D1E_34ECC7E37C06/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 8,
+            "column": 393,
+            "path": "/elements/EAID_67C028CF_83B6_51DB_9D1E_34ECC7E37C06/isAbstract",
+            "reason": "the abstract tag"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 11,
+            "column": 47,
+            "path": "/elements/EAID_56671BEF_64D9_52DE_9D78_636CF27B856A/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 11,
+            "column": 196,
+            "path": "/elements/EAID_56671BEF_64D9_52DE_9D78_636CF27B856A/@stereotypes",
+            "reason": "the record kind"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 11,
+            "column": 225,
+            "path": "/elements/EAID_56671BEF_64D9_52DE_9D78_636CF27B856A/@tags",
+            "reason": "the MDG bookkeeping (qname, tier)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 11,
+            "column": 296,
+            "path": "/elements/EAID_56671BEF_64D9_52DE_9D78_636CF27B856A/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 11,
+            "column": 391,
+            "path": "/elements/EAID_56671BEF_64D9_52DE_9D78_636CF27B856A/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 11,
+            "column": 415,
+            "path": "/elements/EAID_56671BEF_64D9_52DE_9D78_636CF27B856A/isAbstract",
+            "reason": "the abstract tag"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 13,
+            "column": 47,
+            "path": "/elements/EAID_F77489C6_6A70_5D18_BEDF_498CB3022253/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 13,
+            "column": 196,
+            "path": "/elements/EAID_F77489C6_6A70_5D18_BEDF_498CB3022253/@stereotypes",
+            "reason": "the record kind"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 13,
+            "column": 225,
+            "path": "/elements/EAID_F77489C6_6A70_5D18_BEDF_498CB3022253/@tags",
+            "reason": "the MDG bookkeeping (qname, tier)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 13,
+            "column": 298,
+            "path": "/elements/EAID_F77489C6_6A70_5D18_BEDF_498CB3022253/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 13,
+            "column": 397,
+            "path": "/elements/EAID_F77489C6_6A70_5D18_BEDF_498CB3022253/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 13,
+            "column": 421,
+            "path": "/elements/EAID_F77489C6_6A70_5D18_BEDF_498CB3022253/isAbstract",
+            "reason": "the abstract tag"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 15,
+            "column": 47,
+            "path": "/elements/EAID_36A36FEF_A4E9_5CB7_91A5_B202BD65590E/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 15,
+            "column": 196,
+            "path": "/elements/EAID_36A36FEF_A4E9_5CB7_91A5_B202BD65590E/@stereotypes",
+            "reason": "the record kind"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 15,
+            "column": 225,
+            "path": "/elements/EAID_36A36FEF_A4E9_5CB7_91A5_B202BD65590E/@tags",
+            "reason": "the MDG bookkeeping (qname, tier)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 15,
+            "column": 319,
+            "path": "/elements/EAID_36A36FEF_A4E9_5CB7_91A5_B202BD65590E/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 15,
+            "column": 381,
+            "path": "/elements/EAID_36A36FEF_A4E9_5CB7_91A5_B202BD65590E/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 15,
+            "column": 405,
+            "path": "/elements/EAID_36A36FEF_A4E9_5CB7_91A5_B202BD65590E/isAbstract",
+            "reason": "the abstract tag"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 18,
+            "column": 47,
+            "path": "/elements/EAID_0425E2A2_62A1_5AB7_83FB_8B3C9052B1C7/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 18,
+            "column": 196,
+            "path": "/elements/EAID_0425E2A2_62A1_5AB7_83FB_8B3C9052B1C7/@stereotypes",
+            "reason": "the record kind"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 18,
+            "column": 225,
+            "path": "/elements/EAID_0425E2A2_62A1_5AB7_83FB_8B3C9052B1C7/@tags",
+            "reason": "the MDG bookkeeping (qname, tier)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 18,
+            "column": 319,
+            "path": "/elements/EAID_0425E2A2_62A1_5AB7_83FB_8B3C9052B1C7/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 18,
+            "column": 383,
+            "path": "/elements/EAID_0425E2A2_62A1_5AB7_83FB_8B3C9052B1C7/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 18,
+            "column": 407,
+            "path": "/elements/EAID_0425E2A2_62A1_5AB7_83FB_8B3C9052B1C7/isAbstract",
+            "reason": "the abstract tag"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 20,
+            "column": 47,
+            "path": "/elements/EAID_EBD35E19_11DD_53DB_8D38_33B8C3645DC9/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 20,
+            "column": 224,
+            "path": "/elements/EAID_EBD35E19_11DD_53DB_8D38_33B8C3645DC9/@tags",
+            "reason": "the MDG bookkeeping (qname)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 20,
+            "column": 266,
+            "path": "/elements/EAID_EBD35E19_11DD_53DB_8D38_33B8C3645DC9/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 20,
+            "column": 365,
+            "path": "/elements/EAID_EBD35E19_11DD_53DB_8D38_33B8C3645DC9/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 20,
+            "column": 389,
+            "path": "/elements/EAID_EBD35E19_11DD_53DB_8D38_33B8C3645DC9/isAbstract",
+            "reason": "an er entity is never abstract"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 21,
+            "column": 2,
+            "path": "/elements/EAID_EBD35E19_11DD_53DB_8D38_33B8C3645DC9/ownedAttribute/0/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 21,
+            "column": 135,
+            "path": "/elements/EAID_EBD35E19_11DD_53DB_8D38_33B8C3645DC9/ownedAttribute/0/@stereotypes",
+            "reason": "the record kind"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 21,
+            "column": 166,
+            "path": "/elements/EAID_EBD35E19_11DD_53DB_8D38_33B8C3645DC9/ownedAttribute/0/@tags",
+            "reason": "the MDG bookkeeping (qname; type is the UML type)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 21,
+            "column": 247,
+            "path": "/elements/EAID_EBD35E19_11DD_53DB_8D38_33B8C3645DC9/ownedAttribute/0/@properties",
+            "reason": "EA's element properties"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 21,
+            "column": 305,
+            "path": "/elements/EAID_EBD35E19_11DD_53DB_8D38_33B8C3645DC9/ownedAttribute/0/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 21,
+            "column": 338,
+            "path": "/elements/EAID_EBD35E19_11DD_53DB_8D38_33B8C3645DC9/ownedAttribute/0/type/$ref",
+            "reason": "type: the UML type, by name"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 22,
+            "column": 2,
+            "path": "/elements/EAID_EBD35E19_11DD_53DB_8D38_33B8C3645DC9/ownedAttribute/1/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 22,
+            "column": 135,
+            "path": "/elements/EAID_EBD35E19_11DD_53DB_8D38_33B8C3645DC9/ownedAttribute/1/@stereotypes",
+            "reason": "the record kind"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 22,
+            "column": 166,
+            "path": "/elements/EAID_EBD35E19_11DD_53DB_8D38_33B8C3645DC9/ownedAttribute/1/@tags",
+            "reason": "the MDG bookkeeping (qname; type is the UML type)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 22,
+            "column": 249,
+            "path": "/elements/EAID_EBD35E19_11DD_53DB_8D38_33B8C3645DC9/ownedAttribute/1/@properties",
+            "reason": "EA's element properties"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 22,
+            "column": 309,
+            "path": "/elements/EAID_EBD35E19_11DD_53DB_8D38_33B8C3645DC9/ownedAttribute/1/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 22,
+            "column": 342,
+            "path": "/elements/EAID_EBD35E19_11DD_53DB_8D38_33B8C3645DC9/ownedAttribute/1/type/$ref",
+            "reason": "type: the UML type, by name"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 24,
+            "column": 47,
+            "path": "/elements/EAID_9BA4590D_D6AF_52D1_9DCB_B8D250E25569/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 24,
+            "column": 224,
+            "path": "/elements/EAID_9BA4590D_D6AF_52D1_9DCB_B8D250E25569/@tags",
+            "reason": "the MDG bookkeeping (qname)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 24,
+            "column": 265,
+            "path": "/elements/EAID_9BA4590D_D6AF_52D1_9DCB_B8D250E25569/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 24,
+            "column": 325,
+            "path": "/elements/EAID_9BA4590D_D6AF_52D1_9DCB_B8D250E25569/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 24,
+            "column": 349,
+            "path": "/elements/EAID_9BA4590D_D6AF_52D1_9DCB_B8D250E25569/isAbstract",
+            "reason": "an er entity is never abstract"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 25,
+            "column": 2,
+            "path": "/elements/EAID_9BA4590D_D6AF_52D1_9DCB_B8D250E25569/ownedAttribute/0/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 25,
+            "column": 135,
+            "path": "/elements/EAID_9BA4590D_D6AF_52D1_9DCB_B8D250E25569/ownedAttribute/0/@stereotypes",
+            "reason": "the record kind"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 25,
+            "column": 166,
+            "path": "/elements/EAID_9BA4590D_D6AF_52D1_9DCB_B8D250E25569/ownedAttribute/0/@tags",
+            "reason": "the MDG bookkeeping (qname; type is the UML type)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 25,
+            "column": 246,
+            "path": "/elements/EAID_9BA4590D_D6AF_52D1_9DCB_B8D250E25569/ownedAttribute/0/@properties",
+            "reason": "EA's element properties"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 25,
+            "column": 304,
+            "path": "/elements/EAID_9BA4590D_D6AF_52D1_9DCB_B8D250E25569/ownedAttribute/0/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 25,
+            "column": 337,
+            "path": "/elements/EAID_9BA4590D_D6AF_52D1_9DCB_B8D250E25569/ownedAttribute/0/type/$ref",
+            "reason": "type: the UML type, by name"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 27,
+            "column": 47,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 27,
+            "column": 224,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/@tags",
+            "reason": "the MDG bookkeeping (qname)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 27,
+            "column": 262,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 27,
+            "column": 303,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/@outgoing",
+            "reason": "relations and groundings are their own elements"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 27,
+            "column": 598,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 27,
+            "column": 622,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/isAbstract",
+            "reason": "an er entity is never abstract"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 28,
+            "column": 2,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/ownedAttribute/0/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 28,
+            "column": 135,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/ownedAttribute/0/@stereotypes",
+            "reason": "the record kind"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 28,
+            "column": 166,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/ownedAttribute/0/@tags",
+            "reason": "the MDG bookkeeping (qname; type is the UML type)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 28,
+            "column": 251,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/ownedAttribute/0/@properties",
+            "reason": "EA's element properties"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 28,
+            "column": 313,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/ownedAttribute/0/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 28,
+            "column": 346,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/ownedAttribute/0/type/$ref",
+            "reason": "type: the UML type, by name"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 29,
+            "column": 2,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/ownedAttribute/1/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 29,
+            "column": 135,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/ownedAttribute/1/@stereotypes",
+            "reason": "the record kind"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 29,
+            "column": 166,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/ownedAttribute/1/@tags",
+            "reason": "the MDG bookkeeping (qname; type is the UML type)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 29,
+            "column": 252,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/ownedAttribute/1/@properties",
+            "reason": "EA's element properties"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 29,
+            "column": 319,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/ownedAttribute/1/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 29,
+            "column": 352,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/ownedAttribute/1/type/$ref",
+            "reason": "type: the UML type, by name"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 30,
+            "column": 2,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/ownedAttribute/2/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 30,
+            "column": 135,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/ownedAttribute/2/@stereotypes",
+            "reason": "the record kind"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 30,
+            "column": 166,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/ownedAttribute/2/@tags",
+            "reason": "the MDG bookkeeping (qname; type is the UML type)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 30,
+            "column": 243,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/ownedAttribute/2/@properties",
+            "reason": "EA's element properties"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 30,
+            "column": 301,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/ownedAttribute/2/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 30,
+            "column": 334,
+            "path": "/elements/EAID_9A8C71B0_1BDF_522C_8BE8_E3AB59631652/ownedAttribute/2/type/$ref",
+            "reason": "type: the UML type, by name"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 32,
+            "column": 47,
+            "path": "/elements/EAID_8873EABD_4882_568A_B9AE_E9D1E267FD7D/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 32,
+            "column": 227,
+            "path": "/elements/EAID_8873EABD_4882_568A_B9AE_E9D1E267FD7D/@tags",
+            "reason": "the MDG bookkeeping (qname)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 32,
+            "column": 286,
+            "path": "/elements/EAID_8873EABD_4882_568A_B9AE_E9D1E267FD7D/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 32,
+            "column": 350,
+            "path": "/elements/EAID_8873EABD_4882_568A_B9AE_E9D1E267FD7D/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 32,
+            "column": 374,
+            "path": "/elements/EAID_8873EABD_4882_568A_B9AE_E9D1E267FD7D/isAbstract",
+            "reason": "a dimension is never abstract"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 33,
+            "column": 2,
+            "path": "/elements/EAID_8873EABD_4882_568A_B9AE_E9D1E267FD7D/ownedAttribute/0/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 33,
+            "column": 135,
+            "path": "/elements/EAID_8873EABD_4882_568A_B9AE_E9D1E267FD7D/ownedAttribute/0/@stereotypes",
+            "reason": "the record kind"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 33,
+            "column": 166,
+            "path": "/elements/EAID_8873EABD_4882_568A_B9AE_E9D1E267FD7D/ownedAttribute/0/@tags",
+            "reason": "the MDG bookkeeping (qname; type is the UML type)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 33,
+            "column": 252,
+            "path": "/elements/EAID_8873EABD_4882_568A_B9AE_E9D1E267FD7D/ownedAttribute/0/@properties",
+            "reason": "EA's element properties"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 33,
+            "column": 311,
+            "path": "/elements/EAID_8873EABD_4882_568A_B9AE_E9D1E267FD7D/ownedAttribute/0/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 33,
+            "column": 344,
+            "path": "/elements/EAID_8873EABD_4882_568A_B9AE_E9D1E267FD7D/ownedAttribute/0/type/$ref",
+            "reason": "type: the UML type, by name"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 34,
+            "column": 2,
+            "path": "/elements/EAID_8873EABD_4882_568A_B9AE_E9D1E267FD7D/ownedAttribute/1/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 34,
+            "column": 135,
+            "path": "/elements/EAID_8873EABD_4882_568A_B9AE_E9D1E267FD7D/ownedAttribute/1/@stereotypes",
+            "reason": "the record kind"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 34,
+            "column": 166,
+            "path": "/elements/EAID_8873EABD_4882_568A_B9AE_E9D1E267FD7D/ownedAttribute/1/@tags",
+            "reason": "the MDG bookkeeping (qname; type is the UML type)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 34,
+            "column": 253,
+            "path": "/elements/EAID_8873EABD_4882_568A_B9AE_E9D1E267FD7D/ownedAttribute/1/@properties",
+            "reason": "EA's element properties"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 34,
+            "column": 314,
+            "path": "/elements/EAID_8873EABD_4882_568A_B9AE_E9D1E267FD7D/ownedAttribute/1/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 34,
+            "column": 347,
+            "path": "/elements/EAID_8873EABD_4882_568A_B9AE_E9D1E267FD7D/ownedAttribute/1/type/$ref",
+            "reason": "type: the UML type, by name"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 36,
+            "column": 47,
+            "path": "/elements/EAID_C8CBF0B4_A916_5081_9955_BE5F18E56DEE/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 36,
+            "column": 227,
+            "path": "/elements/EAID_C8CBF0B4_A916_5081_9955_BE5F18E56DEE/@tags",
+            "reason": "the MDG bookkeeping (qname)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 36,
+            "column": 285,
+            "path": "/elements/EAID_C8CBF0B4_A916_5081_9955_BE5F18E56DEE/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 36,
+            "column": 349,
+            "path": "/elements/EAID_C8CBF0B4_A916_5081_9955_BE5F18E56DEE/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 36,
+            "column": 373,
+            "path": "/elements/EAID_C8CBF0B4_A916_5081_9955_BE5F18E56DEE/isAbstract",
+            "reason": "a dimension is never abstract"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 37,
+            "column": 2,
+            "path": "/elements/EAID_C8CBF0B4_A916_5081_9955_BE5F18E56DEE/ownedAttribute/0/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 37,
+            "column": 135,
+            "path": "/elements/EAID_C8CBF0B4_A916_5081_9955_BE5F18E56DEE/ownedAttribute/0/@stereotypes",
+            "reason": "the record kind"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 37,
+            "column": 166,
+            "path": "/elements/EAID_C8CBF0B4_A916_5081_9955_BE5F18E56DEE/ownedAttribute/0/@tags",
+            "reason": "the MDG bookkeeping (qname; type is the UML type)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 37,
+            "column": 250,
+            "path": "/elements/EAID_C8CBF0B4_A916_5081_9955_BE5F18E56DEE/ownedAttribute/0/@properties",
+            "reason": "EA's element properties"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 37,
+            "column": 308,
+            "path": "/elements/EAID_C8CBF0B4_A916_5081_9955_BE5F18E56DEE/ownedAttribute/0/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 37,
+            "column": 341,
+            "path": "/elements/EAID_C8CBF0B4_A916_5081_9955_BE5F18E56DEE/ownedAttribute/0/type/$ref",
+            "reason": "type: the UML type, by name"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 39,
+            "column": 47,
+            "path": "/elements/EAID_79E12DAC_E428_5E2A_965C_4E2A0EAD4F8A/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 39,
+            "column": 224,
+            "path": "/elements/EAID_79E12DAC_E428_5E2A_965C_4E2A0EAD4F8A/@tags",
+            "reason": "the MDG bookkeeping (qname)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 39,
+            "column": 345,
+            "path": "/elements/EAID_79E12DAC_E428_5E2A_965C_4E2A0EAD4F8A/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 39,
+            "column": 405,
+            "path": "/elements/EAID_79E12DAC_E428_5E2A_965C_4E2A0EAD4F8A/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 39,
+            "column": 429,
+            "path": "/elements/EAID_79E12DAC_E428_5E2A_965C_4E2A0EAD4F8A/isAbstract",
+            "reason": "a measure is never abstract"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 41,
+            "column": 47,
+            "path": "/elements/EAID_EC1824ED_660A_5303_B393_E33781BE190B/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 41,
+            "column": 224,
+            "path": "/elements/EAID_EC1824ED_660A_5303_B393_E33781BE190B/@tags",
+            "reason": "the MDG bookkeeping (qname)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 41,
+            "column": 288,
+            "path": "/elements/EAID_EC1824ED_660A_5303_B393_E33781BE190B/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 41,
+            "column": 378,
+            "path": "/elements/EAID_EC1824ED_660A_5303_B393_E33781BE190B/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 41,
+            "column": 402,
+            "path": "/elements/EAID_EC1824ED_660A_5303_B393_E33781BE190B/isAbstract",
+            "reason": "a measure is never abstract"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 43,
+            "column": 47,
+            "path": "/elements/EAID_C5630BA7_99D2_508C_801A_3052FD2A9620/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 43,
+            "column": 224,
+            "path": "/elements/EAID_C5630BA7_99D2_508C_801A_3052FD2A9620/@tags",
+            "reason": "the MDG bookkeeping (qname)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 43,
+            "column": 288,
+            "path": "/elements/EAID_C5630BA7_99D2_508C_801A_3052FD2A9620/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 43,
+            "column": 346,
+            "path": "/elements/EAID_C5630BA7_99D2_508C_801A_3052FD2A9620/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 43,
+            "column": 370,
+            "path": "/elements/EAID_C5630BA7_99D2_508C_801A_3052FD2A9620/isAbstract",
+            "reason": "a measure is never abstract"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 45,
+            "column": 1,
+            "path": "/elements/EAID_917FED18_0A95_5E1B_8327_34D889CC1615",
+            "record": "buyer",
+            "reason": "kind mapping null (/@stereotypes = involves)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 53,
+            "column": 1,
+            "path": "/elements/EAID_04176BAC_17CA_5005_9F94_8D1D82D6984E",
+            "record": "item",
+            "reason": "kind mapping null (/@stereotypes = involves)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 61,
+            "column": 47,
+            "path": "/elements/EAID_F97452C8_15BD_5E58_BA53_A07AD5C5D175/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 61,
+            "column": 232,
+            "path": "/elements/EAID_F97452C8_15BD_5E58_BA53_A07AD5C5D175/@tags",
+            "reason": "the MDG bookkeeping (qname)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 61,
+            "column": 280,
+            "path": "/elements/EAID_F97452C8_15BD_5E58_BA53_A07AD5C5D175/@tags/cardinality",
+            "reason": "cardinality: read from the association ends"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 61,
+            "column": 314,
+            "path": "/elements/EAID_F97452C8_15BD_5E58_BA53_A07AD5C5D175/@properties",
+            "reason": "EA's connector properties (documentation is the description)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 61,
+            "column": 395,
+            "path": "/elements/EAID_F97452C8_15BD_5E58_BA53_A07AD5C5D175/@source/$ref",
+            "reason": "from: the end name"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 61,
+            "column": 465,
+            "path": "/elements/EAID_F97452C8_15BD_5E58_BA53_A07AD5C5D175/@source/role",
+            "reason": "the role name is the end name"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 61,
+            "column": 518,
+            "path": "/elements/EAID_F97452C8_15BD_5E58_BA53_A07AD5C5D175/@target/$ref",
+            "reason": "to: the end name"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 61,
+            "column": 592,
+            "path": "/elements/EAID_F97452C8_15BD_5E58_BA53_A07AD5C5D175/@target/role",
+            "reason": "the role name is the end name"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 61,
+            "column": 659,
+            "path": "/elements/EAID_F97452C8_15BD_5E58_BA53_A07AD5C5D175/memberEnd",
+            "reason": "the association ends: from, to and cardinality"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 63,
+            "column": 78,
+            "path": "/elements/EAID_F97452C8_15BD_5E58_BA53_A07AD5C5D175/ownedEnd",
+            "reason": "the association ends: from, to and cardinality"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 75,
+            "column": 1,
+            "path": "/elements/EAID_7F3589E4_1588_5211_ADD5_D9A0614C4679",
+            "record": "date",
+            "reason": "kind missing (/@stereotypes)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 76,
+            "column": 1,
+            "path": "/elements/EAID_FD11CEC9_74F6_57D7_98D6_C07BCE449A2D",
+            "record": "decimal",
+            "reason": "kind missing (/@stereotypes)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 77,
+            "column": 1,
+            "path": "/elements/EAID_A8598F21_09A4_5D21_BF76_A9161B5A68DE",
+            "record": "int",
+            "reason": "kind missing (/@stereotypes)"
+        },
+        {
+            "file": "shop.xmi",
+            "line": 78,
+            "column": 1,
+            "path": "/elements/EAID_E1614F83_E3FD_54AA_AA0B_6F135F4926F4",
+            "record": "text",
+            "reason": "kind missing (/@stereotypes)"
+        }
+    ],
+    "overridden": [],
+    "warnings": []
+}

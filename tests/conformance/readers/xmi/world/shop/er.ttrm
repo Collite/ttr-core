@@ -1,0 +1,7 @@
+package shop
+model er
+
+def entity customer { description: "A buyer of record", attributes: [def attribute id { type: int }, def attribute name { type: text, optional: true }] }
+def entity product { attributes: [def attribute id { type: int }] }
+def entity sale { attributes: [def attribute amount { type: decimal }, def attribute customer_id { type: int }, def attribute id { type: int }] }
+def relation sale_customer { from: sale, to: customer, cardinality: { from: "0..*", to: "1" } }

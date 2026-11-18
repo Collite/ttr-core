@@ -1,0 +1,90 @@
+# ea-erd/1 — a plain UML class model / ERD exported from Enterprise Architect as XMI 2.1 → a TTR er package, and, only
+# with `cn-from-uml: true`, a cn skeleton (MW-P5 S5.3, readers contracts §3; XM 06 §3 "plain ERD/UML, best effort").
+# Shipped with ttr-core: `ttr-metadata import-xmi --from <model.xmi> --profile ea-erd/1 --package <name>`.
+#
+# Every UML class → `def entity <name>` (its EA notes → `description`), each owned attribute → `def attribute` (`type` =
+# EA's type name, `optional: true` when its lower bound is 0); every named association → `def relation <name>` from EA's
+# source end to its target end, with the ends' multiplicities as `cardinality` — EA's connector ends in `xmi:Extension`:
+# an export without them gives relations with no `from`/`to` (✅R372-B; UML's member ends carry no direction, and EA
+# writes the destination end first). A property's `type` is consumed in both XMI forms (EA's type name is read from its
+# properties); a generalization's `general` in the attribute form EA writes (✅R372-A). Names are the UML names, so an unnamed
+# association is `ys/record-id-missing` at the association, and a name that is a TTR word (`number`, `date`, …) is
+# `ys/profile-invalid` at its element: rename it in EA, or drop it from the export.
+#
+# cn (XM 06 §3, opt-in): this profile declares `cn-from-uml: false`, so ttr-import drops its cn operations. A child profile
+# `{profile: <yours>/1, extends: ea-erd/1, cn-from-uml: true, grammar: …, operations: []}` turns them on: every class is
+# also `def kind <name>` in an abstract cn skeleton (`skeleton: true`, D-14), its generalizations → `is_a`.
+#
+# The sidecar keeps each element's xmi:id (`sourceName`, EA's GUID) and a UUIDv5 of it (`foreignId`), so the next
+# snapshot's renames are a sidecar diff (`delta.renamed`). Skipped, each listed in the report's ignored[]: elements that
+# are neither a class nor an association (primitive types, notes, interfaces, dependencies), diagrams, and EA's layout,
+# style and project data. Curated: any other key is `ys/unknown-key` — extend this profile in a child for a richer export.
+profile: ea-erd/1
+grammar: '>=0.22 <1.0'
+skeleton: true
+cn-from-uml: false
+sourceName: /@xmi/id
+foreignId: /@xmi/uuid
+operations:
+  - {op: package, mapping: {}, default: model}
+  - op: kinds
+    at: /elements
+    id: /name
+    kind: /@xmi/type
+    unmapped: skip
+    mapping: {'uml:Class': entity, 'uml:Association': relation}
+  - {op: kinds, in: entity, at: /ownedAttribute, id: /name, mapping: {attribute: attribute}}
+  - {op: ignore, at: /model, reason: 'the EA model root (the package is --package)'}
+  - {op: ignore, at: /@diagrams, reason: diagrams are not model facts}
+
+  # er
+  - {op: rename, in: entity, at: /@properties/documentation, to: {kind: entity, property: description}}
+  - {op: ignore, in: entity, at: /@properties, reason: "EA's element properties (documentation is the description)"}
+  - {op: ignore, in: entity, at: /@xmi, reason: 'xmi:id and type (the sidecar keeps the id)'}
+  - {op: ignore, in: entity, at: /visibility, reason: UML visibility}
+  - {op: ignore, in: entity, at: /isAbstract, reason: 'an er entity is never abstract'}
+  - {op: ignore, in: entity, at: /generalization, reason: 'an er entity has no is_a (cn is_a only with cn-from-uml: true)'}
+  - {op: ignore, in: entity, at: /@outgoing, reason: associations are their own elements}
+  - {op: rename, in: attribute, at: /@properties/type, to: {kind: attribute, property: type}}
+  - {op: rename, in: attribute, at: /@properties/documentation, to: {kind: attribute, property: description}}
+  - {op: values, in: attribute, at: /lowerValue/0/value, to: {kind: attribute, property: optional}, mapping: {'0': true, '1': false}}
+  - {op: ignore, in: attribute, at: /@properties, reason: "EA's attribute properties (type and documentation are read)"}
+  - {op: ignore, in: attribute, at: /type, reason: "the UML type (EA's type name is read)"}
+  - {op: ignore, in: attribute, at: /lowerValue, reason: 'optional: the lower bound'}
+  - {op: ignore, in: attribute, at: /upperValue, reason: 'a single-valued attribute'}
+  - {op: ignore, in: attribute, at: /@xmi, reason: 'xmi:id and type (the sidecar keeps the id)'}
+  - {op: ignore, in: attribute, at: /visibility, reason: UML visibility}
+  - {op: ignore, in: attribute, at: /isStatic, reason: UML property flags}
+  - {op: ignore, in: attribute, at: /isReadOnly, reason: UML property flags}
+  - {op: ignore, in: attribute, at: /isDerived, reason: UML property flags}
+  - {op: ignore, in: attribute, at: /isOrdered, reason: UML property flags}
+  - {op: ignore, in: attribute, at: /isUnique, reason: UML property flags}
+  - {op: ignore, in: attribute, at: /isDerivedUnion, reason: UML property flags}
+  - {op: shape, in: relation, at: /@source, to: {kind: relation, property: from}, template: {ref: {input: /@name}}}
+  - {op: shape, in: relation, at: /@target, to: {kind: relation, property: to}, template: {ref: {input: /@name}}}
+  - {op: rename, in: relation, at: /@source/multiplicity, to: {kind: relation, path: [cardinality, from]}}
+  - {op: rename, in: relation, at: /@target/multiplicity, to: {kind: relation, path: [cardinality, to]}}
+  - {op: rename, in: relation, at: /@properties/documentation, to: {kind: relation, property: description}}
+  - {op: ignore, in: relation, at: /@source/$ref, reason: 'from: the end name'}
+  - {op: ignore, in: relation, at: /@target/$ref, reason: 'to: the end name'}
+  - {op: ignore, in: relation, at: /@source/role, reason: 'the role name (TTR relations have none)'}
+  - {op: ignore, in: relation, at: /@target/role, reason: 'the role name (TTR relations have none)'}
+  - {op: ignore, in: relation, at: /@properties, reason: "EA's connector properties (documentation is the description)"}
+  - {op: ignore, in: relation, at: /@xmi, reason: 'xmi:id and type (the sidecar keeps the id)'}
+  - {op: ignore, in: relation, at: /memberEnd, reason: 'the association ends: from, to and cardinality come from EA'}
+  - {op: ignore, in: relation, at: /ownedEnd, reason: 'the association ends: from, to and cardinality come from EA'}
+  - {op: ignore, in: relation, at: /visibility, reason: UML visibility}
+
+  # cn — only with cn-from-uml: true (ttr-import drops these while it is false).
+  - op: kinds
+    at: /elements
+    id: /name
+    kind: /@xmi/type
+    unmapped: skip
+    mapping: {'uml:Class': kind}
+  - {op: each, in: kind, at: /generalization, to: {kind: kind, property: is_a}, shape: {ref: {input: $item/general/@name}}}
+  - {op: ignore, in: kind, at: /@properties, reason: 'the description is the er entity''s'}
+  - {op: ignore, in: kind, at: /@xmi, reason: 'xmi:id and type (the sidecar keeps the id)'}
+  - {op: ignore, in: kind, at: /visibility, reason: UML visibility}
+  - {op: ignore, in: kind, at: /isAbstract, reason: 'every skeleton kind is abstract'}
+  - {op: ignore, in: kind, at: /@outgoing, reason: associations are their own elements}
