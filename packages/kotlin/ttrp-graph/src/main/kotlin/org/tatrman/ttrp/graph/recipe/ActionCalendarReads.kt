@@ -5,6 +5,7 @@ import org.tatrman.ttr.metadata.model.AutomationAction
 import org.tatrman.ttr.parser.model.AutoValue
 import org.tatrman.ttrp.ast.RecipeDecl
 import org.tatrman.ttrp.ast.SourceLocation
+import org.tatrman.ttrp.ast.WiringArg
 import org.tatrman.ttrp.ast.WiringValue
 import org.tatrman.ttrp.diagnostics.Severity
 import org.tatrman.ttrp.diagnostics.TtrpDiagnostic
@@ -12,6 +13,7 @@ import org.tatrman.ttrp.diagnostics.TtrpDiagnosticId
 import org.tatrman.ttrp.expr.CatalogId
 import org.tatrman.ttrp.expr.ColumnRef
 import org.tatrman.ttrp.expr.DurationExpr
+import org.tatrman.ttrp.expr.DurationUnit
 import org.tatrman.ttrp.expr.Expression
 import org.tatrman.ttrp.expr.FunctionCall
 import org.tatrman.ttrp.expr.ParamRef
@@ -23,6 +25,7 @@ import org.tatrman.ttrp.resolve.TtrpChecker
 
 /**
  * Action-time counts need the same model calendar as island time sugar, without adding a graph Load or JOIN.
+ * So does a `due` in working days — the wiring's, else the action's default (D-249).
  * Read the parsed direct arguments/when and the checked action's expression defaults; never scan rendered text
  * or checkout paths. Nested action calls and their defaults are a separate, gated dispatch contract.
  */
@@ -47,7 +50,9 @@ internal class ActionCalendarReads(
                     }
                 } + listOfNotNull(wiring.whenCondition) +
                     defaults.getOrPut(wiring.action) { expressions(action, wiring.actionLocation) }
-            if (expressions.any(::needsCalendar) && at == null) at = wiring.actionLocation
+            if ((dueInWorkingDays(wiring.args, action) || expressions.any(::needsCalendar)) && at == null) {
+                at = wiring.actionLocation
+            }
         }
         val location = at ?: return emptyList()
         val calendar = report.modelIndex?.calendars()?.singleOrNull()
@@ -79,6 +84,20 @@ internal class ActionCalendarReads(
                 }
             }
         }
+
+    /**
+     * AU S2.4f (D-249): a `due` in working days is a date the Server counts over the governed calendar, so the
+     * recipe declares that read. The wiring's own `due:` (a column or the approval property) wins over the action's
+     * `due:` default; `days`/`weeks` need no calendar.
+     */
+    private fun dueInWorkingDays(
+        args: List<WiringArg>,
+        action: AutomationAction,
+    ): Boolean {
+        val due = args.lastOrNull { it.name == "due" } ?: return action.due?.unit == DurationUnit.WORKING_DAYS.spelling
+        val expression = (due.value as? WiringValue.Expr)?.expression
+        return (expression as? DurationExpr)?.unit == DurationUnit.WORKING_DAYS
+    }
 
     private fun needsCalendar(expression: Expression): Boolean =
         NodeExpressions.walk(expression).filterIsInstance<FunctionCall>().any { call ->

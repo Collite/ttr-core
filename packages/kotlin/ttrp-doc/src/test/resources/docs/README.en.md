@@ -10,6 +10,7 @@
 ## What it reads
 
 - `er.entity.customer_price`
+- `er.entity.date_dim`
 - `er.entity.inventory`
 - `er.entity.invoice`
 - Order (`er.entity.order`)
