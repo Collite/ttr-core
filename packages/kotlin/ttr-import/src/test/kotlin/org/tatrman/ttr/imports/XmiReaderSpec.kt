@@ -422,4 +422,28 @@ class XmiReaderSpec :
                 ),
             ) shouldBe listOf(ImportReport.Renamed("p.er.entity.X", "p.md.dimension.X", "u1"))
         }
+
+        test("F5 ✅R372-C: a child's own cn operations under an inherited cn-from-uml: false are a located error") {
+            val root = workspace()
+
+            fun child(flag: String) =
+                root.resolve("child-${flag.ifEmpty { "none" }.replace(": ", "")}.yaml").also {
+                    it.writeText(
+                        "profile: erd-described/1\ngrammar: '>=0.22 <1.0'\nextends: ea-erd/1\n$flag\noperations:\n" +
+                            "  - {op: shape, in: kind, to: {kind: kind, property: description}, at: /@properties, " +
+                            "template: {en: {input: /documentation}}}\n",
+                    )
+                }
+            val inherited = child("")
+            val refused =
+                shouldThrow<ProfileException> { run(root, "orders-erd.xmi", inherited.toString(), "orders", out = "a") }
+            refused.code shouldBe "ys/profile-invalid"
+            refused.location.file shouldBe inherited.toRealPath().toString()
+            refused.location.line shouldBe 6
+            refused.message.orEmpty() shouldContain "cn operations need `cn-from-uml: true`"
+            refused.message.orEmpty() shouldContain "ea-erd/1"
+            val opted = run(root, "orders-erd.xmi", child("cn-from-uml: true").toString(), "orders", out = "b")
+            body(opted.files.getValue("orders/cn.ttrm")) shouldContain
+                "def kind Customer { description: { en: \"A person or company that places orders.\" }, abstract: true }"
+        }
     })

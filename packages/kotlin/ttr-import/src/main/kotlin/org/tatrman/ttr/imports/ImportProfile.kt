@@ -29,9 +29,11 @@ import java.nio.file.Path
  * an IRI's label); without it, or where it selects no string, the sidecar keeps the record id. [lexicon]: the synonym
  * rules [Lexicon] emits `lexicon` documents by (MW-P5 S5.2 T4). [foreignId] (MW-P5 S5.3): a JSON Pointer relative to each
  * record whose string is the record's sidecar `foreignId` (the `xmi` front-end's `/@xmi/uuid`). [cnFromUml] (`cn-from-uml`,
- * S5.3, XM 06 §3): where a profile declares it `false` (`ea-erd/1`), [ImportProfile.chain] drops the profile's cn
- * operations, so a plain UML/ERD export makes no cn definitions unless a child profile opts in with `true`; undeclared,
- * nothing is dropped. A child wins, key by key.
+ * S5.3, XM 06 §3): where the nearest profile that declares it declares `false` (`ea-erd/1`), [ImportProfile.chain]
+ * drops that profile's cn operations, so a plain UML/ERD export makes no cn definitions unless a child profile opts in
+ * with `true`; any other profile of the chain with a cn operation of its own is then `ys/profile-invalid` at that
+ * operation (✅R372-C: a child that inherits `false` is told, not silently emptied). Undeclared, nothing is dropped. A
+ * child wins, key by key.
  */
 data class ReaderOptions(
     val skeleton: Boolean = false,
@@ -50,6 +52,8 @@ class ImportProfile internal constructor(
     val chain: List<ProfileDefinition>,
     val options: ReaderOptions,
     internal val sources: Map<ProfileDefinition, String>,
+    /** The index in [chain] of the nearest profile that declares `cn-from-uml`; null when none does. */
+    private val cnFromUmlAt: Int? = null,
 ) {
     val identity: String get() = chain.last().let { "${it.name}/${it.major}" }
 
@@ -164,9 +168,10 @@ class ImportProfile internal constructor(
     }
 
     /**
-     * A declared `cn-from-uml: false` (MW-P5 S5.3): every operation that only makes or fills cn definitions is dropped — one whose `in`
-     * is a cn kind, and a `kinds` op whose every non-null `mapping` value is one. A profile that declares no cn operation is
-     * unchanged.
+     * A declared `cn-from-uml: false` (MW-P5 S5.3): every operation of the declaring profile that only makes or fills cn
+     * definitions is dropped — one whose `in` is a cn kind, and a `kinds` op whose every non-null `mapping` value is one.
+     * Such an operation in any other profile of the chain is `ys/profile-invalid` at the operation (✅R372-C). [chain] is
+     * [ImportProfile.chain] in order (`--package` only rewrites `package` operations), so the declarer is found by index.
      */
     private fun withoutCn(chain: List<ProfileDefinition>): List<ProfileDefinition> {
         fun text(value: JsonElement?) = (value as? JsonPrimitive)?.contentOrNull
@@ -178,7 +183,21 @@ class ImportProfile internal constructor(
             val targets = (value["mapping"] as? JsonObject)?.values?.mapNotNull { text(it) }.orEmpty()
             return targets.isNotEmpty() && targets.all { it in CN_KINDS }
         }
-        return chain.map { profile -> profile.copy(operations = profile.operations.filterNot(::cn)) }
+        val declarer = requireNotNull(cnFromUmlAt)
+        chain.forEachIndexed { i, profile ->
+            if (i == declarer) return@forEachIndexed
+            profile.operations.firstOrNull(::cn)?.let { op ->
+                throw ProfileException(
+                    "ys/profile-invalid",
+                    op.location,
+                    "cn operations need `cn-from-uml: true` (the chain inherits false from " +
+                        "${chain[declarer].name}/${chain[declarer].major})",
+                )
+            }
+        }
+        return chain.mapIndexed { i, profile ->
+            if (i == declarer) profile.copy(operations = profile.operations.filterNot(::cn)) else profile
+        }
     }
 
     /** The overlay a header names: [cli] when given, else the nearest file profile's path overlay or inline overlay. */
@@ -220,14 +239,11 @@ class ImportProfile internal constructor(
                             ProfileResolver.SHIPPED_LABEL,
                         )
                     }.associateWith { it.file }
-            return ImportProfile(
-                chain,
-                options(chain) { profile ->
-                    sources[profile]?.let { Files.readString(Path.of(it)) }
-                        ?: requireNotNull(shippedText("${profile.name}/${profile.major}"))
-                },
-                sources,
-            )
+            val text = { profile: ProfileDefinition ->
+                sources[profile]?.let { Files.readString(Path.of(it)) }
+                    ?: requireNotNull(shippedText("${profile.name}/${profile.major}"))
+            }
+            return ImportProfile(chain, options(chain, text), sources, cnFromUmlAt(chain, text))
         }
 
         /** A profile ttr-core ships, by identity; null when it ships none of that name. */
@@ -239,7 +255,12 @@ class ImportProfile internal constructor(
                 "${profile.name}/${profile.major}" == identity,
             ) { "$resource declares ${profile.name}/${profile.major}" }
             check(profile.extends == null) { "a shipped profile extends nothing: $resource" }
-            return ImportProfile(listOf(profile), options(listOf(profile)) { text }, emptyMap())
+            return ImportProfile(
+                listOf(profile),
+                options(listOf(profile)) { text },
+                emptyMap(),
+                cnFromUmlAt(listOf(profile)) { text },
+            )
         }
 
         /** The text of a profile ttr-core ships, by identity; null when it ships none of that name. */
@@ -250,6 +271,16 @@ class ImportProfile internal constructor(
                 ?.bufferedReader()
                 ?.use { it.readText() }
         }
+
+        /** The index of the nearest profile of [chain] that declares `cn-from-uml`; null when none does. */
+        private fun cnFromUmlAt(
+            chain: List<ProfileDefinition>,
+            text: (ProfileDefinition) -> String,
+        ): Int? =
+            chain.indices.lastOrNull { i ->
+                (YamlData.read(text(chain[i]), chain[i].file).value["cn-from-uml"] as? JsonPrimitive)?.booleanOrNull !=
+                    null
+            }
 
         private fun options(
             chain: List<ProfileDefinition>,
