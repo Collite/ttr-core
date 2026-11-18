@@ -141,7 +141,8 @@ class XmiFrontEndSpec :
             val xxe =
                 """<?xml version="1.0"?>
 <!DOCTYPE x [<!ENTITY e SYSTEM "${secret.toUri()}">]>
-<xmi:XMI xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"><uml:Model xmlns:uml="u" name="&e;"/></xmi:XMI>
+<xmi:XMI xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"><uml:Model xmlns:uml="u" name="m">
+<packagedElement xmi:type="uml:Class" xmi:id="C" name="c">&e;</packagedElement></uml:Model></xmi:XMI>
 """
             val e = refused(xxe.toByteArray())
             e.message.orEmpty() shouldNotContain "TOP-SECRET"
