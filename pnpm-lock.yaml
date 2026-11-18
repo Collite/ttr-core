@@ -473,6 +473,31 @@ importers:
         specifier: ^3.0.0
         version: 3.2.4(@types/node@22.19.19)(tsx@4.22.0)(yaml@2.9.1)
 
+  packages/profile:
+    dependencies:
+      '@tatrman/parser':
+        specifier: workspace:*
+        version: link:../parser
+      '@tatrman/semantics':
+        specifier: workspace:*
+        version: link:../semantics
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
+      yaml:
+        specifier: 2.9.1
+        version: 2.9.1
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.19
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.6
+        version: 4.1.7(@types/node@22.19.19)(vite@6.4.2(@types/node@22.19.19)(tsx@4.22.0)(yaml@2.9.1))
+
   packages/semantics:
     dependencies:
       '@tatrman/md-catalog':
