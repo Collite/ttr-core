@@ -43,6 +43,8 @@ internal class ConsumptionLedger {
         unknown: UnknownKeys = UnknownKeys.ERROR,
     ): List<Pair<ForeignNode, List<String>>> {
         val dropped = mutableListOf<Pair<ForeignNode, List<String>>>()
+        // review-361 F3: only `ignore` reads the shape, so a strict run builds none.
+        val shaping = unknown == UnknownKeys.IGNORE
 
         fun visit(
             node: ForeignNode,
@@ -52,7 +54,7 @@ internal class ConsumptionLedger {
             when (node.value) {
                 is JsonObject ->
                     node.entries().forEach { child ->
-                        val childShape = shape + escapePointer(child.mappingKey!!)
+                        val childShape = if (shaping) shape + escapePointer(child.mappingKey!!) else shape
                         if (child.path !in consumed && child.path !in opened) {
                             if (unknown == UnknownKeys.ERROR) {
                                 throw ProfileException(
@@ -66,7 +68,7 @@ internal class ConsumptionLedger {
                             visit(child, childShape)
                         }
                     }
-                is JsonArray -> node.entries().forEach { visit(it, shape + "*") }
+                is JsonArray -> node.entries().forEach { visit(it, if (shaping) shape + "*" else shape) }
                 JsonNull -> Unit
                 else ->
                     if (unknown == UnknownKeys.ERROR) {
@@ -164,6 +166,7 @@ internal class RecordPlan(
      * consumed whole) — a `stitky` element by `at: /stitky` (review-361 F2).
      */
     fun dropped(nodes: List<Pair<ForeignNode, List<String>>>): List<ProfileWarning> {
+        if (nodes.isEmpty()) return emptyList()
         val byPath = records.groupBy { it.source.path }.mapValues { it.value.first() }
 
         fun holder(path: String): Record? {
