@@ -37,6 +37,33 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   (✅D-MW-98). `ttr-mdg/1` and `ea-erd/1` declare it on a relation's two ends, so an association without EA's
   connector ends is reported instead of passing silently.
 
+### Fixed — 0.22.10: an obligation action's `working_days` due declares the calendar read (AU-core S2.4f, D-249/D-251)
+
+- `ttrp-graph` `ActionCalendarReads`: the Server counts an obligation action's due date over the governed calendar,
+  so a `due` in working days now makes the recipe read the model calendar. An obligation action is one with
+  `sinks: { native: obligation }`, such as `expect`. `objectsRead` gains the world's calendar entity
+  (`er.entity.date_dim` on the fixture world), as `working_days(between:, and:)` already did, and the D-94
+  declared-scope check now admits the read. Two sources count:
+  - the wiring's `due:`, when it types as working days: `3 working_days`, `working_days(:settlement)`, a
+    working-days parameter `:settlement`, or a `case` of those, including in a wiring selected by `when:`;
+  - the action's own `due: <n> working_days`, even when the wiring sets a `due` of its own (`2 days`,
+    `:as_of`), as writer defaults already do.
+- An approval action's `due` (`approval: required`, `by:`, `due:`) is the process engine's user-task date and
+  declares nothing. `days`/`weeks` dues read no calendar. Nothing is lowered and no SQL changes.
+- Out of scope: a `due` inside a nested action call (`action: x { … }`) and the callee's default. They stay outside
+  the class's direct-action contract.
+- Bundles that move: a recipe that wires an obligation action with such a `due`; in the fixtures, decide_return
+  (`objectsRead`, the README's "What it reads", the manifest hash). hartland must rebuild and re-approve
+  `decide_return` (`approve-all`).
+
+### Changed — 0.22.10: an obligation action's working-days due needs a unique calendar (AU-core S2.4f)
+
+- A recipe that wires an obligation action with a working-days `due` (its own or the action's default) now needs
+  exactly one entity with `semantics { role: event_date }`. With none or several, the build fails with
+  `TTRP-FN-002` "a `due` in working days needs the model's calendar …". The error points at the `due:` argument, or
+  at the wiring's action when the `due` is the action's default. Before 0.22.10 such a recipe built and the Server
+  refused its due date at run time.
+
 ### Added — `import-xmi`: the `xmi` front-end, `ttr-mdg/1`, `ea-erd/1`, the sidecar rename diff (MW-P5 S5.3)
 
 - `ttr-import` gains the `xmi` front-end: XMI 2.1 (Enterprise Architect flavour) through StAX, no DTD or external

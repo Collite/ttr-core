@@ -159,6 +159,20 @@ class RecipeTime(
         }
     }
 
+    /** The unit [e] types as when it is a duration (a literal, `days(:p)`, a duration parameter, a `case`) — silent. */
+    fun durationUnit(
+        e: Expression,
+        row: Row?,
+    ): DurationUnit? {
+        val saved = sink
+        sink = null
+        try {
+            return (type(e, row, null) as? RecipeType.Duration)?.unit
+        } finally {
+            sink = saved
+        }
+    }
+
     fun check(rows: RecipeRows): List<TtrpDiagnostic> {
         this.rows = rows
         val ids = (rg.roles.values + listOfNotNull(rg.decision)).flatMap { graph.containers[it]?.memberIds.orEmpty() }
