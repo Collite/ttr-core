@@ -23,7 +23,8 @@ function workspace(run: (root: string) => void) {
 }
 const uri = (root: string, file: string) => pathToFileURL(join(root, file)).href;
 
-describe('YAML lint input', () => {
+// Allow cold schema compilation on shared CI runners, as the profile/LSP suites do.
+describe('YAML lint input', { timeout: 30_000 }, () => {
   it('replays schema/profile errors through registered ys rules without requiring an AST', () =>
     workspace((root) => {
       writeFileSync(join(root, 'model/entities.yaml'), 'entity:\n  Customer:\n    typo: wrong\n');
