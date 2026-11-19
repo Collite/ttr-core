@@ -1,0 +1,22 @@
+// generated-from: ../../sources@4a1b0705283d5812982d6ca46a43a642bb2dfbf5dfa0fb45e44c6dacdc724b91 profile pdm/16 generator 0.0.1-LOCAL — do not edit
+package db_sales
+model db
+
+def table customers {
+    columns: [
+        def column id { type: int, },
+        def column email { type: { type: text, length: 80 }, optional: true, },
+    ]
+}
+
+def fk fk_orders_customer { from: [db_sales.db.dbo.orders.customer_id], to: [db_sales.db.dbo.customers.id],
+}
+
+def table orders {
+    columns: [
+        def column order_no { type: int, },
+        def column customer_id { type: int, },
+        def column total { type: { type: decimal, length: 12, precision: 2 }, },
+    ]
+}
+

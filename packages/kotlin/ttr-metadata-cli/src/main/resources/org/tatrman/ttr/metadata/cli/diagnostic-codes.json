@@ -22,5 +22,6 @@
   {"code":"xm/overlay-orphan","family":"xm","meaning":"An overlay entry names no emitted definition (its suggestion may carry a rename)","raisedBy":"ttr-profile Overlay"},
   {"code":"xm/generated-stale","family":"xm","meaning":"An input a generated file's header names changed since generation, or is not found","raisedBy":"ttr-metadata GeneratedGuard (lint)"},
   {"code":"xm/generated-edited","family":"xm","meaning":"A generated file's body differs from a fresh generation of its inputs, or its header is malformed","raisedBy":"ttr-metadata GeneratedGuard (lint)"},
+  {"code":"xm/pdm-version","family":"xm","meaning":"PowerDesigner XML has no version or does not declare the supported 16 version line","raisedBy":"ttr-import PdmFrontEnd"},
   {"code":"xm/snapshot-size","family":"xm","meaning":"A captured snapshot exceeds 5 MiB and --large was not given","raisedBy":"ttr-metadata SnapshotCapture (snapshot)"}
 ]

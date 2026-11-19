@@ -1,0 +1,7 @@
+// generated-from: ../../sources@4a1b0705283d5812982d6ca46a43a642bb2dfbf5dfa0fb45e44c6dacdc724b91 profile pdm/16 generator 0.0.1-LOCAL — do not edit
+package cn_sales
+model cn
+
+def kind Customer { description: "A customer in the conceptual model.", is_a: [cn_sales.cn.kind.Person], abstract: true }
+def kind Person { description: "A person of record.", abstract: true }
+def relation_type orders { label: { en: "orders" }, abstract: true }

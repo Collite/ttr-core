@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?PowerDesigner signature="PDM_DATA_MODEL_XML" version="15.3.0.3243"?>
+<Model xmlns:a="attribute" xmlns:c="collection" xmlns:o="object">
+  <o:RootObject Id="root">
+    <c:Children>
+      <o:Model Id="o300">
+        <a:ObjectID>00000000-0000-4000-8000-000000000300</a:ObjectID>
+        <a:Name>db_sales</a:Name>
+        <a:Code>db_sales</a:Code>
+        <c:GenerationOrigins>
+          <o:Shortcut Id="o1200">
+            <a:ObjectID>00000000-0000-4000-8000-000000001200</a:ObjectID>
+            <a:Name>source_model</a:Name>
+            <a:Code>source_model</a:Code>
+            <a:TargetID>00000000-0000-4000-8000-000000000200</a:TargetID>
+          </o:Shortcut>
+        </c:GenerationOrigins>
+        <c:Tables>
+          <o:Table Id="o301">
+            <a:ObjectID>00000000-0000-4000-8000-000000000301</a:ObjectID>
+            <a:Name>customers</a:Name>
+            <a:Code>customers</a:Code>
+            <a:History>ORG {00000000-0000-4000-8000-000000000201}
+DAT 1234567890</a:History>
+            <c:Columns>
+              <o:Column Id="o311">
+                <a:ObjectID>00000000-0000-4000-8000-000000000311</a:ObjectID>
+                <a:Name>id</a:Name>
+                <a:Code>id</a:Code>
+                <a:History>ORG {00000000-0000-4000-8000-000000000211}
+DAT 1234567890</a:History>
+                <a:DataType>int</a:DataType>
+                <a:Column.Mandatory>1</a:Column.Mandatory>
+              </o:Column>
+              <o:Column Id="o312">
+                <a:ObjectID>00000000-0000-4000-8000-000000000312</a:ObjectID>
+                <a:Name>email</a:Name>
+                <a:Code>email</a:Code>
+                <a:History>ORG {00000000-0000-4000-8000-000000000212}
+DAT 1234567890</a:History>
+                <a:DataType>varchar(80)</a:DataType>
+                <a:Column.Mandatory>0</a:Column.Mandatory>
+              </o:Column>
+            </c:Columns>
+          </o:Table>
+          <o:Table Id="o302">
+            <a:ObjectID>00000000-0000-4000-8000-000000000302</a:ObjectID>
+            <a:Name>orders</a:Name>
+            <a:Code>orders</a:Code>
+            <a:History>ORG {00000000-0000-4000-8000-000000000202}
+DAT 1234567890</a:History>
+            <c:Columns>
+              <o:Column Id="o321">
+                <a:ObjectID>00000000-0000-4000-8000-000000000321</a:ObjectID>
+                <a:Name>order_no</a:Name>
+                <a:Code>order_no</a:Code>
+                <a:History>ORG {00000000-0000-4000-8000-000000000221}
+DAT 1234567890</a:History>
+                <a:DataType>int</a:DataType>
+                <a:Column.Mandatory>1</a:Column.Mandatory>
+              </o:Column>
+              <o:Column Id="o322">
+                <a:ObjectID>00000000-0000-4000-8000-000000000322</a:ObjectID>
+                <a:Name>customer_id</a:Name>
+                <a:Code>customer_id</a:Code>
+                <a:History>ORG {00000000-0000-4000-8000-000000000222}
+DAT 1234567890</a:History>
+                <a:DataType>int</a:DataType>
+                <a:Column.Mandatory>1</a:Column.Mandatory>
+              </o:Column>
+              <o:Column Id="o323">
+                <a:ObjectID>00000000-0000-4000-8000-000000000323</a:ObjectID>
+                <a:Name>total</a:Name>
+                <a:Code>total</a:Code>
+                <a:History>ORG {00000000-0000-4000-8000-000000000223}
+DAT 1234567890</a:History>
+                <a:DataType>decimal(12,2)</a:DataType>
+                <a:Column.Mandatory>1</a:Column.Mandatory>
+              </o:Column>
+            </c:Columns>
+          </o:Table>
+        </c:Tables>
+        <c:References>
+          <o:Reference Id="o303">
+            <a:ObjectID>00000000-0000-4000-8000-000000000303</a:ObjectID>
+            <a:Name>fk_orders_customer</a:Name>
+            <a:Code>fk_orders_customer</a:Code>
+            <a:History>ORG {00000000-0000-4000-8000-000000000203}
+DAT 1234567890</a:History>
+            <c:ParentTable>
+              <o:Table Ref="o301" />
+            </c:ParentTable>
+            <c:ChildTable>
+              <o:Table Ref="o302" />
+            </c:ChildTable>
+            <c:Joins>
+              <o:ReferenceJoin Id="o304">
+                <a:ObjectID>00000000-0000-4000-8000-000000000304</a:ObjectID>
+                <c:Object1>
+                  <o:Column Ref="o311" />
+                </c:Object1>
+                <c:Object2>
+                  <o:Column Ref="o322" />
+                </c:Object2>
+              </o:ReferenceJoin>
+            </c:Joins>
+          </o:Reference>
+        </c:References>
+        <c:Packages>
+          <o:Package Id="o350">
+            <a:ObjectID>00000000-0000-4000-8000-000000000350</a:ObjectID>
+            <a:Name>audit</a:Name>
+            <a:Code>audit</a:Code>
+            <c:Tables>
+              <o:Table Id="o351">
+                <a:ObjectID>00000000-0000-4000-8000-000000000351</a:ObjectID>
+                <a:Name>change_log</a:Name>
+                <a:Code>change_log</a:Code>
+                <c:Columns>
+                  <o:Column Id="o352">
+                    <a:ObjectID>00000000-0000-4000-8000-000000000352</a:ObjectID>
+                    <a:Name>entry_id</a:Name>
+                    <a:Code>entry_id</a:Code>
+                    <a:DataType>bigint</a:DataType>
+                  </o:Column>
+                </c:Columns>
+              </o:Table>
+            </c:Tables>
+          </o:Package>
+        </c:Packages>
+        <c:PhysicalDiagrams>
+          <o:PhysicalDiagram Id="o353">
+            <a:ObjectID>00000000-0000-4000-8000-000000000353</a:ObjectID>
+            <a:Name>layout</a:Name>
+            <a:Code>layout</a:Code>
+            <a:DisplayPreferences>canvas-only</a:DisplayPreferences>
+          </o:PhysicalDiagram>
+        </c:PhysicalDiagrams>
+      </o:Model>
+    </c:Children>
+  </o:RootObject>
+</Model>

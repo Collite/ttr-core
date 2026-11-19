@@ -24,6 +24,7 @@
   },
   "reserved": ["ys/twin-missing"],
   "raises": [
+    {"code": "xm/pdm-version", "import-pdm": "readers/pdm/pd15.pdm", "at": "pd15.pdm:2"},
     {"code": "ys/profile-invalid", "lint": "dialect-negative/demo-cs-profiles/tree", "at": "profiles/invalid.yaml:4"},
     {"code": "ys/profile-grammar-mismatch", "lint": "dialect-negative/demo-cs-profiles/tree", "at": "profiles/old.yaml:2"},
     {"code": "ys/profile-not-found", "lint": "dialect-negative/demo-cs-profiles/tree", "at": "not-found.yaml:1"},

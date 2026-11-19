@@ -139,6 +139,11 @@ object DiagnosticCodes {
                 "ttr-metadata GeneratedGuard (lint)",
             ),
             DiagnosticCode(
+                "xm/pdm-version",
+                "PowerDesigner XML has no version or does not declare the supported 16 version line",
+                "ttr-import PdmFrontEnd",
+            ),
+            DiagnosticCode(
                 "xm/snapshot-size",
                 "A captured snapshot exceeds 5 MiB and --large was not given",
                 "ttr-metadata SnapshotCapture (snapshot)",

@@ -1,0 +1,6 @@
+// generated-from: ../../sources@4a1b0705283d5812982d6ca46a43a642bb2dfbf5dfa0fb45e44c6dacdc724b91 profile pdm/16 generator 0.0.1-LOCAL — do not edit
+package er_sales
+import cn_sales.*
+model binding
+
+def cn2er_kind g_00000000_0000_4000_8000_000000000201_00000000_0000_4000_8000_000000000102 { description: { en: "Customer" }, kind: cn_sales.cn.kind.Customer, target: er_sales.er.entity.Customer }
