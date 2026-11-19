@@ -410,6 +410,11 @@ export function createServerConnection(
   const yamlResults = new Map<string, ParseResult>();
   const isYaml = (uri: string): boolean => /\.ya?ml$/i.test(uri);
   const isTtr = (uri: string): boolean => /\.ttr[mg]$/.test(uri) || yamlResults.has(uri);
+  function withoutDialectEdits(edit: WorkspaceEdit): WorkspaceEdit {
+    const uris = [...Object.keys(edit.changes ?? {}), ...(edit.documentChanges ?? []).flatMap(change =>
+      'textDocument' in change ? [change.textDocument.uri] : 'uri' in change ? [change.uri] : [change.oldUri, change.newUri])];
+    return uris.some(isYaml) ? { documentChanges: [] } : edit;
+  }
   function fileSnapshot(): Map<string, string> {
     const files = new Map(diskDocs);
     for (const doc of documents.all()) files.set(doc.uri, doc.getText());
@@ -2113,7 +2118,7 @@ export function createServerConnection(
           `Cannot rename label '${symbol.name}': the definition of '${read.owner}' (${read.uri.split('/').pop()}:${read.source.line}) reads it (\`${read.text}\`), and the editor does not rewrite definition blocks. Edit the definition first, then rename.`,
         );
       }
-      return buildParticipantRename(symbol, newBareName);
+      return withoutDialectEdits(buildParticipantRename(symbol, newBareName));
     }
 
     // TTR-side edit (def + references + imports + .ttrg) plus in-SQL usages.
@@ -2122,7 +2127,7 @@ export function createServerConnection(
       keepParticipantLabels(edit, targetQname, newBareName);
       renameConceptImports(edit, symbol, newBareName);
     }
-    return edit;
+    return withoutDialectEdits(edit);
   });
 
   /**

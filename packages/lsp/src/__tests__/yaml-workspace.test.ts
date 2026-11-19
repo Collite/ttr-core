@@ -7,12 +7,12 @@ import { mkdtempSync, cpSync, readFileSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { createServerConnection } from '../server.js';
+import { createServerConnection, type ServerOptions } from '../server.js';
 import { YamlWorkspaceLoader } from '@tatrman/lint/yaml';
 
 const cleanup: (() => void)[] = [];
 afterEach(() => { cleanup.splice(0).reverse().forEach(fn => fn()); });
-async function workspace(shared = false) {
+async function workspace(shared = false, extra: ServerOptions = {}) {
   const root = mkdtempSync(join(tmpdir(), 's73-lsp-'));
   if (shared) {
     cpSync(new URL('../../../../tests/conformance/dialect/demo-cs/tree/', import.meta.url), join(root, 'model'), { recursive: true });
@@ -24,7 +24,7 @@ async function workspace(shared = false) {
   const server = lsp.createConnection(new lsp.StreamMessageReader(b), new lsp.StreamMessageWriter(a));
   cleanup.push(() => { client.dispose(); server.dispose(); });
   const loader = new YamlWorkspaceLoader([root]);
-  createServerConnection(server, { loadYamlDocuments: buffers => loader.load(buffers) });
+  createServerConnection(server, { ...extra, loadYamlDocuments: buffers => loader.load(buffers) });
   client.listen(); server.listen();
   const diagnostics = new Map<string, lsp.Diagnostic[]>();
   client.onNotification('textDocument/publishDiagnostics', (p: lsp.PublishDiagnosticsParams) => diagnostics.set(p.uri, p.diagnostics));
@@ -149,6 +149,24 @@ describe('S7.3 demo-cs/1 mixed workspace', () => {
     expect(graph.edges).toContainEqual(expect.objectContaining({ fromNode: 'demo.er.entity.Dodavka', toNode: 'demo.er.entity.Odberatel' }));
     await w.open('notes.yaml');
     expect(w.diagnostics.has(w.uri('notes.yaml'))).toBe(false);
+  });
+
+  it('refuses an atomic native rename when an SQL usage would edit YAML', async () => {
+    const { parseSql, extract } = await import('@tatrman/sql');
+    const { resolveManifest } = await import('@tatrman/semantics');
+    const w = await workspace(false, {
+      loadManifest: async () => resolveManifest(undefined, '/proj'),
+      readConfigFile: async path => path.endsWith('modeler.toml') ? '[sql]\ndefault-dialect = "tsql"\n[[sql.namespace-map]]\nnamespace = "dbo"\ndatabase = "WH"\nschema = "dbo"\n[sql.defaults.tsql]\ndatabase = "WH"\nschema = "dbo"\n' : undefined,
+      analyzeSqlBlock(value, dialect) {
+      const { tree } = parseSql(value, dialect);
+      return tree ? extract(tree, dialect) : undefined;
+    } });
+    await w.open('table.ttrm', 'package demo\nmodel db schema dbo\ndef table Customer { columns { def column id { type: int } } }');
+    await w.open('model/sql.yaml', 'ttr: "0.22"\npackage: demo\nmodel: db\nschema: dbo\ndefs:\n- kind: query\n  id: Q\n  properties:\n    sourceText: {tag: sql, block: "SELECT id FROM Customer"}\n');
+    const textDocument = { uri: w.uri('table.ttrm') }, position = { line: 2, character: 12 };
+    const refs = await w.client.sendRequest<lsp.Location[]>('textDocument/references', { textDocument, position, context: { includeDeclaration: true } });
+    expect(refs.some(ref => ref.uri === w.uri('model/sql.yaml'))).toBe(true);
+    expect(await w.client.sendRequest('textDocument/rename', { textDocument, position, newName: 'Renamed' })).toEqual({ documentChanges: [] });
   });
 
 });
