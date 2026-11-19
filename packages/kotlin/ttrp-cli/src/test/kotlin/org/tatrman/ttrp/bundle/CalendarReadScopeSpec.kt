@@ -183,7 +183,8 @@ class CalendarReadScopeSpec :
                 listOf("er.entity.business_calendar", "er.entity.order")
         }
 
-        // AU S2.4f (D-249): a `due` in working days is computed by the Server over the governed calendar.
+        // AU S2.4f (D-249, D-251): a working-days `due` the Server computes — an obligation action's — declares the
+        // calendar read. An approval action's `due` is the engine's user-task date and declares nothing.
         val dueActions =
             """
             package hartland.automation
@@ -195,6 +196,13 @@ class CalendarReadScopeSpec :
                           def column due { type: date }]
                 sinks: { native: obligation }
                 approval: none
+            }
+            def action chase_by {
+                columns: [def column order { type: order.order_number }, def column kind { type: text },
+                          def column due { type: date, optional: true }]
+                sinks: { native: obligation }
+                approval: none
+                due: 2 working_days
             }
             def action confirm {
                 columns: [def column order { type: order.order_number }]
@@ -218,9 +226,19 @@ class CalendarReadScopeSpec :
                 "chase { order: order_number, kind: 'refund', due: working_days(:settle) }",
             "(b) a wiring `due: 3 working_days`" to
                 "chase { order: order_number, kind: 'refund', due: 3 working_days }",
-            "(c) an action-default `due: 2 working_days` with no wiring `due`" to "confirm { order: order_number }",
+            "(c') an obligation action's default `due: 2 working_days` with no wiring `due`" to
+                "chase_by { order: order_number, kind: 'refund' }",
             "(e) a `when:`-selected wiring `due: working_days(:p)`" to
                 "chase { order: order_number, kind: 'refund', due: working_days(:settle) } when: order_number > 0",
+            "(f) a wiring `due: :p` of a working-days parameter" to
+                "chase { order: order_number, kind: 'refund', due: :settle }",
+            "(g) a wiring `due:` case in working days" to
+                "chase { order: order_number, kind: 'refund', " +
+                "due: case when order_number > 0 then working_days(2) else working_days(:settle) end }",
+            "(d) a wiring `due: 2 days` over an obligation default in working days" to
+                "chase_by { order: order_number, kind: 'refund', due: 2 days }",
+            "(d) a wiring `due: :as_of` over an obligation default in working days" to
+                "chase_by { order: order_number, kind: 'refund', due: :as_of }",
         )) {
             "$name declares the model calendar" {
                 assertCalendar(build(dueRecipe(wiring), extra = dueActions))
@@ -228,11 +246,12 @@ class CalendarReadScopeSpec :
         }
 
         for ((name, wiring) in listOf(
+            "(c) an approval action's default `due: 2 working_days`" to "confirm { order: order_number }",
             "(d) a wiring `due: days(:p)`" to "chase { order: order_number, kind: 'refund', due: days(:remind) }",
+            "(d') a wiring `due: :p` of a days parameter" to
+                "chase { order: order_number, kind: 'refund', due: :remind }",
             "(d) a wiring `due: 2 days`" to "chase { order: order_number, kind: 'refund', due: 2 days }",
             "(d) a wiring `due: weeks(1)`" to "chase { order: order_number, kind: 'refund', due: weeks(1) }",
-            "(d) a wiring `due: 2 days` over an action-default in working days" to
-                "confirm { order: order_number, due: 2 days }",
         )) {
             "$name does not declare the calendar" {
                 build(dueRecipe(wiring), extra = dueActions).manifest.recipe!!.objectsRead shouldContainExactly
@@ -324,6 +343,30 @@ class CalendarReadScopeSpec :
                 errors.size shouldBe 1
                 errors.single().location.file shouldBe "calendar_action.ttrp"
                 (errors.single().location.line > 0) shouldBe true
+            }
+
+            for ((where, wiring) in listOf(
+                "the action's default" to "chase_by { order: order_number, kind: 'refund' }",
+                "the wiring's" to "chase { order: order_number, kind: 'refund',\n        due: working_days(:settle) }",
+            )) {
+                "a $name model calendar under $where working-days `due` names the `due`" {
+                    val root = project(transform, extra = dueActions)
+                    val text = dueRecipe(wiring)
+                    val plan =
+                        TtrpPipeline(
+                            TtrpManifest(world = "hartland.worlds.demo", manifestDir = root),
+                            root.resolve("models"),
+                        ).plan(text, "calendar_action.ttrp")
+                    withClue(plan.diagnostics) { plan.ok shouldBe false }
+                    val error =
+                        plan.diagnostics.single {
+                            it.message.contains("one entity with `semantics { role: event_date }`")
+                        }
+                    error.message shouldContain "a `due` in working days needs the model's calendar"
+                    val anchor = if (wiring.contains("due:")) "due:" else "chase_by"
+                    val line = text.lines().indexOfFirst { it.contains(anchor) }
+                    error.location.line shouldBe line + 1
+                }
             }
         }
     })
