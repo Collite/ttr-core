@@ -35,6 +35,7 @@ import { entries, jsonText } from './scalars.js';
 
 type ObjectValue = { [key: string]: Json };
 const object = (v: Json | undefined): ObjectValue => (isRecord(v) ? v : {});
+const PACKAGE_PATH = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*(?![\s\S])/;
 const escape = (v: string) => v.replace(/~/g, '~0').replace(/\//g, '~1');
 const resolve = (p: string, n: ForeignNode, includeNull = false) =>
   new JsonPointer(p).resolve(n, includeNull);
@@ -646,11 +647,36 @@ export class CanonicalBuilder {
         const suffix = rekind
           ? `; the overlay re-kinded ${rekind[0]} from ${record.kind} to ${this.rekinds.get(record)} at ${rekind[1].file}:${rekind[1].line}:${rekind[1].column}`
           : '';
-        throw new ProfileException(
-          'ys/profile-invalid',
-          origin,
-          (error?.message ?? 'Invalid canonical document') + suffix
-        );
+        let message = error?.message ?? 'Invalid canonical document';
+        const type = /^must be (string|object|array|number|integer|boolean|null)$/.exec(
+          message
+        )?.[1];
+        if (type) {
+          // The parser supplies Ajv's shorthand; profile refusals use Kotlin's located type text.
+          const value = path
+            .split('/')
+            .slice(1)
+            .reduce<Json | undefined>((value, key) => {
+              const decoded = key.replace(/~1/g, '/').replace(/~0/g, '~');
+              return Array.isArray(value)
+                ? value[Number(decoded)]
+                : value instanceof Map
+                  ? value.get(decoded)
+                  : isRecord(value)
+                    ? value[decoded]
+                    : undefined;
+            }, raw);
+          const found =
+            value === null
+              ? 'null'
+              : value instanceof NumericScalar
+                ? 'number'
+                : Array.isArray(value)
+                  ? 'array'
+                  : typeof value;
+          message = `${path}: ${found} found, ${type} expected`;
+        }
+        throw new ProfileException('ys/profile-invalid', origin, message + suffix);
       }
       const relocate = (source: SourceLocation): SourceLocation => {
         const nearest = enclosing(pointerAt(source), true);
@@ -843,8 +869,7 @@ export class ProfileEngine {
             if (!plan.records.length) return '';
             const written = selected?.value;
             const path = typeof written === 'string' ? written.replace(/\//g, '.') : undefined;
-            if (path !== undefined && /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*(?![\s\S])/.test(path))
-              return path;
+            if (path !== undefined && PACKAGE_PATH.test(path)) return path;
             throw new ProfileException(
               'ys/package-invalid',
               plan.records[0].source.span(true),

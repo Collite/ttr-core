@@ -1,1 +1,1 @@
-{"code":"ys/package-invalid","file":"one.yaml","line":2,"column":10,"path":"/entity/Customer"}
+{"code":"ys/package-invalid","file":"one.yaml","line":2,"column":10,"path":"/entity/Customer","message":"one.yaml:2:10: ys/package-invalid /entity/Customer: \"Sales/billing\" is no TTR package path (verbatim: lower-case names, `/` → `.`)"}

@@ -18,22 +18,25 @@ const cases = readdirSync(root, { withFileTypes: true })
 
 describe('S5.3a operands: Kotlin-produced canonical bytes, reports and refusals', () => {
   test('all four behaviours and their refusal/null variants are present', () => {
-    expect(cases).toEqual(
-      expect.arrayContaining([
-        'run-first',
-        'run-only',
-        'as-ref',
-        'xmi-multi',
-        'verbatim',
-        'verbatim-dotted',
-        'verbatim-mapping',
-        'verbatim-default',
-        'package-invalid',
-        'required-warn',
-        'required-silent',
-        'as-ref-names-refused',
-      ])
-    );
+    expect(cases).toEqual([
+      'as-ref',
+      'as-ref-names-refused',
+      'package-empty',
+      'package-invalid',
+      'package-missing',
+      'package-null',
+      'package-trailing-newline',
+      'required-silent',
+      'required-warn',
+      'run-first',
+      'run-only',
+      'verbatim',
+      'verbatim-default',
+      'verbatim-dotted',
+      'verbatim-mapping',
+      'verbatim-no-records',
+      'xmi-multi',
+    ]);
   });
   for (const name of cases) {
     test(`${name}: matches the Kotlin oracle`, () => {
@@ -75,6 +78,7 @@ describe('S5.3a operands: Kotlin-produced canonical bytes, reports and refusals'
         }
         expect(caught).toMatchObject({
           code: oracle.code,
+          message: oracle.message,
           location: {
             file: oracle.file,
             line: oracle.line,

@@ -17,7 +17,9 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - `rename`, `shape` and `link` honour `required: warn` for absent or explicit-null
   inputs, reporting located `ys/key-missing` warnings while continuing the run.
   Shared Kotlin-produced operand vectors include the captured sales/billing XMI
-  records, warning reports and refusal positions.
+  records, warning reports and refusal positions. Both Kotlin and TS replay the
+  exact operand roster in CI, including full refusal messages. Profile schema
+  negations and canonical type refusals now use Kotlin's diagnostic text in TS.
 
 ### Added — `package: {verbatim: true}`; `import-xmi` makes one TTR package per UML package (MW-P5 S5.3a, ✅D-MW-91)
 

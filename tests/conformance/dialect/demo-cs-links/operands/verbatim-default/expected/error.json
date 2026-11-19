@@ -1,1 +1,1 @@
-{"code":"ys/profile-invalid","file":"profile.yaml","line":4,"column":5,"path":"/operations/0"}
+{"code":"ys/profile-invalid","file":"profile.yaml","line":4,"column":5,"path":"/operations/0","message":"profile.yaml:4:5: ys/profile-invalid /operations/0: /operations/0: must not be valid to the schema \"/properties/operations/items/allOf/1/then/then/not\" : {\"anyOf\":[{\"required\":[\"mapping\"]},{\"required\":[\"default\"]}]}"}
