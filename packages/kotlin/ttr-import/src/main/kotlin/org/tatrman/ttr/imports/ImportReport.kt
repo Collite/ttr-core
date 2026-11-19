@@ -31,12 +31,33 @@ data class ImportReport(
      * there is one, so a run without renames keeps its bytes.
      */
     val renamed: List<Renamed> = emptyList(),
+    /**
+     * S5.3a T4b: the entries of a previous `<package>.sources.json` under `--out` that this run emits nothing for, whose
+     * foreign id this run does not name. Written as `delta.removed` only when there is one.
+     */
+    val removed: List<Removed> = emptyList(),
 ) {
-    /** One rename: the record with this foreign id was [from] in the previous generation and is [to] now. */
+    /**
+     * One rename: the record with this foreign id was [from] in the previous generation and is [to] now; [moved] names
+     * both packages when it moved between them (S5.3a T4b).
+     */
     data class Renamed(
         val from: String,
         val to: String,
         val foreignId: String,
+        val moved: Moved? = null,
+    )
+
+    /** The package a renamed record was in ([from]) and is in now ([to]). */
+    data class Moved(
+        val from: String,
+        val to: String,
+    )
+
+    /** One entry of an emptied previous package: its [qname], and its [foreignId] when it had one. */
+    data class Removed(
+        val qname: String,
+        val foreignId: String?,
     )
 
     /** One ignored key; [record] names the record a `kinds` null mapping skipped whole (S5.2a). */
@@ -102,16 +123,37 @@ data class ImportReport(
                     }
                 }
                 putJsonArray("warnings") { warnings.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } }
-                if (renamed.isNotEmpty()) {
+                if (renamed.isNotEmpty() || removed.isNotEmpty()) {
                     put(
                         "delta",
                         buildJsonObject {
-                            putJsonArray("renamed") {
-                                renamed.forEach {
-                                    addJsonObject {
-                                        put("from", it.from)
-                                        put("to", it.to)
-                                        put("foreignId", it.foreignId)
+                            if (renamed.isNotEmpty()) {
+                                putJsonArray("renamed") {
+                                    renamed.forEach {
+                                        addJsonObject {
+                                            put("from", it.from)
+                                            put("to", it.to)
+                                            put("foreignId", it.foreignId)
+                                            it.moved?.let { moved ->
+                                                put(
+                                                    "package",
+                                                    buildJsonObject {
+                                                        put("from", moved.from)
+                                                        put("to", moved.to)
+                                                    },
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if (removed.isNotEmpty()) {
+                                putJsonArray("removed") {
+                                    removed.forEach {
+                                        addJsonObject {
+                                            put("qname", it.qname)
+                                            it.foreignId?.let { id -> put("foreignId", id) }
+                                        }
                                     }
                                 }
                             }
@@ -183,6 +225,16 @@ data class ImportReport(
                 appendLine("|---|---|---|")
                 renamed.forEach { appendLine("| `${it.from}` | `${it.to}` | `${it.foreignId}` |") }
             }
+            if (removed.isNotEmpty()) {
+                appendLine()
+                appendLine("#### Removed since the last generation (${removed.size})")
+                appendLine()
+                appendLine(
+                    "Their packages are no longer generated; delete their files under `--out` (the run does not).",
+                )
+                appendLine()
+                removed.forEach { appendLine("- `${it.qname}`" + (it.foreignId?.let { id -> " (`$id`)" } ?: "")) }
+            }
             if (warnings.isNotEmpty()) {
                 appendLine()
                 appendLine("#### Warnings (${warnings.size})")
@@ -230,6 +282,7 @@ data class ImportReport(
             warnings: List<String> = emptyList(),
             records: String? = null,
             renamed: List<Renamed> = emptyList(),
+            removed: List<Removed> = emptyList(),
         ): ImportReport =
             ImportReport(
                 frontEnd,
@@ -258,6 +311,7 @@ data class ImportReport(
                 warnings,
                 records,
                 renamed.sortedWith(compareBy<Renamed, String>(Bytewise) { it.from }.thenBy(Bytewise) { it.to }),
+                removed.sortedWith(compareBy(Bytewise) { it.qname }),
             )
     }
 }

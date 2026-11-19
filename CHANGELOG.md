@@ -22,6 +22,10 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - `ea-erd/1` links a relation's ends by the end class's `xmi:id` (`as: ref`), so every end is a qualified reference and
   an end in another UML package resolves. `ttr-mdg/1` still resolves every reference by name, so a multi-package XM
   world splits but does not link across packages.
+- The reader's rename delta reads every previous `<package>.sources.json` under `--out` and pairs foreign ids across
+  packages: an element moved between UML packages is a `delta.renamed` entry with `package: {from, to}`. A previous
+  package the run emits nothing for lists its remaining entries as `delta.removed` (`{qname, foreignId?}`); the run
+  does not delete that package's files.
 
 ### Added — `import-xmi`: the `xmi` front-end, `ttr-mdg/1`, `ea-erd/1`, the sidecar rename diff (MW-P5 S5.3)
 

@@ -133,17 +133,26 @@ object Reader {
             }
         }
         val sidecars = TreeMap<String, String>(Bytewise)
-        val renamed = mutableListOf<ImportReport.Renamed>()
         val sources = foreignIds(result.sources, result.origins, trees, profile.options.foreignId)
         sources.groupBy { it.pkg }.forEach { (pkg, entries) ->
             val name = "$pkg.sources.json"
             sidecars[name] = SourcesJsonWriter.write(header.header(name).text, entries)
-            renamed += SidecarDelta.renamed(request.out.resolve(name), entries)
         }
+        // S5.3a T4b: the delta against every previous sidecar under --out, so a move between packages pairs.
+        val delta = SidecarDelta.of(request.out, sources)
         return GeneratedPackage(
             files,
             sidecars,
-            ImportReport.of(frontEnd.name, profile.identity, result, packages, warnings, frontEnd.records, renamed),
+            ImportReport.of(
+                frontEnd.name,
+                profile.identity,
+                result,
+                packages,
+                warnings,
+                frontEnd.records,
+                delta.renamed,
+                delta.removed,
+            ),
         )
     }
 

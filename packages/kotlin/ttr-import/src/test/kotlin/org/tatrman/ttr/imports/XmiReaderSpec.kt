@@ -32,6 +32,7 @@ import org.tatrman.ttr.yaml.CanonicalYaml
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
+import kotlin.io.path.deleteExisting
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
@@ -404,6 +405,76 @@ class XmiReaderSpec :
                 )
         }
 
+        test(
+            "S5.3a T4b: the delta pairs across packages — a moved class names both packages; an emptied package's rest is removed",
+        ) {
+            val root = workspace()
+            write(root, "m", run(root, "sales-billing.xmi", "ea-erd/1", null, out = "m"))
+            // Snapshot 3: Invoice moved sales/billing → sales, billed_to deleted (sales.billing emptied), Order renamed.
+            val moved = run(root, "sales-billing-moved.xmi", "ea-erd/1", null, out = "m")
+            moved.files.keys shouldContainExactly listOf("sales/er.ttrm")
+            val delta = report(moved).getValue("delta").jsonObject
+            delta.getValue("renamed").jsonArray.map { it.jsonObject.toString() } shouldBe
+                listOf(
+                    """{"from":"sales.billing.er.entity.Invoice","to":"sales.er.entity.Invoice",""" +
+                        """"foreignId":"5d2a62bd-8b3f-5be6-9a3e-190df23181ae","package":{"from":"sales.billing","to":"sales"}}""",
+                    """{"from":"sales.billing.er.entity.Invoice.total","to":"sales.er.entity.Invoice.total",""" +
+                        """"foreignId":"f2077dc4-7025-58ff-be14-ed4f7faad021","package":{"from":"sales.billing","to":"sales"}}""",
+                    """{"from":"sales.er.entity.Order","to":"sales.er.entity.PurchaseOrder",""" +
+                        """"foreignId":"${Uuid5.of(
+                            XmiFrontEnd.NAMESPACE,
+                            "EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12",
+                        )}"}""",
+                    """{"from":"sales.er.entity.Order.order_no","to":"sales.er.entity.PurchaseOrder.order_no",""" +
+                        """"foreignId":"${Uuid5.of(
+                            XmiFrontEnd.NAMESPACE,
+                            "EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D22",
+                        )}"}""",
+                )
+            delta.getValue("removed") shouldBe
+                Json.parseToJsonElement(
+                    """[{"qname":"sales.billing.er.relation.billed_to","foreignId":"5aae9e62-40b3-5c5c-b12f-3412dc018732"}]""",
+                )
+            moved.report.markdown() shouldContain "#### Removed since the last generation (1)"
+            moved.report.markdown() shouldContain
+                "- `sales.billing.er.relation.billed_to` (`5aae9e62-40b3-5c5c-b12f-3412dc018732`)"
+            // The stale files deleted as the report says, the move back is a rename again (sales → sales.billing).
+            write(root, "m", moved)
+            root.resolve("m/sales.billing.sources.json").deleteExisting()
+            root.resolve("m/sales/billing/er.ttrm").deleteExisting()
+            val back = report(run(root, "sales-billing.xmi", "ea-erd/1", null, out = "m")).getValue("delta").jsonObject
+            back.keys shouldBe setOf("renamed")
+            back
+                .getValue("renamed")
+                .jsonArray
+                .first()
+                .jsonObject
+                .getValue("package") shouldBe
+                Json.parseToJsonElement("""{"from":"sales","to":"sales.billing"}""")
+            // Only an emptied package's entries are removed (with or without a foreign id); what left a package the run
+            // still emits is not (the delta stays the rename half there).
+            val dir = Files.createTempDirectory("s53a-delta")
+            dir.resolve("a.sources.json").writeText(
+                """{"entries": [{"qname": "a.er.entity.X", "kind": "entity", "foreignId": "u1"}, """ +
+                    """{"qname": "a.er.entity.Y", "kind": "entity", "foreignId": "u2"}]}""",
+            )
+            dir.resolve("b.sources.json").writeText(
+                """{"entries": [{"qname": "b.er.entity.Z", "kind": "entity", "foreignId": "u3"}, """ +
+                    """{"qname": "b.er.entity.W", "kind": "entity"}]}""",
+            )
+            SidecarDelta.of(
+                dir,
+                listOf(
+                    org.tatrman.ttr.profile
+                        .SourceEntry("a.er.entity.X", "entity", "a", "u1", null, null),
+                ),
+            ) shouldBe
+                SidecarDelta.Delta(
+                    emptyList(),
+                    listOf(ImportReport.Removed("b.er.entity.Z", "u3"), ImportReport.Removed("b.er.entity.W", null)),
+                )
+        }
+
         test("F3: a foreign id with one qname on each side is a rename even when its kind changed") {
             val dir = Files.createTempDirectory("s53-delta")
             val previous = dir.resolve("p.sources.json")
@@ -412,15 +483,16 @@ class XmiReaderSpec :
                     """{"qname": "p.er.entity.Y", "kind": "entity", "foreignId": "u2"}, """ +
                     """{"qname": "p.cn.kind.Y", "kind": "kind", "foreignId": "u2"}]}""",
             )
-            SidecarDelta.renamed(
-                previous,
-                listOf(
-                    org.tatrman.ttr.profile
-                        .SourceEntry("p.md.dimension.X", "dimension", "p", "u1", null, null),
-                    org.tatrman.ttr.profile
-                        .SourceEntry("p.md.dimension.Y", "dimension", "p", "u2", null, null),
-                ),
-            ) shouldBe listOf(ImportReport.Renamed("p.er.entity.X", "p.md.dimension.X", "u1"))
+            SidecarDelta
+                .of(
+                    dir,
+                    listOf(
+                        org.tatrman.ttr.profile
+                            .SourceEntry("p.md.dimension.X", "dimension", "p", "u1", null, null),
+                        org.tatrman.ttr.profile
+                            .SourceEntry("p.md.dimension.Y", "dimension", "p", "u2", null, null),
+                    ),
+                ).renamed shouldBe listOf(ImportReport.Renamed("p.er.entity.X", "p.md.dimension.X", "u1"))
         }
 
         test("F5 ✅R372-C: a child's own cn operations under an inherited cn-from-uml: false are a located error") {
