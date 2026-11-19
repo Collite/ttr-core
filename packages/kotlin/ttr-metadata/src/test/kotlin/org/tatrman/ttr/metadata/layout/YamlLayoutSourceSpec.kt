@@ -8,6 +8,8 @@ import io.kotest.matchers.string.shouldContain
 import org.tatrman.ttr.metadata.model.ModelDescriptor
 import org.tatrman.ttr.metadata.reconcile.ModelReconciler
 import org.tatrman.ttr.metadata.source.*
+import org.tatrman.ttr.parser.model.LayoutPoint
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
@@ -111,8 +113,6 @@ class YamlLayoutSourceSpec :
                 root.put("layouts/agent/broken.yaml", "not: a layout")
                 root.put("layouts/.hidden/broken.yaml", "not: a layout")
                 root.put("layouts/nested/inventory.yml", authored)
-                root.put("layouts/ignored.ttrg", "broken graph")
-                root.put("model.ignore", "layouts/\n") // content ignores must not suppress the separate layout reader
                 val reads = mutableListOf<String>()
                 val delegate = LocalFsStorage("t", root)
                 val recording =
@@ -124,6 +124,101 @@ class YamlLayoutSourceSpec :
                 source.layoutFiles.map { it.source } shouldBe listOf("layouts/nested/inventory.yml")
                 reads.any { "/agent/" in it || "/.hidden/" in it || it.endsWith(".ttrg") } shouldBe false
                 load(root, layouts = false).second shouldBe LayoutIndex.EMPTY
+            }
+        }
+        "a yaml source serves YAML and TTR graphs together with sidecar positions" {
+            tree { root ->
+                root.put("layouts/a.yaml", authored.replace("name: inventory", "name: a"))
+                root.put("layouts/b.ttrg", twin.replace("graph inventory", "graph b"))
+                root.put(
+                    "layouts/b.ttrl",
+                    """
+                    ttrl 1
+                    canvas b {
+                      mode: manual
+                      nodes: { "demo.widgets.er.entity.widget": {x: 99, y: 101} }
+                    }
+                    """.trimIndent(),
+                )
+                val (source, index) = load(root)
+                source.layoutFiles.map { it.format } shouldBe listOf(LayoutFileFormat.YAML, LayoutFileFormat.TTRG)
+                index.all.map { it.name } shouldBe listOf("a", "b")
+                index["b"]!!.positions["demo.widgets.er.entity.widget"] shouldBe LayoutPoint(99.0, 101.0)
+                index["b"]!!.positionsFrom shouldBe "sidecar"
+                index.issues.shouldBeEmpty()
+            }
+        }
+        "a duplicate name across YAML and TTR graphs is an issue on both files and neither is served" {
+            tree { root ->
+                root.put("layouts/a.yaml", authored.replace("name: inventory", "name: a"))
+                root.put("layouts/a.ttrg", twin.replace("graph inventory", "graph a"))
+                val (_, index) = load(root)
+                index.all.shouldBeEmpty()
+                index.issues.map { it.path }.toSet() shouldBe setOf("layouts/a.yaml", "layouts/a.ttrg")
+                index.issues.forEach { it.reason shouldContain "the name a is also declared by" }
+            }
+        }
+        "layout collection reuses model.ignore and the tree profile whole-file ignores before reading layouts" {
+            tree { root ->
+                root.put("layouts/main.yaml", authored)
+                root.put("layouts/drafts/d.yaml", "not: [valid")
+                root.put("layouts/skipped/bad.yaml", "not: [valid")
+                root.put("layouts/skipped/bad.ttrg", "not a graph")
+                root.put("model.ignore", "profiles/\nlayouts/drafts/**\n")
+                root.put("ttr.yaml", "profile: ./profiles/layouts.yaml\ngrammar: '>=0.22 <1.0'\n")
+                root.put(
+                    "profiles/layouts.yaml",
+                    """
+                    profile: layouts/1
+                    grammar: '>=0.22 <1.0'
+                    operations:
+                      - {op: ignore, files: [layouts/skipped/**]}
+                    """.trimIndent(),
+                )
+                val delegate = LocalFsStorage("t", root)
+                val reads = mutableListOf<String>()
+                val storage =
+                    object : ModelStorage by delegate {
+                        override fun read(file: StorageFile): String {
+                            reads += file.underRoot()
+                            return delegate.read(file)
+                        }
+                    }
+                val source = YamlFileSource("t", 100, storage, layouts = true).load()
+                source.errors.shouldBeEmpty()
+                source.layoutFiles.map { it.source } shouldBe listOf("layouts/main.yaml")
+                val result = ModelReconciler(ModelDescriptor("t", "t")).reconcile(listOf(source))
+                val index = LayoutIndex.build(listOf(source), result.model)
+                index.all.map { it.name } shouldBe listOf("inventory")
+                index.issues.shouldBeEmpty()
+                reads.count { it == "model.ignore" } shouldBe 1
+                reads.none { it.startsWith("layouts/drafts/") || it.startsWith("layouts/skipped/") } shouldBe true
+            }
+        }
+        listOf(false, true).forEach { unreadable ->
+            "an ${if (unreadable) "unreadable" else "invalid"} model.ignore fails closed for every layout format" {
+                tree { root ->
+                    root.put("layouts/main.yaml", authored)
+                    root.put("layouts/main.ttrg", twin)
+                    root.put("model.ignore", "!unsupported-reinclude\n")
+                    val delegate = LocalFsStorage("t", root)
+                    val reads = mutableListOf<String>()
+                    val storage =
+                        object : ModelStorage by delegate {
+                            override fun read(file: StorageFile): String {
+                                val path = file.underRoot()
+                                reads += path
+                                if (path == "model.ignore" && unreadable) throw IOException("fixture unreadable")
+                                return delegate.read(file)
+                            }
+                        }
+                    val source = YamlFileSource("t", 100, storage, layouts = true).load()
+                    source.layoutFiles.shouldBeEmpty()
+                    source.errors.first { it.file == root.resolve("model.ignore").toString() }.message shouldContain
+                        "ys/profile-invalid"
+                    reads.count { it == "model.ignore" } shouldBe 1
+                    reads.none { it.startsWith("layouts/") } shouldBe true
+                }
             }
         }
         "a yaml source without layouts serves zero layouts without an error" {
