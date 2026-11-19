@@ -252,6 +252,18 @@ class LinkOpsSpec :
             invalid.code shouldBe "ys/profile-invalid"
         }
 
+        test("review-378 F7: link … required: warn warns on an explicit null as on an absent key") {
+            val ops =
+                entityOps +
+                    "- {op: link, in: entity, at: /role, to: {kind: entity, property: roles}, by: sourceName, " +
+                    "required: warn}"
+            run("entity:\n  A: {role: ~}\n  B: {}\n", ops).report.warnings.map { it.describe() } shouldBe
+                listOf(
+                    "ys/key-missing: A has no /role, so entity.roles is not written",
+                    "ys/key-missing: B has no /role, so entity.roles is not written",
+                )
+        }
+
         // review-251 F4 (✅R251-C): the sidecar part is read only when a lookup needs it, and never below
         // dot-directories, build or node_modules.
         val tableLink =

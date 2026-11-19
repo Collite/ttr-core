@@ -96,7 +96,11 @@ internal class WriteOp(
                     continue
                 }
             plan.consumption.consume(source)
-            if (source.value != JsonNull) builder.write(plan, record, path, source.value, source)
+            if (source.value == JsonNull) {
+                op.missing(plan, record, path)
+            } else {
+                builder.write(plan, record, path, source.value, source)
+            }
         }
     }
 }

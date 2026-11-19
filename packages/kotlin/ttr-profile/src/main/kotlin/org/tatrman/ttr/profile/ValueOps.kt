@@ -155,7 +155,11 @@ internal class ShapeOp(
                 )
             if (!filled.inputs) plan.consumption.consume(base)
             val shaped = filled.value
-            if (base.value == JsonNull || shaped === Missing) continue
+            if (base.value == JsonNull) {
+                op.missing(plan, record, path)
+                continue
+            }
+            if (shaped === Missing) continue
             builder.write(plan, record, path, shaped as JsonElement, base)
         }
     }
@@ -282,7 +286,10 @@ internal class LinkOp(
             plan.consumption.consume(source)
             val linked =
                 when (source.value) {
-                    JsonNull -> continue
+                    JsonNull -> {
+                        op.missing(plan, record, path)
+                        continue
+                    }
                     is JsonArray ->
                         JsonArray(
                             source.entries().map {

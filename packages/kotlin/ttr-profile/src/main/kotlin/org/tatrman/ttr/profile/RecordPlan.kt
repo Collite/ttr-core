@@ -128,8 +128,8 @@ internal class PlannedOp(
 
     /**
      * ✅D-MW-98 (S5.3a T4c): with `required: warn` (on `rename`, `shape` and `link`), a [record] where `at` selects
-     * nothing gets one warning `ys/key-missing`, located at the record, naming the key and the property not written;
-     * the run goes on. Without it an absent `at` writes nothing, silently.
+     * nothing **or `null`** (review-378 F7) gets one warning `ys/key-missing`, located at the record, naming the key and
+     * the property not written; the run goes on (a `null` stays consumed). Without it nothing is written, silently.
      */
     fun missing(
         plan: RecordPlan,

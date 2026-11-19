@@ -363,6 +363,13 @@ class StructuralOpsSpec :
             runOps(source, ops.replace(", required: warn", "")).report.warnings shouldBe emptyList()
             shouldThrow<ProfileException> { recordProfile(ops.replace("required: warn", "required: error")) }
                 .code shouldBe "ys/profile-invalid"
+            // review-378 F7: an explicit null writes nothing too, so it warns (rename, shape), and stays consumed.
+            val nulls = runOps("entity:\n  A: {}\nvztahy:\n  T: {popis: ~, od: ~, do: A}\n", ops)
+            nulls.report.warnings.map { it.describe() } shouldBe
+                listOf(
+                    "ys/key-missing: T has no /popis, so relation.description is not written",
+                    "ys/key-missing: T has no /od, so relation.from is not written",
+                )
         }
     })
 

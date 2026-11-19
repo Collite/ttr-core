@@ -28,7 +28,7 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   the same `--out` are not compared, and a renamed input starts a fresh generation. A previous package the run emits
   nothing for is listed in `delta.emptied` with its two paths, and its entries that went nowhere are `delta.removed`
   (`{qname, foreignId?}`); the run does not delete that package's files.
-- `rename`, `shape` and `link` take `required: warn`: a record where `at` selects nothing gets one warning, the new
+- `rename`, `shape` and `link` take `required: warn`: a record where `at` selects nothing or `null` gets one warning, the new
   catalogued `ys/key-missing`, located at the record and naming the property not written; the run goes on
   (✅D-MW-98). `ttr-mdg/1` and `ea-erd/1` declare it on a relation's two ends, so an association without EA's
   connector ends is reported instead of passing silently.
