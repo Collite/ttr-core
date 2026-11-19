@@ -32,3 +32,35 @@ export function jsonText(value: import('./input.js').Json): string {
     );
   return JSON.stringify(value);
 }
+
+/** Networknt's located type text, shared by profile loading and canonical validation. */
+export function schemaTypeMessage(
+  message: string,
+  root: import('./input.js').Json,
+  path: string
+): string {
+  const expected = /^must be (string|object|array|number|integer|boolean|null)$/.exec(message)?.[1];
+  if (!expected) return message;
+  const value = path
+    .split('/')
+    .slice(1)
+    .reduce<import('./input.js').Json | undefined>((value, key) => {
+      const decoded = key.replace(/~1/g, '/').replace(/~0/g, '~');
+      return Array.isArray(value)
+        ? value[Number(decoded)]
+        : value instanceof Map
+          ? value.get(decoded)
+          : value !== null && typeof value === 'object' && !(value instanceof NumericScalar)
+            ? (value as { [key: string]: import('./input.js').Json })[decoded]
+            : undefined;
+    }, root);
+  const found =
+    value === null
+      ? 'null'
+      : value instanceof NumericScalar
+        ? 'number'
+        : Array.isArray(value)
+          ? 'array'
+          : typeof value;
+  return `${path}: ${found} found, ${expected} expected`;
+}
