@@ -126,10 +126,17 @@ filter and leaves the recipe's existing fingerprint algorithms unchanged. Defaul
 an explicit argument overrides them. Nested action callees and their defaults are outside this direct-action
 contract. The runtime still resolves and guards the auxiliary read in the pinned world.
 
-A `due` in working days declares the calendar too. That covers the wiring's `due:`, literal (`3 working_days`) or a
-parameter (`working_days(:settlement)`), and the action's own `due: 2 working_days` when the wiring has no `due:`.
-The Server counts the due date over that calendar. A `due` in `days` or `weeks` adds no read, and a wiring's
-`due: 2 days` over a working-days default adds none either.
+An obligation action's `due` in working days declares the calendar too, because the Server counts the due date over
+it. An obligation action is one with `sinks: { native: obligation }`, such as `expect`. Both sources count, and one
+never cancels the other:
+
+- the wiring's `due:` when it types as working days: `3 working_days`, `working_days(:settlement)`, a working-days
+  parameter, or a `case` of those;
+- the action's own `due: 2 working_days`, even when the wiring sets a `due` of its own.
+
+Such a recipe needs a unique calendar; without one, `TTRP-FN-002` names the `due`. An approval action's `due` is the
+process engine's user-task date and declares nothing, and a `due` in `days` or `weeks` adds no read. As with the
+other action-time reads, a `due` inside a nested action call is outside this direct-action contract.
 
 ## Expressions in recipes
 
