@@ -7,7 +7,8 @@ import {
 import { conceptKeyword } from '@tatrman/parser';
 import type { Document, Definition, GraphBlock } from '@tatrman/parser';
 
-export function buildDocumentSymbols(doc: Document, lines: string[] = []): DocumentSymbol[] {
+export function buildDocumentSymbols(doc: Document, lines: string[] = [], dialect = false): DocumentSymbol[] {
+  if (dialect) return doc.definitions.map(def => buildDefSymbol(def, lines));
   if (doc.graph) {
     return buildGraphSymbols(doc.graph);
   }

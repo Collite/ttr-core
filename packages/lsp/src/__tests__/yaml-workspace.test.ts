@@ -30,7 +30,15 @@ async function workspace() {
     client.sendNotification('textDocument/didOpen', { textDocument: { uri: uri(file), languageId: 'yaml', version: 1, text } });
     await client.sendRequest('textDocument/documentSymbol', { textDocument: { uri: uri(file) } });
   };
-  return { root, client, diagnostics, uri, open };
+  const change = async (file: string, text: string) => {
+    client.sendNotification('textDocument/didChange', { textDocument: { uri: uri(file), version: 2 }, contentChanges: [{ text }] });
+    await client.sendRequest('textDocument/documentSymbol', { textDocument: { uri: uri(file) } });
+  };
+  const close = async (file: string) => {
+    client.sendNotification('textDocument/didClose', { textDocument: { uri: uri(file) } });
+    await client.sendRequest('textDocument/documentSymbol', { textDocument: { uri: uri(file) } });
+  };
+  return { root, client, diagnostics, uri, open, change, close };
 }
 
 describe('S7.3 demo-cs/1 mixed workspace', () => {
@@ -73,4 +81,41 @@ describe('S7.3 demo-cs/1 mixed workspace', () => {
     writeFileSync(join(w.root, 'model/ttr-profile.yaml'), profile);
     await w.client.sendNotification('workspace/didChangeWatchedFiles', { changes: [{ uri: w.uri('model/ttr-profile.yaml'), type: 2 }] });
   });
+  it('converts code-point ranges and cursor positions to LSP UTF-16 after emoji', async () => {
+    const w = await workspace();
+    const text = 'entity: {Customer: {popis: "😀"}, Other: {popis: "second"}}';
+    await w.open('model/entities.yaml', text);
+    const hover = await w.client.sendRequest<lsp.Hover>('textDocument/hover', { textDocument: { uri: w.uri('model/entities.yaml') }, position: { line: 0, character: text.indexOf('Other') + 1 } });
+    expect(JSON.stringify(hover)).toContain('second');
+    const symbols = await w.client.sendRequest<lsp.DocumentSymbol[]>('textDocument/documentSymbol', { textDocument: { uri: w.uri('model/entities.yaml') } });
+    expect(symbols.find(s => s.name === 'Other')!.selectionRange.start.character).toBe(text.indexOf('Other'));
+    const bad = text.replace('popis: "second"', 'typo: "second"');
+    await w.change('model/entities.yaml', bad);
+    expect(w.diagnostics.get(w.uri('model/entities.yaml'))!.find(d => d.code === 'ys/unknown-key')!.range.start).toEqual({ line: 0, character: bad.indexOf('typo') });
+  });
+  it('removes stale symbols on model errors and restores saved profile state on close', async () => {
+    const w = await workspace(); await w.open('model/entities.yaml');
+    const original = readFileSync(join(w.root, 'model/entities.yaml'), 'utf8');
+    await w.change('model/entities.yaml', 'entity: {Customer: {typo: bad}}');
+    const symbols = await w.client.sendRequest<lsp.SymbolInformation[]>('workspace/symbol', { query: 'Customer' });
+    expect(symbols).toEqual([]);
+    await w.change('model/entities.yaml', original);
+    const profile = readFileSync(join(w.root, 'model/ttr-profile.yaml'), 'utf8');
+    await w.open('model/ttr-profile.yaml', profile.replace('property: description', 'property: attributes'));
+    expect(w.diagnostics.get(w.uri('model/entities.yaml'))!.some(d => d.code === 'ys/profile-invalid')).toBe(true);
+    await w.close('model/ttr-profile.yaml');
+    expect(w.diagnostics.get(w.uri('model/entities.yaml'))!.some(d => d.code === 'ys/profile-invalid')).toBe(false);
+    expect(await w.client.sendRequest<lsp.SymbolInformation[]>('workspace/symbol', { query: 'Customer' })).toHaveLength(1);
+  });
+  it('never offers dialect write-back, completion, formatting or TTR semantic tokens', async () => {
+    const w = await workspace(); await w.open('model/entities.yaml');
+    const textDocument = { uri: w.uri('model/entities.yaml') }, position = { line: 1, character: 4 };
+    expect(await w.client.sendRequest('textDocument/prepareRename', { textDocument, position })).toBeNull();
+    expect(await w.client.sendRequest('textDocument/rename', { textDocument, position, newName: 'Changed' })).toEqual({ documentChanges: [] });
+    expect(await w.client.sendRequest('textDocument/formatting', { textDocument, options: { tabSize: 2, insertSpaces: true } })).toEqual([]);
+    expect(await w.client.sendRequest('textDocument/codeAction', { textDocument, range: { start: position, end: position }, context: { diagnostics: [] } })).toEqual([]);
+    expect(await w.client.sendRequest('textDocument/completion', { textDocument, position })).toEqual({ isIncomplete: false, items: [] });
+    expect(await w.client.sendRequest('textDocument/semanticTokens/full', { textDocument })).toEqual({ data: [] });
+  });
+
 });

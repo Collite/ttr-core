@@ -357,7 +357,7 @@ export class YamlBridge {
     entries: { key: string; value: Json; path: string }[]
   ): Piece {
     const field = (key: string, rule = 'id') =>
-      this.render(rule, record(value)[key], pointer(path, key));
+      this.render(rule, record(value, path)[key], pointer(path, key));
     switch (prop.rule) {
       case 'searchableProperty': {
         const method = entries.filter((e) => e.key === 'method').at(-1);
@@ -374,15 +374,15 @@ export class YamlBridge {
         return join([
           field('attribute'),
           ' -> ',
-          record(value).to === undefined ? join(['{', field('toColumn'), '}']) : field('to'),
-          ...(record(value).from ? [' { from: ', field('from', 'listOfIds'), ' }'] : []),
+          record(value, path).to === undefined ? join(['{', field('toColumn'), '}']) : field('to'),
+          ...(record(value, path).from ? [' { from: ', field('from', 'listOfIds'), ' }'] : []),
         ]);
       case 'setProperty':
         return join([field('attribute'), ' = ', field('column')]);
       case 'transitionsProperty':
         return this.map(value, path, (v, p) => this.render('listOfIds', v, p));
       case 'stepsProperty':
-        return this.array(value, path, (v, p) => this.definition(record(v), p, 'step', 'autoBody'));
+        return this.array(value, path, (v, p) => this.definition(record(v, p), p, 'step', 'autoBody'));
       default:
         return this.expr(prop.value, value, path);
     }

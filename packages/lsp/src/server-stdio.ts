@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { YamlWorkspaceLoader } from '@tatrman/lint/yaml';
 import { createServerConnection } from './server.js';
 import { createConnection, ProposedFeatures } from 'vscode-languageserver/lib/node/main.js';
 import { findProjectRoot, loadProject, loadStockVocabularies } from '@tatrman/semantics/node-only';
@@ -7,9 +8,17 @@ import { findProjectRoot, loadProject, loadStockVocabularies } from '@tatrman/se
 import { parseSql, extract } from '@tatrman/sql';
 import type { SqlDialect } from '@tatrman/parser';
 
+let yamlLoader: YamlWorkspaceLoader | undefined;
+let yamlRoots = '';
+
 const connection = createConnection(ProposedFeatures.all, process.stdin, process.stdout);
 
 createServerConnection(connection, {
+  loadYamlDocuments(buffers, roots) {
+    const key = JSON.stringify(roots);
+    if (!yamlLoader || yamlRoots !== key) { yamlLoader = new YamlWorkspaceLoader([...roots]); yamlRoots = key; }
+    return yamlLoader.load(buffers);
+  },
   analyzeSqlBlock(value: string, dialect: SqlDialect) {
     const { tree } = parseSql(value, dialect);
     return tree ? extract(tree, dialect) : undefined;

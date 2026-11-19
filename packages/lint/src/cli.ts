@@ -3,6 +3,8 @@
 import { Command } from 'commander';
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { YamlWorkspaceLoader } from './yaml.js';
+import { fileURLToPath } from 'node:url';
 import { parseString } from '@tatrman/parser';
 import type { Document } from '@tatrman/parser';
 import {
@@ -19,7 +21,7 @@ import {
 import { DiagnosticCode } from '@tatrman/parser';
 import type { ManifestDiagnostic, ResolvedManifest } from '@tatrman/semantics';
 import { applyWorkspaceEditToText } from '@tatrman/edit';
-import { lintDocument, lintProject } from './runner.js';
+import { lintDocument, lintProject, lintInputDiagnostics } from './runner.js';
 import { loadLintConfig, type ResolvedLintConfig } from './config.js';
 import { collectSafeFixes } from './fix.js';
 import { RULES } from './registry.js';
@@ -33,6 +35,7 @@ program
   .name('modeler-lint')
   .description('Lint a TTR project against the .ttrlint.toml rule set')
   .argument('<project-root>', 'Root of the project (directory containing modeler.toml)')
+  .option('--profile [reference]', 'Read YAML models under ttr.yaml, or use this profile reference')
   .option('--fix', 'Apply safe fixes (per [fix].apply), then report the remainder', false)
   .option('--format <fmt>', 'pretty | json', 'pretty')
   .option('--fail-on <sev>', 'error | warning | info | none (overrides [cli].fail-on)')
@@ -56,15 +59,16 @@ program
       );
       const ruleSubset = subsetRules(opts.rule);
       const files = collectFiles(root);
-      if (files.length === 0) {
+      if (files.length === 0 && !opts.profile) {
         console.error(`modeler-lint: no .ttrm/.ttrg files under ${root}`);
         process.exit(2);
       }
 
-      let diagnostics = lintAll(root, files, config, ruleSubset);
+      let diagnostics = lintAll(root, files, config, ruleSubset, opts.profile);
 
       if (opts.fix && config.applyFixes !== 'none') {
         diagnostics = applyFixesToFixpoint(root, files, config, ruleSubset);
+        if (opts.profile) diagnostics = lintAll(root, files, config, ruleSubset, opts.profile);
       }
 
       report(diagnostics, config, opts);
@@ -78,6 +82,7 @@ program
   });
 
 interface CliOptions {
+  profile?: string | boolean;
   fix: boolean;
   format: string;
   failOn?: 'error' | 'warning' | 'info' | 'none';
@@ -122,7 +127,7 @@ function loadManifestFromRoot(root: string): ResolvedManifest {
   }
 }
 
-function loadProject(root: string, files: string[]): LoadedProject {
+function loadProject(root: string, files: string[], yaml = new Map<string, import('@tatrman/parser').ParseResult>()): LoadedProject {
   const manifest = loadManifestFromRoot(root);
   const symbols = new ProjectSymbolTable();
   const documents = new Map<string, Document>();
@@ -134,25 +139,35 @@ function loadProject(root: string, files: string[]): LoadedProject {
     symbols.upsertDocument(file, ast, ast.modelDirective?.modelCode ?? '', effectiveSchemaId(ast.modelDirective?.schema, packageName, manifest), packageName);
     synthesizeMappings(symbols, file, ast);
   }
+  for (const [uri, result] of yaml) {
+    if (!result.ast) continue;
+    const file = fileURLToPath(uri);
+    documents.set(uri, result.ast);
+    const ast = result.ast, packageName = effectivePackage(ast, file, root, manifest.packages);
+    symbols.upsertDocument(uri, ast, ast.modelDirective?.modelCode ?? '', effectiveSchemaId(ast.modelDirective?.schema, packageName, manifest), packageName);
+    synthesizeMappings(symbols, uri, ast);
+  }
   const resolver = new Resolver(symbols, manifest.packages.root, manifest);
   const graph = new PackageGraphBuilder(symbols, documents).build();
   return { documents, deps: { manifest, symbols, resolver }, graph };
 }
 
-function lintAll(root: string, files: string[], config: ResolvedLintConfig, rules: Rule[] | undefined): LintDiagnostic[] {
-  const project = loadProject(root, files);
+function lintAll(root: string, files: string[], config: ResolvedLintConfig, rules: Rule[] | undefined, profile?: string | boolean): LintDiagnostic[] {
+  const yaml = profile ? new YamlWorkspaceLoader([root], profile).load() : new Map<string, import('@tatrman/parser').ParseResult>();
+  const project = loadProject(root, files, yaml);
   const projectByUri = lintProject(project.documents, project.graph, project.deps, config, rules);
   const out: LintDiagnostic[] = [];
   for (const [uri, ast] of project.documents) {
     out.push(...lintDocument(uri, ast, project.deps, config, rules));
     out.push(...(projectByUri.get(uri) ?? []));
   }
+  for (const result of yaml.values()) out.push(...lintInputDiagnostics(result.errors, config, rules));
   // Config-level diagnostics (unknown rule, clamp, deprecation) once.
   out.push(...config.diagnostics);
   // Manifest-load diagnostics, preserving their individual codes and severities,
   // attributed to modeler.toml.
   out.push(...manifestDiagnostics(root, project.deps.manifest));
-  return out;
+  return out.map(d => ({ ...d, source: { ...d.source, file: d.source.file.startsWith('file:') ? fileURLToPath(d.source.file) : d.source.file } }));
 }
 
 /** validateManifest() diagnostics mapped onto LintDiagnostic, sourced at modeler.toml. */

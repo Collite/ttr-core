@@ -31,6 +31,7 @@ import {
   sqlPosToFile,
   fileToSqlOffset,
   type ParseError,
+  type ParseResult,
   type Document,
   type Definition,
   type Reference,
@@ -117,7 +118,7 @@ import { conceptHoverLines } from './concept-hover.js';
 import type { ListSymbolsParams, ListedSymbol, SchemaSubject } from './hosted-protocol.js';
 import { definitionLabelReads, labelSource, participantsOf, type LabelRead } from './concept-rename.js';
 import { formatDocument, DEFAULT_FORMAT_CONFIG, type FormatConfig } from '@tatrman/format';
-import { lintDocument, lintProject, recommendedConfig, loadLintConfig, ruleForCode, type LintDiagnostic, type ResolvedLintConfig, type DocumentRuleContext } from '@tatrman/lint';
+import { lintDocument, lintProject, lintInputDiagnostics, recommendedConfig, loadLintConfig, ruleForCode, type LintDiagnostic, type ResolvedLintConfig, type DocumentRuleContext } from '@tatrman/lint';
 import { refactorExtractDefToNewFile } from './code-actions.js';
 import { getCodeLenses } from './code-lens.js';
 import { stageWorkspaceEdit } from './edit-cache.js';
@@ -125,6 +126,9 @@ import { synthesize, type EditOp, type EditArgs } from '@tatrman/edit';
 import type { ModelerEditParams, ModelerEditResult } from './hosted-protocol.js';
 
 export interface ServerOptions {
+  /** Desktop YAML adapter; the browser host retains its existing file-map contract. */
+  loadYamlDocuments?: (buffers: ReadonlyMap<string, string>, roots: readonly string[]) => Map<string, ParseResult & { text: string }>;
+
   /**
    * Optional callback to load the project manifest for a workspace.
    * The stdio entry wires this to `findProjectRoot` + `loadProject` from
@@ -206,13 +210,6 @@ function rangeArea(loc: SourceLocation): number {
   return (loc.endLine - loc.line) * 1000 + (loc.endColumn - loc.column);
 }
 
-function sourceLocationToRange(source: SourceLocation) {
-  return {
-    start: { line: source.line - 1, character: source.column },
-    end: { line: source.endLine - 1, character: source.endColumn },
-  };
-}
-
 /** Line (1-indexed) / column (0-indexed) of a char offset within `text`. */
 function offsetToLineColumn(text: string, offset: number): { line: number; column: number } {
   let line = 1;
@@ -283,6 +280,7 @@ export function createServerConnection(
 
   const projectSymbols = new ProjectSymbolTable();
   let authoringRootUri: string | undefined;
+  let workspaceRoots: string[] = [];
   let manifest: ResolvedManifest = resolveManifest(undefined, '');
   // `[sql]` config from modeler.toml (embedded-sql §3.3) — default dialect +
   // (database, schema) ⇄ namespace map for the §3.4 SQL resolver. Refreshed
@@ -409,7 +407,9 @@ export function createServerConnection(
   // it through normal didOpen/didChange. Never apply that patch twice.
   const editDocs = new Map<string, TextDocument>();
   const pendingTexts = new Map<string, string[]>();
-  const isTtr = (uri: string): boolean => /\.ttr[mg]$/.test(uri);
+  const yamlResults = new Map<string, ParseResult>();
+  const isYaml = (uri: string): boolean => /\.ya?ml$/i.test(uri);
+  const isTtr = (uri: string): boolean => /\.ttr[mg]$/.test(uri) || yamlResults.has(uri);
   function fileSnapshot(): Map<string, string> {
     const files = new Map(diskDocs);
     for (const doc of documents.all()) files.set(doc.uri, doc.getText());
@@ -420,12 +420,27 @@ export function createServerConnection(
     return editDocs.get(uri) ?? documents.get(uri) ?? (diskDocs.has(uri)
       ? TextDocument.create(uri, 'ttr', 0, diskDocs.get(uri)!) : undefined);
   }
+  function yamlPosition(uri: string, position: { line: number; character: number }) {
+    if (!isYaml(uri)) return position;
+    const line = getDocument(uri)?.getText().split('\n')[position.line] ?? '';
+    return { line: position.line, character: [...line.slice(0, position.character)].length };
+  }
+  function utf16Range(uri: string, range: { start: { line: number; character: number }; end: { line: number; character: number } }) {
+    if (!isYaml(uri)) return range;
+    const lines = getDocument(uri)?.getText().split('\n') ?? [];
+    const point = (p: { line: number; character: number }) => ({ line: p.line, character: [...(lines[p.line] ?? '')].slice(0, p.character).join('').length });
+    return { start: point(range.start), end: point(range.end) };
+  }
+  function sourceLocationToRange(source: SourceLocation) {
+    return utf16Range(source.file, { start: { line: source.line - 1, character: source.column }, end: { line: source.endLine - 1, character: source.endColumn } });
+  }
   function cachedDocuments(): TextDocument[] {
     return [...fileSnapshot()].filter(([uri]) => isTtr(uri)).map(([uri]) => getDocument(uri)!);
   }
 
   const parseCache = new Map<string, { text: string; result: ReturnType<typeof parseString> }>();
   function parseCached(content: string, uri: string): ReturnType<typeof parseString> {
+    if (isYaml(uri)) return yamlResults.get(uri) ?? { sourceFile: uri, errors: [] };
     const cached = parseCache.get(uri);
     if (cached?.text === content) return cached.result;
     const result = parseString(content, uri);
@@ -436,6 +451,34 @@ export function createServerConnection(
     if (!isTtr(uri)) return undefined;
     const result = parseCached(content, uri);
     return result.ast;
+  }
+
+  function refreshYamlDocuments(): void {
+    if (!opts.loadYamlDocuments) return;
+    const buffers = new Map(documents.all().map(doc => [doc.uri, doc.getText()]));
+    const next = opts.loadYamlDocuments(buffers, workspaceRoots);
+    const previous = [...yamlResults.keys()];
+    for (const uri of previous) {
+      projectSymbols.removeDocument(uri); refIndex.removeDocument(uri); sqlRefIndex.removeDocument(uri);
+      parseCache.delete(uri);
+      if (!next.has(uri)) { diskDocs.delete(uri); connection.sendDiagnostics({ uri, diagnostics: [] }); }
+    }
+    yamlResults.clear();
+    for (const [uri, result] of next) {
+      yamlResults.set(uri, result);
+      if (!isOpen(uri)) diskDocs.set(uri, result.text);
+    }
+    // Two passes: all symbols must exist before indexing cross-file references.
+    for (const [uri, result] of next) updateSymbolTable(uri, result.text);
+    for (const [uri, result] of next) {
+      if (!result.ast) continue;
+      const context = projectSymbols.documentContext(uri)!;
+      refIndex.upsertDocument(uri, result.ast, context.schemaCode, context.namespace, resolver, context.packageName);
+      indexSqlReferences(uri, result.ast);
+    }
+    packageGraph = null; invalidateSymbols();
+    const projectDiagnostics = lintProject(getProjectDocuments(), getPackageGraph(), { manifest, symbols: projectSymbols, resolver }, lintConfig());
+    for (const [uri, result] of next) publishDiagnostics(uri, result.text, projectDiagnostics);
   }
 
   // --- Embedded-SQL IDE features (§4.1–4.3) — desktop only --------------------
@@ -652,13 +695,15 @@ export function createServerConnection(
     if (!isTtr(uri)) return [];
 
     const result = parseCached(content, uri);
-    const diagnostics: Diagnostic[] = result.errors.map((err: ParseError) => ({
+    const diagnostics: Diagnostic[] = [
+      ...lintInputDiagnostics(result.errors, lintConfig()).map(toLspDiagnostic),
+      ...result.errors.filter(d => !d.code?.startsWith('ys/') && !d.code?.startsWith('xm/')).map((err: ParseError) => ({
       range: sourceLocationToRange(err.source),
       message: err.message,
       severity: severityToLsp(err.severity),
       code: err.code,
       source: 'modeler',
-    }));
+    }))];
 
     if (result.ast) {
       const config = lintConfig();
@@ -806,7 +851,7 @@ export function createServerConnection(
     for (const d of cachedDocuments()) texts.set(d.uri, d.getText());
     const docs: CnDocument[] = [];
     for (const [uri, text] of texts) {
-      if (!uri.endsWith('.ttrm')) continue;
+      if (!isTtr(uri) || uri.endsWith('.ttrg')) continue;
       const ast = parseDocument(text, uri);
       if (!ast) continue;
       const context = projectSymbols.documentContext(uri) ?? {
@@ -856,7 +901,7 @@ export function createServerConnection(
     packageGraph = null;
     invalidateSymbols();
     const result = parseCached(content, uri);
-    if (!result.ast) return;
+    if (!result.ast) { projectSymbols.removeDocument(uri); refIndex.removeDocument(uri); sqlRefIndex.removeDocument(uri); return; }
     // '' (no directive) ⇒ the semantics layer derives the schema per definition
     // from its kind (modelForKind). Do NOT default to 'db' here. When the file
     // declares no `schema`, fill the db schema slot from the manifest (package
@@ -953,6 +998,7 @@ export function createServerConnection(
 
   documents.onDidChangeContent((event: TextDocumentChangeEvent<TextDocument>) => {
     const uri = event.document.uri;
+    if (isYaml(uri) && opts.loadYamlDocuments) { refreshYamlDocuments(); return; }
     const pending = pendingTexts.get(uri) ?? [];
     const acknowledged = pending.indexOf(event.document.getText());
     if (acknowledged >= 0 && acknowledged < pending.length - 1) {
@@ -967,6 +1013,7 @@ export function createServerConnection(
 
   documents.onDidClose((event: TextDocumentChangeEvent<TextDocument>) => {
     const uri = event.document.uri;
+    if (isYaml(uri) && opts.loadYamlDocuments) { refreshYamlDocuments(); return; }
     editDocs.delete(uri);
     pendingTexts.delete(uri);
     const disk = diskDocs.get(uri);
@@ -1003,6 +1050,7 @@ export function createServerConnection(
     const wsUri = params.workspaceFolders?.[0]?.uri
       ?? params.rootUri
       ?? (params.rootPath ? `file://${params.rootPath}` : null);
+    workspaceRoots = params.workspaceFolders?.map(folder => folder.uri) ?? (wsUri ? [wsUri] : []);
     supportsConfiguration = !!params.capabilities?.workspace?.configuration;
     if (wsUri) {
       authoringRootUri = wsUri.startsWith('file://') ? wsUri.replace(/\/$/, '') : undefined;
@@ -1029,6 +1077,7 @@ export function createServerConnection(
       // response, hence before any didOpen) so the first opened file already
       // sees the full project.
       await loadProjectIntoSymbols();
+      refreshYamlDocuments();
     }
     return {
       capabilities: {
@@ -1102,6 +1151,7 @@ export function createServerConnection(
   // must watch `**/.ttrlint.toml`). The Designer / browser host (and tests) can
   // also trigger a reload deterministically via `modeler/reloadLintConfig`.
   connection.onDidChangeWatchedFiles(async (params) => {
+    if (params.changes.some(c => isYaml(c.uri))) refreshYamlDocuments();
     if (params.changes.some((c) => c.uri.endsWith('.ttrlint.toml'))) {
       await refreshLintConfig();
     }
@@ -1578,6 +1628,7 @@ export function createServerConnection(
 
   connection.onDefinition((params) => {
     const uri = params.textDocument.uri;
+    params = { ...params, position: yamlPosition(uri, params.position) };
     const doc = getDocument(uri);
     if (!doc) return null;
 
@@ -1710,6 +1761,7 @@ export function createServerConnection(
 
   connection.onReferences((params) => {
     const uri = params.textDocument.uri;
+    params = { ...params, position: yamlPosition(uri, params.position) };
     const doc = getDocument(uri);
     if (!doc) return [];
 
@@ -1755,6 +1807,7 @@ export function createServerConnection(
 
   connection.onHover((params) => {
     const uri = params.textDocument.uri;
+    params = { ...params, position: yamlPosition(uri, params.position) };
     const doc = getDocument(uri);
     if (!doc) return null;
 
@@ -1882,6 +1935,7 @@ export function createServerConnection(
    */
   function buildSymbolRenameWithSql(targetQname: string, symbol: ReturnType<typeof projectSymbols.get>, newBareName: string, fallbackContent: string): WorkspaceEdit {
     const sym = symbol!;
+    if (isYaml(sym.documentUri) || refIndex.findByQname(targetQname).some(ref => isYaml(ref.documentUri))) return { documentChanges: [] };
     const ttrgDocs = new Map<string, string>();
     for (const d of cachedDocuments()) ttrgDocs.set(d.uri, d.getText());
     const defContent = getDocument(sym.documentUri)?.getText() ?? fallbackContent;
@@ -1903,6 +1957,7 @@ export function createServerConnection(
 
   connection.onPrepareRename((params) => {
     const uri = params.textDocument.uri;
+    if (isYaml(uri)) return null;
     const doc = getDocument(uri);
     if (!doc) return null;
 
@@ -1966,6 +2021,7 @@ export function createServerConnection(
 
   connection.onRenameRequest((params) => {
     const uri = params.textDocument.uri;
+    if (isYaml(uri)) return { documentChanges: [] };
     const doc = getDocument(uri);
     if (!doc) return { documentChanges: [] };
 
@@ -1984,7 +2040,7 @@ export function createServerConnection(
       const nameStart = lineText.indexOf(ast.packageDecl.name);
       if (nameStart >= 0) {
         const allDocs = new Map<string, string>();
-        for (const d of cachedDocuments()) allDocs.set(d.uri, d.getText());
+        for (const d of cachedDocuments()) { if (isYaml(d.uri)) return { documentChanges: [] }; allDocs.set(d.uri, d.getText()); }
         return buildRenamePackageEdit({
           oldPackageName: ast.packageDecl.name,
           newPackageName: params.newName,
@@ -2034,7 +2090,7 @@ export function createServerConnection(
 
     if (!targetQname) return { documentChanges: [] };
     const symbol = labelSymbol ?? projectSymbols.get(targetQname);
-    if (!symbol) return { documentChanges: [] };
+    if (!symbol || isYaml(symbol.documentUri) || refIndex.findByQname(targetQname).some(ref => isYaml(ref.documentUri))) return { documentChanges: [] };
 
     // Surface invalid / colliding renames as LSP errors (I1.5) so VS Code shows
     // a refusal dialog, instead of silently producing an empty edit.
@@ -2093,7 +2149,7 @@ export function createServerConnection(
     for (const d of cachedDocuments()) texts.set(d.uri, d.getText());
     const out: Array<LabelRead & { uri: string }> = [];
     for (const [uri, text] of texts) {
-      if (!uri.endsWith('.ttrm')) continue;
+      if (!isTtr(uri) || uri.endsWith('.ttrg')) continue;
       const ast = parseDocument(text, uri);
       if (ast) for (const r of definitionLabelReads(ast, label)) out.push({ ...r, uri });
     }
@@ -2280,6 +2336,7 @@ export function createServerConnection(
 
   connection.onDocumentSymbol((params) => {
     const uri = params.textDocument.uri;
+    if (!isTtr(uri)) return [];
     const doc = getDocument(uri);
     if (!doc) return [];
 
@@ -2287,11 +2344,15 @@ export function createServerConnection(
     const result = parseCached(content, uri);
     if (!result.ast) return [];
 
-    return buildDocumentSymbols(result.ast, content.split('\n'));
+    const symbols = buildDocumentSymbols(result.ast, isYaml(uri) ? [] : content.split('\n'), isYaml(uri));
+    const convert = (symbol: import('vscode-languageserver').DocumentSymbol): import('vscode-languageserver').DocumentSymbol => ({ ...symbol,
+      range: utf16Range(uri, symbol.range), selectionRange: utf16Range(uri, symbol.selectionRange), children: symbol.children?.map(convert) });
+    return symbols.map(convert);
   });
 
   connection.onCodeLens((params) => {
     const uri = params.textDocument.uri;
+    if (isYaml(uri)) return [];
     const doc = getDocument(uri);
     if (!doc) return [];
     const ast = parseDocument(doc.getText(), uri);
@@ -2301,6 +2362,7 @@ export function createServerConnection(
 
   connection.onDocumentFormatting(async (params) => {
     const uri = params.textDocument.uri;
+    if (isYaml(uri)) return [];
     const doc = getDocument(uri);
     if (!doc) return [];
     const content = doc.getText();
@@ -2324,6 +2386,7 @@ export function createServerConnection(
 
   connection.onCodeAction(async (params) => {
     const uri = params.textDocument.uri;
+    if (isYaml(uri)) return [];
     const doc = getDocument(uri);
     if (!doc) return [];
     const content = doc.getText();
@@ -2424,6 +2487,7 @@ export function createServerConnection(
 
   connection.onRequest('textDocument/semanticTokens/full', (params) => {
     const uri = params.textDocument.uri;
+    if (isYaml(uri)) return { data: [] };
     const doc = getDocument(uri);
     if (!doc) return { data: [] };
 
@@ -2532,6 +2596,7 @@ export function createServerConnection(
 
   connection.onCompletion(async (params) => {
     const uri = params.textDocument.uri;
+    if (isYaml(uri)) return { isIncomplete: false, items: [] };
     const doc = getDocument(uri);
     if (!doc) return { isIncomplete: false, items: [] };
 

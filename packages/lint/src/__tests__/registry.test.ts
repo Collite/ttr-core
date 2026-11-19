@@ -33,7 +33,7 @@ describe('rule registry', () => {
       // Rule codes are namespaced: ttr/* (core), md/* and the one er/* MD code, cn/* (0.17,
       // the conceptual model), plus the stable TTR-SEM-2xx grounding family (grammar 4.2 —
       // these are the cross-repo wire codes mirrored by ai-platform's proto enums).
-      expect(/^(ttr|md|er|cn)\/|^TTR-SEM-\d{3}$/.test(rule.code)).toBe(true);
+      expect(/^(ttr|md|er|cn|ys|xm)\/|^TTR-SEM-\d{3}$/.test(rule.code)).toBe(true);
     }
   });
 

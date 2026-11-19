@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { YAML_RULES } from './yaml.js';
 import type { Rule } from '../rule.js';
 import { STRUCTURE_RULES } from './structure.js';
 import { SEARCH_RULES } from './search.js';
@@ -17,6 +18,7 @@ import { CN_RULES } from './cn.js';
 
 /** Every rule in the registry, assembled from the per-category rule modules. */
 export const ALL_RULES: Rule[] = [
+  ...YAML_RULES,
   ...STRUCTURE_RULES,
   ...SEARCH_RULES,
   ...REFERENCE_RULES,

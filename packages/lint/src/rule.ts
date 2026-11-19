@@ -16,7 +16,7 @@ export type RuleCategory =
   | 'semantics'
   | 'lexicon'
   | 'cn';
-export type RuleScope = 'document' | 'project';
+export type RuleScope = 'document' | 'project' | 'input';
 export type RuleId = string; // kebab, no `ttr/` prefix
 
 /**
@@ -24,7 +24,7 @@ export type RuleId = string; // kebab, no `ttr/` prefix
  * a lint-tool code (`ttrlint/*`, contracts §5.6) emitted by the runner/config
  * for suppression/config problems. Kept as a union so both flow through one type.
  */
-export type LintCode = DiagnosticCode | `ttrlint/${string}`;
+export type LintCode = DiagnosticCode | `ys/${string}` | `xm/${string}` | `ttrlint/${string}`;
 
 export interface LintDiagnostic {
   ruleId: RuleId;
@@ -44,7 +44,7 @@ export interface Fix {
 
 export interface Rule {
   id: RuleId;
-  code: DiagnosticCode;
+  code: LintCode;
   category: RuleCategory;
   scope: RuleScope;
   defaultSeverity: Exclude<Severity, 'off'>;
@@ -101,4 +101,10 @@ export interface ProjectRuleContext extends BaseContext {
   cache: Map<string, unknown>;
 }
 
-export type RuleContext = DocumentRuleContext | ProjectRuleContext;
+export interface InputRuleContext {
+  scope: 'input';
+  diagnostics: readonly import('@tatrman/parser').ParseError[];
+  report(d: { source: SourceLocation; message: string; severity?: Exclude<Severity, 'off'> }): void;
+}
+
+export type RuleContext = InputRuleContext | DocumentRuleContext | ProjectRuleContext;
