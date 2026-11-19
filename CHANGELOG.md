@@ -21,6 +21,21 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   exact operand roster in CI, including full refusal messages. Profile schema
   negations and canonical type refusals now use Kotlin's diagnostic text in TS.
 
+### Added — Native YAML layouts (MW-P4 S4.3, library reader)
+
+- `YamlFileSource(layouts = true)` reads authored `layouts/**/*.yaml` / `.yml` as VL format-1 layouts,
+  resolved against the same loaded model as `.ttrg` layouts. `layouts/agent/**` is ignored. Layout files
+  are excluded from model/profile parsing, including when layout serving is disabled.
+- Invalid layouts are isolated from model loading. Missing or ambiguous cards are omitted from the
+  served objects and positions and reported with `vl/layout-unresolved` at the authored YAML span.
+  The existing missing/ambiguous response fields retain the unresolved refs.
+- `closureLayout(snapshot, closure, schema = "er")` projects a resolved tag closure onto ER entity
+  cards or DB table/view cards (`schema = "db"`), with deterministic grid placement grouped by package
+  (D-MW-108). It uses the captured snapshot's package provenance and adds no cards outside the closure.
+  The HTTP route and its server pin adoption are MW S4.3b.
+- JVM compatibility: `LayoutFileRef` gains a format parameter. Rebuild Kotlin/JVM consumers together
+  with this grammar-family patch; already compiled consumers are not binary compatible. Grammar stays 0.22.
+
 ### Added — `package: {verbatim: true}`; `import-xmi` makes one TTR package per UML package (MW-P5 S5.3a, ✅D-MW-91)
 
 - The profile engine's `package` op takes `verbatim: true`: the string at `at` is the package path as written, `/` → `.`

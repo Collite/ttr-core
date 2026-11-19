@@ -130,7 +130,8 @@ data class SourceSnapshot(
     val loadedFiles: List<LoadedFile> = emptyList(),
     /**
      * VL contracts V-37 — the layout files under the model root: every `.ttrg` with its sibling `.ttrl`
-     * when present. Collected and read with the model files (one listing, one version) but never parsed as
+     * when present, or a yaml source's authored `layouts/**/*.yaml` / `.yml` (MW S4.3). Collected and read
+     * with the model files (one listing, one version) but never parsed as
      * model: they become the registry's `LayoutIndex` at the swap. Empty unless the source was asked for
      * them ([FileBasedSource]'s `layouts`).
      */
@@ -144,7 +145,7 @@ data class SourceSnapshot(
 )
 
 /**
- * One layout file (VL V-37): a `.ttrg` and, when one sits beside it, its `<stem>.ttrl` sidecar, read in
+ * One layout file (VL V-37): a native VL YAML document (MW S4.3), or a `.ttrg` and its optional `.ttrl` sidecar, read in
  * the same load as the model they lay out. [source] is the `.ttrg`'s path under the model root, `/`-separated
  * (`layouts/sales.ttrg`) — the form the catalog reports; [sidecarSource] the same for the `.ttrl`.
  */
@@ -157,7 +158,11 @@ data class LayoutFileRef(
     val sidecarSource: String? = null,
     /** set when the `.ttrg` or its sidecar could not be read; [content] is then empty (V-38: an issue, not a failed load) */
     val unreadable: LayoutReadFailure? = null,
+    /** MW S4.3: only yaml sources collect the native VL format. TTR/sidecar behaviour stays the default. */
+    val format: LayoutFileFormat = LayoutFileFormat.TTRG,
 )
+
+enum class LayoutFileFormat { TTRG, YAML }
 
 /** Why a layout file could not be read: [source] is the file's path under the model root (the `.ttrg` or the `.ttrl`). */
 data class LayoutReadFailure(
@@ -676,31 +681,49 @@ class FileBasedSource(
         listed: List<StorageFile>,
         storage: ModelStorage,
     ): List<LayoutFileRef> {
-        val sidecars = listed.filter { it.extension() == "ttrl" }.associateBy { it.path.removeSuffix(".ttrl") }
-        return listed.filter { it.extension() == "ttrg" }.map { file ->
-            val sidecar = sidecars[file.path.removeSuffix(".ttrg")]
-            val ref =
-                LayoutFileRef(
-                    path = file.path,
-                    source = file.underRoot(),
-                    content = "",
-                    sidecarPath = sidecar?.path,
-                    sidecarSource = sidecar?.underRoot(),
-                )
-            val content =
-                try {
-                    storage.read(file)
-                } catch (e: Exception) {
-                    return@map ref.copy(unreadable = LayoutReadFailure(ref.source, e.readFailure()))
+        val yaml = reader is YamlTreeReader
+        val sidecars =
+            if (yaml) {
+                emptyMap()
+            } else {
+                listed.filter { it.extension() == "ttrl" }.associateBy { it.path.removeSuffix(".ttrl") }
+            }
+        return listed
+            .filter {
+                if (yaml) {
+                    val path = it.underRoot()
+                    it.extension() in setOf("yaml", "yml") &&
+                        path.startsWith("layouts/") &&
+                        !path.startsWith("layouts/agent/") &&
+                        TreeContent.includes(path.split('/'))
+                } else {
+                    it.extension() == "ttrg"
                 }
-            val sidecarContent =
-                try {
-                    sidecar?.let { storage.read(it) }
-                } catch (e: Exception) {
-                    return@map ref.copy(unreadable = LayoutReadFailure(ref.sidecarSource!!, e.readFailure()))
-                }
-            ref.copy(content = content, sidecarContent = sidecarContent)
-        }
+            }.map { file ->
+                val sidecar = sidecars[file.path.removeSuffix(".ttrg")]
+                val ref =
+                    LayoutFileRef(
+                        path = file.path,
+                        source = file.underRoot(),
+                        content = "",
+                        sidecarPath = sidecar?.path,
+                        sidecarSource = sidecar?.underRoot(),
+                        format = if (yaml) LayoutFileFormat.YAML else LayoutFileFormat.TTRG,
+                    )
+                val content =
+                    try {
+                        storage.read(file)
+                    } catch (e: Exception) {
+                        return@map ref.copy(unreadable = LayoutReadFailure(ref.source, e.readFailure()))
+                    }
+                val sidecarContent =
+                    try {
+                        sidecar?.let { storage.read(it) }
+                    } catch (e: Exception) {
+                        return@map ref.copy(unreadable = LayoutReadFailure(ref.sidecarSource!!, e.readFailure()))
+                    }
+                ref.copy(content = content, sidecarContent = sidecarContent)
+            }
     }
 
     private fun Exception.readFailure(): String =
