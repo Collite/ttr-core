@@ -529,6 +529,28 @@ class XmiReaderSpec :
                 )
         }
 
+        test("review-378 F4: a package mapping keys on the input's stem; a files: glob sees <stem>/<package path>") {
+            val root = workspace()
+            val profile =
+                root.resolve("f4.yaml").also {
+                    it.writeText(
+                        "profile: f4/1\ngrammar: '>=0.22 <1.0'\nunknown: ignore\noperations:\n" +
+                            "  - {op: package, mapping: {sales-billing: shop}}\n" +
+                            "  - {op: kinds, at: /elements, id: /name, kind: /@xmi/type, unmapped: skip, " +
+                            "mapping: {'uml:Class': entity}}\n" +
+                            "  - {op: rename, in: entity, at: /@properties/documentation, " +
+                            "to: {kind: entity, property: description}, files: ['sales-billing/sales/billing']}\n",
+                    )
+                }
+            val generated = run(root, "sales-billing.xmi", profile.toString(), null, out = "f4")
+            generated.files.keys shouldContainExactly listOf("shop/er.ttrm")
+            val er = body(generated.files.getValue("shop/er.ttrm"))
+            er shouldContain "def entity Customer {"
+            er shouldContain "def entity Invoice { description: \"What a customer owes for an order.\""
+            // The rename is scoped to the billing tree: Customer's documentation (in sales) is not read.
+            er shouldNotContain "A buyer of record."
+        }
+
         test("✅R378-A: another input's sidecars under the same --out are no previous generation (review-378 F1)") {
             val root = workspace()
             write(root, "p1", run(root, "shop.xmi", "ttr-mdg/1", "shop", out = "p1"))

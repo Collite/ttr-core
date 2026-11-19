@@ -23,9 +23,7 @@ internal class PackageOp(
             if ("at" in op.value) {
                 (selected?.value as? JsonPrimitive)?.takeIf { it.isString }?.content
             } else {
-                plan.tree.file
-                    .substringAfterLast('/')
-                    .substringBeforeLast('.', plan.tree.file.substringAfterLast('/'))
+                stem(plan.tree.label)
             }
         return op.value
             .getValue("mapping")
@@ -44,6 +42,16 @@ internal class PackageOp(
                     "Unmapped package key $key"
                 },
             )
+    }
+
+    /**
+     * review-378 F4: a `mapping` without `at` keys on the stem of the **input** the tree was read from — its label, less
+     * any `#part` (RDF's `#subjects`) — not of its `file`: the `xmi` front-end's per-package trees are files
+     * `<stem>/<package path>` with the input's name as label. For every one-tree front-end the two stems agree.
+     */
+    private fun stem(label: String): String {
+        val name = label.substringBefore('#').substringAfterLast('/')
+        return name.substringBeforeLast('.', name)
     }
 
     /**
