@@ -1,4 +1,4 @@
-profile: demo-cs/1
+profile: editor-demo/1
 grammar: '>=0.22 <1.0'
 operations:
   - {op: package, mapping: {}, default: demo}

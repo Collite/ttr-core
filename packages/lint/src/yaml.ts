@@ -8,6 +8,7 @@ import {
   type ParseResult,
   type ParseError,
   type Document,
+  type PropertyValue,
   type SourceLocation,
 } from '@tatrman/parser';
 import {
@@ -121,10 +122,21 @@ export class YamlWorkspaceLoader {
     this.roots.forEach(walk);
     for (const [uri, text] of buffers)
       if (uri.startsWith('file:') && isYamlFile(uri)) texts.set(uri, text);
-    const signature = [...texts.keys()].filter(uri => /\/ttr\.yaml$/.test(uri)).sort().map(uri => {
-      try { return uri + '\0' + read(pathOf(uri)); } catch { return uri + '\0<invalid>'; }
-    }).join('\0');
-    if (signature !== this.markerSignature) { this.invalidate(); this.markerSignature = signature; }
+    const signature = [...texts.keys()]
+      .filter((uri) => /\/ttr\.yaml$/.test(uri))
+      .sort()
+      .map((uri) => {
+        try {
+          return uri + '\0' + read(pathOf(uri));
+        } catch {
+          return uri + '\0<invalid>';
+        }
+      })
+      .join('\0');
+    if (signature !== this.markerSignature) {
+      this.invalidate();
+      this.markerSignature = signature;
+    }
     const out = new Map<string, ParseResult>();
     const excluded = new Set<string>();
     const failures = new Set<string>();
@@ -219,10 +231,11 @@ export class YamlWorkspaceLoader {
       while (pending.length) {
         try {
           const applied = ProfileEngine.apply(pending, group.chain, group.root, true);
+          const targets = new Set(applied.sources.map((source) => source.qname));
           for (const document of applied.documents) {
             const uri = uriOf(join(group.root, document.file!));
             const previous = out.get(uri) ?? empty(uri);
-            const ast = authoredAst(document.ast, pending);
+            const ast = authoredAst(document.ast, pending, targets);
             if (previous.ast)
               previous.ast = {
                 ...previous.ast,
@@ -276,7 +289,7 @@ function spanSource(span: ProfileSpan, uri: string, text: string): SourceLocatio
 }
 
 /** Expand carried key positions to authored key+value ranges for editor hit testing. */
-function authoredAst(ast: Document, trees: ForeignTree[]): Document {
+function authoredAst(ast: Document, trees: ForeignTree[], targets: ReadonlySet<string>): Document {
   const spans = new Map<string, SourceLocation>();
   const key = (s: SourceLocation) => `${s.file}:${s.offsetStart}:${s.offsetEnd}`;
   for (const tree of trees)
@@ -292,13 +305,31 @@ function authoredAst(ast: Document, trees: ForeignTree[]): Document {
       spans.set(key(value), range);
       spans.set(key(name), range);
     }
+  // Default links retain qualified strings in canonical output. Reference-bearing
+  // endpoint slots need an editor projection, without changing the engine's bytes.
+  const endpoint = (value: PropertyValue): PropertyValue => {
+    if (value.kind === 'string' && targets.has(value.value))
+      return {
+        kind: 'id',
+        path: value.value,
+        parts: value.value.split('.'),
+        source: value.source,
+      };
+    if (value.kind === 'list') return { ...value, items: value.items.map(endpoint) };
+    return value;
+  };
   const copy = (value: unknown, field = ''): unknown => {
     if (!value || typeof value !== 'object') return value;
     if (Array.isArray(value)) return value.map((child) => copy(child, field));
     if (ArrayBuffer.isView(value)) return value;
     if ('offsetStart' in value && 'file' in value)
       return field === 'source' ? (spans.get(key(value as SourceLocation)) ?? value) : value;
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, copy(v, k)]));
+    const result = Object.fromEntries(Object.entries(value).map(([k, v]) => [k, copy(v, k)]));
+    if (result.kind === 'relation' || result.kind === 'fk') {
+      for (const slot of ['from', 'to'])
+        if (result[slot]) result[slot] = endpoint(result[slot] as PropertyValue);
+    }
+    return result;
   };
   return copy(ast) as Document;
 }

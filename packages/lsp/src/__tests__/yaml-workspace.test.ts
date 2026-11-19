@@ -12,9 +12,12 @@ import { YamlWorkspaceLoader } from '@tatrman/lint/yaml';
 
 const cleanup: (() => void)[] = [];
 afterEach(() => { cleanup.splice(0).reverse().forEach(fn => fn()); });
-async function workspace() {
+async function workspace(shared = false) {
   const root = mkdtempSync(join(tmpdir(), 's73-lsp-'));
-  cpSync(new URL('./fixtures/yaml-workspace/', import.meta.url), root, { recursive: true });
+  if (shared) {
+    cpSync(new URL('../../../../tests/conformance/dialect/demo-cs/tree/', import.meta.url), join(root, 'model'), { recursive: true });
+    writeFileSync(join(root, 'notes.yaml'), 'entity: {Unrelated: plain}');
+  } else cpSync(new URL('./fixtures/yaml-workspace/', import.meta.url), root, { recursive: true });
   cleanup.push(() => rmSync(root, { recursive: true, force: true }));
   const a = new PassThrough(), b = new PassThrough();
   const client = lsp.createConnection(new lsp.StreamMessageReader(a), new lsp.StreamMessageWriter(b));
@@ -52,12 +55,12 @@ describe('S7.3 demo-cs/1 mixed workspace', () => {
     expect(w.diagnostics.has(w.uri('notes.yaml'))).toBe(false);
   });
   it.each([
-    ['entity:\n  Customer:\n    typo: A customer\n', 'ys/unknown-key', 2, 4],
-    ['entity:\n  Customer:\n    popis: [wrong]\n', 'ys/profile-invalid', 2, 4],
-    ['relations:\n  Purchases:\n    od: demo.er.entity.Missing\n    do: demo.er.entity.Customer\n', 'ttr/unresolved-reference', 2, 4],
+    ['entity:\n  Invoice:\n    typo: A customer\n', 'ys/unknown-key', 2, 4],
+    ['entity:\n  Invoice:\n    popis: [wrong]\n', 'ys/profile-invalid', 2, 4],
+    ['zaznamy:\n- druh: vazba\n  nazev: Broken\n  entita: demo.er.entity.Missing\n', 'ttr/unresolved-reference', 3, 2],
   ])('one diagnostic at the authored key/value: %s', async (text, code, line, character) => {
-    const w = await workspace();
-    const file = code.startsWith('ttr/') ? 'model/relations.yaml' : 'model/entities.yaml';
+    const w = await workspace(true);
+    const file = code.startsWith('ttr/') ? 'model/03-mixed.yaml' : 'model/02-mapping.yaml';
     await w.open(file, text);
     const errors = w.diagnostics.get(w.uri(file))!.filter(d => d.code === code);
     expect(errors).toHaveLength(1);
@@ -132,6 +135,20 @@ describe('S7.3 demo-cs/1 mixed workspace', () => {
     const uri = (file: string) => pathToFileURL(join(root, file)).href;
     expect(JSON.stringify(await client.sendRequest('textDocument/documentSymbol', { textDocument: { uri: uri('model/entities.yaml') } }))).toContain('Customer');
     expect(await client.sendRequest('textDocument/definition', { textDocument: { uri: uri('model/relations.yaml') }, position: { line: 2, character: 15 } })).toMatchObject({ uri: uri('model/entities.yaml'), range: { start: { line: 1, character: 2 } } });
+  });
+
+  it('uses the original shared demo-cs chain for default-string links, hover and symbols', async () => {
+    const w = await workspace(true); await w.open('model/10-vazby.yaml');
+    const hit = await w.client.sendRequest<lsp.Location>('textDocument/definition', { textDocument: { uri: w.uri('model/10-vazby.yaml') }, position: { line: 4, character: 9 } });
+    expect(hit).toMatchObject({ uri: w.uri('model/07-fanout.yaml'), range: { start: { line: 5, character: 2 } } });
+    const hover = await w.client.sendRequest<lsp.Hover>('textDocument/hover', { textDocument: { uri: w.uri('model/07-fanout.yaml') }, position: { line: 5, character: 4 } });
+    expect(JSON.stringify(hover)).toContain('Dodávka');
+    const symbols = await w.client.sendRequest<lsp.DocumentSymbol[]>('textDocument/documentSymbol', { textDocument: { uri: w.uri('model/07-fanout.yaml') } });
+    expect(symbols.find(s => s.name === 'Dodavka')!.selectionRange.start).toEqual({ line: 5, character: 2 });
+    const graph = await w.client.sendRequest<{ edges: { fromNode: string; toNode: string }[] }>('modeler/getModelGraph', { textDocument: { uri: w.uri('model/10-vazby.yaml') }, schema: 'er' });
+    expect(graph.edges).toContainEqual(expect.objectContaining({ fromNode: 'demo.er.entity.Dodavka', toNode: 'demo.er.entity.Odberatel' }));
+    await w.open('notes.yaml');
+    expect(w.diagnostics.has(w.uri('notes.yaml'))).toBe(false);
   });
 
 });
