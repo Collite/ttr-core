@@ -1,0 +1,2 @@
+model: {package: sales}
+entity: {Customer: {}}

@@ -1,0 +1,6 @@
+entity:
+  A: {}
+vztahy:
+  R: {}
+  N: {popis: ~, od: ~, do: ~}
+  S: {popis: s, od: {jmeno: A}, do: A}

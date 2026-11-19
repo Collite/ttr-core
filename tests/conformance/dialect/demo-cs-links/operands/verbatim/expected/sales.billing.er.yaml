@@ -1,0 +1,8 @@
+ttr: "0.22"
+package: "sales.billing"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "Customer"
+    properties: {}

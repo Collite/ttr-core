@@ -138,32 +138,40 @@ export const SourcesJsonReader = {
   },
 };
 export class LinkIndex {
-  private keys?: Map<string, Map<string, LinkEntry[]>>;
+  private readonly runByKey: Map<string, Map<string, LinkEntry[]>>;
+  private sidecarByKey?: Map<string, Map<string, LinkEntry[]>>;
   constructor(
     readonly run: LinkEntry[],
     readonly sidecars: () => LinkEntry[] = () => []
-  ) {}
-  resolve(by: string, value: string, kind?: string | null): LinkEntry[] {
-    if (!this.keys) {
-      const keys = new Map<string, Map<string, LinkEntry[]>>();
-      const entries = [...this.run, ...this.sidecars()];
-      for (const key of ['sourceName', 'iri', 'path'] as const) {
-        const map = new Map<string, LinkEntry[]>();
-        for (const entry of entries) {
-          const value = entry[key];
-          if (value !== null && value !== undefined)
-            map.set(value, [...(map.get(value) ?? []), entry]);
-        }
-        keys.set(key, map);
+  ) {
+    this.runByKey = this.keyed(run);
+  }
+  private keyed(entries: LinkEntry[]): Map<string, Map<string, LinkEntry[]>> {
+    const keys = new Map<string, Map<string, LinkEntry[]>>();
+    for (const key of ['sourceName', 'iri', 'path'] as const) {
+      const map = new Map<string, LinkEntry[]>();
+      for (const entry of entries) {
+        const value = entry[key];
+        if (value !== null && value !== undefined)
+          map.set(value, [...(map.get(value) ?? []), entry]);
       }
-      this.keys = keys;
+      keys.set(key, map);
     }
-    const found = new Set<string>();
-    return (this.keys.get(by)?.get(value) ?? []).filter((e) => {
-      if ((kind != null && e.kind !== kind) || found.has(e.qname)) return false;
-      found.add(e.qname);
-      return true;
-    });
+    return keys;
+  }
+  resolve(by: string, value: string, kind?: string | null): LinkEntry[] {
+    const candidates = (keys: Map<string, Map<string, LinkEntry[]>>) => {
+      const found = new Set<string>();
+      return (keys.get(by)?.get(value) ?? []).filter((entry) => {
+        if ((kind != null && entry.kind !== kind) || found.has(entry.qname)) return false;
+        found.add(entry.qname);
+        return true;
+      });
+    };
+    const live = candidates(this.runByKey);
+    if (live.length) return live;
+    this.sidecarByKey ??= this.keyed(this.sidecars());
+    return candidates(this.sidecarByKey);
   }
   qname(value: string): LinkEntry[] {
     return this.run.filter((e) => e.qname === value);

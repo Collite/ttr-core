@@ -1,0 +1,8 @@
+profile: parity/1
+grammar: '>=0.22 <1.0'
+operations:
+  - {op: package, mapping: {a: alfa, b: beta}}
+  - {op: kinds, at: /entity, mapping: {e: entity}}
+  - {op: kinds, at: /vztahy, mapping: {r: relation}}
+  - {op: link, in: relation, at: /od, to: {kind: relation, property: from}, by: sourceName, as: ref}
+  - {op: link, in: relation, at: /do, to: {kind: relation, property: to}, by: sourceName, as: ref}
