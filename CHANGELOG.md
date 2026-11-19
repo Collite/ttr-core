@@ -14,6 +14,10 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - Invalid layouts are isolated from model loading. Missing or ambiguous cards are omitted from the
   served objects and positions and reported with `vl/layout-unresolved` at the authored YAML span.
   The existing missing/ambiguous response fields retain the unresolved refs.
+- `closureLayout(snapshot, closure, schema = "er")` projects a resolved tag closure onto ER entity
+  cards or DB table/view cards (`schema = "db"`), with deterministic grid placement grouped by package
+  (D-MW-108). It uses the captured snapshot's package provenance and adds no cards outside the closure.
+  The HTTP route and its server pin adoption are MW S4.3b.
 - JVM compatibility: `LayoutFileRef` gains a format parameter. Rebuild Kotlin/JVM consumers together
   with this grammar-family patch; already compiled consumers are not binary compatible. Grammar stays 0.22.
 
