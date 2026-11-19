@@ -16,7 +16,7 @@ await build({
   target: 'es2022',
   external,
   legalComments: 'inline',
-  banner: { js: '// SPDX-License-Identifier: Apache-2.0' },
+  banner: { js: "// SPDX-License-Identifier: Apache-2.0\nimport{createRequire as ___cr}from'node:module';const require=___cr(import.meta.url);" },
 });
 cpSync('dist/browser.worker.js', `${outdir}/browser.worker.js`);
 cpSync('dist/server-browser.js', `${outdir}/server-browser.js`);

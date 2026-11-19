@@ -1,0 +1,6 @@
+profile: values/1
+grammar: '>=0.22 <1.0'
+operations:
+- {op: package, mapping: {}, default: demo}
+- {op: kinds, at: /entity, mapping: {entity: entity}}
+- {op: each, in: entity, at: /v, to: {kind: entity, property: description}, key: /key, missing: en, shape: {input: $item/text}}

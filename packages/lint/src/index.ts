@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-export { lintDocument, lintProject } from './runner.js';
+export { lintDocument, lintProject, lintInputDiagnostics } from './runner.js';
 export type { LintDeps } from './runner.js';
 export {
   resolveLintConfig,

@@ -8,6 +8,18 @@ VS Code extension for TTR (Tatrman) language support. Thin shim around the share
 - Syntax highlighting via the TextMate grammar generated from `TTR.g4`
 - LSP integration: diagnostics, hover, go-to-definition, find-references, workspace symbols, semantic-token highlighting
 
+## YAML models
+
+Opening YAML or a workspace containing `ttr.yaml` activates the extension. YAML documents below
+the nearest marker declaring a profile are assigned `ttr-yaml`; unrelated YAML
+keeps its ordinary language mode. A per-file dialect or canonical `ttr:` header also opts in. You can select
+**TTR YAML** explicitly; manual language choices are preserved. Highlighting reuses
+VS Code's YAML grammar. Diagnostics, hover, document symbols and go-to-definition
+show the authored file and keys. Saving or editing `ttr.yaml` / `ttr-profile.yaml`
+refreshes the model. YAML edits are coalesced after 200 ms of quiet, and unchanged
+profile groups reuse their parsed models. Rename, completion, formatting and code actions in dialect
+files are reserved for v2.
+
 ## Development
 
 1. Open `packages/vscode-ext` in VS Code.

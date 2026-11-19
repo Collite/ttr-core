@@ -1,0 +1,1 @@
+{"code": "ys/profile-invalid", "file": "profile.yaml", "line": 3, "column": 1, "path": "/operations", "message": "profile.yaml:3:1: ys/profile-invalid /operations: /operations: string found, array expected"}

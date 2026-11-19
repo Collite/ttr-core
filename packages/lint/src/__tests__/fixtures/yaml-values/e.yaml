@@ -1,0 +1,3 @@
+entity:
+  R:
+    v: [{key: en, text: z}, {key: en, text: a}, {text: b}]

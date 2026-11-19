@@ -1,0 +1,9 @@
+profile: editor-demo/1
+grammar: '>=0.22 <1.0'
+operations:
+  - {op: package, mapping: {}, default: demo}
+  - {op: kinds, at: /entity, mapping: {entita: entity}}
+  - {op: kinds, at: /relations, mapping: {vztah: relation}}
+  - {op: rename, in: entity, at: /popis, to: {kind: entity, property: description}}
+  - {op: shape, in: relation, at: /od, template: {ref: {input: ''}}, to: {kind: relation, property: from}}
+  - {op: shape, in: relation, at: /do, template: {ref: {input: ''}}, to: {kind: relation, property: to}}

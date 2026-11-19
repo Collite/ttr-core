@@ -20,10 +20,13 @@ The existing dialect/canonical corpus is unchanged.
   plus a populated record; the full report pins warning order, messages and
   authored positions. `required-silent` keeps the operand opt-in.
 
-The oracle was captured from Kotlin against master `ec11f73` before TS
+`schema-array`, `schema-string` and `schema-object` (S7.3) pin full Kotlin
+profile-loader type refusal messages.
+
+The original oracle was captured from Kotlin against master `ec11f73` before TS
 implementation. `OperandsConformanceSpec` now replays every vector in the Kotlin
 `ttr-profile` test task; `operands.test.ts` replays the same vectors in TS. Both
-pin the exact 17-folder roster (18 tests including the roster check), compare
+pin the exact 20-folder roster (21 tests including the roster check), compare
 canonical UTF-8 bytes, compare reports structurally, and check refusals by code,
 file, line, column, path and full exception message. The Gradle test task tracks
 this directory as an input, so editing an oracle invalidates its cached result.

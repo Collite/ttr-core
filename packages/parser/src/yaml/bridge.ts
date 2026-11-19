@@ -75,8 +75,8 @@ function mark(piece: Piece, path: string, literal?: Projection['literal']): Piec
     ],
   };
 }
-function string(value: Json): string {
-  if (typeof value !== 'string') throw new YamlFailure('', 'Expected a string');
+function string(value: Json, path = ''): string {
+  if (typeof value !== 'string') throw new YamlFailure(path, 'Expected a string');
   return value;
 }
 function expression(source: string): Expression {
@@ -128,17 +128,21 @@ export class YamlBridge {
     if (doc.package !== undefined)
       parts.push(join(['package ', this.render('qualifiedName', doc.package, '/package')]));
     if (doc.imports)
-      for (const [i, value] of list(doc.imports).entries())
-        parts.push(mark(raw(`import ${string(value)}`), `/imports/${i}`));
+      for (const [i, value] of list(doc.imports, '/imports').entries())
+        parts.push(mark(raw(`import ${string(value, `/imports/${i}`)}`), `/imports/${i}`));
     if (doc.model !== undefined) {
-      const model: (Piece | string)[] = ['model ', mark(raw(string(doc.model)), '/model')];
+      const model: (Piece | string)[] = [
+        'model ',
+        mark(raw(string(doc.model, '/model')), '/model'),
+      ];
       for (const key of ['schema', 'locale'])
-        if (doc[key] !== undefined) model.push(` ${key} `, mark(raw(string(doc[key])), `/${key}`));
+        if (doc[key] !== undefined)
+          model.push(` ${key} `, mark(raw(string(doc[key], `/${key}`)), `/${key}`));
       parts.push(mark(join(model), '/model'));
     }
     if (doc.graph) {
-      const graph = record(doc.graph);
-      const properties = record(graph.properties);
+      const graph = record(doc.graph, '/graph');
+      const properties = record(graph.properties, '/graph/properties');
       const entries = Object.entries(properties).map(([key, value]) => {
         const path = pointer('/graph/properties', key);
         const rule = (
@@ -156,7 +160,7 @@ export class YamlBridge {
         mark(
           join([
             'graph ',
-            mark(raw(string(graph.id)), '/graph/id'),
+            mark(raw(string(graph.id, '/graph/id')), '/graph/id'),
             ' { ',
             join(entries, ', '),
             ' }',
@@ -166,19 +170,20 @@ export class YamlBridge {
       );
     }
     if (doc.defs)
-      for (const [i, def] of list(doc.defs).entries()) {
-        const value = record(def);
-        const kind = string(value.kind);
+      for (const [i, def] of list(doc.defs, '/defs').entries()) {
+        const value = record(def, `/defs/${i}`);
+        const kind = string(value.kind, `/defs/${i}/kind`);
         const body = kinds.get(kind);
         if (!body) throw new YamlFailure(`/defs/${i}/kind`, `Unknown definition kind ${kind}`);
         parts.push(this.definition(value, `/defs/${i}`, kind, body));
       }
     if (doc.security)
-      for (const [i, block] of list(doc.security).entries()) {
-        const statements = list(block).map((value, j) => {
-          const s = record(value);
+      for (const [i, block] of list(doc.security, '/security').entries()) {
+        const statements = list(block, `/security/${i}`).map((value, j) => {
           const path = `/security/${i}/${j}`;
-          const field = (key: string) => mark(raw(string(s[key])), pointer(path, key));
+          const s = record(value, path);
+          const field = (key: string) =>
+            mark(raw(string(s[key], pointer(path, key))), pointer(path, key));
           let piece: Piece;
           switch (s.verb) {
             case 'own':
@@ -219,18 +224,30 @@ export class YamlBridge {
     return mark(
       join([
         `def ${kind} `,
-        value.id === undefined ? '' : mark(raw(string(value.id)), pointer(path, 'id')),
+        value.id === undefined
+          ? ''
+          : mark(raw(string(value.id, pointer(path, 'id'))), pointer(path, 'id')),
         ' ',
         this.body(body, value[fields], pointer(path, fields)),
       ]),
       path
     );
   }
+  private autoEntries(value: Json, path: string): Piece {
+    const values = list(value, path).flatMap((v, i) => {
+      const itemPath = pointer(path, i);
+      return Object.entries(record(v, itemPath)).map(([key, child]) => {
+        const p = pointer(itemPath, key);
+        return mark(join([mark(raw(key), p), ': ', this.generic(child, p, 'autoValue')]), p);
+      });
+    });
+    return join(['{ ', join(values, ', '), ' }']);
+  }
   private array(value: Json, path: string, encode: (v: Json, p: string) => Piece): Piece {
     return join([
       '[',
       join(
-        list(value).map((v, i) => encode(v, pointer(path, i))),
+        list(value, path).map((v, i) => encode(v, pointer(path, i))),
         ', '
       ),
       ']',
@@ -245,7 +262,7 @@ export class YamlBridge {
     return join([
       '{ ',
       join(
-        Object.entries(record(value)).map(([key, v]) => {
+        Object.entries(record(value, path)).map(([key, v]) => {
           const p = pointer(path, key);
           return mark(
             join([mark(raw(quotedKey ? encodeTtrString(key) : key), p), ': ', encode(v, p)]),
@@ -267,13 +284,13 @@ export class YamlBridge {
       );
     const entries = Array.isArray(value)
       ? value.flatMap((v, i) =>
-          Object.entries(record(v)).map(([key, v]) => ({
+          Object.entries(record(v, pointer(path, i))).map(([key, v]) => ({
             key,
             value: v,
             path: pointer(pointer(path, i), key),
           }))
         )
-      : Object.entries(record(value)).map(([key, v]) => ({
+      : Object.entries(record(value, path)).map(([key, v]) => ({
           key,
           value: v,
           path: pointer(path, key),
@@ -286,9 +303,12 @@ export class YamlBridge {
         if (body.members.length && key === (name === 'storageDef' ? 'schemas' : 'members')) {
           return mark(
             join(
-              list(v).map((item, i) => {
-                const member = record(item);
-                const kind = name === 'storageDef' ? 'schema' : string(member.kind);
+              list(v, p).map((item, i) => {
+                const member = record(item, pointer(p, i));
+                const kind =
+                  name === 'storageDef'
+                    ? 'schema'
+                    : string(member.kind, pointer(pointer(p, i), 'kind'));
                 const shape = body.members.find((m) => m.kind === kind);
                 if (!shape) throw new YamlFailure(pointer(p, i), `Unknown member kind ${kind}`);
                 return this.definition(
@@ -337,7 +357,7 @@ export class YamlBridge {
     entries: { key: string; value: Json; path: string }[]
   ): Piece {
     const field = (key: string, rule = 'id') =>
-      this.render(rule, record(value)[key], pointer(path, key));
+      this.render(rule, record(value, path)[key], pointer(path, key));
     switch (prop.rule) {
       case 'searchableProperty': {
         const method = entries.filter((e) => e.key === 'method').at(-1);
@@ -354,15 +374,15 @@ export class YamlBridge {
         return join([
           field('attribute'),
           ' -> ',
-          record(value).to === undefined ? join(['{', field('toColumn'), '}']) : field('to'),
-          ...(record(value).from ? [' { from: ', field('from', 'listOfIds'), ' }'] : []),
+          record(value, path).to === undefined ? join(['{', field('toColumn'), '}']) : field('to'),
+          ...(record(value, path).from ? [' { from: ', field('from', 'listOfIds'), ' }'] : []),
         ]);
       case 'setProperty':
         return join([field('attribute'), ' = ', field('column')]);
       case 'transitionsProperty':
         return this.map(value, path, (v, p) => this.render('listOfIds', v, p));
       case 'stepsProperty':
-        return this.array(value, path, (v, p) => this.definition(record(v), p, 'step', 'autoBody'));
+        return this.array(value, path, (v, p) => this.definition(record(v, p), p, 'step', 'autoBody'));
       default:
         return this.expr(prop.value, value, path);
     }
@@ -446,15 +466,7 @@ export class YamlBridge {
         );
       }
       case 'autoObject': {
-        const values = list(record(value).object).flatMap((v, i) =>
-          Object.entries(record(v)).map(([key, v]) =>
-            join([
-              `${key}: `,
-              this.generic(v, pointer(pointer(pointer(path, 'object'), i), key), 'autoValue'),
-            ])
-          )
-        );
-        return join(['{ ', join(values, ', '), ' }']);
+        return this.autoEntries(record(value, path).object, pointer(path, 'object'));
       }
       case 'functionCall':
         return join([
@@ -497,7 +509,7 @@ export class YamlBridge {
         return join([
           field('call'),
           ' ',
-          this.render('autoObject', { object: record(value).entries }, path),
+          this.autoEntries(record(value, path).entries, pointer(path, 'entries')),
         ]);
       case 'rangeLiteral':
         return join([

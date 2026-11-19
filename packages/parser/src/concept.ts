@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { mappedPoint } from './coordinates.js';
 import { stringSourcePosition } from './strings.js';
 /**
  * 0.17 — read access to a cn body (`ConceptDef`, `ConceptSugar`, `ConceptBindingDef`). The body keeps
@@ -59,17 +60,7 @@ export function embeddedBlockLocation(
   // ones on this line before the column (`escapes` index the whole text, in code points).
   const lineStart = block.text.split('\n').slice(0, l).reduce((n, s) => n + [...s].length + 1, 0);
   if (block.textMapping) {
-    const { offsets, lineStarts, startLine } = block.textMapping;
-    const point = (index: number) => {
-      const offset = offsets[Math.max(0, Math.min(index, offsets.length - 1))];
-      let lo = 0, hi = lineStarts.length;
-      while (lo + 1 < hi) {
-        const mid = (lo + hi) >>> 1;
-        if (lineStarts[mid] <= offset) lo = mid;
-        else hi = mid;
-      }
-      return { offset, line: startLine + lo, column: offset - lineStarts[lo] };
-    };
+    const point = (index: number) => mappedPoint(block.textMapping!, index);
     const from = point(lineStart + column), to = point(lineStart + column + length);
     return { file: block.source.file, line: from.line, column: from.column,
       endLine: to.line, endColumn: to.column, offsetStart: from.offset, offsetEnd: to.offset };

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { codePointTable } from '../coordinates.js';
 import type { SourceLocation } from '../ast.js';
 import type { Piece, Projection } from './bridge.js';
 
@@ -17,15 +18,7 @@ export class Projections {
   private readonly cache = new Map<string, Projection | undefined>();
   constructor(bridge: Piece) {
     // The bridge builder uses JS string indices; the native parser uses code points.
-    const points = new Uint32Array(bridge.text.length + 1);
-    let units = 0,
-      count = 0;
-    for (const ch of bridge.text) {
-      points[units] = count;
-      if (ch.length === 2) points[units + 1] = count;
-      units += ch.length;
-      points[units] = ++count;
-    }
+    const points = codePointTable(bridge.text);
     const spans = bridge.spans
       .map((span, order) => ({
         span: { ...span, start: points[span.start], end: points[span.end] },

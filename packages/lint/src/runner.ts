@@ -223,3 +223,19 @@ function emit(
 function lineLoc(file: string, line: number): SourceLocation {
   return { file, line, column: 0, endLine: line, endColumn: 0, offsetStart: 0, offsetEnd: 0 };
 }
+
+/** Schema/profile producers have no AST on refusal; run their located diagnostics through the rule registry. */
+export function lintInputDiagnostics(
+  diagnostics: readonly import('@tatrman/parser').ParseError[],
+  config: ResolvedLintConfig,
+  rules: Rule[] = allRules(),
+): LintDiagnostic[] {
+  const out: LintDiagnostic[] = [];
+  for (const rule of rules) {
+    if (rule.scope !== 'input') continue;
+    const severity = config.severityOf(rule.id);
+    if (severity === 'off') continue;
+    rule.check({ scope: 'input', diagnostics, report: d => emit(out, rule, severity, undefined, { ...d, severity }) });
+  }
+  return out;
+}

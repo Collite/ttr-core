@@ -74,6 +74,7 @@ export interface TaggedBlockValue {
   value: string;                // tag/fence stripped, dedented, one trailing newline removed
   tagSource: SourceLocation;    // span of the tag token text
   valueSource: SourceLocation;  // span of `value` within the file (post-dedent)
+  textMapping?: import('./coordinates.js').TextMapping;
   indentWidth: number;          // common indent removed by dedent (for the §8 source map)
   source: SourceLocation;       // whole literal
   leadingTrivia?: Trivia[];
@@ -1626,7 +1627,7 @@ export interface EmbeddedBlock {
   /** YAML scalars can encode a character with more than two source characters.
    * Decoded code-point boundaries map to authored code-point offsets; line starts
    * cover the physical scalar. The authored form remains independent of this map. */
-  textMapping?: { offsets: number[]; lineStarts: number[]; startLine: number };
+  textMapping?: import('./coordinates.js').TextMapping;
   /** The whole literal. */
   source: SourceLocation;
   leadingTrivia?: Trivia[];

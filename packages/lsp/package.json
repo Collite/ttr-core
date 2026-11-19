@@ -27,7 +27,7 @@
   },
   "scripts": {
     "build": "tsc && pnpm run bundle-stdio && pnpm run bundle-browser && node scripts/build-package.mjs",
-    "bundle-stdio": "esbuild src/server-stdio.ts --bundle --platform=node --format=esm --target=es2022 --outfile=dist/server-stdio.js --external:vscode-languageserver --external:vscode-languageserver-protocol --external:vscode-jsonrpc --external:node:fs --external:node:path --external:antlr4ng --external:@tatrman/parser --external:@tatrman/semantics --external:@tatrman/edit --external:@tatrman/sql",
+    "bundle-stdio": "esbuild src/server-stdio.ts --bundle --platform=node --format=esm --target=es2022 --outfile=dist/server-stdio.js --external:vscode-languageserver --external:vscode-languageserver-protocol --external:vscode-jsonrpc --external:node:fs --external:node:path --external:antlr4ng --external:@tatrman/parser --external:@tatrman/semantics --external:@tatrman/edit --external:@tatrman/sql --banner:js=\"import{createRequire as ___cr}from'node:module';const require=___cr(import.meta.url);\"",
     "bundle-browser": "esbuild src/server-browser.ts --bundle --platform=browser --format=esm --target=es2022 --outfile=dist/server-browser.js --external:node:fs --external:node:path --external:fs/promises --external:fs --external:path && cp dist/server-browser.js dist/browser.worker.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

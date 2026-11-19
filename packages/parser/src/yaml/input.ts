@@ -3,6 +3,7 @@ import { isAlias, isMap, isNode, isScalar, isSeq, parseAllDocuments, type Node }
 import Ajv2020Module from 'ajv/dist/2020.js';
 import type { ErrorObject, ValidateFunction } from 'ajv';
 import type { SourceLocation } from '../ast.js';
+import { codePointTable, lineOf } from '../coordinates.js';
 import { decimalText } from './numbers.js';
 import { canonicalSchema } from '../generated/canonical-yaml.js';
 import { DiagnosticCode } from '../diagnostics.js';
@@ -11,13 +12,13 @@ export type Json = null | boolean | number | string | Json[] | { [key: string]: 
 export type RecordValue = { [key: string]: Json };
 export const pointer = (parent: string, key: string | number): string =>
   `${parent}/${String(key).replace(/~/g, '~0').replace(/\//g, '~1')}`;
-export const record = (v: Json): RecordValue => {
+export const record = (v: Json, path = ''): RecordValue => {
   if (!v || typeof v !== 'object' || Array.isArray(v))
-    throw new YamlFailure('', 'Expected a mapping');
+    throw new YamlFailure(path, 'Expected a mapping');
   return v;
 };
-export const list = (v: Json): Json[] => {
-  if (!Array.isArray(v)) throw new YamlFailure('', 'Expected a sequence');
+export const list = (v: Json, path = ''): Json[] => {
+  if (!Array.isArray(v)) throw new YamlFailure(path, 'Expected a sequence');
   return v;
 };
 export class YamlFailure extends Error {
@@ -43,32 +44,20 @@ export class YamlCoordinates {
     readonly text: string,
     readonly uri: string
   ) {
-    if (text.length > 12_000_000)
+    try {
+      this.points = codePointTable(text, 6_000_000);
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error;
       throw new YamlFailure('', 'YAML exceeds 6000000 code points', DiagnosticCode.YamlSyntax);
-    this.points = new Uint32Array(text.length + 1);
-    let units = 0,
-      points = 0;
-    for (const ch of text) {
-      this.points[units] = points;
-      if (ch.length === 2) this.points[units + 1] = points;
-      units += ch.length;
-      this.points[units] = ++points;
-      if (ch === '\n') this.lineStarts.push(units);
     }
-    if (points > 6_000_000)
-      throw new YamlFailure('', 'YAML exceeds 6000000 code points', DiagnosticCode.YamlSyntax);
+    for (let i = 0; i < text.length; i++) if (text[i] === '\n') this.lineStarts.push(i + 1);
   }
+
   span([start, end]: [number, number]): SourceLocation {
     start = Math.max(0, Math.min(start, this.text.length));
     end = Math.max(start, Math.min(end, this.text.length));
     const position = (offset: number) => {
-      let lo = 0,
-        hi = this.lineStarts.length;
-      while (lo + 1 < hi) {
-        const mid = (lo + hi) >>> 1;
-        if (this.lineStarts[mid] <= offset) lo = mid;
-        else hi = mid;
-      }
+      const lo = lineOf(this.lineStarts, offset);
       return { line: lo + 1, column: this.points[offset] - this.points[this.lineStarts[lo]] };
     };
     const a = position(start),
