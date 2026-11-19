@@ -71,6 +71,20 @@ describe('lossless scalars and output maps', () => {
     ]);
     expect(nodes.every((n) => n.source.line === 3)).toBe(true);
   });
+  it.each([
+    ['+9007199254740993', '9007199254740993'],
+    ['+1.50', '1.50'],
+    ['+1e3', '1E+3'],
+    ['.50', '0.50'],
+    ['1.', '1'],
+    ['0xFFFFFFFFFFFFFFFF', '18446744073709551615'],
+  ])('canonical reader resolves %s without a rounded fallback', (source, text) => {
+    const parsed = parseYamlDocument(
+      `ttr: '0.22'\nmodel: automation\ndefs: [{kind: program, id: Numbers, properties: {custom: ${source}}}]`
+    );
+    expect(parsed.diagnostics).toEqual([]);
+    expect(numericNodes(parsed.ast).map((n) => n.text)).toEqual([text]);
+  });
   it.each(['rename', 'shape', 'each'])(
     '%s keeps text through copying and typed AST relocation',
     (op) => {
