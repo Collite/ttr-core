@@ -1,0 +1,8 @@
+{
+  "scopeName": "source.ttr-yaml",
+  "patterns": [
+    {
+      "include": "source.yaml"
+    }
+  ]
+}

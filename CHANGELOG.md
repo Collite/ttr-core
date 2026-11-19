@@ -6,6 +6,21 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — YAML editor and lint support (MW-P7 S7.3)
+
+- Desktop LSP discovers nearest profile markers and per-file dialect headers,
+  indexes the profile engine's canonical ASTs, and provides diagnostics, hover,
+  symbols and cross-file definition targets on authored YAML ranges.
+- VS Code contributes `ttr-yaml` without global YAML filename associations,
+  activates on `ttr.yaml`, and reuses the YAML grammar. Profile changes invalidate
+  the index; dialect write-back remains unavailable.
+- `modeler-lint --profile [reference]` reads YAML roots and runs schema/profile
+  `ys/*` and link `xm/*` diagnostics through its configurable rule runner.
+- Closed review-334 parser carry: position-independent concept fingerprints,
+  quoted SQL locations, call-entry projections, precise bridge failure paths and
+  unknown expression tags read as plain text. Profile type refusals match Kotlin
+  on three new shared vectors replayed in both engines.
+
 ### Fixed — TS profile operands match Kotlin (MW-P7 S7.2b)
 
 - `@tatrman/profile` resolves links from live run records first, falling back lazily

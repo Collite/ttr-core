@@ -76,6 +76,17 @@
           "light": "./icons/ttrg.svg",
           "dark": "./icons/ttrg.svg"
         }
+      },
+      {
+        "id": "ttr-yaml",
+        "aliases": [
+          "TTR YAML"
+        ],
+        "configuration": "./yaml-language-configuration.json",
+        "icon": {
+          "light": "./icons/ttrm.svg",
+          "dark": "./icons/ttrm.svg"
+        }
       }
     ],
     "grammars": [
@@ -88,6 +99,11 @@
         "language": "ttrg",
         "scopeName": "source.ttrg",
         "path": "./syntaxes/ttrg.tmLanguage.json"
+      },
+      {
+        "language": "ttr-yaml",
+        "scopeName": "source.ttr-yaml",
+        "path": "./syntaxes/ttr-yaml.tmLanguage.json"
       }
     ],
     "configuration": {
@@ -144,18 +160,20 @@
     "commands": [
       {
         "command": "modeler.mdHopReport",
-        "title": "TTR: md → er hop report"
+        "title": "TTR: md \u2192 er hop report"
       },
       {
         "command": "modeler.cnHygieneReport",
         "title": "Concept hygiene report",
         "category": "TTR",
-        "description": "Previews the conceptual model's hygiene report: grades, groundings, the md→er hop, terms."
+        "description": "Previews the conceptual model's hygiene report: grades, groundings, the md\u2192er hop, terms."
       }
     ]
   },
   "activationEvents": [
     "onLanguage:ttr",
-    "onLanguage:ttrg"
+    "onLanguage:ttrg",
+    "onLanguage:ttr-yaml",
+    "workspaceContains:**/ttr.yaml"
   ]
 }
