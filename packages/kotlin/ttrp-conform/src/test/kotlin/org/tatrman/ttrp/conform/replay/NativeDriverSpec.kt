@@ -181,6 +181,13 @@ internal class ContractServer(
         server.stop(0, 1000)
     }
 
+    /**
+     * The Server's key for a fixture key: the recipe key `order.order_number` as its column-named object. Assumes the
+     * release_order fixtures (every `legacyN8nPerform` caller today); a fixture with another key column must pass it here.
+     */
+    private fun keyObject(key: JsonElement): JsonElement =
+        key as? JsonObject ?: buildJsonObject { put("order_number", key) }
+
     private fun keys(id: String): List<JsonElement> {
         val port = bodies.getValue(id).getValue("port").jsonObject
         return port["keys"]?.jsonArray
@@ -347,8 +354,13 @@ internal class ContractServer(
                 path.endsWith("/perform") -> {
                     val body = Json.parseToJsonElement(call.receiveText()).jsonObject
                     if (legacyN8nPerform) {
+                        // §1.2 (R254-A, S1.5.10): the Server reads `keys` as objects and refuses a bare value.
                         val selected = body.getValue("keys").jsonArray
-                        val eligible = keys(id)
+                        if (selected.any { it !is JsonObject }) {
+                            call.respondText("{}", ContentType.Application.Json, HttpStatusCode.BadRequest)
+                            return
+                        }
+                        val eligible = keys(id).map(::keyObject)
                         val action = path.substringAfter("/actions/").substringBefore('/')
                         val performed = selected.filter { action == "release" && it in eligible }
                         call.respondText(
@@ -477,7 +489,14 @@ internal class ContractServer(
                     if (legacyN8nPerform) {
                         body.getValue("outcomes").jsonArray.forEach { raw ->
                             val outcome = raw.jsonObject
-                            require(includeMail && outcome["key"] in keys(id)) { "outcome key not in mail preview" }
+                            // §1.2: an outcome's key is the same object (`OutcomeItem.key`); a bare value is refused.
+                            if (outcome["key"] !is JsonObject) {
+                                call.respondText("{}", ContentType.Application.Json, HttpStatusCode.BadRequest)
+                                return
+                            }
+                            require(includeMail && outcome["key"] in keys(id).map(::keyObject)) {
+                                "outcome key not in mail preview"
+                            }
                             require(outcome["status"] == JsonPrimitive("delivered"))
                         }
                         call.respondText("{}", ContentType.Application.Json)

@@ -718,7 +718,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route release collect\").isExecuted ? $(\"route release collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route release collect\").isExecuted ? $(\"route release collect\").first().json.rows : []).map(r => ({\"order_number\":r[\"order_number\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -820,7 +820,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route release_confirmed collect\").isExecuted ? $(\"route release_confirmed collect\").first().json.rows : []).map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/action-release_confirmed-ask'} }}",
+                "jsonBody": "={{ {keys:($(\"route release_confirmed collect\").isExecuted ? $(\"route release_confirmed collect\").first().json.rows : []).map(r => ({\"order_number\":r[\"order_number\"]})),callbackUrl:$execution.resumeUrl + '/action-release_confirmed-ask'} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1139,7 +1139,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {outcomes:$(\"action hold notify split\").item.json.mail.rows.map(r => ({key:r[\"order_number\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                "jsonBody": "={{ {outcomes:$(\"action hold notify split\").item.json.mail.rows.map(r => ({key:({\"order_number\":r[\"order_number\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -2116,7 +2116,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route release collect\").isExecuted ? $(\"route release collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route release collect\").isExecuted ? $(\"route release collect\").first().json.rows : []).map(r => ({\"order_number\":r[\"order_number\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -2204,7 +2204,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route release_confirmed collect\").isExecuted ? $(\"route release_confirmed collect\").first().json.rows : []).map(r => r[\"order_number\"]),callbackUrl:$execution.resumeUrl + '/action-release_confirmed-ask'} }}",
+                        "jsonBody": "={{ {keys:($(\"route release_confirmed collect\").isExecuted ? $(\"route release_confirmed collect\").first().json.rows : []).map(r => ({\"order_number\":r[\"order_number\"]})),callbackUrl:$execution.resumeUrl + '/action-release_confirmed-ask'} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -2320,7 +2320,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {outcomes:$(\"action hold notify split\").item.json.mail.rows.map(r => ({key:r[\"order_number\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                        "jsonBody": "={{ {outcomes:$(\"action hold notify split\").item.json.mail.rows.map(r => ({key:({\"order_number\":r[\"order_number\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                         "options": {
                             "response": {
                                 "response": {

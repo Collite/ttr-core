@@ -63,6 +63,21 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   `TTRP-FN-002` "a `due` in working days needs the model's calendar …". The error points at the `due:` argument, or
   at the wiring's action when the `due` is the action's default. Before 0.22.10 such a recipe built and the Server
   refused its due date at run time.
+### Fixed — 0.22.10: perform bodies send key objects (AU S1.5.10, ttr-server §1.2)
+
+- `ttr-emit-camunda` (C7 Spin and C8 FEEL) and `ttr-emit-n8n`: every emitted `perform` body sends
+  `keys: [{<key column>: value, …}]`, one object per row naming every recipe key column, for a one-column key too.
+  Before, a one-column key sent the bare value (`{"keys":[4711]}`), which the Server refuses with 400: its
+  `PerformRequest.keys` is a list of objects (contracts §1.2, R254-A). Camunda two-column keys are
+  unchanged. n8n's two-column `perform` body was a JavaScript syntax error (`r => {…}` read as a block, so the perform
+  node could never run) and now sends the object.
+- The `outcome` body's `key` takes the same object, for the same reason (`OutcomeItem.key` is an object): the mail
+  delivery outcome in both Camunda dialects and both n8n mail paths (per row and digest).
+- Unchanged: the Open's `port.key` (the caller's key; the answer Open's column-named object), the engine-local
+  `ttrKey` (the approval user task and the mail worker read it bare), the python client (already sent objects).
+- Exports that move: every Camunda/n8n export with a one-column key and a Server-performed or mail action, and every
+  n8n export with a multi-column key and a Server-performed action. hartland
+  must re-export, re-approve (`approve-all`) and redeploy.
 
 ### Added — `import-xmi`: the `xmi` front-end, `ttr-mdg/1`, `ea-erd/1`, the sidecar rename diff (MW-P5 S5.3)
 

@@ -197,7 +197,12 @@ class N8nDryDriverSpec :
                                                     "parameters" to
                                                         JsonObject(
                                                             n.getValue("parameters").jsonObject +
-                                                                ("jsonBody" to JsonPrimitive("={{ {keys:[999]} }}")),
+                                                                (
+                                                                    "jsonBody" to
+                                                                        JsonPrimitive(
+                                                                            "={{ {keys:[{order_number:999}]} }}",
+                                                                        )
+                                                                ),
                                                         )
                                                 ),
                                         )

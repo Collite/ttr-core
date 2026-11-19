@@ -951,7 +951,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {outcomes:$(\"action premium notify split\").item.json.mail.rows.map(r => ({key:r[\"customer_sk\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                "jsonBody": "={{ {outcomes:$(\"action premium notify split\").item.json.mail.rows.map(r => ({key:({\"customer_sk\":r[\"customer_sk\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -999,7 +999,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route premium collect\").isExecuted ? $(\"route premium collect\").first().json.rows : []).map(r => r[\"customer_sk\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route premium collect\").isExecuted ? $(\"route premium collect\").first().json.rows : []).map(r => ({\"customer_sk\":r[\"customer_sk\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1188,7 +1188,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {outcomes:$(\"action regular notify split\").item.json.mail.rows.map(r => ({key:r[\"customer_sk\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                "jsonBody": "={{ {outcomes:$(\"action regular notify split\").item.json.mail.rows.map(r => ({key:({\"customer_sk\":r[\"customer_sk\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1236,7 +1236,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route regular collect\").isExecuted ? $(\"route regular collect\").first().json.rows : []).map(r => r[\"customer_sk\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route regular collect\").isExecuted ? $(\"route regular collect\").first().json.rows : []).map(r => ({\"customer_sk\":r[\"customer_sk\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -2399,7 +2399,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {outcomes:$(\"action premium notify split\").item.json.mail.rows.map(r => ({key:r[\"customer_sk\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                        "jsonBody": "={{ {outcomes:$(\"action premium notify split\").item.json.mail.rows.map(r => ({key:({\"customer_sk\":r[\"customer_sk\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -2433,7 +2433,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route premium collect\").isExecuted ? $(\"route premium collect\").first().json.rows : []).map(r => r[\"customer_sk\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route premium collect\").isExecuted ? $(\"route premium collect\").first().json.rows : []).map(r => ({\"customer_sk\":r[\"customer_sk\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -2521,7 +2521,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {outcomes:$(\"action regular notify split\").item.json.mail.rows.map(r => ({key:r[\"customer_sk\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                        "jsonBody": "={{ {outcomes:$(\"action regular notify split\").item.json.mail.rows.map(r => ({key:({\"customer_sk\":r[\"customer_sk\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -2555,7 +2555,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route regular collect\").isExecuted ? $(\"route regular collect\").first().json.rows : []).map(r => r[\"customer_sk\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route regular collect\").isExecuted ? $(\"route regular collect\").first().json.rows : []).map(r => ({\"customer_sk\":r[\"customer_sk\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {

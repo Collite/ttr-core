@@ -57,6 +57,11 @@ A non-2xx refusal keeps the Server's status and body in `ttrRefusedReason`. A 2x
 commit (e.g. `status: waiting`) leaves `ttrRefusedReason` null; its `status` is in the history, as the
 row-local `ttrAnswerStatus`. A refused answer is never counted as decided.
 
+A Server key is always the column-named object (ttr-server contracts §1.2). Every per-row `perform` body sends
+`keys: [{<key column>: value, …}]` and every `outcome` body `key: {…}`, for a one-column key too:
+`{"keys":[{"order_number":4711}]}`, never `[4711]`. The n8n exporter sends the same shape. The engine-local
+`ttrKey` (the approval user task, the mail worker's input) stays the bare value for a one-column key.
+
 C7 HTTP scripts resolve `BpmnError` and Spin for Camunda 7 and CIB seven without relying on an execution
 binding in connector output scripts. Both engines retain `TTR_STALE` and `TTR_REFUSED` boundary codes;
 transient HTTP failures remain exceptions, retried by failed jobs only on asynchronous tasks.
