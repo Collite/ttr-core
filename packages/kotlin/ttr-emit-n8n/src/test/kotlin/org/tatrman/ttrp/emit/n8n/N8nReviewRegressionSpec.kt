@@ -118,6 +118,46 @@ class N8nReviewRegressionSpec :
             }.message!! shouldContain
                 "bare route-row column"
         }
+        "S1.5.10 perform keys and outcome keys are column-named objects, for one-column keys too (§1.2, R254-A)" {
+            fun performGraph(columns: List<String>) =
+                n8nGraph().let { b ->
+                    b.copy(
+                        recipe = b.recipe.copy(key = columns),
+                        program = b.program.copy(mode = "batch", port = "none"),
+                        routes = b.routes.filter { it.name == "release" },
+                        wirings = listOf(WiringMeta(listOf("verdict.release"), "release", emptyMap(), null)),
+                        actions = mapOf("release" to b.actions.getValue("release")),
+                    )
+                }
+            val lines =
+                listOf(1, 2).map {
+                    buildJsonObject {
+                        put("order_number", it)
+                        put("line_no", it * 10)
+                    }
+                }
+            WorkflowFixture().use { f ->
+                f.routes = mapOf("release" to listOf(row(1), row(2)))
+                f.run(workflow(performGraph(listOf("order.order_number"))))["error"] shouldBe null
+                f.calls.single { it.path.endsWith("/perform") }.body!!["keys"] shouldBe
+                    JsonArray(listOf(row(1), row(2)))
+            }
+            WorkflowFixture().use { f ->
+                f.routes = mapOf("release" to lines)
+                f.run(workflow(performGraph(listOf("order.order_number", "order.line_no"))))["error"] shouldBe null
+                f.calls.single { it.path.endsWith("/perform") }.body!!["keys"] shouldBe JsonArray(lines)
+            }
+            WorkflowFixture().use { f ->
+                f.routes = mapOf("mail" to listOf(row(1, "a@example.test"), row(2, "b@example.test")))
+                f.actions = JsonArray((1..2).map { actionPreview(it, "notify") })
+                f.run(workflow(mailGraph()))["error"] shouldBe null
+                f.calls
+                    .filter { it.path.endsWith("/outcome") }
+                    .flatMap { it.body!!.getValue("outcomes").jsonArray }
+                    .map { it.jsonObject.getValue("key") }
+                    .toSet() shouldBe setOf(row(1), row(2))
+            }
+        }
         "R3 a duplicate live handle waits for closed or waiting without driving it; abandonment permits one reopen" {
             for (state in listOf("closed", "waiting", "abandoned")) {
                 WorkflowFixture().use { f ->
