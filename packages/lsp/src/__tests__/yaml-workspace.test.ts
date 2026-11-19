@@ -2,6 +2,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import * as lsp from 'vscode-languageserver/node';
 import { PassThrough } from 'node:stream';
+import { spawn } from 'node:child_process';
 import { mkdtempSync, cpSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -116,6 +117,21 @@ describe('S7.3 demo-cs/1 mixed workspace', () => {
     expect(await w.client.sendRequest('textDocument/codeAction', { textDocument, range: { start: position, end: position }, context: { diagnostics: [] } })).toEqual([]);
     expect(await w.client.sendRequest('textDocument/completion', { textDocument, position })).toEqual({ isIncomplete: false, items: [] });
     expect(await w.client.sendRequest('textDocument/semanticTokens/full', { textDocument })).toEqual({ data: [] });
+  });
+
+  it('desktop stdio discovers marker-only workspaces and indexes closed YAML files', async () => {
+    const root = mkdtempSync(join(tmpdir(), 's73-stdio-'));
+    cpSync(new URL('./fixtures/yaml-workspace/', import.meta.url), root, { recursive: true });
+    cleanup.push(() => rmSync(root, { recursive: true, force: true }));
+    const child = spawn(process.execPath, [new URL('../../dist/server-stdio.js', import.meta.url).pathname], { stdio: ['pipe', 'pipe', 'pipe'] });
+    const client = lsp.createConnection(new lsp.StreamMessageReader(child.stdout), new lsp.StreamMessageWriter(child.stdin));
+    cleanup.push(() => { client.dispose(); child.kill(); });
+    child.once('exit', () => client.dispose());
+    client.listen();
+    await client.sendRequest('initialize', { processId: null, rootUri: pathToFileURL(root).href, workspaceFolders: [{ uri: pathToFileURL(root).href, name: 'models' }], capabilities: {} });
+    const uri = (file: string) => pathToFileURL(join(root, file)).href;
+    expect(JSON.stringify(await client.sendRequest('textDocument/documentSymbol', { textDocument: { uri: uri('model/entities.yaml') } }))).toContain('Customer');
+    expect(await client.sendRequest('textDocument/definition', { textDocument: { uri: uri('model/relations.yaml') }, position: { line: 2, character: 15 } })).toMatchObject({ uri: uri('model/entities.yaml'), range: { start: { line: 1, character: 2 } } });
   });
 
 });
