@@ -1,0 +1,16 @@
+ttr: "0.22"
+package: "demo"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "A"
+    properties: {}
+  -
+    kind: "relation"
+    id: "R"
+    properties: {}
+  -
+    kind: "relation"
+    id: "N"
+    properties: {}

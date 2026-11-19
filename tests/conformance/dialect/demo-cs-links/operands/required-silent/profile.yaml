@@ -1,0 +1,9 @@
+profile: parity/1
+grammar: '>=0.22 <1.0'
+operations:
+  - {op: package, mapping: {}, default: demo}
+  - {op: kinds, at: /entity, mapping: {e: entity}}
+  - {op: kinds, at: /vztahy, mapping: {r: relation}}
+  - {op: rename, in: relation, at: /popis, to: {kind: relation, property: description}}
+  - {op: shape, in: relation, at: /od, to: {kind: relation, property: from}, template: {ref: {input: /jmeno}}}
+  - {op: link, in: relation, at: /do, to: {kind: relation, property: to}, by: sourceName}

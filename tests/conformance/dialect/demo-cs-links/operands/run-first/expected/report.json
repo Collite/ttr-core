@@ -1,0 +1,1 @@
+{"documents":[{"package":"demo","model":"er","imports":["sklad.*"],"defs":2}],"ignored":[{"file":"one.yaml","line":2,"column":20,"path":"/entity/0/guid","reason":null},{"file":"one.yaml","line":3,"column":19,"path":"/entity/1/guid","reason":null}],"overridden":[]}

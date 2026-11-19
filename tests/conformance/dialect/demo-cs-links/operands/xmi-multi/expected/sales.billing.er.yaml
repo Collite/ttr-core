@@ -1,0 +1,27 @@
+ttr: "0.22"
+package: "sales.billing"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "Invoice"
+    properties:
+      description: "What a customer owes for an order."
+      attributes:
+        -
+          id: "total"
+          properties:
+            type: "BigDecimal"
+            optional: false
+  -
+    kind: "relation"
+    id: "billed_to"
+    properties:
+      description: "Every invoice is billed to one customer, across packages."
+      from:
+        ref: "sales.billing.er.entity.Invoice"
+      to:
+        ref: "sales.er.entity.Customer"
+      cardinality:
+        from: "0..*"
+        to: "1"

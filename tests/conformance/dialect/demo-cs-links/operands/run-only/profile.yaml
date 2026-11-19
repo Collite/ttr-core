@@ -1,0 +1,6 @@
+profile: parity/1
+grammar: '>=0.22 <1.0'
+operations:
+  - {op: package, mapping: {}, default: demo}
+  - {op: kinds, at: /entity, mapping: {e: entity}}
+  - {op: link, in: entity, at: /role, to: {kind: entity, property: roles}, by: sourceName}
