@@ -20,6 +20,8 @@ import java.security.MessageDigest
  * egress_url }` replaced `server { extends: native }` and the `*_native_*` deployments were renamed, which moves the
  * world fingerprint (every manifest) and the catalogs' world lines; islands, parts and READMEs are unchanged.
  * Re-recording writes all four recipes' stripped digests, preserving the complete golden.
+ * AU S2.4f (D-249/D-251) re-recorded decide_return's README + manifest: its `expect` (obligation) `due` in working
+ * days declares the calendar read (`er.entity.date_dim` in `objectsRead` and under "What it reads").
  */
 class CutUnaffectedBundleSpec :
     StringSpec({
