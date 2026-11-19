@@ -1,0 +1,4 @@
+relations:
+  Purchases:
+    od: demo.er.entity.Customer
+    do: demo.er.entity.Customer
