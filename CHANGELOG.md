@@ -14,6 +14,10 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - The `xmi` front-end reads one tree per UML package; `ttr-mdg/1` and `ea-erd/1` take the package from it, so
   `import-xmi` without `--package` writes each UML package as its TTR package (`--package` still puts all in one).
   An EA root package such as `Orders` is no TTR package path: rename it, or give `--package`.
+  The document is parsed once and each package's tree is a view of it, so time and memory grow with the document,
+  not with packages × document; the 6M code-point input budget is per input, as before. A UML package above an
+  element whose name is empty or contains `/` is `ys/profile-invalid` at that package (it would merge with another).
+  A `package` `mapping` without `at` keys on the input's stem; a `files:` glob sees `<stem>/<package path>`.
 - A child profile that restates `cn-from-uml: false` no longer fails inside its parent (review-372 N1).
 - `link` resolves among the run's records first and reads the root's sidecars only when none matches, so a renamed or
   moved record's stale sidecar entry no longer makes its link ambiguous (✅D-MW-100).
