@@ -61,6 +61,20 @@ class XmiReaderSpec :
                 if (renames) Files.copy(fixture.resolve("renames.yaml"), root.resolve("renames.yaml"))
             }
 
+        /** [input] under `<root>/sources` re-exported: its bytes replaced by [snapshot]'s (from [from]'s `sources/`). */
+        fun reexport(
+            root: Path,
+            input: String,
+            snapshot: String,
+            from: Path = root,
+        ) {
+            Files.copy(
+                from.resolve("sources/$snapshot"),
+                root.resolve("sources/$input"),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+            )
+        }
+
         fun run(
             root: Path,
             input: String,
@@ -270,8 +284,10 @@ class XmiReaderSpec :
             entries.all { (it.jsonObject["foreignId"] as? JsonPrimitive)?.content?.length == 36 } shouldBe true
             write(root, "model", first)
 
-            // Snapshot 2: the class renamed in EA (same GUID). The sidecar diff against the previous generation.
-            val second = run(root, "shop-renamed.xmi", "ttr-mdg/1", "shop")
+            // Snapshot 2: the class renamed in EA (same GUID), re-exported to the same path (✅R378-A: the delta reads this
+            // input's previous generation). The sidecar diff against it.
+            reexport(root, "shop.xmi", "shop-renamed.xmi")
+            val second = run(root, "shop.xmi", "ttr-mdg/1", "shop")
             val renamed =
                 report(second)
                     .getValue("delta")
@@ -368,6 +384,11 @@ class XmiReaderSpec :
             dumps(asChildren) shouldBe dumps(asAttributes)
         }
 
+        /** A sidecar generated from `in.x` beside it (any hash), holding [entries]. */
+        fun sidecar(entries: String) =
+            """{"generated-from": "generated-from: in.x@${"0".repeat(64)} profile p/1 generator g — do not edit", """ +
+                """"entries": [$entries]}"""
+
         fun renames(generated: GeneratedPackage): List<Pair<String, String>> =
             report(generated)["delta"]
                 ?.jsonObject
@@ -390,14 +411,15 @@ class XmiReaderSpec :
                         "sources/orders-erd.xmi",
                     ).readText(charset("windows-1252"))
                     .replace("name=\"Customer\"", "name=\"Client\"")
-            root.resolve("sources/orders-client.xmi").writeText(renamed, charset("windows-1252"))
-            // Run 1 with the cn skeleton (cn + er), run 2 without it (er only), one class renamed in between.
+            // Run 1 with the cn skeleton (cn + er), run 2 without it (er only), one class renamed in between (the same
+            // input path, re-exported).
             write(
                 root,
                 "f",
                 run(root, "orders-erd.xmi", fixture.resolve("profiles/ea-erd-cn.yaml").toString(), "orders", out = "f"),
             )
-            renames(run(root, "orders-client.xmi", "ea-erd/1", "orders", out = "f")) shouldBe
+            root.resolve("sources/orders-erd.xmi").writeText(renamed, charset("windows-1252"))
+            renames(run(root, "orders-erd.xmi", "ea-erd/1", "orders", out = "f")) shouldBe
                 listOf(
                     "orders.er.entity.Customer" to "orders.er.entity.Client",
                     "orders.er.entity.Customer.email" to "orders.er.entity.Client.email",
@@ -410,9 +432,19 @@ class XmiReaderSpec :
         ) {
             val root = workspace()
             write(root, "m", run(root, "sales-billing.xmi", "ea-erd/1", null, out = "m"))
-            // Snapshot 3: Invoice moved sales/billing → sales, billed_to deleted (sales.billing emptied), Order renamed.
-            val moved = run(root, "sales-billing-moved.xmi", "ea-erd/1", null, out = "m")
+            // Another input's import in the same --out is not this input's generation (✅R378-A).
+            write(root, "m", run(root, "shop.xmi", "ttr-mdg/1", "shop", out = "m"))
+            // Snapshot 3, re-exported to the same path: Invoice moved sales/billing → sales, billed_to deleted
+            // (sales.billing emptied), Order renamed. The hash differs; the path pairs it (✅R378-A).
+            reexport(root, "sales-billing.xmi", "sales-billing-moved.xmi")
+            val moved = run(root, "sales-billing.xmi", "ea-erd/1", null, out = "m")
             moved.files.keys shouldContainExactly listOf("sales/er.ttrm")
+            // review-378 F3: the emptied package is named, with its two paths; shop is not.
+            report(moved).getValue("delta").jsonObject.getValue("emptied") shouldBe
+                Json.parseToJsonElement("""["sales.billing"]""")
+            moved.report.markdown() shouldContain "#### Emptied since the last generation (1)"
+            moved.report.markdown() shouldContain "- `sales.billing`: `sales.billing.sources.json` and `sales/billing/`"
+            moved.report.markdown() shouldNotContain "shop."
             val delta = report(moved).getValue("delta").jsonObject
             delta.getValue("renamed").jsonArray.map { it.jsonObject.toString() } shouldBe
                 listOf(
@@ -442,6 +474,7 @@ class XmiReaderSpec :
             write(root, "m", moved)
             root.resolve("m/sales.billing.sources.json").deleteExisting()
             root.resolve("m/sales/billing/er.ttrm").deleteExisting()
+            reexport(root, "sales-billing.xmi", "sales-billing.xmi", fixture)
             val back = report(run(root, "sales-billing.xmi", "ea-erd/1", null, out = "m")).getValue("delta").jsonObject
             back.keys shouldBe setOf("renamed")
             back
@@ -455,24 +488,54 @@ class XmiReaderSpec :
             // still emits is not (the delta stays the rename half there).
             val dir = Files.createTempDirectory("s53a-delta")
             dir.resolve("a.sources.json").writeText(
-                """{"entries": [{"qname": "a.er.entity.X", "kind": "entity", "foreignId": "u1"}, """ +
-                    """{"qname": "a.er.entity.Y", "kind": "entity", "foreignId": "u2"}]}""",
+                sidecar(
+                    """{"qname": "a.er.entity.X", "kind": "entity", "foreignId": "u1"}, """ +
+                        """{"qname": "a.er.entity.Y", "kind": "entity", "foreignId": "u2"}""",
+                ),
             )
             dir.resolve("b.sources.json").writeText(
-                """{"entries": [{"qname": "b.er.entity.Z", "kind": "entity", "foreignId": "u3"}, """ +
-                    """{"qname": "b.er.entity.W", "kind": "entity"}]}""",
+                sidecar(
+                    """{"qname": "b.er.entity.Z", "kind": "entity", "foreignId": "u3"}, """ +
+                        """{"qname": "b.er.entity.W", "kind": "entity"}""",
+                ),
+            )
+            // No header, or another input's: not this input's generation (✅R378-A), so neither is emptied.
+            dir.resolve("d.sources.json").writeText(
+                """{"entries": [{"qname": "d.er.entity.U", "kind": "entity", "foreignId": "u5"}]}""",
+            )
+            dir.resolve("e.sources.json").writeText(
+                sidecar(
+                    """{"qname": "e.er.entity.T", "kind": "entity", "foreignId": "u6"}""",
+                ).replace("in.x@", "other.x@"),
+            )
+            // c's only entry moved to a: c is emptied all the same (review-378 F3), with nothing removed.
+            dir.resolve("c.sources.json").writeText(
+                sidecar("""{"qname": "c.er.entity.V", "kind": "entity", "foreignId": "u4"}"""),
             )
             SidecarDelta.of(
                 dir,
+                dir.resolve("in.x"),
                 listOf(
                     org.tatrman.ttr.profile
                         .SourceEntry("a.er.entity.X", "entity", "a", "u1", null, null),
+                    org.tatrman.ttr.profile
+                        .SourceEntry("a.er.entity.V", "entity", "a", "u4", null, null),
                 ),
             ) shouldBe
                 SidecarDelta.Delta(
-                    emptyList(),
+                    listOf(ImportReport.Renamed("c.er.entity.V", "a.er.entity.V", "u4", ImportReport.Moved("c", "a"))),
                     listOf(ImportReport.Removed("b.er.entity.Z", "u3"), ImportReport.Removed("b.er.entity.W", null)),
+                    listOf("b", "c"),
                 )
+        }
+
+        test("✅R378-A: another input's sidecars under the same --out are no previous generation (review-378 F1)") {
+            val root = workspace()
+            write(root, "p1", run(root, "shop.xmi", "ttr-mdg/1", "shop", out = "p1"))
+            val orders = run(root, "orders-erd.xmi", "ea-erd/1", "orders", out = "p1")
+            report(orders)["delta"] shouldBe null
+            orders.report.markdown() shouldNotContain "Removed since"
+            orders.report.markdown() shouldNotContain "Emptied since"
         }
 
         test("T4c ✅D-MW-98: an association without EA's connector ends is a relation with no ends and two warnings") {
@@ -501,13 +564,16 @@ class XmiReaderSpec :
             val dir = Files.createTempDirectory("s53-delta")
             val previous = dir.resolve("p.sources.json")
             previous.writeText(
-                """{"entries": [{"qname": "p.er.entity.X", "kind": "entity", "foreignId": "u1"}, """ +
-                    """{"qname": "p.er.entity.Y", "kind": "entity", "foreignId": "u2"}, """ +
-                    """{"qname": "p.cn.kind.Y", "kind": "kind", "foreignId": "u2"}]}""",
+                sidecar(
+                    """{"qname": "p.er.entity.X", "kind": "entity", "foreignId": "u1"}, """ +
+                        """{"qname": "p.er.entity.Y", "kind": "entity", "foreignId": "u2"}, """ +
+                        """{"qname": "p.cn.kind.Y", "kind": "kind", "foreignId": "u2"}""",
+                ),
             )
             SidecarDelta
                 .of(
                     dir,
+                    dir.resolve("in.x"),
                     listOf(
                         org.tatrman.ttr.profile
                             .SourceEntry("p.md.dimension.X", "dimension", "p", "u1", null, null),

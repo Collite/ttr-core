@@ -36,6 +36,11 @@ data class ImportReport(
      * foreign id this run does not name. Written as `delta.removed` only when there is one.
      */
     val removed: List<Removed> = emptyList(),
+    /**
+     * review-378 F3: the previous generation's packages this run emits nothing for, named even when every entry moved.
+     * Written as `delta.emptied` only when there is one.
+     */
+    val emptied: List<String> = emptyList(),
 ) {
     /**
      * One rename: the record with this foreign id was [from] in the previous generation and is [to] now; [moved] names
@@ -123,7 +128,7 @@ data class ImportReport(
                     }
                 }
                 putJsonArray("warnings") { warnings.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } }
-                if (renamed.isNotEmpty() || removed.isNotEmpty()) {
+                if (renamed.isNotEmpty() || removed.isNotEmpty() || emptied.isNotEmpty()) {
                     put(
                         "delta",
                         buildJsonObject {
@@ -145,6 +150,11 @@ data class ImportReport(
                                             }
                                         }
                                     }
+                                }
+                            }
+                            if (emptied.isNotEmpty()) {
+                                putJsonArray("emptied") {
+                                    emptied.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) }
                                 }
                             }
                             if (removed.isNotEmpty()) {
@@ -225,13 +235,21 @@ data class ImportReport(
                 appendLine("|---|---|---|")
                 renamed.forEach { appendLine("| `${it.from}` | `${it.to}` | `${it.foreignId}` |") }
             }
+            if (emptied.isNotEmpty()) {
+                appendLine()
+                appendLine("#### Emptied since the last generation (${emptied.size})")
+                appendLine()
+                appendLine(
+                    "These packages are no longer generated; delete their files under `--out` (the run does not):",
+                )
+                appendLine()
+                emptied.forEach { appendLine("- `$it`: `$it.sources.json` and `${it.replace('.', '/')}/`") }
+            }
             if (removed.isNotEmpty()) {
                 appendLine()
                 appendLine("#### Removed since the last generation (${removed.size})")
                 appendLine()
-                appendLine(
-                    "Their packages are no longer generated; delete their files under `--out` (the run does not).",
-                )
+                appendLine("Entries of the emptied packages that this run does not generate anywhere else.")
                 appendLine()
                 removed.forEach { appendLine("- `${it.qname}`" + (it.foreignId?.let { id -> " (`$id`)" } ?: "")) }
             }
@@ -283,6 +301,7 @@ data class ImportReport(
             records: String? = null,
             renamed: List<Renamed> = emptyList(),
             removed: List<Removed> = emptyList(),
+            emptied: List<String> = emptyList(),
         ): ImportReport =
             ImportReport(
                 frontEnd,
@@ -312,6 +331,7 @@ data class ImportReport(
                 records,
                 renamed.sortedWith(compareBy<Renamed, String>(Bytewise) { it.from }.thenBy(Bytewise) { it.to }),
                 removed.sortedWith(compareBy(Bytewise) { it.qname }),
+                emptied.sortedWith(Bytewise),
             )
     }
 }

@@ -7,8 +7,10 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import org.tatrman.ttr.metadata.export.GeneratedHeader
 import org.tatrman.ttr.profile.SourceEntry
 import java.io.IOException
+import java.io.UncheckedIOException
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -21,10 +23,15 @@ import java.nio.file.Path
  * one side has, and entries without a foreign id, are no rename. An unreadable sidecar, or one that is not the S3.6
  * shape, is skipped (the run never fails on it: the sidecar is regenerated whole).
  *
- * S5.3a T4b: the previous generation is **every** `<package>.sources.json` directly under `--out` (where a run writes
- * them), each entry in the package its file names, so the pairing spans packages: an element moved between UML
- * packages is a rename whose [ImportReport.Renamed] names both packages. A previous package this run emits nothing
- * for is emptied: each of its entries whose foreign id this run does not name is [ImportReport.Removed].
+ * S5.3a T4b: the previous generation is every `<package>.sources.json` directly under `--out` (where a run writes them)
+ * **whose `generated-from` names this run's input** (✅R378-A: the path before `@`, resolved against `--out`; the hash is
+ * not compared, since the input changes between generations), each entry in the package its file names, so the pairing
+ * spans packages: an element moved between UML packages is a rename whose [ImportReport.Renamed] names both packages.
+ * Another input's sidecars under the same `--out` are not this run's generation; a renamed input starts a fresh one.
+ * A sidecar without a parsable header is skipped like an unreadable one. A previous package this run emits nothing for
+ * is [Delta.emptied] (named even when every entry moved, review-378 F3); each of its entries whose foreign id this run
+ * does not name is [ImportReport.Removed]. Listing `--out` never fails the run: an [IOException] or
+ * [UncheckedIOException] (raised while the listing is read) means no previous generation (review-378 F6).
  */
 internal object SidecarDelta {
     /** One sidecar entry, as the diff sees it. */
@@ -38,13 +45,16 @@ internal object SidecarDelta {
     data class Delta(
         val renamed: List<ImportReport.Renamed>,
         val removed: List<ImportReport.Removed>,
+        val emptied: List<String> = emptyList(),
     )
 
+    /** The delta of [current] (generated from [input]) against the previous generation of [input] under [out]. */
     fun of(
         out: Path,
+        input: Path,
         current: List<SourceEntry>,
     ): Delta {
-        val previous = previous(out)
+        val previous = previous(out, real(input))
         val before =
             previous.values
                 .flatten()
@@ -74,14 +84,13 @@ internal object SidecarDelta {
                 }
             }
         val emitted = current.map { it.pkg }.toSet()
+        val emptied = previous.filterKeys { it !in emitted }
         val removed =
-            previous
-                .filterKeys { it !in emitted }
-                .values
+            emptied.values
                 .flatten()
                 .filter { it.foreignId == null || it.foreignId !in now }
                 .map { ImportReport.Removed(it.qname, it.foreignId) }
-        return Delta(renamed, removed)
+        return Delta(renamed, removed, emptied.keys.toList())
     }
 
     private fun rename(
@@ -95,28 +104,59 @@ internal object SidecarDelta {
             else -> ImportReport.Renamed(was.qname, now.qname, foreignId, ImportReport.Moved(was.pkg, now.pkg))
         }
 
-    /** package → its sidecar's entries, for every readable `<package>.sources.json` directly under [out]. */
-    private fun previous(out: Path): Map<String, List<SourceEntry>> {
+    /**
+     * package → its sidecar's entries, for every readable `<package>.sources.json` directly under [out] whose header
+     * names [input] (a real path).
+     */
+    private fun previous(
+        out: Path,
+        input: Path,
+    ): Map<String, List<SourceEntry>> {
         if (!Files.isDirectory(out)) return emptyMap()
         val names =
             try {
                 Files.list(out).use { paths -> paths.map { it.fileName.toString() }.toList() }
             } catch (e: IOException) {
                 return emptyMap()
+            } catch (e: UncheckedIOException) {
+                return emptyMap()
             }
+        val directory = real(out)
         return names
             .filter { it.endsWith(SUFFIX) && it.length > SUFFIX.length }
             .sorted()
             .mapNotNull { name ->
                 val pkg = name.removeSuffix(SUFFIX)
-                read(out.resolve(name))?.let { pkg to it.map { e -> e.copy(pkg = pkg) } }
+                val (from, entries) = read(out.resolve(name)) ?: return@mapNotNull null
+                val header = from?.let { GeneratedHeader.parse("# $it") } ?: return@mapNotNull null
+                if (directory.resolve(header.snapshot.path).normalize() != input) return@mapNotNull null
+                pkg to entries.map { it.copy(pkg = pkg) }
             }.toMap()
+    }
+
+    /**
+     * [path] with its nearest existing ancestor made real and the rest appended, as `GeneratedInputs` writes the
+     * header's paths (between real paths: macOS `/tmp`, a linked `--out`).
+     */
+    private fun real(path: Path): Path {
+        val absolute = path.toAbsolutePath().normalize()
+        var existing: Path? = absolute
+        while (existing != null && !Files.exists(existing)) existing = existing.parent
+        existing ?: return absolute
+        return try {
+            existing.toRealPath().resolve(existing.relativize(absolute))
+        } catch (e: IOException) {
+            absolute
+        }
     }
 
     private const val SUFFIX = ".sources.json"
 
-    /** The entries of the sidecar at [path] (qname, kind, foreign id); null when it is not readable or not the S3.6 shape. */
-    private fun read(path: Path): List<SourceEntry>? {
+    /**
+     * The sidecar at [path]: its `generated-from` text and its entries (qname, kind, foreign id); null when it is not
+     * readable or not the S3.6 shape.
+     */
+    private fun read(path: Path): Pair<String?, List<SourceEntry>>? {
         if (!Files.isRegularFile(path)) return null
         val value =
             try {
@@ -127,12 +167,14 @@ internal object SidecarDelta {
                 return null
             }
         val entries = ((value as? JsonObject)?.get("entries") as? JsonArray) ?: return null
-        return entries.mapNotNull { entry ->
-            val obj = entry as? JsonObject ?: return@mapNotNull null
-            val qname = (obj["qname"] as? JsonPrimitive)?.contentOrNull ?: return@mapNotNull null
-            val foreignId = (obj["foreignId"] as? JsonPrimitive)?.contentOrNull
-            val kind = (obj["kind"] as? JsonPrimitive)?.contentOrNull.orEmpty()
-            SourceEntry(qname, kind, "", foreignId, null, null)
-        }
+        val from = ((value as JsonObject)["generated-from"] as? JsonPrimitive)?.contentOrNull
+        return from to
+            entries.mapNotNull { entry ->
+                val obj = entry as? JsonObject ?: return@mapNotNull null
+                val qname = (obj["qname"] as? JsonPrimitive)?.contentOrNull ?: return@mapNotNull null
+                val foreignId = (obj["foreignId"] as? JsonPrimitive)?.contentOrNull
+                val kind = (obj["kind"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+                SourceEntry(qname, kind, "", foreignId, null, null)
+            }
     }
 }

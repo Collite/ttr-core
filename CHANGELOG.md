@@ -22,10 +22,12 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 - `ea-erd/1` links a relation's ends by the end class's `xmi:id` (`as: ref`), so every end is a qualified reference and
   an end in another UML package resolves. `ttr-mdg/1` still resolves every reference by name, so a multi-package XM
   world splits but does not link across packages.
-- The reader's rename delta reads every previous `<package>.sources.json` under `--out` and pairs foreign ids across
-  packages: an element moved between UML packages is a `delta.renamed` entry with `package: {from, to}`. A previous
-  package the run emits nothing for lists its remaining entries as `delta.removed` (`{qname, foreignId?}`); the run
-  does not delete that package's files.
+- The reader's rename delta reads the previous `<package>.sources.json` files under `--out` that were generated from
+  the same input (their `generated-from` path; the hash is not compared), and pairs foreign ids across packages: an
+  element moved between UML packages is a `delta.renamed` entry with `package: {from, to}`. Another input's sidecars in
+  the same `--out` are not compared, and a renamed input starts a fresh generation. A previous package the run emits
+  nothing for is listed in `delta.emptied` with its two paths, and its entries that went nowhere are `delta.removed`
+  (`{qname, foreignId?}`); the run does not delete that package's files.
 - `rename`, `shape` and `link` take `required: warn`: a record where `at` selects nothing gets one warning, the new
   catalogued `ys/key-missing`, located at the record and naming the property not written; the run goes on
   (✅D-MW-98). `ttr-mdg/1` and `ea-erd/1` declare it on a relation's two ends, so an association without EA's

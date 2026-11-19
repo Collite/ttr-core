@@ -138,8 +138,8 @@ object Reader {
             val name = "$pkg.sources.json"
             sidecars[name] = SourcesJsonWriter.write(header.header(name).text, entries)
         }
-        // S5.3a T4b: the delta against every previous sidecar under --out, so a move between packages pairs.
-        val delta = SidecarDelta.of(request.out, sources)
+        // S5.3a T4b: the delta against every previous sidecar of this input under --out (✅R378-A), across packages.
+        val delta = SidecarDelta.of(request.out, input, sources)
         return GeneratedPackage(
             files,
             sidecars,
@@ -152,6 +152,7 @@ object Reader {
                 frontEnd.records,
                 delta.renamed,
                 delta.removed,
+                delta.emptied,
             ),
         )
     }
