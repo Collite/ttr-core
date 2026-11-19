@@ -102,7 +102,7 @@ object Reader {
             val canonical = if (profile.options.skeleton) skeleton(document.canonical) else document.canonical
             val pkg = canonical.value.text("package")
             val model = canonical.value.text("model")
-            val path = listOf(pkg.replace('.', '/'), "$model.ttrm").filter { it.isNotEmpty() }.joinToString("/")
+            val path = outputPath(pkg, "$model.ttrm")
             if (files.put(path, header.header(path).line(GeneratedHeader.Form.TTRM) + render(canonical)) != null) {
                 throw ReaderInputException("two generated documents render to $path; the profile's packages collide")
             }

@@ -149,14 +149,14 @@
         {
             "file": "sales.cdm",
             "line": 57,
-            "column": 108,
+            "column": 168,
             "path": "/objects/o105/Object2",
             "reason": "CDM relationships are open-tier relation types; participants require authored semantics"
         },
         {
             "file": "sales.cdm",
             "line": 57,
-            "column": 178,
+            "column": 298,
             "path": "/diagrams",
             "reason": "PD diagrams, symbols and display preferences are not model facts"
         },
@@ -395,28 +395,28 @@
         {
             "file": "sales.ldm",
             "line": 83,
-            "column": 107,
+            "column": 167,
             "path": "/objects/o203/Object2",
             "reason": "relationship endpoint resolved by its PD object reference"
         },
         {
             "file": "sales.ldm",
             "line": 83,
-            "column": 177,
+            "column": 297,
             "path": "/diagrams",
             "reason": "PD diagrams, symbols and display preferences are not model facts"
         },
         {
             "file": "sales.ldm",
             "line": 83,
-            "column": 392,
+            "column": 512,
             "path": "/generationLinks/g_00000000_0000_4000_8000_000000000201_00000000_0000_4000_8000_000000000102/ObjectID",
             "reason": "generation-link identity retained in the sidecar"
         },
         {
             "file": "sales.ldm",
             "line": 83,
-            "column": 481,
+            "column": 601,
             "path": "/generationLinks/g_00000000_0000_4000_8000_000000000201_00000000_0000_4000_8000_000000000102/@pd",
             "reason": "generation link class and package path"
         },
@@ -710,10 +710,10 @@
         },
         {
             "file": "sales.pdm",
-            "line": 96,
+            "line": 97,
             "column": 1,
-            "path": "/objects/o303/Joins",
-            "reason": "reference joins are resolved as column pairs from child to parent"
+            "path": "/objects/o303/Joins/0",
+            "reason": "kind mapping null (/@pd/type = PDM.ReferenceJoin)"
         },
         {
             "file": "sales.pdm",
@@ -788,98 +788,98 @@
         {
             "file": "sales.pdm",
             "line": 136,
-            "column": 607,
+            "column": 662,
             "path": "/generationLinks/g_00000000_0000_4000_8000_000000000311_00000000_0000_4000_8000_000000000211/ObjectID",
             "reason": "generation-link identity retained in the sidecar"
         },
         {
             "file": "sales.pdm",
             "line": 136,
-            "column": 696,
+            "column": 751,
             "path": "/generationLinks/g_00000000_0000_4000_8000_000000000311_00000000_0000_4000_8000_000000000211/@pd",
             "reason": "generation link class and package path"
         },
         {
             "file": "sales.pdm",
             "line": 136,
-            "column": 993,
+            "column": 1097,
             "path": "/generationLinks/g_00000000_0000_4000_8000_000000000312_00000000_0000_4000_8000_000000000212/ObjectID",
             "reason": "generation-link identity retained in the sidecar"
         },
         {
             "file": "sales.pdm",
             "line": 136,
-            "column": 1082,
+            "column": 1186,
             "path": "/generationLinks/g_00000000_0000_4000_8000_000000000312_00000000_0000_4000_8000_000000000212/@pd",
             "reason": "generation link class and package path"
         },
         {
             "file": "sales.pdm",
             "line": 136,
-            "column": 1386,
+            "column": 1533,
             "path": "/generationLinks/g_00000000_0000_4000_8000_000000000302_00000000_0000_4000_8000_000000000202/ObjectID",
             "reason": "generation-link identity retained in the sidecar"
         },
         {
             "file": "sales.pdm",
             "line": 136,
-            "column": 1475,
+            "column": 1622,
             "path": "/generationLinks/g_00000000_0000_4000_8000_000000000302_00000000_0000_4000_8000_000000000202/@pd",
             "reason": "generation link class and package path"
         },
         {
             "file": "sales.pdm",
             "line": 136,
-            "column": 1753,
+            "column": 1961,
             "path": "/generationLinks/g_00000000_0000_4000_8000_000000000321_00000000_0000_4000_8000_000000000221/ObjectID",
             "reason": "generation-link identity retained in the sidecar"
         },
         {
             "file": "sales.pdm",
             "line": 136,
-            "column": 1842,
+            "column": 2050,
             "path": "/generationLinks/g_00000000_0000_4000_8000_000000000321_00000000_0000_4000_8000_000000000221/@pd",
             "reason": "generation link class and package path"
         },
         {
             "file": "sales.pdm",
             "line": 136,
-            "column": 2151,
+            "column": 2402,
             "path": "/generationLinks/g_00000000_0000_4000_8000_000000000322_00000000_0000_4000_8000_000000000222/ObjectID",
             "reason": "generation-link identity retained in the sidecar"
         },
         {
             "file": "sales.pdm",
             "line": 136,
-            "column": 2240,
+            "column": 2491,
             "path": "/generationLinks/g_00000000_0000_4000_8000_000000000322_00000000_0000_4000_8000_000000000222/@pd",
             "reason": "generation link class and package path"
         },
         {
             "file": "sales.pdm",
             "line": 136,
-            "column": 2549,
+            "column": 2837,
             "path": "/generationLinks/g_00000000_0000_4000_8000_000000000323_00000000_0000_4000_8000_000000000223/ObjectID",
             "reason": "generation-link identity retained in the sidecar"
         },
         {
             "file": "sales.pdm",
             "line": 136,
-            "column": 2638,
+            "column": 2926,
             "path": "/generationLinks/g_00000000_0000_4000_8000_000000000323_00000000_0000_4000_8000_000000000223/@pd",
             "reason": "generation link class and package path"
         },
         {
             "file": "sales.pdm",
             "line": 136,
-            "column": 2948,
+            "column": 3285,
             "path": "/generationLinks/g_00000000_0000_4000_8000_000000000303_00000000_0000_4000_8000_000000000203/ObjectID",
             "reason": "generation-link identity retained in the sidecar"
         },
         {
             "file": "sales.pdm",
             "line": 136,
-            "column": 3037,
+            "column": 3374,
             "path": "/generationLinks/g_00000000_0000_4000_8000_000000000303_00000000_0000_4000_8000_000000000203/@pd",
             "reason": "generation link class and package path"
         }

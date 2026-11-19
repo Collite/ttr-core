@@ -5,12 +5,11 @@ import kotlinx.serialization.json.*
 import org.tatrman.ttr.profile.ForeignTree
 import org.tatrman.ttr.profile.ProfileException
 import org.tatrman.ttr.profile.ProfileSpan
-import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.io.UncheckedIOException
 import java.nio.file.Files
 import java.nio.file.Path
-import javax.xml.stream.XMLInputFactory
+import java.util.Locale
 import javax.xml.stream.XMLStreamConstants
 import javax.xml.stream.XMLStreamException
 
@@ -19,9 +18,9 @@ import javax.xml.stream.XMLStreamException
  * and object references become `$ref` nodes. `@pd` carries the foreign class/model, local id, and package/code paths.
  * No TTR kinds or types are selected here: `pdm/16` owns that projection.
  *
- * One ForeignTree view per PD package, as with XMI. The model's Code and enclosing package Codes form its verbatim
- * package path; a Code is never sanitised. A reference keeps its XML id and the target's Code ancestry (`@path`), so
- * profile `link by: path` resolves the record that `kinds id: /Code` discovers. Duplicate paths fail in the engine.
+ * One ForeignTree view per PD package, as with XMI. Model/Package Code segments are lower-cased (Locale.ROOT);
+ * definition Codes stay verbatim. References retain local XML ids and qualified Code paths as provenance; links use
+ * the resolved ObjectID (`by: sourceName`, control room §66), so repeated Codes in different packages are distinct.
  * Generation links are the object's History ORG ids, joined to objects of its model's GenerationOrigins among the
  * supplied files; missing models remain raw unresolved links, never trigger filesystem/network reads.
  */
@@ -29,13 +28,26 @@ object PdmFrontEnd : FrontEnd {
     override val name = "pdm"
     override val records = "/objects"
     private val extensions = setOf("cdm", "ldm", "pdm")
+    private val containers = setOf("Model", "Package")
+    private val nonDefinitions = containers + "RootObject"
+    private val linkObjects = setOf("Reference", "Relationship", "Inheritance")
+    private val piAttributes = Regex("""([A-Za-z]+)="([^"]*)"""")
+    private val version16 = Regex("16(?:\\.[0-9]+)+")
+    private val historyOrigins = Regex("(?m)^ORG \\{([^}]+)}")
+    private val sqlType = Regex("([A-Za-z][A-Za-z0-9_ ]*?)(?:\\(([0-9]+)(?:,\\s*([0-9]+))?\\))?")
+
+    // Only PD logical abbreviations take bare lengths: INT4 and FLOAT8 are whole SQL names.
+    private val logicalType =
+        Regex(
+            "(LVA|VMBT|LBIN|MBT|BIN|PIC|TXT|VA|LA|SI|LI|BT|NO|DC|MN|NM|SF|LF|TS|DT|BL|A|I|N|F|D|T)([0-9]+)(?:,\\s*([0-9]+))?",
+        )
 
     override fun parse(files: List<Path>): List<ForeignTree> {
         val expanded =
             try {
                 files.flatMap { input ->
                     if (!Files.isDirectory(input)) {
-                        listOf(input)
+                        listOf(input to input.fileName.toString())
                     } else {
                         Files.walk(input).use { paths ->
                             paths
@@ -46,6 +58,7 @@ object PdmFrontEnd : FrontEnd {
                                             .substringAfterLast('.', "")
                                             .lowercase() in extensions
                                 }.sorted()
+                                .map { it to input.relativize(it).joinToString("/") }
                                 .toList()
                         }
                     }
@@ -56,7 +69,22 @@ object PdmFrontEnd : FrontEnd {
                 throw ReaderInputException("cannot list PD input (${e.javaClass.simpleName}: ${e.message})")
             }
         if (expanded.isEmpty()) throw ReaderInputException("no .cdm, .ldm or .pdm input files")
-        val documents = labelled(expanded).map { (file, label) -> read(file, label) }
+        val documents = expanded.map { (file, label) -> read(file, label) }
+        val packageCodes = mutableMapOf<String, String>()
+        documents.forEach { d ->
+            d.objects.values.filter { it.ns == "object" && it.tag in containers }.forEach { n ->
+                val raw = d.rawPackagePath(n)
+                val pkg = d.packagePath(n)
+                val before = packageCodes.putIfAbsent(pkg, raw)
+                if (before != null && before != raw) {
+                    throw ProfileException(
+                        "ys/package-invalid",
+                        XmlInput.span(d.label, n.line, n.column),
+                        "PD packages '$before' and '$raw' both map to package '$pkg'",
+                    )
+                }
+            }
+        }
         val global =
             documents
                 .flatMap { d ->
@@ -67,6 +95,7 @@ object PdmFrontEnd : FrontEnd {
                         }
                     }
                 }.groupBy({ it.first }, { it.second })
+        documents.forEach { it.global = global }
         return documents.flatMap { document ->
             val whole = ForeignTree.read(document.json(global), document.label.substringBeforeLast('.'), document.label)
             val value = whole.root.value.jsonObject
@@ -142,7 +171,7 @@ object PdmFrontEnd : FrontEnd {
     ): Nothing =
         throw ProfileException(
             "ys/profile-invalid",
-            ProfileSpan(label, node.line, node.column, node.line, node.column, ""),
+            XmlInput.span(label, node.line, node.column),
             message,
         )
 
@@ -150,23 +179,7 @@ object PdmFrontEnd : FrontEnd {
         file: Path,
         label: String,
     ): Document {
-        val factory =
-            XMLInputFactory.newFactory().apply {
-                setProperty(XMLInputFactory.SUPPORT_DTD, false)
-                setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false)
-                setProperty(XMLInputFactory.IS_COALESCING, true)
-                setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, true)
-            }
-        val reader =
-            try {
-                factory.createXMLStreamReader(ByteArrayInputStream(XmiFrontEnd.bytes(file)))
-            } catch (e: XMLStreamException) {
-                throw ProfileException(
-                    "ys/profile-invalid",
-                    ProfileSpan(label, 1, 1, 1, 1, ""),
-                    e.message ?: "Invalid PD XML",
-                )
-            }
+        val reader = XmlInput.reader(XmiFrontEnd.bytes(file, label), label)
         try {
             val stack = mutableListOf<Node>()
             var root: Node? = null
@@ -177,17 +190,17 @@ object PdmFrontEnd : FrontEnd {
                     XMLStreamConstants.PROCESSING_INSTRUCTION ->
                         if (reader.piTarget == "PowerDesigner") {
                             val attrs =
-                                Regex("([A-Za-z]+)=\"([^\"]*)\"").findAll(reader.piData).associate {
+                                piAttributes.findAll(reader.piData).associate {
                                     it.groupValues[1] to
                                         it.groupValues[2]
                                 }
                             signature = attrs["signature"]
                             version = attrs["version"]
-                            if (version?.matches(Regex("16(?:\\.[0-9]+)+")) != true) {
+                            if (version?.matches(version16) != true) {
                                 val l = reader.location
                                 throw ProfileException(
                                     "xm/pdm-version",
-                                    ProfileSpan(label, l.lineNumber, l.columnNumber, l.lineNumber, l.columnNumber, ""),
+                                    XmlInput.span(label, l.lineNumber, l.columnNumber),
                                     "PowerDesigner version ${version ?: "(missing)"}; expected the 16 line",
                                 )
                             }
@@ -206,8 +219,8 @@ object PdmFrontEnd : FrontEnd {
                                     reader.getAttributeLocalName(it) to
                                         reader.getAttributeValue(it)
                                 },
-                                reader.location.lineNumber,
-                                reader.location.columnNumber,
+                                reader.location.lineNumber.coerceAtLeast(1),
+                                reader.location.columnNumber.coerceAtLeast(1),
                             )
                         node.parent = stack.lastOrNull()
                         node.parent?.children?.add(node) ?: run { root = node }
@@ -241,17 +254,10 @@ object PdmFrontEnd : FrontEnd {
                 }
             return Document(top, label, kind)
         } catch (e: XMLStreamException) {
-            val l = e.location
-            throw ProfileException(
-                "ys/profile-invalid",
-                ProfileSpan(
-                    label,
-                    l?.lineNumber ?: 1,
-                    l?.columnNumber ?: 1,
-                    l?.lineNumber ?: 1,
-                    l?.columnNumber ?: 1,
-                    "",
-                ),
+            XmlInput.fail(
+                label,
+                e.location?.lineNumber ?: 1,
+                e.location?.columnNumber ?: 1,
                 e.message ?: "Invalid PD XML",
             )
         } finally {
@@ -268,6 +274,10 @@ object PdmFrontEnd : FrontEnd {
         val model: Node
         private val parents = mutableMapOf<String, MutableList<Node>>()
         private val positions = mutableMapOf<String, Node>()
+        private val packagePaths = mutableMapOf<Node, String>()
+        private val paths = mutableMapOf<Node, String>()
+        private val skippedRecords = mutableSetOf<Node>()
+        lateinit var global: Map<String, List<Pair<Document, Node>>>
 
         init {
             fun index(node: Node) {
@@ -305,17 +315,10 @@ object PdmFrontEnd : FrontEnd {
             }
         }
 
-        fun packagePath(node: Node): String =
-            generateSequence(node) {
-                it.parent
-            }.filter {
-                it.ns == "object" &&
-                    it.tag in
-                    setOf(
-                        "Model",
-                        "Package",
-                    )
-            }.toList()
+        fun rawPackagePath(node: Node): String =
+            generateSequence(node) { it.parent }
+                .filter { it.ns == "object" && it.tag in containers }
+                .toList()
                 .asReversed()
                 .joinToString("/") {
                     val code = it.scalar("Code") ?: fail(label, it, "PD ${it.tag} has no Code for its package path")
@@ -323,25 +326,79 @@ object PdmFrontEnd : FrontEnd {
                     code
                 }
 
-        private fun path(node: Node) =
-            generateSequence(node) { it.parent }
-                .filter {
-                    it.ns == "object" &&
-                        it.tag !in setOf("Model", "Package", "RootObject")
-                }.toList()
-                .asReversed()
-                .mapNotNull { it.scalar("Code") }
-                .joinToString("/")
+        fun packagePath(node: Node): String =
+            packagePaths.getOrPut(node) {
+                if (node.ns == "object" && node.tag in containers) {
+                    rawPackagePath(node).lowercase(Locale.ROOT)
+                } else {
+                    node.parent?.let(::packagePath).orEmpty()
+                }
+            }
+
+        private fun path(node: Node): String =
+            paths.getOrPut(node) {
+                (
+                    listOf(packagePath(node)) +
+                        generateSequence(node) { it.parent }
+                            .filter { it.ns == "object" && it.tag !in nonDefinitions }
+                            .toList()
+                            .asReversed()
+                            .mapNotNull { it.scalar("Code") }
+                ).filter { it.isNotEmpty() }.joinToString("/")
+            }
+
+        private fun resolved(
+            node: Node,
+            seen: Set<Node> = emptySet(),
+        ): Pair<Document, Node>? {
+            if (node.tag != "Shortcut") return this to node
+            val id = node.scalar("TargetID") ?: return null
+            if (node in seen) fail(label, node, "PD shortcut cycle at $id")
+            val candidates = global[uuid(id)].orEmpty()
+            if (candidates.size > 1) {
+                fail(
+                    label,
+                    node,
+                    "Shortcut target $id is ambiguous: ${candidates.joinToString { it.first.label }}",
+                )
+            }
+            val (doc, target) = candidates.singleOrNull() ?: return null
+            return doc.resolved(target, seen + node)
+        }
 
         private fun ref(node: Node): JsonObject {
             val id = node.attrs["Ref"]!!
             val target = objects[id]
+            val found = target?.let(::resolved)
             return buildJsonObject {
                 put("\$ref", id)
-                put("@path", target?.let(::path) ?: id)
-                if (target != null) {
-                    put("@type", "$kind.${target.tag}")
+                put("@path", found?.let { (d, n) -> d.path(n) } ?: id)
+                if (found != null) {
+                    val (doc, n) = found
+                    n.scalar("ObjectID")?.let { put("@objectId", it) }
+                    put("@type", "${doc.kind}.${n.tag}")
+                } else if (target?.tag == "Shortcut") {
+                    val reason = "shortcut to ${target.scalar("TargetID")} outside the supplied models"
+                    put("@skip", reason)
                 }
+            }
+        }
+
+        private fun skipped(
+            node: Node,
+            reason: String,
+            at: String,
+        ): JsonObject {
+            positions[at] = node
+            return buildJsonObject {
+                put("Code", node.scalar("Code") ?: node.id ?: node.attrs["Ref"].orEmpty())
+                put(
+                    "@pd",
+                    buildJsonObject {
+                        put("type", reason)
+                        put("package", packagePath(node))
+                    },
+                )
             }
         }
 
@@ -350,6 +407,28 @@ object PdmFrontEnd : FrontEnd {
             at: String,
         ): JsonObject {
             positions[at] = node
+            if (node.tag in linkObjects) {
+                fun missingShortcut(n: Node): String? {
+                    if (n.attrs["Ref"] != null) return ref(n)["@skip"]?.jsonPrimitive?.content
+                    return n.children.firstNotNullOfOrNull(::missingShortcut)
+                }
+                missingShortcut(node)?.let {
+                    skippedRecords += node
+                    return skipped(node, it, at)
+                }
+            }
+            if (node.tag == "ReferenceJoin" &&
+                listOf("Object1", "Object2").any {
+                    node
+                        .collection(it)
+                        .firstOrNull()
+                        ?.let(::ref)
+                        ?.get("@objectId") ==
+                        null
+                }
+            ) {
+                return skipped(node, "incomplete ReferenceJoin: missing Object1 or Object2; whole pair skipped", at)
+            }
             return buildJsonObject {
                 if (node.attrs["Ref"] != null) {
                     ref(node).forEach { (k, v) -> put(k, v) }
@@ -385,27 +464,37 @@ object PdmFrontEnd : FrontEnd {
                     put(
                         "@parents",
                         JsonArray(
-                            it.map { n ->
-                                ref(n).getValue("@path")
-                            },
+                            it.mapNotNull { n -> ref(n)["@objectId"] },
                         ),
                     )
                 }
                 if (node.tag == "Reference") {
-                    val joins = node.collection("Joins")
-                    for ((key, end) in listOf("@joinFrom" to "Object2", "@joinTo" to "Object1")) {
-                        put(
-                            key,
-                            JsonArray(
-                                joins.mapNotNull { join ->
-                                    join.collection(end).firstOrNull()?.let { ref(it)["@path"] }
-                                },
-                            ),
-                        )
-                    }
+                    val pairs =
+                        node.collection("Joins").mapNotNull { join ->
+                            val parent =
+                                join
+                                    .collection("Object1")
+                                    .firstOrNull()
+                                    ?.let(::ref)
+                                    ?.get("@objectId")
+                            val child =
+                                join
+                                    .collection("Object2")
+                                    .firstOrNull()
+                                    ?.let(::ref)
+                                    ?.get("@objectId")
+                            if (parent == null || child == null) {
+                                null
+                            } else {
+                                child to parent
+                            }
+                        }
+                    put("@joinFrom", JsonArray(pairs.map { it.first }))
+                    put("@joinTo", JsonArray(pairs.map { it.second }))
                 }
                 node.scalar("DataType")?.let { raw ->
-                    val match = Regex("([A-Za-z ]+)(?:\\(?([0-9]+)(?:,\\s*([0-9]+))?\\)?)?").matchEntire(raw.trim())
+                    val text = raw.trim().uppercase(Locale.ROOT)
+                    val match = logicalType.matchEntire(text) ?: sqlType.matchEntire(text)
                     if (match != null) {
                         put(
                             "@dataType",
@@ -423,9 +512,15 @@ object PdmFrontEnd : FrontEnd {
         private fun top(node: Node) =
             node.tag != "Package" &&
                 node.parent?.ns == "collection" &&
-                node.parent?.parent?.let { it.tag in setOf("Model", "Package") && it.ns == "object" } == true
+                node.parent?.parent?.let { it.tag in containers && it.ns == "object" } == true
 
         fun json(global: Map<String, List<Pair<Document, Node>>>): String {
+            this.global = global
+            val projected =
+                objects
+                    .filterValues { top(it) && !it.tag.endsWith("Diagram") }
+                    .mapValues { value(it.value, "/objects/${escape(it.key)}") }
+                    .toMutableMap()
             val links = linkedMapOf<String, JsonElement>()
             val originIds =
                 model
@@ -434,9 +529,9 @@ object PdmFrontEnd : FrontEnd {
                     ).mapNotNull { it.scalar("TargetID") }
                     .map(::uuid)
                     .toSet()
-            objects.values.filter { it.scalar("History") != null }.forEach { target ->
+            objects.values.filter { it.scalar("History") != null && it !in skippedRecords }.forEach { target ->
                 val origins =
-                    Regex("(?m)^ORG \\{([^}]+)}")
+                    historyOrigins
                         .findAll(target.scalar("History")!!)
                         .map {
                             uuid(it.groupValues[1])
@@ -447,7 +542,15 @@ object PdmFrontEnd : FrontEnd {
                             d.model.scalar("ObjectID")?.let(::uuid) in
                                 originIds
                         }
-                    if (candidates.size > 1) fail(label, target, "Generation origin $origin is ambiguous")
+                    if (candidates.size >
+                        1
+                    ) {
+                        fail(
+                            label,
+                            target,
+                            "Generation origin $origin is ambiguous: ${candidates.joinToString { it.first.label }}",
+                        )
+                    }
                     val found = candidates.singleOrNull()
                     val sourceDoc = found?.first
                     val source = found?.second
@@ -470,8 +573,8 @@ object PdmFrontEnd : FrontEnd {
                                     put("package", packagePath(target))
                                 },
                             )
-                            put("source", if (sourceDoc != null && source != null) sourceDoc.path(source) else origin)
-                            put("target", path(target))
+                            put("source", source?.scalar("ObjectID") ?: origin)
+                            put("target", target.scalar("ObjectID") ?: target.id!!)
                         }
                 }
             }
@@ -486,12 +589,7 @@ object PdmFrontEnd : FrontEnd {
                     )
                     put(
                         "objects",
-                        JsonObject(
-                            objects
-                                .filterValues {
-                                    top(it) && !it.tag.endsWith("Diagram")
-                                }.mapValues { value(it.value, "/objects/${escape(it.key)}") },
-                        ),
+                        JsonObject(projected),
                     )
                     put(
                         "diagrams",

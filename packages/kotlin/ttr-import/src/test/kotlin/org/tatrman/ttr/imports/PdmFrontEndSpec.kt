@@ -23,7 +23,7 @@ class PdmFrontEndSpec :
             db.sharesInput(trees.last()) shouldBe true
             JsonPointer("/objects/o303/Joins/0/Object2/0/\$ref").resolve(db.root)!!.value shouldBe JsonPrimitive("o322")
             JsonPointer("/objects/o303/Joins/0/Object2/0/@path").resolve(db.root)!!.value shouldBe
-                JsonPrimitive("orders/customer_id")
+                JsonPrimitive("db_sales/orders/customer_id")
             JsonPointer("/objects/o301/@pd/type").resolve(db.root)!!.value shouldBe JsonPrimitive("PDM.Table")
             val line =
                 fixture

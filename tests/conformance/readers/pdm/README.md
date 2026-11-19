@@ -28,15 +28,20 @@ Schema references used when authoring these fixtures:
   parent column and Object2 the child; GenerationOrigins names the origin model through a Shortcut TargetID, and an
   object's History ORG UUIDs identify origin objects. No example content was copied into these fixtures.
 
-The front-end resolves only the files supplied to this run. Model/package Codes form verbatim package paths; object
-Codes form definition ids. `$ref` retains the local XML id, and `@path` carries the target object's Code ancestry for
-profile `link by: path`. A Code path shared by several records of the requested kind is an ambiguous link error;
-there is no package guess. `ObjectID` is the stable sidecar identity. `History` is retained as foreign data, and the
-front-end also collects generation links separately; `pdm/16` chooses cn2er/er2db kinds. An origin not present among
-the model's supplied GenerationOrigins produces an ignored generation record. No external model is opened implicitly.
+The front-end resolves only the files supplied to this run. Each Model/Package Code segment is lower-cased with
+`Locale.ROOT`; distinct raw paths that collide after lower-casing are refused with `ys/package-invalid` naming both.
+Definition Codes stay verbatim. `$ref` retains the local XML id, and `@path` carries the target's model/package and
+Code ancestry as readable provenance. All links match the resolved `ObjectID` through `by: sourceName` (control room
+§66, amending R391-B); repeated table/entity/column Codes in different packages or models are therefore distinct.
+`ObjectID` is also the stable sidecar identity. Generation origins join exact ObjectIDs, with no Code-based guess.
+An origin not present among the model's supplied GenerationOrigins produces an ignored generation record.
+Shortcuts follow `TargetID` only among supplied models; an FK or relationship through an unavailable shortcut is
+skipped with an ignored entry naming the missing target. Incomplete ReferenceJoins are skipped as whole pairs and
+reported at the join. No external model is opened implicitly. Directory inputs keep `/`-separated paths relative
+to `--from` in diagnostics; archive copies that repeat ObjectIDs are ambiguous and the error names both paths.
 
 The profile's type mapping is data: SQL spellings and PD logical abbreviations (`I`, `VA80`, `N12,2`, etc.) map through
-`values`, after lexical decomposition of the type name/length/precision. Unlisted type names fall back to text.
+`values`, after lexical decomposition of the type name/length/precision. Unlisted type names fall back to text. TTR-M has no binary primitive, so binary spellings also map to text.
 Diagrams and display preferences have an explicit ignore reason. Other PD metadata not selected by the generic
 profile stays visible in `ignored[]` and aggregated warnings (`unknown: ignore`). CDM attributes and participants are
 not asserted as conceptual semantics: entities are abstract kinds and relationships are open-tier relation types.

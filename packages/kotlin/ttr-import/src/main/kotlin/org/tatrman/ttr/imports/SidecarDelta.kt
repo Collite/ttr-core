@@ -97,10 +97,39 @@ internal object SidecarDelta {
                     .map { it.qname.removePrefix("$pkg.").substringBefore('.') }
                     .distinct()
                     .sorted()
-                    .map { "${pkg.replace('.', '/')}/$it.ttrm" }
+                    .map { outputPath(pkg, "$it.ttrm") }
+                    .plus(lexicons(out, pkg))
+                    .distinct()
+                    .sorted()
             }
         return Delta(renamed, removed, emptied.keys.toList(), emptiedFiles)
     }
+
+    /** Lexicons have no sidecar entries; only the emptied package's own existing files belong in its listing. */
+    private fun lexicons(
+        out: Path,
+        pkg: String,
+    ): List<String> =
+        try {
+            val dir = out.resolve(pkg.replace('.', '/'))
+            if (!Files.isDirectory(dir)) {
+                emptyList()
+            } else {
+                Files.list(dir).use { paths ->
+                    paths
+                        .filter { Files.isRegularFile(it) && it.fileName.toString().matches(LEXICON) }
+                        .map { outputPath(pkg, it.fileName.toString()) }
+                        .sorted()
+                        .toList()
+                }
+            }
+        } catch (e: IOException) {
+            emptyList()
+        } catch (e: UncheckedIOException) {
+            emptyList()
+        }
+
+    private val LEXICON = Regex("lexicon[.].+[.]ttrm")
 
     private fun rename(
         was: Named,
@@ -132,7 +161,7 @@ internal object SidecarDelta {
             }
         val directory = real(out)
         return names
-            .filter { it.endsWith(SUFFIX) && it.length > SUFFIX.length }
+            .filter { it.endsWith(SUFFIX) && it.length >= SUFFIX.length }
             .sorted()
             .mapNotNull { name ->
                 val pkg = name.removeSuffix(SUFFIX)
