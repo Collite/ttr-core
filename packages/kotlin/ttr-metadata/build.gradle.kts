@@ -26,6 +26,7 @@ dependencies {
     // Re-exported: consumers get one coherent ttr-* set (contracts §1).
     api(project(":packages:kotlin:ttr-parser"))
     implementation(libs.kotlinx.ser.json) // Deterministic md-hop report rendering.
+    implementation(libs.json.schema.validator) // MW S4.3: published VL layout schema, on located ttr-yaml data.
     api(project(":packages:kotlin:ttr-writer"))
     api(project(":packages:kotlin:ttr-semantics"))
     // S6-A — the MemberCatalog capability implements ttr-md-resolver's member interfaces
@@ -171,3 +172,8 @@ val exportGrammarResources by tasks.registering {
     }
 }
 sourceSets.main { resources.srcDir(exportGrammarResources) }
+
+// Bundle the existing published format, never a hand-maintained copy of its schema.
+tasks.processResources {
+    from("../../package-sdk/schemas/layout.schema.json") { into("org/tatrman/ttr/metadata/layout") }
+}
