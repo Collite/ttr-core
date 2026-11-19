@@ -218,7 +218,7 @@ class XmiReaderSpec :
             val er = body(plain.files.getValue("orders/er.ttrm"))
             er shouldContain
                 "def relation placed_by { description: \"Every order is placed by exactly one customer.\", " +
-                "from: Order, to: Customer, cardinality: { from: \"0..*\", to: \"1\" },"
+                "from: orders.er.entity.Order, to: orders.er.entity.Customer, cardinality: { from: \"0..*\", to: \"1\" },"
             er shouldContain
                 "def attribute email { type: String, optional: true, description: \"Where order confirmations go.\", }"
             reasons(plain) shouldContain
@@ -488,7 +488,9 @@ class XmiReaderSpec :
                 "def kind Customer { description: { en: \"A person or company that places orders.\" }, abstract: true }"
         }
 
-        test("S5.3a: one TTR package per UML package (verbatim), each with its own elements") {
+        test(
+            "S5.3a: one TTR package per UML package (verbatim); a cross-package end is a qualified reference, no import",
+        ) {
             val root = workspace()
             val generated = run(root, "sales-billing.xmi", "ea-erd/1", null, out = "multi")
             matches(generated, "multi")
@@ -497,17 +499,21 @@ class XmiReaderSpec :
             billing shouldContain "package sales.billing"
             billing shouldContain "def entity Invoice {"
             billing shouldNotContain "def entity Customer"
+            billing shouldContain "from: sales.billing.er.entity.Invoice, to: sales.er.entity.Customer,"
+            billing shouldNotContain "import"
             val sales = body(generated.files.getValue("sales/er.ttrm"))
             sales shouldContain "package sales"
-            sales shouldContain "from: Order, to: Customer,"
+            sales shouldContain "from: sales.er.entity.Order, to: sales.er.entity.Customer,"
+            sales shouldNotContain "import"
             sales shouldNotContain "Invoice"
             report(generated).getValue("packages").jsonArray.map {
                 it.jsonObject
                     .getValue("package")
                     .jsonPrimitive.content
             } shouldBe listOf("sales.billing", "sales") // the report lists packages by file path
-            // billed_to's end Customer is in package sales: by name it does not resolve in sales.billing, and no
-            // `imports:` is written — the link that would resolve it is S5.3a Found (a).
+            // ✅D-MW-101: billed_to's end Customer (package sales) resolves in sales.billing; the world loads strict.
+            write(root, "multi", generated)
+            loadStrict(root.resolve("multi"))
             // One input, several trees under its one label: an error in the first package's tree names its own XMI line
             // (placed_by, line 20), not a line of the last tree read.
             root.resolve("sources/dated.xmi").writeText(

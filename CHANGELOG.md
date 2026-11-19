@@ -15,8 +15,13 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   `import-xmi` without `--package` writes each UML package as its TTR package (`--package` still puts all in one).
   An EA root package such as `Orders` is no TTR package path: rename it, or give `--package`.
 - A child profile that restates `cn-from-uml: false` no longer fails inside its parent (review-372 N1).
-- Edges: a relation end in another UML package does not resolve yet (by name), and `ttr-mdg/1` resolves every reference
-  by name, so a multi-package world splits but does not link across packages.
+- `link` resolves among the run's records first and reads the root's sidecars only when none matches, so a renamed or
+  moved record's stale sidecar entry no longer makes its link ambiguous (✅D-MW-100).
+- `link` takes `as: ref`: each result is written `{ref: <qualified qname>}`, a reference the loader resolves, and no
+  package is imported (✅D-MW-101). Without it the qname stays a string, as before.
+- `ea-erd/1` links a relation's ends by the end class's `xmi:id` (`as: ref`), so every end is a qualified reference and
+  an end in another UML package resolves. `ttr-mdg/1` still resolves every reference by name, so a multi-package XM
+  world splits but does not link across packages.
 
 ### Added — `import-xmi`: the `xmi` front-end, `ttr-mdg/1`, `ea-erd/1`, the sidecar rename diff (MW-P5 S5.3)
 

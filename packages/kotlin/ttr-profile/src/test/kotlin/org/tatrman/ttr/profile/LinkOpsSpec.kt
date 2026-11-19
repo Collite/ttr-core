@@ -199,6 +199,59 @@ class LinkOpsSpec :
                 .getValue("imports") shouldBe JsonArray(listOf(JsonPrimitive("sklad.*")))
         }
 
+        test("✅D-MW-101 `as: ref`: each result is {ref: <qualified qname>}, and no package is imported") {
+            val previous =
+                sidecarRoot(
+                    "sklad.sources.json" to
+                        """{"entries": [{"qname": "sklad.er.entity.Product", "kind": "entity", "sourceName": "P"}]}""",
+                )
+            val ops =
+                "- {op: package, mapping: {a: alfa, b: beta}, default: demo}\n" +
+                    "- {op: kinds, at: /entity, mapping: {entita: entity}}\n" +
+                    "- {op: kinds, at: /vztahy, mapping: {vztah: relation}}\n" +
+                    "- {op: link, in: relation, at: /od, to: {kind: relation, property: from}, by: sourceName,\n" +
+                    "   as: ref}\n" +
+                    "- {op: link, in: relation, at: /do, to: {kind: relation, property: to}, by: sourceName, as: ref}"
+            val result =
+                ProfileEngine.apply(
+                    listOf(
+                        ForeignTree.read("entity:\n  A: {}\n", "a.yaml"),
+                        ForeignTree.read(
+                            "entity:\n  B: {}\nvztahy:\n  R1: {od: B, do: A}\n  R2: {od: B, do: P}\n",
+                            "b.yaml",
+                        ),
+                    ),
+                    listOf(recordProfile(ops)),
+                    previous,
+                )
+            val beta = result.documents.single { it.value.string("package") == "beta" }
+            beta.value.getValue("imports") shouldBe JsonArray(emptyList())
+            beta.value
+                .getValue("defs")
+                .jsonArray
+                .filter { it.jsonObject.string("kind") == "relation" }
+                .map { it.jsonObject.getValue("properties") } shouldBe
+                listOf(
+                    Json.parseToJsonElement("""{"from":{"ref":"beta.er.entity.B"},"to":{"ref":"alfa.er.entity.A"}}"""),
+                    Json.parseToJsonElement(
+                        """{"from":{"ref":"beta.er.entity.B"},"to":{"ref":"sklad.er.entity.Product"}}""",
+                    ),
+                )
+            // A list links each element to a ref, so a target that takes only names (`roles`) refuses it at the
+            // canonical check; `as` takes no other value.
+            val list =
+                entityOps +
+                    "- {op: link, in: entity, at: /role, to: {kind: entity, property: roles}, by: sourceName, as: ref}"
+            val names = shouldThrow<ProfileException> { run("entity:\n  A: {role: [B, A]}\n  B: {}\n", list) }
+            names.code shouldBe "ys/profile-invalid"
+            names.detail shouldContain "/defs/0/properties/roles/0: object found"
+            val invalid =
+                shouldThrow<ProfileException> {
+                    recordProfile(list.replace("as: ref", "as: string"))
+                }
+            invalid.code shouldBe "ys/profile-invalid"
+        }
+
         // review-251 F4 (✅R251-C): the sidecar part is read only when a lookup needs it, and never below
         // dot-directories, build or node_modules.
         val tableLink =

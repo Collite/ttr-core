@@ -5,8 +5,9 @@
 # Packages (MW-P5 S5.3a, ✅D-MW-91): each UML package that holds a class or an association is its own TTR package, its
 # path as written (`sales/billing` → `sales.billing`, the only change); a path that is no TTR package path (EA's
 # `Orders`, `Domain Model`) is `ys/package-invalid` at the package's first element — rename the package in EA, or give
-# `--package <name>` to put every element in one package. A relation's ends are the end classes' names, so an end in
-# another package does not resolve yet (S5.3a Found: `link` reads a re-import's stale sidecars).
+# `--package <name>` to put every element in one package. A relation's ends link by the end class's xmi:id (this run's
+# records first, ✅D-MW-100) and are written as qualified references (`as: ref`, ✅D-MW-101), so an end in another package
+# resolves without an import.
 #
 # Every UML class → `def entity <name>` (its EA notes → `description`), each owned attribute → `def attribute` (`type` =
 # EA's type name, `optional: true` when its lower bound is 0); every named association → `def relation <name>` from EA's
@@ -66,13 +67,13 @@ operations:
   - {op: ignore, in: attribute, at: /isOrdered, reason: UML property flags}
   - {op: ignore, in: attribute, at: /isUnique, reason: UML property flags}
   - {op: ignore, in: attribute, at: /isDerivedUnion, reason: UML property flags}
-  - {op: shape, in: relation, at: /@source, to: {kind: relation, property: from}, template: {ref: {input: /@name}}}
-  - {op: shape, in: relation, at: /@target, to: {kind: relation, property: to}, template: {ref: {input: /@name}}}
+  - {op: link, in: relation, at: /@source/$ref, to: {kind: relation, property: from}, by: sourceName, kind: entity, as: ref}
+  - {op: link, in: relation, at: /@target/$ref, to: {kind: relation, property: to}, by: sourceName, kind: entity, as: ref}
   - {op: rename, in: relation, at: /@source/multiplicity, to: {kind: relation, path: [cardinality, from]}}
   - {op: rename, in: relation, at: /@target/multiplicity, to: {kind: relation, path: [cardinality, to]}}
   - {op: rename, in: relation, at: /@properties/documentation, to: {kind: relation, property: description}}
-  - {op: ignore, in: relation, at: /@source/$ref, reason: 'from: the end name'}
-  - {op: ignore, in: relation, at: /@target/$ref, reason: 'to: the end name'}
+  - {op: ignore, in: relation, at: /@source/@name, reason: 'from: linked by the end''s xmi:id'}
+  - {op: ignore, in: relation, at: /@target/@name, reason: 'to: linked by the end''s xmi:id'}
   - {op: ignore, in: relation, at: /@source/role, reason: 'the role name (TTR relations have none)'}
   - {op: ignore, in: relation, at: /@target/role, reason: 'the role name (TTR relations have none)'}
   - {op: ignore, in: relation, at: /@properties, reason: "EA's connector properties (documentation is the description)"}

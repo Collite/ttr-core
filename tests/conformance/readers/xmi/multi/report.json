@@ -257,16 +257,16 @@
         {
             "file": "sales-billing.xmi",
             "line": 20,
-            "column": 296,
-            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31/@source/$ref",
-            "reason": "from: the end name"
+            "column": 349,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31/@source/@name",
+            "reason": "from: linked by the end's xmi:id"
         },
         {
             "file": "sales-billing.xmi",
             "line": 20,
-            "column": 404,
-            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31/@target/$ref",
-            "reason": "to: the end name"
+            "column": 457,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31/@target/@name",
+            "reason": "to: linked by the end's xmi:id"
         },
         {
             "file": "sales-billing.xmi",
@@ -418,16 +418,16 @@
         {
             "file": "sales-billing.xmi",
             "line": 38,
-            "column": 382,
-            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32/@source/$ref",
-            "reason": "from: the end name"
+            "column": 435,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32/@source/@name",
+            "reason": "from: linked by the end's xmi:id"
         },
         {
             "file": "sales-billing.xmi",
             "line": 38,
-            "column": 492,
-            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32/@target/$ref",
-            "reason": "to: the end name"
+            "column": 545,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32/@target/@name",
+            "reason": "to: linked by the end's xmi:id"
         },
         {
             "file": "sales-billing.xmi",

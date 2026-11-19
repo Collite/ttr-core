@@ -670,16 +670,16 @@
         {
             "file": "orders-erd.xmi",
             "line": 45,
-            "column": 364,
-            "path": "/elements/EAID_5A4D7B6E_BC8F_4E5A_8B6C_7D8E9FA0B105/@source/$ref",
-            "reason": "from: the end name"
+            "column": 417,
+            "path": "/elements/EAID_5A4D7B6E_BC8F_4E5A_8B6C_7D8E9FA0B105/@source/@name",
+            "reason": "from: linked by the end's xmi:id"
         },
         {
             "file": "orders-erd.xmi",
             "line": 45,
-            "column": 472,
-            "path": "/elements/EAID_5A4D7B6E_BC8F_4E5A_8B6C_7D8E9FA0B105/@target/$ref",
-            "reason": "to: the end name"
+            "column": 525,
+            "path": "/elements/EAID_5A4D7B6E_BC8F_4E5A_8B6C_7D8E9FA0B105/@target/@name",
+            "reason": "to: linked by the end's xmi:id"
         },
         {
             "file": "orders-erd.xmi",
@@ -719,16 +719,16 @@
         {
             "file": "orders-erd.xmi",
             "line": 55,
-            "column": 297,
-            "path": "/elements/EAID_6B5E8C7F_CD9A_4F6B_9C7D_8E9FA0B1C206/@source/$ref",
-            "reason": "from: the end name"
+            "column": 350,
+            "path": "/elements/EAID_6B5E8C7F_CD9A_4F6B_9C7D_8E9FA0B1C206/@source/@name",
+            "reason": "from: linked by the end's xmi:id"
         },
         {
             "file": "orders-erd.xmi",
             "line": 55,
-            "column": 405,
-            "path": "/elements/EAID_6B5E8C7F_CD9A_4F6B_9C7D_8E9FA0B1C206/@target/$ref",
-            "reason": "to: the end name"
+            "column": 458,
+            "path": "/elements/EAID_6B5E8C7F_CD9A_4F6B_9C7D_8E9FA0B1C206/@target/@name",
+            "reason": "to: linked by the end's xmi:id"
         },
         {
             "file": "orders-erd.xmi",

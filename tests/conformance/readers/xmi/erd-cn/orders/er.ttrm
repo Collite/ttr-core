@@ -28,9 +28,9 @@ def entity Product {
     ]
 }
 
-def relation lists { from: Order, to: Product, cardinality: { from: "0..*", to: "1..*" },
+def relation lists { from: orders.er.entity.Order, to: orders.er.entity.Product, cardinality: { from: "0..*", to: "1..*" },
 }
 
-def relation placed_by { description: "Every order is placed by exactly one customer.", from: Order, to: Customer, cardinality: { from: "0..*", to: "1" },
+def relation placed_by { description: "Every order is placed by exactly one customer.", from: orders.er.entity.Order, to: orders.er.entity.Customer, cardinality: { from: "0..*", to: "1" },
 }
 

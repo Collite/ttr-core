@@ -14,6 +14,6 @@ def entity Order {
     ]
 }
 
-def relation placed_by { from: Order, to: Customer, cardinality: { from: "0..*", to: "1" },
+def relation placed_by { from: sales.er.entity.Order, to: sales.er.entity.Customer, cardinality: { from: "0..*", to: "1" },
 }
 

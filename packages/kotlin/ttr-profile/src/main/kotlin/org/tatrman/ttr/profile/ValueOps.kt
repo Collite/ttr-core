@@ -250,7 +250,9 @@ internal class EachOp(
  * `link`: a foreign reference → the qname of one record of the run or one sidecar entry, matched `by` sourceName, iri
  * or path, among the kinds the target property accepts (✅D-MW-67 (c′)) — or, where the property names none, the kind the
  * op's `kind` operand names (✅D-MW-72, S3.7b; a name that exists only as other kinds is `xm/link-kind-missing`). A list
- * of references links each element.
+ * of references links each element. With `as: ref` (✅D-MW-101, S5.3a) each result is `{ref: <qualified qname>}` — a
+ * reference the loader resolves, which needs no import; without it the qname is a string and a target in another
+ * package imports that package.
  */
 internal class LinkOp(
     private val op: PlannedOp,
@@ -266,6 +268,7 @@ internal class LinkOp(
         val by = op.value.string("by")
         val operand = op.value.optionalString("kind")
         val kind = operand ?: ProfileVocabulary.referentKind(path)
+        val asRef = op.value.optionalString("as") == "ref"
         for (record in plan.records.filter { it.kind == op.scope }) {
             val source = op.at.resolve(record.source, includeNull = true) ?: continue
             plan.consumption.consume(source)
@@ -274,9 +277,20 @@ internal class LinkOp(
                     JsonNull -> continue
                     is JsonArray ->
                         JsonArray(
-                            source.entries().map { resolve(it, by, kind, operand != null, plan, builder, record) },
+                            source.entries().map {
+                                resolve(
+                                    it,
+                                    by,
+                                    kind,
+                                    operand != null,
+                                    asRef,
+                                    plan,
+                                    builder,
+                                    record,
+                                )
+                            },
                         )
-                    else -> resolve(source, by, kind, operand != null, plan, builder, record)
+                    else -> resolve(source, by, kind, operand != null, asRef, plan, builder, record)
                 }
             builder.write(plan, record, path, linked, source)
         }
@@ -287,10 +301,11 @@ internal class LinkOp(
         by: String,
         kind: String?,
         declared: Boolean,
+        asRef: Boolean,
         plan: RecordPlan,
         builder: CanonicalBuilder,
         record: Record,
-    ): JsonPrimitive {
+    ): JsonElement {
         val reference =
             (node.value as? JsonPrimitive)?.takeIf { it.isString }?.content ?: throw ProfileException(
                 "xm/link-unresolved",
@@ -323,6 +338,7 @@ internal class LinkOp(
                     "$by $reference$accepted matches ${candidates.joinToString { it.qname }}",
                 )
             }
+        if (asRef) return JsonObject(mapOf("ref" to JsonPrimitive(target.qname)))
         if (target.pkg.isNotEmpty() && target.pkg != ownPackage) builder.import(plan, record, target.pkg)
         return JsonPrimitive(target.qname)
     }

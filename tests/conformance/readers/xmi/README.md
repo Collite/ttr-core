@@ -12,5 +12,6 @@ Invented, no client names. `XmiReaderSpec` reads them in place.
 - `model/` — `shop.xmi` through `ttr-mdg/1 --package shop`; `erd/` — `orders-erd.xmi` through `ea-erd/1 --package orders`;
   `erd-cn/` — the same through `profiles/ea-erd-cn.yaml` (a child with `cn-from-uml: true`).
 - `multi/` — `sales-billing.xmi` through `ea-erd/1` with no `--package`: one TTR package per UML package
-  (`package: {at: /model/package, verbatim: true}`), `sales` and `sales.billing`.
+  (`package: {at: /model/package, verbatim: true}`), `sales` and `sales.billing`; `billed_to`'s end in `sales` is a
+  qualified reference (`link … as: ref`), so the world loads strict with no `import`.
 - `overlay.yaml` (keyed by the old qname) and `renames.yaml` — the overlay-orphan case on the renamed snapshot.

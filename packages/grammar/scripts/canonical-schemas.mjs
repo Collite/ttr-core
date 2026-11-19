@@ -905,6 +905,7 @@ export function createSchemas(metadata) {
       ['mapping']
     ),
     // ✅D-MW-72 (S3.7b): `kind` names the referent kind where the target property names none.
+    // ✅D-MW-101 (S5.3a): `as: ref` writes `{ref: <qualified qname>}` (a reference the loader resolves), no import.
     operation(
       'link',
       {
@@ -912,6 +913,7 @@ export function createSchemas(metadata) {
         to: ref('propertyTarget'),
         by: { enum: ['sourceName', 'iri', 'path'] },
         kind: canonicalKind,
+        as: { const: 'ref' },
       },
       ['in', 'at', 'to', 'by']
     ),
@@ -1069,6 +1071,7 @@ export function createSchemas(metadata) {
                 unmapped: string,
                 missing: string,
                 verbatim: { type: 'boolean' },
+                as: string,
               },
               ['op']
             ),

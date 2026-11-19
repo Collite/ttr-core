@@ -440,6 +440,9 @@
               },
               "verbatim": {
                 "type": "boolean"
+              },
+              "as": {
+                "type": "string"
               }
             },
             "required": [
@@ -1521,6 +1524,9 @@
                         "process",
                         "step"
                       ]
+                    },
+                    "as": {
+                      "const": "ref"
                     }
                   },
                   "required": [
