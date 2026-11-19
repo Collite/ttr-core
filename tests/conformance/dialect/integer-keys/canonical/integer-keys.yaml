@@ -1,0 +1,17 @@
+ttr: "0.22"
+package: "parity"
+model: "er"
+defs:
+  -
+    kind: "attribute"
+    id: "IntegerKeys"
+    properties:
+      valueLabels:
+        "1":
+          en: "one"
+        "10":
+          en: "ten"
+        "2":
+          en: "two"
+        b:
+          en: "bee"

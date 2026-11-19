@@ -1,0 +1,7 @@
+attributes:
+  IntegerKeys:
+    data:
+      "10": {en: ten}
+      "2": {en: two}
+      b: {en: bee}
+      "1": {en: one}

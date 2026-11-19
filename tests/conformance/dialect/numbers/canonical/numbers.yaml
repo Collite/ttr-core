@@ -1,0 +1,16 @@
+ttr: "0.22"
+package: "parity"
+model: "automation"
+defs:
+  -
+    kind: "program"
+    id: "Numbers"
+    properties:
+      -
+        custom:
+          - 9007199254740993
+          - 1.50
+          - 1E+3
+          - 0.0
+          - 31
+          - 123456789012345678901234567890
