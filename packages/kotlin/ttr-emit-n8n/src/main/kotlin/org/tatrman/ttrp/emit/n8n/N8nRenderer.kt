@@ -80,7 +80,7 @@ internal class N8nRenderer(
             ) {
                 "$input.key ?? $input[${literal(keys.single())}]"
             } else {
-                "$input.key ?? {${keys.joinToString(",") { "${literal(it)}:$input[${literal(it)}]" }}}"
+                "$input.key ?? ${keyObject(input, keys)}"
             }
         val port =
             when (graph.program.port) {
@@ -361,7 +361,7 @@ internal class N8nRenderer(
                         rowNode,
                     )}).isExecuted ? $dollar(${literal(rowNode)}).first().json.rows : [])"
                     val statusBody = "$dollar(${literal(prefix + "action status")}).first().json.body"
-                    val previewKey = "(a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? ${keyProjection(
+                    val previewKey = "(a.key && typeof a.key === 'object' && !Array.isArray(a.key) ? ${previewMatchKey(
                         "a.key",
                         keys,
                     )} : a.key)"
@@ -369,7 +369,7 @@ internal class N8nRenderer(
                         if (sink == "n8n-nodes-base.emailSend") {
                             "$routeRows.filter(r => ($statusBody.actions).some(a => a.action === ${literal(
                                 wiring.action,
-                            )} && JSON.stringify(${keyProjection("r", keys)}) === JSON.stringify($previewKey)))"
+                            )} && JSON.stringify(${previewMatchKey("r", keys)}) === JSON.stringify($previewKey)))"
                         } else {
                             routeRows
                         }
@@ -640,14 +640,14 @@ internal class N8nRenderer(
     ): String = "({${keys.joinToString(",") { "${literal(it)}:$row[${literal(it)}]" }}})"
 
     /** Matches a route row to a preview action's key: the bare value for a one-column key. Never a Server body's key. */
-    private fun keyProjection(
+    private fun previewMatchKey(
         row: String,
         keys: List<String>,
     ): String =
         if (keys.size == 1) {
             "$row[${literal(keys.single())}]"
         } else {
-            "{${keys.joinToString(",") { "${literal(it)}:$row[${literal(it)}]" }}}"
+            keyObject(row, keys)
         }
 
     private data class MailAddress(

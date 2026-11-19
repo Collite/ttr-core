@@ -181,7 +181,10 @@ internal class ContractServer(
         server.stop(0, 1000)
     }
 
-    /** The Server's key for a fixture key: the recipe key `order.order_number` as its column-named object. */
+    /**
+     * The Server's key for a fixture key: the recipe key `order.order_number` as its column-named object. Assumes the
+     * release_order fixtures (every `legacyN8nPerform` caller today); a fixture with another key column must pass it here.
+     */
     private fun keyObject(key: JsonElement): JsonElement =
         key as? JsonObject ?: buildJsonObject { put("order_number", key) }
 

@@ -142,7 +142,8 @@ class N8nReviewRegressionSpec :
                 f.calls.single { it.path.endsWith("/perform") }.body!!["keys"] shouldBe
                     JsonArray(listOf(row(1), row(2)))
             }
-            // review-379 L1: on master this body was a JS syntax error (`r => {…}` read as a block); the node never ran.
+            // review-379 L1: on master this body was a JS syntax error (`r => {…}` read as a block);
+            // the perform node never ran.
             WorkflowFixture().use { f ->
                 f.routes = mapOf("release" to lines)
                 f.run(workflow(performGraph(listOf("order.order_number", "order.line_no"))))["error"] shouldBe null
@@ -160,7 +161,7 @@ class N8nReviewRegressionSpec :
                     .toSet() shouldBe setOf(row(1), row(2))
             }
         }
-        "S1.5.10 T1(d) the Open's port.key stays the caller's value: the bare key column, never an object (review-379 L2)" {
+        "S1.5.10 T1(d) the Open's port.key stays the caller's bare value, never an object (review-379 L2)" {
             WorkflowFixture().use { f ->
                 f.run(
                     workflow(bare()),

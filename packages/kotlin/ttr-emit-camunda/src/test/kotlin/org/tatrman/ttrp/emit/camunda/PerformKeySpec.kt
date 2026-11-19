@@ -140,7 +140,13 @@ class PerformKeySpec :
                     .map { inputs.item(it) as Element }
                     .filter { it.getAttribute("name") == "ttrOpenBody" }
                     .map {
-                        val value = factory.createValueExpression(context, it.textContent, Any::class.java).getValue(context)
+                        val value =
+                            factory
+                                .createValueExpression(
+                                    context,
+                                    it.textContent,
+                                    Any::class.java,
+                                ).getValue(context)
                         Json.parseToJsonElement(value.toString()).jsonObject
                     }
             } else {
