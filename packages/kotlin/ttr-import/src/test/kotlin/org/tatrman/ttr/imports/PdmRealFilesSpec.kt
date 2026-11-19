@@ -50,6 +50,29 @@ private fun pdRun(input: Path) =
 
 private fun pdDir() = Files.createTempDirectory("s54c").resolve("sources").also { it.createDirectories() }
 
+private fun pdLoad(generated: GeneratedPackage): org.tatrman.ttr.metadata.LoadResult {
+    val out = Files.createTempDirectory("pd-strict-model")
+    generated.outputs().forEach { (path, text) ->
+        out.resolve(path).also { it.parent.createDirectories() }.writeText(text)
+    }
+    return org.tatrman.ttr.metadata
+        .MetadataLoader(
+            listOf(
+                org.tatrman.ttr.metadata.source
+                    .BuiltinStockSource(),
+                org.tatrman.ttr.metadata.source.FileBasedSource(
+                    "pd",
+                    100,
+                    org.tatrman.ttr.metadata.source
+                        .LocalFsStorage("pd", out),
+                ),
+            ),
+        ).load(
+            org.tatrman.ttr.metadata
+                .LoadOptions(strict = true),
+        )
+}
+
 class PdmRealFilesSpec :
     FunSpec({
         test("C3 all three overlapping input shapes refuse duplicate labels and name both absolute files") {
@@ -112,9 +135,11 @@ class PdmRealFilesSpec :
                         ),
                     )
                 val result = pdRun(root)
-                result.files.getValue("logical/er.ttrm") shouldContain "def relation rel"
-                result.files.getValue("physical/binding.ttrm") shouldContain "logical.er.relation.rel"
-                result.report.warnings.joinToString() shouldContain "ys/key-missing"
+                result.files.getValue("logical/er.ttrm") shouldNotContain "def relation rel"
+                result.files["physical/binding.ttrm"].orEmpty() shouldNotContain "logical.er.relation.rel"
+                result.report.ignored.any { it.reason?.startsWith("generation link") == true } shouldBe true
+                result.report.warnings.count { "LDM Relationship rel" in it } shouldBe 1
+                result.report.warnings.joinToString() shouldNotContain "ys/key-missing"
                 // An unusable FK target must not leave a binding to a record removed during projection.
                 val file = root.resolve(pdm)
                 file.writeText(file.readText().replace("<c:Joins>$join</c:Joins>", "<c:Joins/>"))
@@ -206,40 +231,27 @@ class PdmRealFilesSpec :
             )
             shouldThrow<ProfileException> { pdRun(root) }
         }
-        test("unmodified public PD16 project.cdm imports end to end and reports duplicate relationship renames") {
-            val root = pdDir()
-            val bytes = javaClass.getResourceAsStream("/pdm-public/project.cdm")!!.use { it.readAllBytes() }
-            root.resolve("project.cdm").toFile().writeBytes(bytes)
-            val result = pdRun(root)
-            val text = result.files.getValue("project/cn.ttrm")
-            text shouldContain "def relation_type BELONGS_TO__"
-            result.report.warnings.joinToString() shouldContain "BELONGS_TO"
-            result.files.values.forEach { it shouldNotContain "grounds:" }
-            pdRun(root).outputs() shouldBe result.outputs()
-            val out = root.resolveSibling("strict-model")
-            result.outputs().forEach { (path, text) ->
-                out.resolve(path).also { it.parent.createDirectories() }.writeText(text)
+        test("unmodified public PD16 project.cdm imports end to end and reports duplicate relationship renames")
+            .config(enabledIf = { !System.getenv("TTR_PDM_PUBLIC_CDM").isNullOrBlank() }) {
+                val root = pdDir()
+                val bytes = Files.readAllBytes(Path.of(System.getenv("TTR_PDM_PUBLIC_CDM")))
+                java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest
+                        .getInstance("SHA-256")
+                        .digest(bytes),
+                ) shouldBe
+                    "e4448550a611932e00e122c381b802a74d052c4ba3bf0c8bef0970ab12873bf5"
+                root.resolve("project.cdm").toFile().writeBytes(bytes)
+                val result = pdRun(root)
+                val text = result.files.getValue("project/cn.ttrm")
+                text shouldContain "def relation_type BELONGS_TO__"
+                result.report.warnings.joinToString() shouldContain "BELONGS_TO"
+                result.files.values.forEach { it shouldNotContain "grounds:" }
+                pdRun(root).outputs() shouldBe result.outputs()
+                val loaded = pdLoad(result)
+                loaded.errors shouldBe emptyList()
+                loaded.report?.ok shouldBe true
             }
-            val loaded =
-                org.tatrman.ttr.metadata
-                    .MetadataLoader(
-                        listOf(
-                            org.tatrman.ttr.metadata.source
-                                .BuiltinStockSource(),
-                            org.tatrman.ttr.metadata.source.FileBasedSource(
-                                "public-pd",
-                                100,
-                                org.tatrman.ttr.metadata.source
-                                    .LocalFsStorage("public-pd", out),
-                            ),
-                        ),
-                    ).load(
-                        org.tatrman.ttr.metadata
-                            .LoadOptions(strict = true),
-                    )
-            loaded.errors shouldBe emptyList()
-            loaded.report?.ok shouldBe true
-        }
         test("C5 extended SQL spellings keep semantic sizes only on text and decimal") {
             data class Case(
                 val raw: String,
@@ -346,6 +358,7 @@ class PdmRealFilesSpec :
             )
             lex("fr", "// hand-authored\n")
             lex("de", "// generated-from: invalid\n")
+            Files.write(out.resolve("glossary/lexicon.xx.ttrm"), byteArrayOf(0xFF.toByte(), 0xFE.toByte(), 0))
             input.writeText("new bytes; the snapshot hash must not be compared")
             val linked = root.resolve("linked-input.ttl")
             Files.createSymbolicLink(linked, input)
@@ -364,30 +377,186 @@ class PdmRealFilesSpec :
                     "noId",
                     pdRef("Object1", "Column", "pk") + pdRef("Object2", "Column", "bad"),
                 )
+            val target = pdId("outside-column")
+            val shortcut =
+                pdObject("Shortcut", "external-column", "external-column", "<a:TargetID>$target</a:TargetID>")
+            val good =
+                pdObject(
+                    "ReferenceJoin",
+                    "good",
+                    "good",
+                    pdRef("Object1", "Column", "pk") + pdRef("Object2", "Column", "pk"),
+                )
+            val external =
+                pdObject(
+                    "ReferenceJoin",
+                    "external",
+                    "external",
+                    pdRef("Object1", "Shortcut", "external-column") + pdRef("Object2", "Column", "pk"),
+                )
+            val partial = pdObject("Reference", "partial", "partial_fk", "<c:Joins>$good$external</c:Joins>")
             root.resolve("bad.pdm").writeText(
                 pdModel(
                     "PDM",
                     "db",
-                    "<c:Tables>" +
+                    "<c:Shortcuts>$shortcut</c:Shortcuts><c:Tables>" +
                         pdObject(
                             "Table",
                             "t",
                             "Items",
                             "<c:Columns>$cols</c:Columns>",
                         ) + "</c:Tables>\n<c:References>" +
-                        pdObject("Reference", "ref", "broken_fk", "<c:Joins>\n$absent\n$noId\n</c:Joins>") +
+                        pdObject("Reference", "ref", "broken_fk", "<c:Joins>\n$absent\n$noId\n</c:Joins>") + partial +
                         "</c:References>",
                 ),
             )
             val result = pdRun(root)
-            result.files.values.single() shouldNotContain "def fk"
-            val ignored = result.report.ignored.filter { it.reason?.startsWith("incomplete ReferenceJoin") == true }
+            val text = result.files.values.single()
+            text shouldNotContain "def fk broken_fk"
+            text shouldContain "def fk partial_fk"
+            text shouldContain "from: [db.db.dbo.Items.pk]"
+            text shouldContain "to: [db.db.dbo.Items.pk]"
+            val shortcutIgnored = result.report.ignored.filter { it.reason?.contains(target) == true }
+            shortcutIgnored.size shouldBe 1
+            shortcutIgnored.single().reason!! shouldContain "incomplete ReferenceJoin"
+            val ignored = result.report.ignored.filter { it.record in setOf("absent", "noId") }
             ignored.size shouldBe 2
             ignored[0].reason!! shouldContain "missing Object1 or Object2"
             ignored[1].reason!! shouldContain "no ObjectID"
             ignored[0].line + 1 shouldBe ignored[1].line
             result.report.ignored.count { it.reason?.contains("foreign key skipped") == true } shouldBe 1
             result.report.ignored.any { it.reason == "kind mapping null" } shouldBe false
+        }
+        test("R1 external LDM ends never load as an implicit self-relation") {
+            for (missing in listOf("Object1", "Object2")) {
+                val root = pdDir()
+                val shortcut =
+                    pdObject("Shortcut", "external", "external", "<a:TargetID>${pdId("outside")}</a:TargetID>")
+                val relation =
+                    pdObject(
+                        "Relationship",
+                        "rel",
+                        "rel",
+                        pdRef(
+                            "Object1",
+                            if (missing ==
+                                "Object1"
+                            ) {
+                                "Shortcut"
+                            } else {
+                                "Entity"
+                            },
+                            if (missing == "Object1") "external" else "local",
+                        ) +
+                            pdRef(
+                                "Object2",
+                                if (missing ==
+                                    "Object2"
+                                ) {
+                                    "Shortcut"
+                                } else {
+                                    "Entity"
+                                },
+                                if (missing == "Object2") "external" else "local",
+                            ),
+                    )
+                val xml =
+                    pdModel(
+                        "LDM",
+                        "logical",
+                        "<c:Entities>${pdObject(
+                            "Entity",
+                            "local",
+                            "local",
+                        )}</c:Entities>\n<c:Shortcuts>$shortcut</c:Shortcuts>\n<c:Relationships>$relation</c:Relationships>",
+                    )
+                root.resolve("external.ldm").writeText(xml)
+                val result = pdRun(root)
+                val loaded = pdLoad(result)
+                loaded.errors shouldBe emptyList()
+                loaded.report?.ok shouldBe true
+                val relations =
+                    loaded.model!!
+                        .schemas.values
+                        .filterIsInstance<org.tatrman.ttr.metadata.model.ErSchema>()
+                        .flatMap { it.relations.values }
+                relations.any { it.toEntity == it.qname || it.fromEntity == it.qname } shouldBe false
+                relations shouldBe emptyList()
+                result.files.values.single() shouldNotContain "def relation rel"
+                val reason = "LDM Relationship rel: $missing is a shortcut to ${pdId(
+                    "outside",
+                )} outside the supplied models; relation skipped"
+                val ignored = result.report.ignored.single { it.reason == reason }
+                ignored.path shouldBe "/objects/rel"
+                ignored.line shouldBe xml.lineSequence().indexOfFirst { "<c:Relationships>" in it } + 1
+                result.report.ignored.count { it.reason?.contains(pdId("outside")) == true } shouldBe 1
+                result.report.warnings shouldBe listOf("external.ldm:${ignored.line}:${ignored.column}: $reason")
+            }
+        }
+        test("R3 diagram symbols on external shortcuts retain only the single diagrams ignore") {
+            val root = pdDir()
+            val shortcut = pdObject("Shortcut", "sc", "external", "<a:TargetID>${pdId("diagram-outside")}</a:TargetID>")
+            val symbols =
+                (1..3).joinToString("") {
+                    pdObject("EntitySymbol", "symbol$it", "symbol$it", pdRef("Object", "Shortcut", "sc"))
+                }
+            val diagram = pdObject("ConceptualDiagram", "dg", "dg", "<c:Symbols>$symbols</c:Symbols>")
+            root
+                .resolve(
+                    "diagram.cdm",
+                ).writeText(
+                    pdModel(
+                        "CDM",
+                        "cn",
+                        "<c:Entities>${pdObject(
+                            "Entity",
+                            "e",
+                            "Thing",
+                        )}</c:Entities><c:Shortcuts>$shortcut</c:Shortcuts><c:ConceptualDiagrams>$diagram</c:ConceptualDiagrams>",
+                    ),
+                )
+            val ignored = pdRun(root).report.ignored
+            ignored.filter { it.path.startsWith("/diagrams/") } shouldBe emptyList()
+            ignored.count { it.path == "/diagrams" } shouldBe 1
+        }
+        test("R4 only emitted FKs claim their Code, regardless of the skipped FK's ObjectID or XML order") {
+            val root = pdDir()
+            val columns = pdObject("Column", "pk", "pk") + pdObject("Column", "fk", "fk")
+            val table = pdObject("Table", "t", "Items", "<c:Columns>$columns</c:Columns>")
+            val join =
+                pdObject(
+                    "ReferenceJoin",
+                    "j",
+                    "j",
+                    pdRef("Object1", "Column", "pk") + pdRef("Object2", "Column", "fk"),
+                )
+            for (emptyFirst in listOf(true, false)) {
+                for (emptyLow in listOf(true, false)) {
+                    fun reference(
+                        key: String,
+                        number: Int,
+                        joins: String,
+                    ) = pdObject("Reference", key, "FK_ORDER", "<c:Joins>$joins</c:Joins>")
+                        .replace(pdId(key), "00000000-0000-4000-8000-00000000000$number")
+                    val empty = reference("empty", if (emptyLow) 1 else 2, "")
+                    val valid = reference("valid", if (emptyLow) 2 else 1, join)
+                    root
+                        .resolve(
+                            "duplicates.pdm",
+                        ).writeText(
+                            pdModel(
+                                "PDM",
+                                "db",
+                                "<c:Tables>$table</c:Tables><c:References>${if (emptyFirst) empty + valid else valid + empty}</c:References>",
+                            ),
+                        )
+                    val result = pdRun(root)
+                    val text = result.files.values.single()
+                    text shouldContain "def fk FK_ORDER {"
+                    text shouldNotContain "FK_ORDER__"
+                    result.report.warnings.joinToString() shouldNotContain "renamed PD Reference Code"
+                }
+            }
         }
         test("C8 empty XMI retains the short diagnostic without a StAX prefix") {
             val file = pdDir().resolve("empty.xmi").also { it.writeText("") }

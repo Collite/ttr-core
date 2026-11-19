@@ -120,9 +120,13 @@ internal object SidecarDelta {
                     paths
                         .filter { Files.isRegularFile(it) && it.fileName.toString().matches(LEXICON) }
                         .filter { path ->
-                            val firstLine = Files.newBufferedReader(path).use { it.readLine() }.orEmpty()
-                            val header = GeneratedHeader.parse(firstLine)
-                            header != null && real(path.parent).resolve(header.snapshot.path).normalize() == input
+                            try {
+                                val firstLine = Files.newBufferedReader(path).use { it.readLine() }.orEmpty()
+                                val header = GeneratedHeader.parse(firstLine)
+                                header != null && real(path.parent).resolve(header.snapshot.path).normalize() == input
+                            } catch (e: IOException) {
+                                false
+                            }
                         }.map { outputPath(pkg, it.fileName.toString()) }
                         .sorted()
                         .toList()

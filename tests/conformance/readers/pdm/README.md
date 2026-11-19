@@ -36,8 +36,9 @@ Code ancestry as readable provenance. All links match the resolved `ObjectID` th
 §66, amending R391-B); repeated table/entity/column Codes in different packages or models are therefore distinct.
 `ObjectID` is also the stable sidecar identity. Generation origins join exact ObjectIDs, with no Code-based guess.
 An origin not present among the model's supplied GenerationOrigins produces an ignored generation record.
-Shortcuts follow `TargetID` only among supplied models. An unavailable shortcut end is reported without discarding
-its CDM/LDM relationship; an LDM missing end also gets the profile's `required: warn` warning. Foreign keys retain only
+Shortcuts follow `TargetID` only among supplied models. An unavailable shortcut end keeps its CDM relation type.
+An LDM relationship with an unavailable shortcut end is omitted: one located warning and one ignored entry name the
+end and target (R396-A). Generation links to that skipped relationship are also skipped. Foreign keys retain only
 complete ReferenceJoin pairs; zero complete pairs skip the FK. Each bad join has one readable ignored entry at its XML
 position, distinguishing a missing end from an end without ObjectID. Generation links check both ends after every
 input has been projected; a link to a skipped record is skipped with a reason. No external model is opened implicitly. Directory inputs keep `/`-separated paths relative
@@ -53,7 +54,7 @@ not asserted as conceptual semantics: entities are abstract kinds and relationsh
 
 ## `pdm/16` on public exports
 
-Same-package relationship Codes (CDM/LDM Relationships and PDM References) are ordered by ObjectID: the first keeps
+Only emitted same-package relationship Codes (CDM/LDM Relationships and PDM References) are ordered by ObjectID: the first keeps
 `<code>`, and each later record becomes `<code>__<first-8-ObjectID-hex>` (lower-case hex, hyphens omitted). Each rename
 has one located warning. Missing/repeated ObjectIDs, a repeated short prefix, or a suffix colliding with an existing
 Code remain located refusals. All references and sidecar foreign ids retain the original ObjectID.
@@ -63,8 +64,17 @@ SQL names include `DOUBLE PRECISION`, `TIMESTAMP WITH TIME ZONE`, and `TIMESTAMP
 widths and temporal precision (`INT(11)`, `datetime2(7)`) produce no TTR length/precision; those fields are for text and
 decimal. Unknown names and binary spellings still map to text.
 
-The additional, byte-exact public `project.cdm` regression is under
-`packages/kotlin/ttr-import/src/test/resources/pdm-public/` (upstream GPL-2.0 licence and provenance beside it).
-It imports end to end twice with equal outputs, reports duplicate-Code renames, and strict-loads. The public
-`project.pdm` is PD 15.3 and remains refused. The invented fixture's model/sidecar bytes are unchanged by S5.4c;
-only its join-report entry changed. Emptied lexicons are listed only when their generated header names this input.
+The public `project.cdm` regression is opt-in (R396-B): no third-party XML or licence is committed.
+Supply a local copy from
+[PowerDesigner_Docs](https://github.com/DeytaLevel39/PowerDesigner_Docs/blob/master/src/testpdm/project.cdm):
+
+```sh
+TTR_PDM_PUBLIC_CDM=/absolute/path/to/project.cdm ./gradlew :packages:kotlin:ttr-import:test
+```
+
+The test is reported **skipped** when the variable is unset. When set, it first checks SHA-256
+`e4448550a611932e00e122c381b802a74d052c4ba3bf0c8bef0970ab12873bf5`, then imports twice with equal outputs,
+reports duplicate-Code renames, and strict-loads. Review-396's local run supplies the stage's real-file proof.
+The public `project.pdm` is PD 15.3 and remains refused. The invented fixture's model/sidecar bytes are unchanged by
+S5.4c; only its join-report entry changed. Emptied lexicons are listed only when their generated header names this
+input; an unreadable/non-UTF-8 candidate is excluded individually. Diagram symbols add no per-symbol ignored entries.

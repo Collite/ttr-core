@@ -9,11 +9,18 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 ### Fixed — PowerDesigner real-file imports (MW-P5 S5.4c)
 
 - `pdm/16` disambiguates duplicate relationship Codes by ObjectID order, with located
-  rename warnings; the unmodified public PD 16.7 `project.cdm` imports and strict-loads.
+  rename warnings; the public PD 16.7 `project.cdm` imports and strict-loads in the
+  opt-in `TTR_PDM_PUBLIC_CDM` test (input SHA-256 checked; no third-party fixture committed).
+  Source: https://github.com/DeytaLevel39/PowerDesigner_Docs/blob/master/src/testpdm/project.cdm
+  SHA-256: `e4448550a611932e00e122c381b802a74d052c4ba3bf0c8bef0970ab12873bf5`.
 - Input labels stay relative to each `--from` directory; overlapping labels are refused
   with both absolute paths. Package case collisions are checked per output model.
-- Unavailable shortcut ends preserve conceptual/logical relationships and warn on
-  unresolved logical ends. Generation links check both ends after every input is projected.
+- Unavailable shortcut ends preserve conceptual relation types. An LDM relation with
+  an unavailable shortcut end is omitted with one located warning and ignored entry;
+  its generation bindings are skipped too (R396-A). Generation links check both ends.
+- Skipped foreign keys do not claim duplicate Codes. Shortcut-end joins get one ignored
+  entry each, diagram symbols stay under one diagram ignore, and an unreadable lexicon
+  is skipped individually without hiding readable owned lexicons.
 - SQL type spellings include multi-word names, character units and unbounded precision;
   display widths and fractional-second precision never become TTR integer/date lengths.
 - Empty foreign keys are skipped; incomplete joins get one readable located entry each.

@@ -139,9 +139,11 @@ object PdmFrontEnd : FrontEnd {
                     }
                 }.groupBy({ it.first }, { it.second })
         documents.forEach { it.global = global }
+        // Determine eligibility before names: a skipped FK must not claim a Code or trigger a rename.
+        documents.forEach { it.skip() }
         disambiguate(documents)
         // Project every document before any generation link: either end may have been skipped in another file.
-        documents.forEach { it.prepare() }
+        documents.forEach { it.project() }
         val trees =
             documents.flatMap { document ->
                 val whole =
@@ -199,7 +201,7 @@ object PdmFrontEnd : FrontEnd {
             documents
                 .flatMap { d ->
                     d.objects.values
-                        .filter { it.tag in relationshipObjects && it.scalar("Code") != null }
+                        .filter { it.tag in relationshipObjects && it.scalar("Code") != null && !d.skipped(it) }
                         .map { d to it }
                 }.groupBy { (d, n) -> Triple(d.kind, d.packagePath(n), n.tag) }
         groups.values.forEach { scope ->
@@ -382,6 +384,7 @@ object PdmFrontEnd : FrontEnd {
         private val paths = mutableMapOf<Node, String>()
         private val skippedRecords = mutableSetOf<Node>()
         private val references = mutableMapOf<Node, JsonObject>()
+        private val reportedEnds = mutableSetOf<Node>()
         private val joins = mutableMapOf<Node, List<Pair<JsonElement, JsonElement>>>()
         private lateinit var projected: Map<String, JsonObject>
         val codes = mutableMapOf<Node, String>()
@@ -526,13 +529,39 @@ object PdmFrontEnd : FrontEnd {
                                 } -> refs.firstNotNullOf { it?.get("@skip")?.jsonPrimitive?.content }
                                 else -> "Object1 or Object2 target has no ObjectID"
                             }
+                        reportedEnds += ends.filterNotNull()
                         ignore(join, "$at/Joins/$i", "incomplete ReferenceJoin: $reason; whole pair skipped")
                         null
                     }
                 }
             }
 
-        fun prepare() {
+        fun skipped(node: Node) = node in skippedRecords
+
+        fun skip() {
+            // R396-A: an incomplete LDM relation must not become a loader-synthesized self-relation.
+            if (kind == "LDM") {
+                objects.values.filter { top(it) && it.tag == "Relationship" }.forEach { n ->
+                    val missing =
+                        listOf("Object1", "Object2").mapNotNull { key ->
+                            n
+                                .collection(key)
+                                .firstOrNull()
+                                ?.let(::ref)
+                                ?.get("@skip")
+                                ?.jsonPrimitive
+                                ?.content
+                                ?.let { key to it }
+                        }
+                    if (missing.isNotEmpty()) {
+                        skippedRecords += n
+                        val ends = missing.joinToString("; ") { (key, reason) -> "$key is a $reason" }
+                        val reason = "LDM Relationship ${n.scalar("Code")}: $ends; relation skipped"
+                        ignore(n, "/objects/${escape(n.id!!)}", reason)
+                        warnings += "$label:${n.line}:${n.column}: $reason"
+                    }
+                }
+            }
             objects.values.filter { top(it) && it.tag == "Reference" }.forEach { n ->
                 val at = "/objects/${escape(n.id!!)}"
                 if (pairs(n, at).isEmpty()) {
@@ -545,6 +574,9 @@ object PdmFrontEnd : FrontEnd {
                     ignore(n, at, "Reference has no complete column pairs; foreign key skipped")
                 }
             }
+        }
+
+        fun project() {
             projected =
                 objects
                     .filterValues { top(it) && !it.tag.endsWith("Diagram") && it !in skippedRecords }
@@ -554,13 +586,14 @@ object PdmFrontEnd : FrontEnd {
         private fun value(
             node: Node,
             at: String,
+            report: Boolean = true,
         ): JsonObject {
             positions[at] = node
             return buildJsonObject {
                 if (node.attrs["Ref"] != null) {
                     val reference = ref(node)
-                    reference["@skip"]?.jsonPrimitive?.content?.let { reason ->
-                        ignore(node, at, reason)
+                    if (report && node !in reportedEnds) {
+                        reference["@skip"]?.jsonPrimitive?.content?.let { reason -> ignore(node, at, reason) }
                     }
                     reference.forEach { (k, v) -> put(k, v) }
                     return@buildJsonObject
@@ -594,7 +627,7 @@ object PdmFrontEnd : FrontEnd {
                                 i,
                                 child,
                                 ->
-                                value(child, "$at/${escape(group.tag)}/$i")
+                                value(child, "$at/${escape(group.tag)}/$i", report)
                             },
                         ),
                     )
@@ -730,7 +763,7 @@ object PdmFrontEnd : FrontEnd {
                             objects
                                 .filterValues {
                                     top(it) && it.tag.endsWith("Diagram")
-                                }.mapValues { value(it.value, "/diagrams/${escape(it.key)}") },
+                                }.mapValues { value(it.value, "/diagrams/${escape(it.key)}", report = false) },
                         ),
                     )
                     put("generationLinks", JsonObject(links))

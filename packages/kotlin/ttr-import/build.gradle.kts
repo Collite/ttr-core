@@ -38,6 +38,12 @@ tasks.test {
     inputs.file("../../grammar/schemas/profile.schema.json")
     // The reader fixtures the specs read in place (tests/conformance/readers), so an edited fixture reruns them.
     inputs.dir("../../../tests/conformance/readers")
+    // R396-B: the optional third-party proof stays outside source control; env changes rerun the test task.
+    val publicCdm = providers.environmentVariable("TTR_PDM_PUBLIC_CDM")
+    inputs.property("pdPublicCdm", publicCdm.orElse(""))
+    publicCdm.orNull?.takeIf { it.isNotBlank() }?.let {
+        inputs.file(it).optional().withPropertyName("pdPublicCdmFile")
+    }
 }
 
 mavenPublishing {
