@@ -383,7 +383,8 @@ internal class N8nRenderer(
                             )}]"},to:${address.recipient("row", keys)}}))"
                         return@forEach
                     }
-                    val selectedKeys = "$rows.map(r => ${keyProjection("r", keys)})"
+                    // §1.2 (✅R254-A): `keys` are always column-named objects, one-column keys too.
+                    val selectedKeys = "$rows.map(r => ${keyObject("r", keys)})"
                     val actionName = prefix + "action " + route.name + " " + wiring.action
                     if (sink == "n8n-nodes-base.emailSend") {
                         val address = mailAddress(action, wiring)
@@ -424,7 +425,7 @@ internal class N8nRenderer(
                                 mapOf(
                                     "action" to wiring.action,
                                 ),
-                                body = "{outcomes:$mailRows.map(r => ({key:${keyProjection(
+                                body = "{outcomes:$mailRows.map(r => ({key:${keyObject(
                                     "r",
                                     keys,
                                 )},status:'delivered',at:new Date().toISOString()}))}",
@@ -593,7 +594,7 @@ internal class N8nRenderer(
                     ),
                     body = "{outcomes:$dollar(${literal(
                         prefix + "digest split",
-                    )}).item.json.group.rows.map(r => ({key:${keyProjection(
+                    )}).item.json.group.rows.map(r => ({key:${keyObject(
                         "r",
                         keys,
                     )},status:'delivered',at:new Date().toISOString()}))}",
@@ -629,6 +630,16 @@ internal class N8nRenderer(
                 ?: if (graph.program.mode == "batch") 1800 else 60
         ) * 1000L + 120_000L
 
+    /**
+     * A Server key (§1.2, ✅R254-A): always `{<key column>: value, …}`, for one-column keys too. Parenthesised, so
+     * that `r => <key>` is an object literal, not a block.
+     */
+    private fun keyObject(
+        row: String,
+        keys: List<String>,
+    ): String = "({${keys.joinToString(",") { "${literal(it)}:$row[${literal(it)}]" }}})"
+
+    /** Matches a route row to a preview action's key: the bare value for a one-column key. Never a Server body's key. */
     private fun keyProjection(
         row: String,
         keys: List<String>,

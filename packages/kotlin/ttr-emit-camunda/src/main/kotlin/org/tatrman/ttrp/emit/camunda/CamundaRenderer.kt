@@ -511,11 +511,13 @@ internal class CamundaRenderer(
 
     private fun rowKeyFields(graph: RecipeGraph) = graph.recipe.key.map { it.substringAfterLast('.') }
 
+    /** The engine-local `ttrKey` (user task, mail worker): bare for a one-column key. Never a Server body's key. */
     private fun rowKey(graph: RecipeGraph): String {
         val fields = rowKeyFields(graph)
         return if (fields.size == 1) rowKeyValue(fields.single()) else rowKeyObject(graph)
     }
 
+    /** A Server key (§1.2, ✅R254-A): always `{<key column>: value, …}`, for one-column keys too. */
     private fun rowKeyObject(graph: RecipeGraph): String =
         d.objectValue(rowKeyFields(graph).associateWith(::rowKeyValue))
 
@@ -953,7 +955,8 @@ internal class CamundaRenderer(
                                     "outcomes" to
                                         d.array(
                                             obj(
-                                                "key" to rowKey(graph),
+                                                // §1.2: an outcome's key is the column-named object, as perform's.
+                                                "key" to rowKeyObject(graph),
                                                 "status" to quote("delivered"),
                                                 "at" to
                                                     expr(
@@ -979,7 +982,8 @@ internal class CamundaRenderer(
                                 mapOf(
                                     "action" to wiring.action,
                                 ),
-                                obj("keys" to d.array(rowKey(graph))),
+                                // §1.2 (✅R254-A): `keys` are always column-named objects, one-column keys too.
+                                obj("keys" to d.array(rowKeyObject(graph))),
                             )
                         rowScope.link(last, perform)
                         last = perform

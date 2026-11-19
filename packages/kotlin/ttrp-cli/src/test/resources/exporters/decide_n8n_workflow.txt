@@ -1042,7 +1042,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route reject_not_ours collect\").isExecuted ? $(\"route reject_not_ours collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route reject_not_ours collect\").isExecuted ? $(\"route reject_not_ours collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1163,7 +1163,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {outcomes:$(\"action reject_not_ours notify_customer split\").item.json.mail.rows.map(r => ({key:r[\"line_id\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                "jsonBody": "={{ {outcomes:$(\"action reject_not_ours notify_customer split\").item.json.mail.rows.map(r => ({key:({\"line_id\":r[\"line_id\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1279,7 +1279,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route reject_late collect\").isExecuted ? $(\"route reject_late collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route reject_late collect\").isExecuted ? $(\"route reject_late collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1400,7 +1400,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {outcomes:$(\"action reject_late notify_customer split\").item.json.mail.rows.map(r => ({key:r[\"line_id\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                "jsonBody": "={{ {outcomes:$(\"action reject_late notify_customer split\").item.json.mail.rows.map(r => ({key:({\"line_id\":r[\"line_id\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1516,7 +1516,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route reject_abuse collect\").isExecuted ? $(\"route reject_abuse collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route reject_abuse collect\").isExecuted ? $(\"route reject_abuse collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1637,7 +1637,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {outcomes:$(\"action reject_abuse notify_customer split\").item.json.mail.rows.map(r => ({key:r[\"line_id\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                "jsonBody": "={{ {outcomes:$(\"action reject_abuse notify_customer split\").item.json.mail.rows.map(r => ({key:({\"line_id\":r[\"line_id\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1753,7 +1753,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route to_customer_care collect\").isExecuted ? $(\"route to_customer_care collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route to_customer_care collect\").isExecuted ? $(\"route to_customer_care collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1855,7 +1855,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route refund_no_return collect\").isExecuted ? $(\"route refund_no_return collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route refund_no_return collect\").isExecuted ? $(\"route refund_no_return collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1889,7 +1889,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route refund_no_return collect\").isExecuted ? $(\"route refund_no_return collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route refund_no_return collect\").isExecuted ? $(\"route refund_no_return collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1991,7 +1991,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route replacement_no_return collect\").isExecuted ? $(\"route replacement_no_return collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route replacement_no_return collect\").isExecuted ? $(\"route replacement_no_return collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -2025,7 +2025,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route replacement_no_return collect\").isExecuted ? $(\"route replacement_no_return collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route replacement_no_return collect\").isExecuted ? $(\"route replacement_no_return collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -2127,7 +2127,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route exchange collect\").isExecuted ? $(\"route exchange collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route exchange collect\").isExecuted ? $(\"route exchange collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -2161,7 +2161,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route exchange collect\").isExecuted ? $(\"route exchange collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route exchange collect\").isExecuted ? $(\"route exchange collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -2282,7 +2282,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {outcomes:$(\"action exchange notify_customer split\").item.json.mail.rows.map(r => ({key:r[\"line_id\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                "jsonBody": "={{ {outcomes:$(\"action exchange notify_customer split\").item.json.mail.rows.map(r => ({key:({\"line_id\":r[\"line_id\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -2398,7 +2398,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route refund_after_return collect\").isExecuted ? $(\"route refund_after_return collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route refund_after_return collect\").isExecuted ? $(\"route refund_after_return collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -2432,7 +2432,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route refund_after_return collect\").isExecuted ? $(\"route refund_after_return collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route refund_after_return collect\").isExecuted ? $(\"route refund_after_return collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -2553,7 +2553,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {outcomes:$(\"action refund_after_return notify_customer split\").item.json.mail.rows.map(r => ({key:r[\"line_id\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                "jsonBody": "={{ {outcomes:$(\"action refund_after_return notify_customer split\").item.json.mail.rows.map(r => ({key:({\"line_id\":r[\"line_id\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -4278,7 +4278,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route reject_not_ours collect\").isExecuted ? $(\"route reject_not_ours collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route reject_not_ours collect\").isExecuted ? $(\"route reject_not_ours collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -4312,7 +4312,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {outcomes:$(\"action reject_not_ours notify_customer split\").item.json.mail.rows.map(r => ({key:r[\"line_id\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                        "jsonBody": "={{ {outcomes:$(\"action reject_not_ours notify_customer split\").item.json.mail.rows.map(r => ({key:({\"line_id\":r[\"line_id\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -4400,7 +4400,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route reject_late collect\").isExecuted ? $(\"route reject_late collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route reject_late collect\").isExecuted ? $(\"route reject_late collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -4434,7 +4434,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {outcomes:$(\"action reject_late notify_customer split\").item.json.mail.rows.map(r => ({key:r[\"line_id\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                        "jsonBody": "={{ {outcomes:$(\"action reject_late notify_customer split\").item.json.mail.rows.map(r => ({key:({\"line_id\":r[\"line_id\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -4522,7 +4522,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route reject_abuse collect\").isExecuted ? $(\"route reject_abuse collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route reject_abuse collect\").isExecuted ? $(\"route reject_abuse collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -4556,7 +4556,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {outcomes:$(\"action reject_abuse notify_customer split\").item.json.mail.rows.map(r => ({key:r[\"line_id\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                        "jsonBody": "={{ {outcomes:$(\"action reject_abuse notify_customer split\").item.json.mail.rows.map(r => ({key:({\"line_id\":r[\"line_id\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -4644,7 +4644,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route to_customer_care collect\").isExecuted ? $(\"route to_customer_care collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route to_customer_care collect\").isExecuted ? $(\"route to_customer_care collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -4732,7 +4732,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route refund_no_return collect\").isExecuted ? $(\"route refund_no_return collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route refund_no_return collect\").isExecuted ? $(\"route refund_no_return collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -4766,7 +4766,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route refund_no_return collect\").isExecuted ? $(\"route refund_no_return collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route refund_no_return collect\").isExecuted ? $(\"route refund_no_return collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -4854,7 +4854,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route replacement_no_return collect\").isExecuted ? $(\"route replacement_no_return collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route replacement_no_return collect\").isExecuted ? $(\"route replacement_no_return collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -4888,7 +4888,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route replacement_no_return collect\").isExecuted ? $(\"route replacement_no_return collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route replacement_no_return collect\").isExecuted ? $(\"route replacement_no_return collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -4976,7 +4976,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route exchange collect\").isExecuted ? $(\"route exchange collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route exchange collect\").isExecuted ? $(\"route exchange collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -5010,7 +5010,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route exchange collect\").isExecuted ? $(\"route exchange collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route exchange collect\").isExecuted ? $(\"route exchange collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -5044,7 +5044,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {outcomes:$(\"action exchange notify_customer split\").item.json.mail.rows.map(r => ({key:r[\"line_id\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                        "jsonBody": "={{ {outcomes:$(\"action exchange notify_customer split\").item.json.mail.rows.map(r => ({key:({\"line_id\":r[\"line_id\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -5132,7 +5132,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route refund_after_return collect\").isExecuted ? $(\"route refund_after_return collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route refund_after_return collect\").isExecuted ? $(\"route refund_after_return collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -5166,7 +5166,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route refund_after_return collect\").isExecuted ? $(\"route refund_after_return collect\").first().json.rows : []).map(r => r[\"line_id\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route refund_after_return collect\").isExecuted ? $(\"route refund_after_return collect\").first().json.rows : []).map(r => ({\"line_id\":r[\"line_id\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -5200,7 +5200,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {outcomes:$(\"action refund_after_return notify_customer split\").item.json.mail.rows.map(r => ({key:r[\"line_id\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                        "jsonBody": "={{ {outcomes:$(\"action refund_after_return notify_customer split\").item.json.mail.rows.map(r => ({key:({\"line_id\":r[\"line_id\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                         "options": {
                             "response": {
                                 "response": {

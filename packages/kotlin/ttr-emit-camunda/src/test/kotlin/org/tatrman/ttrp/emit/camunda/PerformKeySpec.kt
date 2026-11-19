@@ -59,7 +59,11 @@ class PerformKeySpec :
                     val name = element.getAttribute("name")
                     val body =
                         if (dialect == Dialect.C7) {
-                            val inputs = element.getElementsByTagNameNS("http://camunda.org/schema/1.0/bpmn", "inputParameter")
+                            val inputs =
+                                element.getElementsByTagNameNS(
+                                    "http://camunda.org/schema/1.0/bpmn",
+                                    "inputParameter",
+                                )
                             val payload =
                                 (0 until inputs.length)
                                     .map { inputs.item(it) as Element }
@@ -76,7 +80,13 @@ class PerformKeySpec :
                                     Any::class.java,
                                 ),
                             )
-                            val value = factory.createValueExpression(context, payload, Any::class.java).getValue(context)
+                            val value =
+                                factory
+                                    .createValueExpression(
+                                        context,
+                                        payload,
+                                        Any::class.java,
+                                    ).getValue(context)
                             Json.parseToJsonElement(value.toString()).jsonObject
                         } else {
                             val inputs = element.getElementsByTagNameNS("http://camunda.org/schema/zeebe/1.0", "input")
@@ -148,7 +158,18 @@ private fun toJson(value: Any?): JsonElement =
         null -> JsonNull
         is Map<*, *> -> JsonObject(value.entries.associate { (k, v) -> k.toString() to toJson(v) })
         is List<*> -> JsonArray(value.map(::toJson))
-        is java.math.BigDecimal -> JsonPrimitive(value.stripTrailingZeros().let { if (it.scale() <= 0) it.toBigInteger() else it })
+        is java.math.BigDecimal ->
+            JsonPrimitive(
+                value.stripTrailingZeros().let {
+                    if (it.scale() <=
+                        0
+                    ) {
+                        it.toBigInteger()
+                    } else {
+                        it
+                    }
+                },
+            )
         is Number -> JsonPrimitive(value)
         is Boolean -> JsonPrimitive(value)
         else -> JsonPrimitive(value.toString())

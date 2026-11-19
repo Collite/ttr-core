@@ -912,7 +912,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route hold_sales collect\").isExecuted ? $(\"route hold_sales collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route hold_sales collect\").isExecuted ? $(\"route hold_sales collect\").first().json.rows : []).map(r => ({\"order_number\":r[\"order_number\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1033,7 +1033,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {outcomes:$(\"action hold_sales notify split\").item.json.mail.rows.map(r => ({key:r[\"order_number\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                "jsonBody": "={{ {outcomes:$(\"action hold_sales notify split\").item.json.mail.rows.map(r => ({key:({\"order_number\":r[\"order_number\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1149,7 +1149,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route hold_ar collect\").isExecuted ? $(\"route hold_ar collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route hold_ar collect\").isExecuted ? $(\"route hold_ar collect\").first().json.rows : []).map(r => ({\"order_number\":r[\"order_number\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1270,7 +1270,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {outcomes:$(\"action hold_ar notify split\").item.json.mail.rows.map(r => ({key:r[\"order_number\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                "jsonBody": "={{ {outcomes:$(\"action hold_ar notify split\").item.json.mail.rows.map(r => ({key:({\"order_number\":r[\"order_number\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1386,7 +1386,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route release_confirmed collect\").isExecuted ? $(\"route release_confirmed collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route release_confirmed collect\").isExecuted ? $(\"route release_confirmed collect\").first().json.rows : []).map(r => ({\"order_number\":r[\"order_number\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -1488,7 +1488,7 @@
                 "genericAuthType": "httpBearerAuth",
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ {keys:($(\"route release collect\").isExecuted ? $(\"route release collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
+                "jsonBody": "={{ {keys:($(\"route release collect\").isExecuted ? $(\"route release collect\").first().json.rows : []).map(r => ({\"order_number\":r[\"order_number\"]}))} }}",
                 "options": {
                     "response": {
                         "response": {
@@ -2731,7 +2731,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route hold_sales collect\").isExecuted ? $(\"route hold_sales collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route hold_sales collect\").isExecuted ? $(\"route hold_sales collect\").first().json.rows : []).map(r => ({\"order_number\":r[\"order_number\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -2765,7 +2765,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {outcomes:$(\"action hold_sales notify split\").item.json.mail.rows.map(r => ({key:r[\"order_number\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                        "jsonBody": "={{ {outcomes:$(\"action hold_sales notify split\").item.json.mail.rows.map(r => ({key:({\"order_number\":r[\"order_number\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -2853,7 +2853,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route hold_ar collect\").isExecuted ? $(\"route hold_ar collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route hold_ar collect\").isExecuted ? $(\"route hold_ar collect\").first().json.rows : []).map(r => ({\"order_number\":r[\"order_number\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -2887,7 +2887,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {outcomes:$(\"action hold_ar notify split\").item.json.mail.rows.map(r => ({key:r[\"order_number\"],status:'delivered',at:new Date().toISOString()}))} }}",
+                        "jsonBody": "={{ {outcomes:$(\"action hold_ar notify split\").item.json.mail.rows.map(r => ({key:({\"order_number\":r[\"order_number\"]}),status:'delivered',at:new Date().toISOString()}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -2975,7 +2975,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route release_confirmed collect\").isExecuted ? $(\"route release_confirmed collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route release_confirmed collect\").isExecuted ? $(\"route release_confirmed collect\").first().json.rows : []).map(r => ({\"order_number\":r[\"order_number\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {
@@ -3063,7 +3063,7 @@
                         "genericAuthType": "httpBearerAuth",
                         "sendBody": true,
                         "specifyBody": "json",
-                        "jsonBody": "={{ {keys:($(\"route release collect\").isExecuted ? $(\"route release collect\").first().json.rows : []).map(r => r[\"order_number\"])} }}",
+                        "jsonBody": "={{ {keys:($(\"route release collect\").isExecuted ? $(\"route release collect\").first().json.rows : []).map(r => ({\"order_number\":r[\"order_number\"]}))} }}",
                         "options": {
                             "response": {
                                 "response": {
