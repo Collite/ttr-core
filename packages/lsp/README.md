@@ -201,3 +201,18 @@ Build produces both transport bundles:
 - `dist/server-browser.js` (browser, Web Worker transport)
 
 Last verified to compile: 2026-05-18.
+## YAML model workspaces
+
+The desktop server reads `.yaml` / `.yml` below the nearest `ttr.yaml` declaring
+`profile` and `grammar`, or with a per-file `ttr: {profile, grammar}` header.
+It runs the shared TypeScript profile engine before indexing the model. Hover,
+symbols, definition targets and diagnostics use authored dialect ranges; closed
+YAML files participate in cross-file resolution. Open model/profile buffers take
+precedence over disk, and profile/marker changes rebuild the YAML index.
+Unmarked plain YAML is ignored. Dialect files are read-only for TTR editing:
+completion, rename, formatting and code actions are unavailable in v1.
+
+For CLI diagnostics use `modeler-lint <workspace> --profile` (nearest marker/header)
+or `--profile ./ttr-profile.yaml` (explicit profile). `--format json` preserves
+`ys/*` / `xm/*` codes alongside semantic `ttr/*` diagnostics. `--fix` edits native
+TTR files only.

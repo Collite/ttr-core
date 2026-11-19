@@ -4,7 +4,7 @@ import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import Ajv2020Module from 'ajv/dist/2020.js';
 import type { ErrorObject, ValidateFunction } from 'ajv';
 import { ForeignData, isRecord, pointer, type Json, type RecordValue } from './input.js';
-import { NumericScalar } from './scalars.js';
+import { NumericScalar, schemaTypeMessage } from './scalars.js';
 import { readProfileFile } from './file-input.js';
 import {
   profileSchema,
@@ -160,7 +160,7 @@ function validate(
     const message =
       error?.keyword === 'not'
         ? `${error.instancePath}: must not be valid to the schema "${error.schemaPath.replace(/^#/, '')}" : ${JSON.stringify(error.schema)}`
-        : (error?.message ?? 'Invalid profile');
+        : schemaTypeMessage(error?.message ?? 'Invalid profile', value, error?.instancePath ?? '');
     invalid(data, prefix + (error ? errorPath(error) : ''), message);
   }
   return value as RecordValue;
@@ -347,7 +347,8 @@ export class ProfileResolver {
   constructor(
     root: string,
     catalog: ReadonlyMap<string, string> | Record<string, string> = new Map(),
-    private readonly shipped: (identity: string) => string | null | undefined = () => null
+    private readonly shipped: (identity: string) => string | null | undefined = () => null,
+    private readonly readFile: (file: string) => string = readProfileFile
   ) {
     this.root = realpathSync(root);
     this.catalog = catalog instanceof Map ? new Map(catalog) : new Map(Object.entries(catalog));
@@ -443,7 +444,7 @@ export class ProfileResolver {
       else {
         let source: string;
         try {
-          source = readProfileFile(path!);
+          source = this.readFile(path!);
         } catch (error) {
           if (error instanceof ProfileException) throw error;
           throw new ProfileException('ys/profile-not-found', at, `Cannot read profile ${ref}`);

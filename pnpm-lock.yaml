@@ -299,6 +299,9 @@ importers:
       '@tatrman/parser':
         specifier: workspace:*
         version: link:../parser
+      '@tatrman/profile':
+        specifier: workspace:*
+        version: link:../profile
       '@tatrman/semantics':
         specifier: workspace:*
         version: link:../semantics

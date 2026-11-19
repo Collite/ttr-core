@@ -31,7 +31,7 @@ import {
   type Overridden,
 } from './links.js';
 
-import { entries, jsonText } from './scalars.js';
+import { entries, jsonText, schemaTypeMessage } from './scalars.js';
 
 type ObjectValue = { [key: string]: Json };
 const object = (v: Json | undefined): ObjectValue => (isRecord(v) ? v : {});
@@ -48,6 +48,8 @@ export interface Ignored {
   record?: string | null;
 }
 export interface ProfileWarning {
+  /** Internal provenance; canonical report JSON deliberately keeps its shared shape. */
+  origin?: 'required' | 'unknown' | 'each';
   location: ProfileSpan;
   message: string;
   record?: string | null;
@@ -98,6 +100,7 @@ export class PlannedOp {
   missing(plan: RecordPlan, record: Record, target: string[]): void {
     if (this.value.required !== 'warn') return;
     plan.warnings.push({
+      origin: 'required',
       location: record.source.span(),
       message: `ys/key-missing: ${record.id} has no ${String(this.value.at ?? '')}, so ${record.kind}.${target.join('.')} is not written`,
     });
@@ -158,6 +161,7 @@ export class ConsumptionLedger {
       let group = groups.get(id);
       if (!group) {
         const warning: ProfileWarning = {
+          origin: 'unknown',
           location: node.span(node.mappingKey !== undefined),
           message: 'not in this profile',
           ...(owner ? { in: owner.kind } : {}),
@@ -647,35 +651,11 @@ export class CanonicalBuilder {
         const suffix = rekind
           ? `; the overlay re-kinded ${rekind[0]} from ${record.kind} to ${this.rekinds.get(record)} at ${rekind[1].file}:${rekind[1].line}:${rekind[1].column}`
           : '';
-        let message = error?.message ?? 'Invalid canonical document';
-        const type = /^must be (string|object|array|number|integer|boolean|null)$/.exec(
-          message
-        )?.[1];
-        if (type) {
-          // The parser supplies Ajv's shorthand; profile refusals use Kotlin's located type text.
-          const value = path
-            .split('/')
-            .slice(1)
-            .reduce<Json | undefined>((value, key) => {
-              const decoded = key.replace(/~1/g, '/').replace(/~0/g, '~');
-              return Array.isArray(value)
-                ? value[Number(decoded)]
-                : value instanceof Map
-                  ? value.get(decoded)
-                  : isRecord(value)
-                    ? value[decoded]
-                    : undefined;
-            }, raw);
-          const found =
-            value === null
-              ? 'null'
-              : value instanceof NumericScalar
-                ? 'number'
-                : Array.isArray(value)
-                  ? 'array'
-                  : typeof value;
-          message = `${path}: ${found} found, ${type} expected`;
-        }
+        const message = schemaTypeMessage(
+          error?.message ?? 'Invalid canonical document',
+          raw,
+          path
+        );
         throw new ProfileException('ys/profile-invalid', origin, message + suffix);
       }
       const relocate = (source: SourceLocation): SourceLocation => {

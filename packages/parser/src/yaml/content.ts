@@ -110,10 +110,8 @@ export function yamlContent(
         (logical[Math.max(0, first)]?.match(/^ */)?.[0].length ?? 0)
     );
     offsets = [];
-    lines = [];
     for (const [i, line] of logical.entries()) {
       let at = Math.min(range[1], (starts[i] ?? range[1]) + (line.trim() ? indent : 0));
-      lines.push(input.coordinates.points[at]);
       for (const point of line) {
         offsets.push(at);
         at += point.length;
@@ -132,7 +130,7 @@ export function yamlContent(
     }
     offsets.push(at);
   }
-  const mapped = offsets.map((offset) => input.coordinates.points[offset]);
+  const mapped = Uint32Array.from(offsets, (offset) => input.coordinates.points[offset]);
   if (mapped.length > 1) {
     lines = [];
     let i = 0;

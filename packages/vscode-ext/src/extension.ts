@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { YamlLanguageSelector } from './yaml-language';
 import { LanguageClient, TransportKind, NodeModule } from 'vscode-languageclient';
 
 // Resolve the LSP server entry point.
@@ -39,15 +40,31 @@ export function activate(context: vscode.ExtensionContext) {
     documentSelector: [
       { scheme: 'file', language: 'ttr' },
       { scheme: 'file', language: 'ttrg' },
+      { scheme: 'file', language: 'ttr-yaml' },
+      { scheme: 'file', language: 'yaml', pattern: '**/{ttr,ttr-profile}.yaml' },
     ],
     outputChannelName: 'TTR Language Server',
     synchronize: {
       // Notify the server when `.ttrm` files change on disk outside the editor
       // (external edits, git operations, create/delete) so the whole-project
       // symbol table stays current for cross-file reference resolution.
-      fileEvents: vscode.workspace.createFileSystemWatcher('**/*.ttrm'),
+      fileEvents: [vscode.workspace.createFileSystemWatcher('**/*.ttrm'), vscode.workspace.createFileSystemWatcher('**/*.{yaml,yml}'), vscode.workspace.createFileSystemWatcher('**/model.ignore'), vscode.workspace.createFileSystemWatcher('**/*.sources.json')],
     },
   });
+
+  const started = client.start();
+  const selector = new YamlLanguageSelector(async (uri, text) => {
+    await started;
+    return client.sendRequest<'ttr-yaml' | 'yaml'>('modeler/yamlLanguage', {uri, text});
+  }, (doc, language) => Promise.resolve(vscode.languages.setTextDocumentLanguage(doc as vscode.TextDocument, language)));
+  const reselectYaml = (uri: vscode.Uri) => {
+    if (!/(?:^|[/\\])(?:ttr|ttr-profile)\.ya?ml$/.test(uri.fsPath) && !/(?:^|[/\\])profiles[/\\]/.test(uri.fsPath)) return;
+    for (const doc of vscode.workspace.textDocuments) void selector.select(doc, true);
+  };
+  const yamlWatcher = vscode.workspace.createFileSystemWatcher('**/*.{yaml,yml}');
+  context.subscriptions.push(yamlWatcher, yamlWatcher.onDidCreate(reselectYaml), yamlWatcher.onDidChange(reselectYaml), yamlWatcher.onDidDelete(reselectYaml),
+    vscode.workspace.onDidOpenTextDocument(doc => { void selector.select(doc); }));
+  for (const doc of vscode.workspace.textDocuments) void selector.select(doc);
 
   context.subscriptions.push(
     // Invoked by the "N references" code lens.
@@ -89,7 +106,6 @@ export function activate(context: vscode.ExtensionContext) {
     }),
   );
 
-  client.start();
 }
 
 export function deactivate(): Thenable<void> | undefined {

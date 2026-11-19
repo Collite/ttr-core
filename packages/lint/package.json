@@ -9,6 +9,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./yaml": {
+      "import": "./dist/yaml.js",
+      "types": "./dist/yaml.d.ts"
     }
   },
   "scripts": {
@@ -22,7 +26,8 @@
     "@tatrman/parser": "workspace:*",
     "@tatrman/semantics": "workspace:*",
     "commander": "^13.0.0",
-    "smol-toml": "^1.6.1"
+    "smol-toml": "^1.6.1",
+    "@tatrman/profile": "workspace:*"
   },
   "bin": {
     "modeler-lint": "./dist/cli.js"

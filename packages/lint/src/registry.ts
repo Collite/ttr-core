@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { DiagnosticCode } from '@tatrman/parser';
-import type { Rule, RuleCategory, RuleId } from './rule.js';
+import type { Rule, RuleCategory, RuleId, LintCode } from './rule.js';
 import { ALL_RULES } from './rules/index.js';
 
 const CATEGORIES: ReadonlySet<RuleCategory> = new Set<RuleCategory>([
@@ -51,7 +50,7 @@ function buildRegistry(rules: readonly Rule[]): Map<RuleId, Rule> {
 export const RULES: ReadonlyMap<RuleId, Rule> = buildRegistry(ALL_RULES);
 
 /** The rule for a wire `code`. For a shared code, the first-registered rule. */
-export function ruleForCode(code: DiagnosticCode): Rule | undefined {
+export function ruleForCode(code: LintCode): Rule | undefined {
   for (const r of RULES.values()) if (r.code === code) return r;
   return undefined;
 }

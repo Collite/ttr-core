@@ -1,0 +1,3 @@
+profile: parity/1
+grammar: ">=0.22 <1.0"
+operations: wrong
