@@ -4,12 +4,16 @@ package org.tatrman.ttr.metadata.layout
 import org.slf4j.LoggerFactory
 import org.tatrman.ttr.metadata.model.Model
 import org.tatrman.ttr.metadata.source.LayoutFileRef
+import org.tatrman.ttr.metadata.source.LayoutFileFormat
 import org.tatrman.ttr.metadata.source.SourceSnapshot
 import org.tatrman.ttr.parser.loader.TtrgIssue
 import org.tatrman.ttr.parser.loader.TtrgLayoutRead
 import org.tatrman.ttr.parser.loader.TtrgLayoutReader
+import org.tatrman.ttr.parser.loader.PositionsFrom
 import org.tatrman.ttr.parser.model.LayoutDocument
 import org.tatrman.ttr.parser.model.LayoutPoint
+import org.tatrman.ttr.parser.model.SourceLocation
+import org.tatrman.ttr.yaml.CanonicalYamlException
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -79,6 +83,12 @@ class LayoutIndex(
             compareBy(LayoutDocument.ALPHABETICAL_ORDER) { l: ResolvedLayout -> l.schema }
                 .thenBy(LayoutDocument.ALPHABETICAL_ORDER) { it.name }
 
+        private data class ReadLayout(
+            val file: LayoutFileRef,
+            val read: TtrgLayoutRead.Ok,
+            val locations: Map<String, SourceLocation>,
+        )
+
         /**
          * Read every layout file of [snapshots] (in their order, each source's files by path) and resolve it
          * against [model]. Packages come from the same snapshots ([LayoutResolver.packagesFrom]) — the reconciled
@@ -104,7 +114,7 @@ class LayoutIndex(
             val files = snapshots.flatMap { s -> s.layoutFiles.sortedBy { it.path } }
             if (files.isEmpty()) return EMPTY
             val index = LayoutResolver.indexOf(model, LayoutResolver.packagesFrom(snapshots))
-            val read = mutableListOf<Pair<LayoutFileRef, TtrgLayoutRead.Ok>>()
+            val read = mutableListOf<ReadLayout>()
             val issues = mutableListOf<LayoutIssue>()
             val warnings = mutableListOf<LayoutIssue>()
             for (file in files) {
@@ -112,9 +122,23 @@ class LayoutIndex(
                     issues += LayoutIssue(it.source, "could not be read: ${oneLine(it.reason)}")
                     continue
                 }
+                var locations = emptyMap<String, SourceLocation>()
                 val r =
                     try {
-                        TtrgLayoutReader.read(file.content, file.sidecarContent, file.source)
+                        if (file.format == LayoutFileFormat.YAML) {
+                            val yaml = YamlLayoutReader.located(file.content, file.source)
+                            locations = yaml.objects
+                            TtrgLayoutRead.Ok(
+                                yaml.document,
+                                PositionsFrom.IN_FILE.takeIf { yaml.document.positions.isNotEmpty() },
+                                emptyList(),
+                            )
+                        } else {
+                            TtrgLayoutReader.read(file.content, file.sidecarContent, file.source)
+                        }
+                    } catch (e: CanonicalYamlException) {
+                        issues += LayoutIssue(file.source, "line ${e.line}, column ${e.column}: ${oneLine(e.detail)}")
+                        continue
                     } catch (e: Throwable) {
                         if (!e.recoverable()) throw e
                         issues +=
@@ -127,20 +151,40 @@ class LayoutIndex(
                 r.warnings.forEach { warnings += issueOf(file, it) }
                 when (r) {
                     is TtrgLayoutRead.Failed -> issues += issueOf(file, r.errors.first())
-                    is TtrgLayoutRead.Ok -> read += file to r
+                    is TtrgLayoutRead.Ok -> read += ReadLayout(file, r, locations)
                 }
             }
             val layouts = mutableListOf<ResolvedLayout>()
-            for ((name, holders) in read.groupBy { it.second.document.name }) {
+            for ((name, holders) in read.groupBy { it.read.document.name }) {
                 if (holders.size == 1) {
-                    val (file, r) = holders.single()
-                    layouts += resolve(r, file, index)
+                    val (file, r, locations) = holders.single()
+                    val layout = resolve(r, file, index)
+                    layouts += layout
+                    if (file.format == LayoutFileFormat.YAML) {
+                        val unresolved = layout.missing + layout.ambiguous.map { it.ref }
+                        for (ref in unresolved) {
+                            val at = locations.getValue(ref)
+                            val candidates = layout.ambiguous.firstOrNull { it.ref == ref }?.candidates
+                            warnings +=
+                                LayoutIssue(
+                                    file.source,
+                                    "line ${at.line}, column ${at.column + 1}: vl/layout-unresolved: '$ref'" +
+                                        (candidates?.joinToString(prefix = " is ambiguous: ") ?: " was not found"),
+                                )
+                        }
+                        val stem = file.source.substringAfterLast('/').substringBeforeLast('.')
+                        if (stem !=
+                            name
+                        ) {
+                            warnings += LayoutIssue(file.source, "name '$name' differs from file stem '$stem'")
+                        }
+                    }
                     continue
                 }
                 // A-VL-7: served by neither — whichever came first would win on file order alone
                 for (holder in holders) {
-                    val others = holders.filter { it !== holder }.joinToString(", ") { it.first.source }
-                    issues += LayoutIssue(holder.first.source, "the name $name is also declared by $others")
+                    val others = holders.filter { it !== holder }.joinToString(", ") { it.file.source }
+                    issues += LayoutIssue(holder.file.source, "the name $name is also declared by $others")
                 }
             }
             issues.sortWith(compareBy({ it.path }, { it.reason }))

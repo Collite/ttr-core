@@ -300,6 +300,7 @@ internal class YamlTreeReader(
                 path == "model.ignore" -> ignoreFile = file
                 file.extension() in setOf("yaml", "yml") &&
                     TreeContent.includes(segments) &&
+                    segments.first() != "layouts" &&
                     path !in CONTROL_FILES -> candidates += file
             }
         }
