@@ -18,13 +18,12 @@ internal class PackageOp(
     fun select(plan: RecordPlan): String {
         val selected = if ("at" in op.value) op.at.resolve(plan.tree.root, includeNull = true) else null
         selected?.let(plan.consumption::consume)
+        if (op.value["verbatim"] == JsonPrimitive(true)) return verbatim(plan, selected)
         val key =
             if ("at" in op.value) {
                 (selected?.value as? JsonPrimitive)?.takeIf { it.isString }?.content
             } else {
-                plan.tree.file
-                    .substringAfterLast('/')
-                    .substringBeforeLast('.', plan.tree.file.substringAfterLast('/'))
+                stem(plan.tree.label)
             }
         return op.value
             .getValue("mapping")
@@ -44,6 +43,48 @@ internal class PackageOp(
                 },
             )
     }
+
+    /**
+     * review-378 F4: a `mapping` without `at` keys on the stem of the **input** the tree was read from — its label, less
+     * any `#part` (RDF's `#subjects`) — not of its `file`: the `xmi` front-end's per-package trees are files
+     * `<stem>/<package path>` with the input's name as label. For every one-tree front-end the two stems agree.
+     */
+    private fun stem(label: String): String {
+        val name = label.substringBefore('#').substringAfterLast('/')
+        return name.substringBeforeLast('.', name)
+    }
+
+    /**
+     * `verbatim: true` (✅D-MW-91, MW-P5 S5.3a): the string at `at` is the package path as written; its `/` separators
+     * (the `xmi` front-end's UML package path) become `.`, the only change. A path that is then no TTR package path
+     * (`[a-z][a-z0-9_]*(.[a-z][a-z0-9_]*)*`), or no string, is `ys/package-invalid` at the tree's first record; a tree
+     * that holds no record names no package (`""`, as with no `package` operation).
+     */
+    private fun verbatim(
+        plan: RecordPlan,
+        selected: ForeignNode?,
+    ): String {
+        if (plan.records.isEmpty()) return ""
+        val written = (selected?.value as? JsonPrimitive)?.takeIf { it.isString }?.content
+        val path = written?.replace('/', '.')
+        if (path != null && PACKAGE_PATH.matches(path)) return path
+        throw ProfileException(
+            "ys/package-invalid",
+            plan.records
+                .first()
+                .source
+                .span(key = true),
+            if (written == null) {
+                "no package path at ${op.value.string("at")}"
+            } else {
+                "\"$written\" is no TTR package path (verbatim: lower-case names, `/` → `.`)"
+            },
+        )
+    }
+
+    private companion object {
+        val PACKAGE_PATH = Regex("[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*")
+    }
 }
 
 /** rename, nest and unnest all select the original input and place it at a schema-validated property path. */
@@ -57,9 +98,17 @@ internal class WriteOp(
     ) {
         val path = op.targetPath()
         for (record in plan.records.filter { it.kind == op.scope }) {
-            val source = op.at.resolve(record.source, includeNull = true) ?: continue
+            val source =
+                op.at.resolve(record.source, includeNull = true) ?: run {
+                    op.missing(plan, record, path)
+                    continue
+                }
             plan.consumption.consume(source)
-            if (source.value != JsonNull) builder.write(plan, record, path, source.value, source)
+            if (source.value == JsonNull) {
+                op.missing(plan, record, path)
+            } else {
+                builder.write(plan, record, path, source.value, source)
+            }
         }
     }
 }
@@ -201,7 +250,9 @@ internal object StructuralExecutor {
             index.sources(),
             plans.flatMap { plan ->
                 val pkg = packages.getValue(plan)
-                plan.records.map { RecordOrigin(Qnames.of(it, pkg), it.kind, pkg, plan.tree.label, it.source.path) }
+                plan.records.map {
+                    RecordOrigin(Qnames.of(it, pkg), it.kind, pkg, plan.tree.label, it.source.path, plan.tree.file)
+                }
             },
         )
     }

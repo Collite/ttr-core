@@ -125,6 +125,27 @@ internal class PlannedOp(
     private val files = value["files"]?.jsonArray?.map { it.jsonPrimitive.content }?.let(::FileSelector)
 
     fun matches(tree: ForeignTree) = files?.matches(tree.file) != false
+
+    /**
+     * ✅D-MW-98 (S5.3a T4c): with `required: warn` (on `rename`, `shape` and `link`), a [record] where `at` selects
+     * nothing **or `null`** (review-378 F7) gets one warning `ys/key-missing`, located at the record, naming the key and
+     * the property not written; the run goes on (a `null` stays consumed). Without it nothing is written, silently.
+     */
+    fun missing(
+        plan: RecordPlan,
+        record: Record,
+        target: List<String>,
+    ) {
+        if (value.optionalString("required") != "warn") return
+        val pointer = value.optionalString("at") ?: ""
+        plan.warnings +=
+            ProfileWarning(
+                record.source.span(),
+                "ys/key-missing: ${record.id} has no $pointer, so ${record.kind}.${target.joinToString(
+                    ".",
+                )} is not written",
+            )
+    }
 }
 
 /**

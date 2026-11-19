@@ -32,6 +32,7 @@ import org.tatrman.ttr.yaml.CanonicalYaml
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
+import kotlin.io.path.deleteExisting
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
@@ -60,11 +61,25 @@ class XmiReaderSpec :
                 if (renames) Files.copy(fixture.resolve("renames.yaml"), root.resolve("renames.yaml"))
             }
 
+        /** [input] under `<root>/sources` re-exported: its bytes replaced by [snapshot]'s (from [from]'s `sources/`). */
+        fun reexport(
+            root: Path,
+            input: String,
+            snapshot: String,
+            from: Path = root,
+        ) {
+            Files.copy(
+                from.resolve("sources/$snapshot"),
+                root.resolve("sources/$input"),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+            )
+        }
+
         fun run(
             root: Path,
             input: String,
             profile: String,
-            pkg: String,
+            pkg: String?,
             out: String = "model",
             overlay: Path? = null,
         ) = Reader.run(
@@ -218,7 +233,7 @@ class XmiReaderSpec :
             val er = body(plain.files.getValue("orders/er.ttrm"))
             er shouldContain
                 "def relation placed_by { description: \"Every order is placed by exactly one customer.\", " +
-                "from: Order, to: Customer, cardinality: { from: \"0..*\", to: \"1\" },"
+                "from: orders.er.entity.Order, to: orders.er.entity.Customer, cardinality: { from: \"0..*\", to: \"1\" },"
             er shouldContain
                 "def attribute email { type: String, optional: true, description: \"Where order confirmations go.\", }"
             reasons(plain) shouldContain
@@ -269,8 +284,10 @@ class XmiReaderSpec :
             entries.all { (it.jsonObject["foreignId"] as? JsonPrimitive)?.content?.length == 36 } shouldBe true
             write(root, "model", first)
 
-            // Snapshot 2: the class renamed in EA (same GUID). The sidecar diff against the previous generation.
-            val second = run(root, "shop-renamed.xmi", "ttr-mdg/1", "shop")
+            // Snapshot 2: the class renamed in EA (same GUID), re-exported to the same path (✅R378-A: the delta reads this
+            // input's previous generation). The sidecar diff against it.
+            reexport(root, "shop.xmi", "shop-renamed.xmi")
+            val second = run(root, "shop.xmi", "ttr-mdg/1", "shop")
             val renamed =
                 report(second)
                     .getValue("delta")
@@ -367,6 +384,11 @@ class XmiReaderSpec :
             dumps(asChildren) shouldBe dumps(asAttributes)
         }
 
+        /** A sidecar generated from `in.x` beside it (any hash), holding [entries]. */
+        fun sidecar(entries: String) =
+            """{"generated-from": "generated-from: in.x@${"0".repeat(64)} profile p/1 generator g — do not edit", """ +
+                """"entries": [$entries]}"""
+
         fun renames(generated: GeneratedPackage): List<Pair<String, String>> =
             report(generated)["delta"]
                 ?.jsonObject
@@ -389,14 +411,15 @@ class XmiReaderSpec :
                         "sources/orders-erd.xmi",
                     ).readText(charset("windows-1252"))
                     .replace("name=\"Customer\"", "name=\"Client\"")
-            root.resolve("sources/orders-client.xmi").writeText(renamed, charset("windows-1252"))
-            // Run 1 with the cn skeleton (cn + er), run 2 without it (er only), one class renamed in between.
+            // Run 1 with the cn skeleton (cn + er), run 2 without it (er only), one class renamed in between (the same
+            // input path, re-exported).
             write(
                 root,
                 "f",
                 run(root, "orders-erd.xmi", fixture.resolve("profiles/ea-erd-cn.yaml").toString(), "orders", out = "f"),
             )
-            renames(run(root, "orders-client.xmi", "ea-erd/1", "orders", out = "f")) shouldBe
+            root.resolve("sources/orders-erd.xmi").writeText(renamed, charset("windows-1252"))
+            renames(run(root, "orders-erd.xmi", "ea-erd/1", "orders", out = "f")) shouldBe
                 listOf(
                     "orders.er.entity.Customer" to "orders.er.entity.Client",
                     "orders.er.entity.Customer.email" to "orders.er.entity.Client.email",
@@ -404,23 +427,182 @@ class XmiReaderSpec :
                 )
         }
 
+        test(
+            "S5.3a T4b: the delta pairs across packages — a moved class names both packages; an emptied package's rest is removed",
+        ) {
+            val root = workspace()
+            write(root, "m", run(root, "sales-billing.xmi", "ea-erd/1", null, out = "m"))
+            // Another input's import in the same --out is not this input's generation (✅R378-A).
+            write(root, "m", run(root, "shop.xmi", "ttr-mdg/1", "shop", out = "m"))
+            // Snapshot 3, re-exported to the same path: Invoice moved sales/billing → sales, billed_to deleted
+            // (sales.billing emptied), Order renamed. The hash differs; the path pairs it (✅R378-A).
+            reexport(root, "sales-billing.xmi", "sales-billing-moved.xmi")
+            val moved = run(root, "sales-billing.xmi", "ea-erd/1", null, out = "m")
+            moved.files.keys shouldContainExactly listOf("sales/er.ttrm")
+            // review-378 F3: the emptied package is named, with its two paths; shop is not.
+            report(moved).getValue("delta").jsonObject.getValue("emptied") shouldBe
+                Json.parseToJsonElement("""["sales.billing"]""")
+            moved.report.markdown() shouldContain "#### Emptied since the last generation (1)"
+            moved.report.markdown() shouldContain "- `sales.billing`: `sales.billing.sources.json` and `sales/billing/`"
+            moved.report.markdown() shouldNotContain "shop."
+            val delta = report(moved).getValue("delta").jsonObject
+            delta.getValue("renamed").jsonArray.map { it.jsonObject.toString() } shouldBe
+                listOf(
+                    """{"from":"sales.billing.er.entity.Invoice","to":"sales.er.entity.Invoice",""" +
+                        """"foreignId":"5d2a62bd-8b3f-5be6-9a3e-190df23181ae","package":{"from":"sales.billing","to":"sales"}}""",
+                    """{"from":"sales.billing.er.entity.Invoice.total","to":"sales.er.entity.Invoice.total",""" +
+                        """"foreignId":"f2077dc4-7025-58ff-be14-ed4f7faad021","package":{"from":"sales.billing","to":"sales"}}""",
+                    """{"from":"sales.er.entity.Order","to":"sales.er.entity.PurchaseOrder",""" +
+                        """"foreignId":"${Uuid5.of(
+                            XmiFrontEnd.NAMESPACE,
+                            "EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12",
+                        )}"}""",
+                    """{"from":"sales.er.entity.Order.order_no","to":"sales.er.entity.PurchaseOrder.order_no",""" +
+                        """"foreignId":"${Uuid5.of(
+                            XmiFrontEnd.NAMESPACE,
+                            "EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D22",
+                        )}"}""",
+                )
+            delta.getValue("removed") shouldBe
+                Json.parseToJsonElement(
+                    """[{"qname":"sales.billing.er.relation.billed_to","foreignId":"5aae9e62-40b3-5c5c-b12f-3412dc018732"}]""",
+                )
+            moved.report.markdown() shouldContain "#### Removed since the last generation (1)"
+            moved.report.markdown() shouldContain
+                "- `sales.billing.er.relation.billed_to` (`5aae9e62-40b3-5c5c-b12f-3412dc018732`)"
+            // The stale files deleted as the report says, the move back is a rename again (sales → sales.billing).
+            write(root, "m", moved)
+            root.resolve("m/sales.billing.sources.json").deleteExisting()
+            root.resolve("m/sales/billing/er.ttrm").deleteExisting()
+            reexport(root, "sales-billing.xmi", "sales-billing.xmi", fixture)
+            val back = report(run(root, "sales-billing.xmi", "ea-erd/1", null, out = "m")).getValue("delta").jsonObject
+            back.keys shouldBe setOf("renamed")
+            back
+                .getValue("renamed")
+                .jsonArray
+                .first()
+                .jsonObject
+                .getValue("package") shouldBe
+                Json.parseToJsonElement("""{"from":"sales","to":"sales.billing"}""")
+            // Only an emptied package's entries are removed (with or without a foreign id); what left a package the run
+            // still emits is not (the delta stays the rename half there).
+            val dir = Files.createTempDirectory("s53a-delta")
+            dir.resolve("a.sources.json").writeText(
+                sidecar(
+                    """{"qname": "a.er.entity.X", "kind": "entity", "foreignId": "u1"}, """ +
+                        """{"qname": "a.er.entity.Y", "kind": "entity", "foreignId": "u2"}""",
+                ),
+            )
+            dir.resolve("b.sources.json").writeText(
+                sidecar(
+                    """{"qname": "b.er.entity.Z", "kind": "entity", "foreignId": "u3"}, """ +
+                        """{"qname": "b.er.entity.W", "kind": "entity"}""",
+                ),
+            )
+            // No header, or another input's: not this input's generation (✅R378-A), so neither is emptied.
+            dir.resolve("d.sources.json").writeText(
+                """{"entries": [{"qname": "d.er.entity.U", "kind": "entity", "foreignId": "u5"}]}""",
+            )
+            dir.resolve("e.sources.json").writeText(
+                sidecar(
+                    """{"qname": "e.er.entity.T", "kind": "entity", "foreignId": "u6"}""",
+                ).replace("in.x@", "other.x@"),
+            )
+            // c's only entry moved to a: c is emptied all the same (review-378 F3), with nothing removed.
+            dir.resolve("c.sources.json").writeText(
+                sidecar("""{"qname": "c.er.entity.V", "kind": "entity", "foreignId": "u4"}"""),
+            )
+            SidecarDelta.of(
+                dir,
+                dir.resolve("in.x"),
+                listOf(
+                    org.tatrman.ttr.profile
+                        .SourceEntry("a.er.entity.X", "entity", "a", "u1", null, null),
+                    org.tatrman.ttr.profile
+                        .SourceEntry("a.er.entity.V", "entity", "a", "u4", null, null),
+                ),
+            ) shouldBe
+                SidecarDelta.Delta(
+                    listOf(ImportReport.Renamed("c.er.entity.V", "a.er.entity.V", "u4", ImportReport.Moved("c", "a"))),
+                    listOf(ImportReport.Removed("b.er.entity.Z", "u3"), ImportReport.Removed("b.er.entity.W", null)),
+                    listOf("b", "c"),
+                )
+        }
+
+        test("review-378 F4: a package mapping keys on the input's stem; a files: glob sees <stem>/<package path>") {
+            val root = workspace()
+            val profile =
+                root.resolve("f4.yaml").also {
+                    it.writeText(
+                        "profile: f4/1\ngrammar: '>=0.22 <1.0'\nunknown: ignore\noperations:\n" +
+                            "  - {op: package, mapping: {sales-billing: shop}}\n" +
+                            "  - {op: kinds, at: /elements, id: /name, kind: /@xmi/type, unmapped: skip, " +
+                            "mapping: {'uml:Class': entity}}\n" +
+                            "  - {op: rename, in: entity, at: /@properties/documentation, " +
+                            "to: {kind: entity, property: description}, files: ['sales-billing/sales/billing']}\n",
+                    )
+                }
+            val generated = run(root, "sales-billing.xmi", profile.toString(), null, out = "f4")
+            generated.files.keys shouldContainExactly listOf("shop/er.ttrm")
+            val er = body(generated.files.getValue("shop/er.ttrm"))
+            er shouldContain "def entity Customer {"
+            er shouldContain "def entity Invoice { description: \"What a customer owes for an order.\""
+            // The rename is scoped to the billing tree: Customer's documentation (in sales) is not read.
+            er shouldNotContain "A buyer of record."
+        }
+
+        test("✅R378-A: another input's sidecars under the same --out are no previous generation (review-378 F1)") {
+            val root = workspace()
+            write(root, "p1", run(root, "shop.xmi", "ttr-mdg/1", "shop", out = "p1"))
+            val orders = run(root, "orders-erd.xmi", "ea-erd/1", "orders", out = "p1")
+            report(orders)["delta"] shouldBe null
+            orders.report.markdown() shouldNotContain "Removed since"
+            orders.report.markdown() shouldNotContain "Emptied since"
+        }
+
+        test("T4c ✅D-MW-98: an association without EA's connector ends is a relation with no ends and two warnings") {
+            val root = workspace()
+            val erd = root.resolve("sources/orders-erd.xmi").readText(charset("windows-1252"))
+            val endless =
+                erd
+                    .replace(Regex("<source xmi:idref=\"[^\"]+\">"), "<source>")
+                    .replace(Regex("<target xmi:idref=\"[^\"]+\">"), "<target>")
+            root.resolve("sources/endless.xmi").writeText(endless, charset("windows-1252"))
+            val generated = run(root, "endless.xmi", "ea-erd/1", "orders", out = "e")
+            body(generated.files.getValue("orders/er.ttrm")) shouldContain "def relation placed_by { description:"
+            body(generated.files.getValue("orders/er.ttrm")) shouldNotContain "from: orders"
+            val warnings = report(generated).getValue("warnings").jsonArray.map { it.jsonPrimitive.content }
+            warnings.filter { "ys/key-missing" in it }.map { it.substringBefore(" — ") }.sorted() shouldBe
+                listOf(
+                    "ys/key-missing: lists has no /@source/\$ref, so relation.from is not written",
+                    "ys/key-missing: lists has no /@target/\$ref, so relation.to is not written",
+                    "ys/key-missing: placed_by has no /@source/\$ref, so relation.from is not written",
+                    "ys/key-missing: placed_by has no /@target/\$ref, so relation.to is not written",
+                )
+            warnings.first { "placed_by has no" in it } shouldContain " — endless.xmi /elements/"
+        }
+
         test("F3: a foreign id with one qname on each side is a rename even when its kind changed") {
             val dir = Files.createTempDirectory("s53-delta")
             val previous = dir.resolve("p.sources.json")
             previous.writeText(
-                """{"entries": [{"qname": "p.er.entity.X", "kind": "entity", "foreignId": "u1"}, """ +
-                    """{"qname": "p.er.entity.Y", "kind": "entity", "foreignId": "u2"}, """ +
-                    """{"qname": "p.cn.kind.Y", "kind": "kind", "foreignId": "u2"}]}""",
-            )
-            SidecarDelta.renamed(
-                previous,
-                listOf(
-                    org.tatrman.ttr.profile
-                        .SourceEntry("p.md.dimension.X", "dimension", "p", "u1", null, null),
-                    org.tatrman.ttr.profile
-                        .SourceEntry("p.md.dimension.Y", "dimension", "p", "u2", null, null),
+                sidecar(
+                    """{"qname": "p.er.entity.X", "kind": "entity", "foreignId": "u1"}, """ +
+                        """{"qname": "p.er.entity.Y", "kind": "entity", "foreignId": "u2"}, """ +
+                        """{"qname": "p.cn.kind.Y", "kind": "kind", "foreignId": "u2"}""",
                 ),
-            ) shouldBe listOf(ImportReport.Renamed("p.er.entity.X", "p.md.dimension.X", "u1"))
+            )
+            SidecarDelta
+                .of(
+                    dir,
+                    dir.resolve("in.x"),
+                    listOf(
+                        org.tatrman.ttr.profile
+                            .SourceEntry("p.md.dimension.X", "dimension", "p", "u1", null, null),
+                        org.tatrman.ttr.profile
+                            .SourceEntry("p.md.dimension.Y", "dimension", "p", "u2", null, null),
+                    ),
+                ).renamed shouldBe listOf(ImportReport.Renamed("p.er.entity.X", "p.md.dimension.X", "u1"))
         }
 
         test("F5 ✅R372-C: a child's own cn operations under an inherited cn-from-uml: false are a located error") {
@@ -445,5 +627,99 @@ class XmiReaderSpec :
             val opted = run(root, "orders-erd.xmi", child("cn-from-uml: true").toString(), "orders", out = "b")
             body(opted.files.getValue("orders/cn.ttrm")) shouldContain
                 "def kind Customer { description: { en: \"A person or company that places orders.\" }, abstract: true }"
+        }
+
+        test(
+            "N1 ✅R372-D: a child restating cn-from-uml: false drops its ancestors' cn operations; only a profile below errs",
+        ) {
+            val root = workspace()
+
+            fun profile(
+                name: String,
+                extends: String,
+                flag: String,
+                operations: String = " []",
+            ) = root.resolve("$name.yaml").also {
+                it.writeText(
+                    "profile: $name/1\ngrammar: '>=0.22 <1.0'\nextends: $extends\n$flag\noperations:$operations\n",
+                )
+            }
+
+            fun bodies(generated: GeneratedPackage) = generated.files.mapValues { body(it.value) }
+            val restated = profile("restated", "ea-erd/1", "cn-from-uml: false")
+            val plain = run(root, "orders-erd.xmi", "ea-erd/1", "orders", out = "a")
+            bodies(run(root, "orders-erd.xmi", restated.toString(), "orders", out = "b")) shouldBe bodies(plain)
+
+            val described =
+                "\n  - {op: shape, in: kind, to: {kind: kind, property: description}, at: /@properties, " +
+                    "template: {en: {input: /documentation}}}"
+            val grandchild = profile("grandchild", "./restated.yaml", "", described)
+            val refused =
+                shouldThrow<ProfileException> {
+                    run(root, "orders-erd.xmi", grandchild.toString(), "orders", out = "c")
+                }
+            refused.code shouldBe "ys/profile-invalid"
+            refused.location.file shouldBe grandchild.toRealPath().toString()
+            refused.location.line shouldBe 6
+            refused.message.orEmpty() shouldContain "the chain inherits false from restated/1"
+
+            val reopened = profile("reopened", "./restated.yaml", "cn-from-uml: true", described)
+            body(
+                run(root, "orders-erd.xmi", reopened.toString(), "orders", out = "d").files.getValue("orders/cn.ttrm"),
+            ) shouldContain
+                "def kind Customer { description: { en: \"A person or company that places orders.\" }, abstract: true }"
+        }
+
+        test(
+            "S5.3a: one TTR package per UML package (verbatim); a cross-package end is a qualified reference, no import",
+        ) {
+            val root = workspace()
+            val generated = run(root, "sales-billing.xmi", "ea-erd/1", null, out = "multi")
+            matches(generated, "multi")
+            generated.files.keys shouldContainExactly listOf("sales/billing/er.ttrm", "sales/er.ttrm")
+            val billing = body(generated.files.getValue("sales/billing/er.ttrm"))
+            billing shouldContain "package sales.billing"
+            billing shouldContain "def entity Invoice {"
+            billing shouldNotContain "def entity Customer"
+            billing shouldContain "from: sales.billing.er.entity.Invoice, to: sales.er.entity.Customer,"
+            billing shouldNotContain "import"
+            val sales = body(generated.files.getValue("sales/er.ttrm"))
+            sales shouldContain "package sales"
+            sales shouldContain "from: sales.er.entity.Order, to: sales.er.entity.Customer,"
+            sales shouldNotContain "import"
+            sales shouldNotContain "Invoice"
+            report(generated).getValue("packages").jsonArray.map {
+                it.jsonObject
+                    .getValue("package")
+                    .jsonPrimitive.content
+            } shouldBe listOf("sales.billing", "sales") // the report lists packages by file path
+            // ✅D-MW-101: billed_to's end Customer (package sales) resolves in sales.billing; the world loads strict.
+            write(root, "multi", generated)
+            loadStrict(root.resolve("multi"))
+            // One input, several trees under its one label: an error in the first package's tree names its own XMI line
+            // (placed_by, line 20), not a line of the last tree read.
+            root.resolve("sources/dated.xmi").writeText(
+                root.resolve("sources/sales-billing.xmi").readText().replace("name=\"Order\"", "name=\"date\""),
+            )
+            val dated = shouldThrow<ProfileException> { run(root, "dated.xmi", "ea-erd/1", null, out = "dated") }
+            dated.code shouldBe "ys/profile-invalid"
+            dated.location.file shouldBe "dated.xmi"
+            dated.location.line shouldBe 20
+            // --package still overrides every tree: one package, as before.
+            run(root, "sales-billing.xmi", "ea-erd/1", "orders", out = "one").files.keys shouldContainExactly
+                listOf("orders/er.ttrm")
+            // EA's own root package name (`Orders`) is no TTR package path: located at the first element.
+            val refused =
+                shouldThrow<ProfileException> { run(root, "orders-erd.xmi", "ea-erd/1", null, out = "two") }
+            refused.code shouldBe "ys/package-invalid"
+            refused.location.file shouldBe "orders-erd.xmi"
+            refused.location.line shouldBe 6
+            refused.message.orEmpty() shouldContain "\"Orders\""
+        }
+
+        test("S5.3a: the shop round trip names its package by the UML package, as --package shop did") {
+            val root = workspace()
+            run(root, "shop.xmi", "ttr-mdg/1", null).outputs() shouldBe
+                run(root, "shop.xmi", "ttr-mdg/1", "shop").outputs()
         }
     })

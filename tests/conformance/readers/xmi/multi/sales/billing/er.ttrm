@@ -1,0 +1,13 @@
+// generated-from: ../../../sources/sales-billing.xmi@cd784056e9352d385cf1b3aa591ccc43ce79d7a758ded9306a657ddab62f4318 profile ea-erd/1 generator 0.0.1-LOCAL — do not edit
+package sales.billing
+model er
+
+def entity Invoice { description: "What a customer owes for an order.",
+    attributes: [
+        def attribute total { type: BigDecimal, },
+    ]
+}
+
+def relation billed_to { description: "Every invoice is billed to one customer, across packages.", from: sales.billing.er.entity.Invoice, to: sales.er.entity.Customer, cardinality: { from: "0..*", to: "1" },
+}
+

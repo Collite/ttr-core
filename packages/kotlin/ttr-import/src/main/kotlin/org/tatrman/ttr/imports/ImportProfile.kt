@@ -30,10 +30,10 @@ import java.nio.file.Path
  * rules [Lexicon] emits `lexicon` documents by (MW-P5 S5.2 T4). [foreignId] (MW-P5 S5.3): a JSON Pointer relative to each
  * record whose string is the record's sidecar `foreignId` (the `xmi` front-end's `/@xmi/uuid`). [cnFromUml] (`cn-from-uml`,
  * S5.3, XM 06 §3): where the nearest profile that declares it declares `false` (`ea-erd/1`), [ImportProfile.chain]
- * drops that profile's cn operations, so a plain UML/ERD export makes no cn definitions unless a child profile opts in
- * with `true`; any other profile of the chain with a cn operation of its own is then `ys/profile-invalid` at that
- * operation (✅R372-C: a child that inherits `false` is told, not silently emptied). Undeclared, nothing is dropped. A
- * child wins, key by key.
+ * drops the cn operations of that profile and of every profile above it (✅R372-D: a child restating `false` overrides
+ * its ancestors), so a plain UML/ERD export makes no cn definitions unless a child profile opts in with `true`; a profile
+ * below the declarer with a cn operation of its own is then `ys/profile-invalid` at that operation (✅R372-C: a child
+ * that inherits `false` is told, not silently emptied). Undeclared, nothing is dropped. A child wins, key by key.
  */
 data class ReaderOptions(
     val skeleton: Boolean = false,
@@ -168,10 +168,12 @@ class ImportProfile internal constructor(
     }
 
     /**
-     * A declared `cn-from-uml: false` (MW-P5 S5.3): every operation of the declaring profile that only makes or fills cn
-     * definitions is dropped — one whose `in` is a cn kind, and a `kinds` op whose every non-null `mapping` value is one.
-     * Such an operation in any other profile of the chain is `ys/profile-invalid` at the operation (✅R372-C). [chain] is
-     * [ImportProfile.chain] in order (`--package` only rewrites `package` operations), so the declarer is found by index.
+     * A declared `cn-from-uml: false` (MW-P5 S5.3): every operation of the nearest declarer and of every profile above it
+     * that only makes or fills cn definitions is dropped — one whose `in` is a cn kind, and a `kinds` op whose every
+     * non-null `mapping` value is one; the declarer overrides its ancestors, whatever they declared (✅R372-D). Such an
+     * operation in a profile below the declarer, which inherits `false` without saying so, is `ys/profile-invalid` at the
+     * operation (✅R372-C). [chain] is [ImportProfile.chain] in order, ancestor first (`--package` only rewrites `package`
+     * operations), so the declarer is found by index.
      */
     private fun withoutCn(chain: List<ProfileDefinition>): List<ProfileDefinition> {
         fun text(value: JsonElement?) = (value as? JsonPrimitive)?.contentOrNull
@@ -185,7 +187,7 @@ class ImportProfile internal constructor(
         }
         val declarer = requireNotNull(cnFromUmlAt)
         chain.forEachIndexed { i, profile ->
-            if (i == declarer) return@forEachIndexed
+            if (i <= declarer) return@forEachIndexed
             profile.operations.firstOrNull(::cn)?.let { op ->
                 throw ProfileException(
                     "ys/profile-invalid",
@@ -196,7 +198,7 @@ class ImportProfile internal constructor(
             }
         }
         return chain.mapIndexed { i, profile ->
-            if (i == declarer) profile.copy(operations = profile.operations.filterNot(::cn)) else profile
+            if (i <= declarer) profile.copy(operations = profile.operations.filterNot(::cn)) else profile
         }
     }
 

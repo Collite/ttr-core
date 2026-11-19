@@ -1,0 +1,4 @@
+ttr: {profile: ./profiles/verbatim.yaml, grammar: '>=0.22 <1.0'}
+oblast: Prodej
+entity:
+  A: {}

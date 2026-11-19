@@ -220,34 +220,45 @@ object Bytewise : Comparator<String> {
 }
 
 /**
- * Every record of the run plus the root's sidecars; S3.6 writes the sidecar from the same entries. The sidecar part is
- * read on the first [resolve] only (✅R251-C): a run with no `link` and no sourceName overlay key never walks the root.
+ * Every record of the run plus the root's sidecars; S3.6 writes the sidecar from the same entries. **Run-first
+ * (⚑MW-P5-S53A-1):** a lookup resolves among this run's records, and reads the sidecars only when none matches, so a
+ * previous snapshot's entry that shares a key with a live record (a renamed or moved element) never shadows it. The
+ * sidecar part is read on the first such lookup only (✅R251-C): a run whose links all resolve in the run, and with no
+ * sourceName overlay key, never walks the root.
  */
 internal class LinkIndex(
     private val run: List<LinkEntry>,
     sidecars: () -> List<LinkEntry> = { emptyList() },
 ) {
-    private val byKey: Map<String, Map<String, List<LinkEntry>>> by lazy {
-        val entries = run + sidecars()
+    private val runByKey = keyed(run)
+    private val sidecarByKey: Map<String, Map<String, List<LinkEntry>>> by lazy { keyed(sidecars()) }
+    private val byQname = run.groupBy { it.qname }
+
+    /** Candidates with distinct qnames, this run's first; [kind] null accepts every kind. */
+    fun resolve(
+        by: String,
+        value: String,
+        kind: String?,
+    ): List<LinkEntry> = candidates(runByKey, by, value, kind).ifEmpty { candidates(sidecarByKey, by, value, kind) }
+
+    private fun candidates(
+        index: Map<String, Map<String, List<LinkEntry>>>,
+        by: String,
+        value: String,
+        kind: String?,
+    ): List<LinkEntry> =
+        index
+            .getValue(by)[value]
+            .orEmpty()
+            .filter { kind == null || it.kind == kind }
+            .distinctBy { it.qname }
+
+    private fun keyed(entries: List<LinkEntry>): Map<String, Map<String, List<LinkEntry>>> =
         mapOf(
             "sourceName" to entries.filter { it.sourceName != null }.groupBy { it.sourceName!! },
             "iri" to entries.filter { it.iri != null }.groupBy { it.iri!! },
             "path" to entries.filter { it.path != null }.groupBy { it.path!! },
         )
-    }
-    private val byQname = run.groupBy { it.qname }
-
-    /** Candidates with distinct qnames; [kind] null accepts every kind. */
-    fun resolve(
-        by: String,
-        value: String,
-        kind: String?,
-    ): List<LinkEntry> =
-        byKey
-            .getValue(by)[value]
-            .orEmpty()
-            .filter { kind == null || it.kind == kind }
-            .distinctBy { it.qname }
 
     /** The run's records as sidecar entries; never reads the sidecars (MW S3.6 T4). */
     fun sources(): List<SourceEntry> =

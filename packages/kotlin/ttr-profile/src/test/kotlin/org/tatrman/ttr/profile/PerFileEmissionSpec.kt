@@ -113,6 +113,36 @@ class PerFileEmissionSpec :
             }
         }
 
+        test("S5.3a: trees that share one label (one input split per package) relocate each record into its own tree") {
+            val label = "x.xmi"
+            val ops =
+                "- {op: package, at: /model/package, verbatim: true}\n- {op: kinds, at: /entity, mapping: {e: entity}}"
+            val documents =
+                ProfileEngine
+                    .apply(
+                        listOf(
+                            ForeignTree.read("model: {package: a}\nentity:\n  A: {}\n", "x/a", label),
+                            ForeignTree.read("model: {package: b}\n\n\n\nentity:\n  B: {}\n", "x/b", label),
+                        ),
+                        listOf(recordProfile(ops)),
+                    ).documents
+            documents.map { document ->
+                document.canonical.ast.definitions
+                    .single()
+                    .let { it.name to it.source.line }
+            } shouldBe listOf("A" to 3, "B" to 6)
+            documents.forEach { document ->
+                document.canonical.ast.definitions
+                    .single()
+                    .source.file shouldBe label
+            }
+            // review-378 F2: trees are found by (label, file); a pair naming no tree is absent, never another tree.
+            val trees =
+                listOf(ForeignTree.read("a: 1\n", "x/a", label), ForeignTree.read("b: 2\n", "x/b", label)).byIdentity()
+            trees.getValue(label to "x/b").file shouldBe "x/b"
+            trees[label to "x/c"] shouldBe null
+        }
+
         test("review-260 F8: a relocated block maps its inner lines into the dialect file, never the generated text") {
             val text = "dotazy:\n  Q:\n    sql:\n      tag: sql\n      block: |\n        SELECT a\n          FROM t\n"
             val label = "/abs/q.yaml"

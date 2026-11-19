@@ -1,0 +1,10 @@
+{
+  "generated-from": "generated-from: ../sources/sales-billing.xmi@cd784056e9352d385cf1b3aa591ccc43ce79d7a758ded9306a657ddab62f4318 profile ea-erd/1 generator 0.0.1-LOCAL — do not edit",
+  "entries": [
+    {"qname":"sales.er.entity.Customer","kind":"entity","foreignId":"99610a94-1b9c-5223-beec-2ce0dcbcc0ad","sourceName":"EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11","locator":"Customer"},
+    {"qname":"sales.er.entity.Customer.id","kind":"attribute","foreignId":"80231cb7-2a19-5a9e-a413-9913894371ae","sourceName":"EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D21","locator":"Customer/id"},
+    {"qname":"sales.er.entity.Order","kind":"entity","foreignId":"6945ef74-d959-5438-b6a5-bb8490671d53","sourceName":"EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12","locator":"Order"},
+    {"qname":"sales.er.entity.Order.order_no","kind":"attribute","foreignId":"5e5a6719-aba1-5c8b-b352-5f87b8218898","sourceName":"EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D22","locator":"Order/order_no"},
+    {"qname":"sales.er.relation.placed_by","kind":"relation","foreignId":"8503c733-6998-5302-9c8d-d7da64dad450","sourceName":"EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31","locator":"placed_by"}
+  ]
+}

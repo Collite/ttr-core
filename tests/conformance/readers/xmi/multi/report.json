@@ -1,0 +1,456 @@
+{
+    "frontEnd": "xmi",
+    "profile": "ea-erd/1",
+    "packages": [
+        {
+            "package": "sales.billing",
+            "model": "er",
+            "file": "sales/billing/er.ttrm",
+            "defs": 2
+        },
+        {
+            "package": "sales",
+            "model": "er",
+            "file": "sales/er.ttrm",
+            "defs": 3
+        }
+    ],
+    "ignored": [
+        {
+            "file": "sales-billing.xmi",
+            "line": 1,
+            "column": 2,
+            "path": "/model",
+            "reason": "the EA model root (the package is its package path, or --package)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 6,
+            "column": 47,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 6,
+            "column": 197,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 6,
+            "column": 434,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 7,
+            "column": 2,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11/ownedAttribute/0/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 7,
+            "column": 135,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11/ownedAttribute/0/@properties",
+            "reason": "EA's attribute properties (type and documentation are read)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 7,
+            "column": 270,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11/ownedAttribute/0/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 7,
+            "column": 295,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11/ownedAttribute/0/isStatic",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 7,
+            "column": 316,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11/ownedAttribute/0/isReadOnly",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 7,
+            "column": 339,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11/ownedAttribute/0/isDerived",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 7,
+            "column": 361,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11/ownedAttribute/0/isOrdered",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 7,
+            "column": 383,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11/ownedAttribute/0/isUnique",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 7,
+            "column": 403,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11/ownedAttribute/0/isDerivedUnion",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 7,
+            "column": 430,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11/ownedAttribute/0/lowerValue",
+            "reason": "optional: the lower bound"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 8,
+            "column": 157,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11/ownedAttribute/0/upperValue",
+            "reason": "a single-valued attribute"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 9,
+            "column": 157,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D11/ownedAttribute/0/type",
+            "reason": "the UML type (EA's type name is read)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 13,
+            "column": 47,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 13,
+            "column": 197,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 13,
+            "column": 375,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12/@outgoing",
+            "reason": "associations are their own elements"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 13,
+            "column": 592,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 14,
+            "column": 2,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12/ownedAttribute/0/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 14,
+            "column": 135,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12/ownedAttribute/0/@properties",
+            "reason": "EA's attribute properties (type and documentation are read)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 14,
+            "column": 279,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12/ownedAttribute/0/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 14,
+            "column": 304,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12/ownedAttribute/0/isStatic",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 14,
+            "column": 325,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12/ownedAttribute/0/isReadOnly",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 14,
+            "column": 348,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12/ownedAttribute/0/isDerived",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 14,
+            "column": 370,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12/ownedAttribute/0/isOrdered",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 14,
+            "column": 392,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12/ownedAttribute/0/isUnique",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 14,
+            "column": 412,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12/ownedAttribute/0/isDerivedUnion",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 14,
+            "column": 439,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12/ownedAttribute/0/lowerValue",
+            "reason": "optional: the lower bound"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 15,
+            "column": 157,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12/ownedAttribute/0/upperValue",
+            "reason": "a single-valued attribute"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 16,
+            "column": 157,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D12/ownedAttribute/0/type",
+            "reason": "the UML type (EA's type name is read)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 20,
+            "column": 47,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 20,
+            "column": 203,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31/@properties",
+            "reason": "EA's connector properties (documentation is the description)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 20,
+            "column": 349,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31/@source/@name",
+            "reason": "from: linked by the end's xmi:id"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 20,
+            "column": 457,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31/@target/@name",
+            "reason": "to: linked by the end's xmi:id"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 20,
+            "column": 521,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 20,
+            "column": 545,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31/memberEnd",
+            "reason": "the association ends: from, to and cardinality come from EA"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 22,
+            "column": 58,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D31/ownedEnd",
+            "reason": "the association ends: from, to and cardinality come from EA"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 31,
+            "column": 47,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 31,
+            "column": 205,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13/@properties",
+            "reason": "EA's element properties (documentation is the description)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 31,
+            "column": 438,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13/@outgoing",
+            "reason": "associations are their own elements"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 31,
+            "column": 657,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 32,
+            "column": 2,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13/ownedAttribute/0/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 32,
+            "column": 135,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13/ownedAttribute/0/@properties",
+            "reason": "EA's attribute properties (type and documentation are read)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 32,
+            "column": 280,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13/ownedAttribute/0/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 32,
+            "column": 305,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13/ownedAttribute/0/isStatic",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 32,
+            "column": 326,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13/ownedAttribute/0/isReadOnly",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 32,
+            "column": 349,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13/ownedAttribute/0/isDerived",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 32,
+            "column": 371,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13/ownedAttribute/0/isOrdered",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 32,
+            "column": 393,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13/ownedAttribute/0/isUnique",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 32,
+            "column": 413,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13/ownedAttribute/0/isDerivedUnion",
+            "reason": "UML property flags"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 32,
+            "column": 440,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13/ownedAttribute/0/lowerValue",
+            "reason": "optional: the lower bound"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 33,
+            "column": 157,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13/ownedAttribute/0/upperValue",
+            "reason": "a single-valued attribute"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 34,
+            "column": 157,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13/ownedAttribute/0/type",
+            "reason": "the UML type (EA's type name is read)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 38,
+            "column": 47,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32/@xmi",
+            "reason": "xmi:id and type (the sidecar keeps the id)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 38,
+            "column": 211,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32/@properties",
+            "reason": "EA's connector properties (documentation is the description)"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 38,
+            "column": 435,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32/@source/@name",
+            "reason": "from: linked by the end's xmi:id"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 38,
+            "column": 545,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32/@target/@name",
+            "reason": "to: linked by the end's xmi:id"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 38,
+            "column": 609,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32/visibility",
+            "reason": "UML visibility"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 38,
+            "column": 633,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32/memberEnd",
+            "reason": "the association ends: from, to and cardinality come from EA"
+        },
+        {
+            "file": "sales-billing.xmi",
+            "line": 40,
+            "column": 58,
+            "path": "/elements/EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32/ownedEnd",
+            "reason": "the association ends: from, to and cardinality come from EA"
+        }
+    ],
+    "overridden": [],
+    "warnings": []
+}

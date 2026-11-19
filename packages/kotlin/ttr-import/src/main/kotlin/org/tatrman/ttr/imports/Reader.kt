@@ -15,6 +15,7 @@ import org.tatrman.ttr.profile.ForeignTree
 import org.tatrman.ttr.profile.JsonPointer
 import org.tatrman.ttr.profile.ProfileEngine
 import org.tatrman.ttr.profile.ProfileWarning
+import org.tatrman.ttr.profile.byIdentity
 import org.tatrman.ttr.profile.RecordOrigin
 import org.tatrman.ttr.profile.SourceEntry
 import org.tatrman.ttr.profile.SourcesJsonWriter
@@ -132,24 +133,35 @@ object Reader {
             }
         }
         val sidecars = TreeMap<String, String>(Bytewise)
-        val renamed = mutableListOf<ImportReport.Renamed>()
         val sources = foreignIds(result.sources, result.origins, trees, profile.options.foreignId)
         sources.groupBy { it.pkg }.forEach { (pkg, entries) ->
             val name = "$pkg.sources.json"
             sidecars[name] = SourcesJsonWriter.write(header.header(name).text, entries)
-            renamed += SidecarDelta.renamed(request.out.resolve(name), entries)
         }
+        // S5.3a T4b: the delta against every previous sidecar of this input under --out (✅R378-A), across packages.
+        val delta = SidecarDelta.of(request.out, input, sources)
         return GeneratedPackage(
             files,
             sidecars,
-            ImportReport.of(frontEnd.name, profile.identity, result, packages, warnings, frontEnd.records, renamed),
+            ImportReport.of(
+                frontEnd.name,
+                profile.identity,
+                result,
+                packages,
+                warnings,
+                frontEnd.records,
+                delta.renamed,
+                delta.removed,
+                delta.emptied,
+            ),
         )
     }
 
     /**
      * MW-P5 S5.3: with a `foreignId` pointer, each record's sidecar entry takes the string the pointer selects in the
      * record's own node (its input tree and path, [RecordOrigin]; the engine's sources and origins are both in record
-     * order); a record where it selects no string keeps none.
+     * order); a record where it selects no string keeps none. The tree is looked up by (label, file), once per run
+     * (review-378 F2).
      */
     private fun foreignIds(
         sources: List<SourceEntry>,
@@ -159,9 +171,9 @@ object Reader {
     ): List<SourceEntry> {
         if (pointer == null) return sources
         check(sources.size == origins.size) { "the engine's sources and origins differ in length" }
-        val byLabel = trees.associateBy { it.label }
+        val byIdentity = trees.byIdentity()
         return sources.zip(origins).map { (entry, origin) ->
-            val tree = byLabel[origin.file] ?: return@map entry
+            val tree = byIdentity[origin.file to origin.tree] ?: return@map entry
             val node = JsonPointer(origin.path + pointer).resolve(tree.root)?.value as? JsonPrimitive
             node?.takeIf { it.isString }?.let { entry.copy(foreignId = it.content) } ?: entry
         }

@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.imports
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.tatrman.ttr.metadata.export.xmi.Uuid5
 import org.tatrman.ttr.profile.ForeignTree
 import org.tatrman.ttr.profile.ProfileException
@@ -22,9 +28,14 @@ import javax.xml.stream.XMLStreamReader
  * `xmi:Extension`) becomes the tree
  *
  * ```
- * {model: {"@id", name, …}, elements: {<xmi:id>: <element>, …}, "@diagrams": [{"@id", name}, …]}
+ * {model: {"@id", name, …, package}, elements: {<xmi:id>: <element>, …}, "@diagrams": [{"@id", name}, …]}
  * ```
  *
+ * - **One tree per UML package** (MW-P5 S5.3a, ✅D-MW-91) that holds at least one element, in document order: its file
+ *   is `<stem>/<package path>`, its `model.package` the package path (the `name`s of the packages below the model,
+ *   `/`-joined, as `@xmi.package`; absent for elements right below the model), its `elements` that package's own.
+ *   A profile's `package: {at: /model/package, verbatim: true}` makes each its own TTR package. References and
+ *   `@outgoing` still resolve across the whole document; `@diagrams` ride on the first tree.
  * - **elements**: every `packagedElement` that is not a `uml:Package`, at any package depth, keyed by its `xmi:id`, in
  *   document order. Packages are not elements; an element names its enclosing packages in `@xmi.package`.
  * - **An element** (and, recursively, each child element: `ownedAttribute`, `ownedEnd`, `generalization`, `lowerValue`,
@@ -78,8 +89,21 @@ object XmiFrontEnd : FrontEnd {
      */
     val NAMESPACE: UUID = Uuid5.of(Uuid5.URL, "http://tatrman.org/ns/ttr-import/xmi-id")
 
+    /**
+     * One tree per UML package that holds at least one element (MW-P5 S5.3a, ✅D-MW-91), in document order: the tree's
+     * file is `<stem>/<package path>` (so a profile's file-scoped `package` operation applies per package), its label
+     * the input's name (so a diagnostic names the XMI file and line). A document with no element is one tree, `<stem>`.
+     * review-378 F2: the whole document is written and parsed **once**; each package's tree is a [ForeignTree.view] of it
+     * (its own elements, `model.package` set), so the work grows with the document, not with packages × document.
+     */
     override fun parse(files: List<Path>): List<ForeignTree> =
-        labelled(files).map { (file, name) -> ForeignTree.read(tree(bytes(file), name), name, name) }
+        labelled(files).flatMap { (file, name) ->
+            val stem = name.substringBeforeLast('.', name)
+            val whole = ForeignTree.read(tree(bytes(file), name), stem, name)
+            split(whole.root.value.jsonObject).map { (pkg, value) ->
+                if (pkg == null) whole else whole.view(value, "$stem/$pkg")
+            }
+        }
 
     /** The raw bytes, refused above 4 × the reader budget before anything is decoded. */
     internal fun bytes(file: Path): ByteArray {
@@ -116,11 +140,45 @@ object XmiFrontEnd : FrontEnd {
         val id: String? get() = attr("xmi:id")
     }
 
-    /** The tree of [bytes] as JSON text. */
+    /** The whole document as one tree, JSON text: every element, `model` without `package` (a view for specs). */
     internal fun tree(
         bytes: ByteArray,
         label: String,
     ): String = Builder(read(bytes, label), label).json()
+
+    /**
+     * One tree value per UML package path that holds an element, in document order (an element's `@xmi.package`, `""`
+     * right below the model), each `model` with `package` (absent for `""`) and that package's elements only;
+     * `@diagrams` ride on the first. No element → the whole tree, path null. Values only: [parse] makes them views.
+     */
+    internal fun split(whole: JsonObject): List<Pair<String?, JsonObject>> {
+        val groups = LinkedHashMap<String, LinkedHashMap<String, JsonElement>>()
+        whole.getValue("elements").jsonObject.forEach { (id, element) ->
+            val pkg =
+                ((element as? JsonObject)?.get("@xmi") as? JsonObject)
+                    ?.get("package")
+                    ?.jsonPrimitive
+                    ?.content
+                    .orEmpty()
+            groups.getOrPut(pkg) { LinkedHashMap() }[id] = element
+        }
+        if (groups.isEmpty()) return listOf(null to whole)
+        val model = whole.getValue("model").jsonObject
+        return groups.entries.mapIndexed { i, (pkg, own) ->
+            pkg to
+                buildJsonObject {
+                    put("model", if (pkg.isEmpty()) model else JsonObject(model + ("package" to JsonPrimitive(pkg))))
+                    put("elements", JsonObject(own))
+                    if (i == 0) whole["@diagrams"]?.let { put("@diagrams", it) }
+                }
+        }
+    }
+
+    /** [split] of the whole document's tree, as package paths (a view for specs). */
+    internal fun trees(
+        bytes: ByteArray,
+        label: String,
+    ): List<Pair<String?, JsonObject>> = split(Json.parseToJsonElement(tree(bytes, label)).jsonObject)
 
     private fun read(
         bytes: ByteArray,
@@ -246,14 +304,18 @@ object XmiFrontEnd : FrontEnd {
             node.children.forEach(::index)
         }
 
-        /** Every non-package `packagedElement` below [node], with its package path. */
+        /**
+         * Every non-package `packagedElement` below [node], with its package path. review-378 F5: a `uml:Package` above an
+         * element whose `name` is empty or contains `/` would give a path another package can have (`a/b` vs `a` → `b`),
+         * so it is `ys/profile-invalid` at that package; a package with no element below it is not checked.
+         */
         private fun collect(
             node: XNode,
-            packages: List<String>,
+            packages: List<XNode>,
         ) {
             for (child in node.children.filter { it.name == "packagedElement" }) {
                 if (child.attr("xmi:type") == "uml:Package") {
-                    collect(child, packages + (child.attr("name") ?: ""))
+                    collect(child, packages + child)
                 } else {
                     val id =
                         child.id ?: fail(
@@ -268,7 +330,19 @@ object XmiFrontEnd : FrontEnd {
                                 "packagedElement has no xmi:id"
                             },
                         )
-                    elements += Element(id, child, packages.joinToString("/"))
+                    packages
+                        .firstOrNull {
+                            val name = it.attr("name")
+                            name.isNullOrEmpty() || '/' in name
+                        }?.let {
+                            fail(
+                                label,
+                                it.line,
+                                it.column,
+                                "uml:Package ${it.id ?: "(no xmi:id)"} has no usable name (empty or containing '/')",
+                            )
+                        }
+                    elements += Element(id, child, packages.joinToString("/") { it.attr("name")!! })
                 }
             }
         }
@@ -384,18 +458,21 @@ object XmiFrontEnd : FrontEnd {
             out.append(": ")
         }
 
+        /** The whole tree as JSON text: every element, no `model.package`, `@diagrams` ([split] makes the packages). */
         fun json(): String {
+            out.setLength(0)
+            line = 1
             out.append("{")
             key("model")
             out.append("{")
             var first = true
+
+            fun sep() {
+                if (!first) out.append(", ")
+                first = false
+            }
             model?.let { m ->
                 at(m.line)
-
-                fun sep() {
-                    if (!first) out.append(", ")
-                    first = false
-                }
                 m.id?.let {
                     sep()
                     key("@id")

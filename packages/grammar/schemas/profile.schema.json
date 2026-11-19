@@ -437,6 +437,15 @@
               },
               "missing": {
                 "type": "string"
+              },
+              "verbatim": {
+                "type": "boolean"
+              },
+              "as": {
+                "type": "string"
+              },
+              "required": {
+                "type": "string"
               }
             },
             "required": [
@@ -695,13 +704,44 @@
                     },
                     "default": {
                       "$ref": "#/$defs/identifier"
+                    },
+                    "verbatim": {
+                      "const": true
                     }
                   },
                   "required": [
-                    "op",
-                    "mapping"
+                    "op"
                   ],
-                  "additionalProperties": false
+                  "additionalProperties": false,
+                  "if": {
+                    "required": [
+                      "verbatim"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "at"
+                    ],
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "mapping"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "default"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "else": {
+                    "required": [
+                      "mapping"
+                    ]
+                  }
                 }
               },
               {
@@ -805,6 +845,9 @@
                     },
                     "to": {
                       "$ref": "#/$defs/propertyTarget"
+                    },
+                    "required": {
+                      "const": "warn"
                     }
                   },
                   "required": [
@@ -920,6 +963,9 @@
                     },
                     "template": {
                       "$ref": "#/$defs/profileTemplate"
+                    },
+                    "required": {
+                      "const": "warn"
                     }
                   },
                   "required": [
@@ -1487,6 +1533,12 @@
                         "process",
                         "step"
                       ]
+                    },
+                    "as": {
+                      "const": "ref"
+                    },
+                    "required": {
+                      "const": "warn"
                     }
                   },
                   "required": [

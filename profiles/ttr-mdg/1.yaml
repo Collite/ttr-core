@@ -1,6 +1,11 @@
 # ttr-mdg/1 — an XMI 2.1 export carrying our MDG Technology (`ttr-mdg`, XM-P1: `ttr-metadata export xmi`) → TTR cn, er and
 # md packages (MW-P5 S5.3, readers contracts §3; XM 06 §3 "EA"). Shipped with ttr-core:
-# `ttr-metadata import-xmi --from <model.xmi> --profile ttr-mdg/1 --package <name>`.
+# `ttr-metadata import-xmi --from <model.xmi> --profile ttr-mdg/1 [--package <name>]`.
+#
+# Packages (MW-P5 S5.3a, ✅D-MW-91): each UML package is its TTR package, its path as written (`/` → `.`; the XM-P1
+# writer names each UML package by its TTR package, `db.retail` included); `--package` puts every element in one package.
+# A package that holds a record and whose path is no TTR package path is `ys/package-invalid`. References stay by UML
+# name, so a reference across packages does not resolve (S5.3a Found).
 #
 # The inverse of the XM-P1 writer for what that writer carries. Records: every element the `xmi` front-end lists under
 # /elements — a «concept» by its `cnKind` tag (`def kind|role|phase|quality|event|relation_type`), every other element by
@@ -9,7 +14,7 @@
 # a property's `type`), so the generated package resolves on its own names. A property's `type` is read in both XMI
 # forms, the attribute `type="X"` and EA's child `<type xmi:idref="X"/>` (✅R372-A); a generalization's `general` only in
 # the attribute form, which is the one EA and the XM-P1 writer write (the child form needs an engine operand: S5.3
-# Found (g)). An association needs EA's connector ends (`xmi:Extension`): without them it has no `from`/`to` (✅R372-B). The sidecar keeps each element's xmi:id
+# Found (g)). An association needs EA's connector ends (`xmi:Extension`): without them it has no `from`/`to`, and each missing end is a `ys/key-missing` warning (✅R372-B, ✅D-MW-98). The sidecar keeps each element's xmi:id
 # (`sourceName`) and a UUIDv5 of it (`foreignId`, the xmi front-end's NAMESPACE), so a later snapshot's renames show as a
 # sidecar diff (`delta.renamed`).
 #
@@ -24,7 +29,7 @@ grammar: '>=0.22 <1.0'
 sourceName: /@xmi/id
 foreignId: /@xmi/uuid
 operations:
-  - {op: package, mapping: {}, default: model}
+  - {op: package, at: /model/package, verbatim: true}
   - op: kinds
     at: /elements
     id: /name
@@ -75,8 +80,8 @@ operations:
   - {op: ignore, in: attribute, at: /type/0/$ref, reason: 'type: the UML type, by name'}
   - {op: values, in: attribute, at: /@tags/nullable, to: {kind: attribute, property: optional}, mapping: {'true': true, 'false': false}}
   - {op: rename, in: relation, at: /@properties/documentation, to: {kind: relation, property: description}}
-  - {op: shape, in: relation, at: /@source, to: {kind: relation, property: from}, template: {ref: {input: /@name}}}
-  - {op: shape, in: relation, at: /@target, to: {kind: relation, property: to}, template: {ref: {input: /@name}}}
+  - {op: shape, in: relation, at: /@source, to: {kind: relation, property: from}, template: {ref: {input: /@name}}, required: warn}
+  - {op: shape, in: relation, at: /@target, to: {kind: relation, property: to}, template: {ref: {input: /@name}}, required: warn}
   - {op: rename, in: relation, at: /@source/multiplicity, to: {kind: relation, path: [cardinality, from]}}
   - {op: rename, in: relation, at: /@target/multiplicity, to: {kind: relation, path: [cardinality, to]}}
   - {op: ignore, in: relation, at: /@tags/cardinality, reason: 'cardinality: read from the association ends'}

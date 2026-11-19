@@ -2,8 +2,10 @@
 package org.tatrman.ttr.profile
 
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import kotlinx.serialization.json.*
 import java.nio.file.Path
 import kotlin.io.path.*
@@ -137,6 +139,56 @@ class StructuralOpsSpec :
             error.location.line shouldBe 1
             error.location.column shouldBe 1
             error.detail.contains("pt02_new") shouldBe true
+        }
+        test("S5.3a package verbatim: the string at `at` is the package path, its `/` the only change, to `.`") {
+            val ops =
+                recordProfile(
+                    "- {op: package, at: /model/package, verbatim: true}\n" +
+                        "- {op: kinds, at: /entity, mapping: {e: entity}}",
+                )
+            val result =
+                ProfileEngine.apply(
+                    listOf(
+                        ForeignTree.read("model: {package: sales}\nentity: {Customer: {}}", "x/sales"),
+                        ForeignTree.read("model: {package: sales/orders}\nentity: {Order: {}}", "x/sales/orders"),
+                        // A tree that holds no record names no package, valid or not (the XM writer's `Types`).
+                        ForeignTree.read("model: {package: Types}\nentity: {}", "x/Types"),
+                    ),
+                    listOf(ops),
+                )
+            result.documents.map {
+                it.value
+                    .getValue("package")
+                    .jsonPrimitive.content
+            } shouldBe
+                listOf("sales", "sales.orders")
+            result.defs().map { it.getValue("id").jsonPrimitive.content } shouldBe listOf("Customer", "Order")
+        }
+        test("S5.3a package verbatim: refused beside mapping or default; an invalid path is ys/package-invalid") {
+            for (extra in listOf(", mapping: {}", ", default: demo", "")) {
+                val at = if (extra.isEmpty()) "" else " at: /model/package,"
+                withClue(extra.ifEmpty { "no at" }) {
+                    shouldThrow<ProfileException> {
+                        recordProfile("- {op: package,$at verbatim: true$extra}")
+                    }.code shouldBe "ys/profile-invalid"
+                }
+            }
+            val ops =
+                "- {op: package, at: /model/package, verbatim: true}\n- {op: kinds, at: /entity, mapping: {e: entity}}"
+            for ((model, detail) in listOf(
+                "{package: Sales}" to "Sales",
+                "{package: 'sales/2024'}" to "sales/2024",
+                "{package: 'sales orders'}" to "sales orders",
+                "{name: sales}" to "no package path at /model/package",
+            )) {
+                withClue(model) {
+                    val error =
+                        shouldThrow<ProfileException> { runOps("model: $model\nentity:\n  Customer: {}", ops) }
+                    error.code shouldBe "ys/package-invalid"
+                    error.location.line shouldBe 3
+                    error.detail shouldContain detail
+                }
+            }
         }
         test("rename and nest unnest read original values, preserve nested order and write typed paths") {
             val result =
@@ -284,6 +336,40 @@ class StructuralOpsSpec :
                     "- {op: rename, in: entity, at: '', to: {kind: entity, property: description}}",
             ).properties()
                 .string("description") shouldBe "Faktura"
+        }
+
+        test("✅D-MW-98 required: warn — rename, shape and link warn ys/key-missing at a record whose at is absent") {
+            val ops =
+                entityOps +
+                    "- {op: kinds, at: /vztahy, mapping: {vztah: relation}}\n" +
+                    "- {op: rename, in: relation, at: /popis, to: {kind: relation, property: description}, " +
+                    "required: warn}\n" +
+                    "- {op: shape, in: relation, at: /od, to: {kind: relation, property: from}, " +
+                    "template: {ref: {input: /jmeno}}, required: warn}\n" +
+                    "- {op: link, in: relation, at: /do, to: {kind: relation, property: to}, by: sourceName, " +
+                    "required: warn}"
+            val source = "entity:\n  A: {}\nvztahy:\n  R: {}\n  S: {popis: s, od: {jmeno: A}, do: A}\n"
+            val result = runOps(source, ops)
+            result.report.warnings.map { Triple(it.location.line, it.location.path, it.describe()) } shouldBe
+                listOf(
+                    Triple(4, "/vztahy/R", "ys/key-missing: R has no /popis, so relation.description is not written"),
+                    Triple(4, "/vztahy/R", "ys/key-missing: R has no /od, so relation.from is not written"),
+                    Triple(4, "/vztahy/R", "ys/key-missing: R has no /do, so relation.to is not written"),
+                )
+            // The run goes on: R has no ends, S has all three.
+            result.defs().map { it.string("id") to it.getValue("properties").jsonObject.keys } shouldBe
+                listOf("A" to emptySet(), "R" to emptySet(), "S" to setOf("description", "from", "to"))
+            // Without the operand an absent key stays silent; the operand takes no other value.
+            runOps(source, ops.replace(", required: warn", "")).report.warnings shouldBe emptyList()
+            shouldThrow<ProfileException> { recordProfile(ops.replace("required: warn", "required: error")) }
+                .code shouldBe "ys/profile-invalid"
+            // review-378 F7: an explicit null writes nothing too, so it warns (rename, shape), and stays consumed.
+            val nulls = runOps("entity:\n  A: {}\nvztahy:\n  T: {popis: ~, od: ~, do: A}\n", ops)
+            nulls.report.warnings.map { it.describe() } shouldBe
+                listOf(
+                    "ys/key-missing: T has no /popis, so relation.description is not written",
+                    "ys/key-missing: T has no /od, so relation.from is not written",
+                )
         }
     })
 

@@ -6,6 +6,37 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — `package: {verbatim: true}`; `import-xmi` makes one TTR package per UML package (MW-P5 S5.3a, ✅D-MW-91)
+
+- The profile engine's `package` op takes `verbatim: true`: the string at `at` is the package path as written, `/` → `.`
+  the only change. Beside `mapping`/`default`, or without `at`, the profile is `ys/profile-invalid`; a path that is no
+  TTR package path is the new `ys/package-invalid`, at the tree's first record.
+- The `xmi` front-end reads one tree per UML package; `ttr-mdg/1` and `ea-erd/1` take the package from it, so
+  `import-xmi` without `--package` writes each UML package as its TTR package (`--package` still puts all in one).
+  An EA root package such as `Orders` is no TTR package path: rename it, or give `--package`.
+  The document is parsed once and each package's tree is a view of it, so time and memory grow with the document,
+  not with packages × document; the 6M code-point input budget is per input, as before. A UML package above an
+  element whose name is empty or contains `/` is `ys/profile-invalid` at that package (it would merge with another).
+  A `package` `mapping` without `at` keys on the input's stem; a `files:` glob sees `<stem>/<package path>`.
+- A child profile that restates `cn-from-uml: false` no longer fails inside its parent (review-372 N1).
+- `link` resolves among the run's records first and reads the root's sidecars only when none matches, so a renamed or
+  moved record's stale sidecar entry no longer makes its link ambiguous (✅D-MW-100).
+- `link` takes `as: ref`: each result is written `{ref: <qualified qname>}`, a reference the loader resolves, and no
+  package is imported (✅D-MW-101). Without it the qname stays a string, as before.
+- `ea-erd/1` links a relation's ends by the end class's `xmi:id` (`as: ref`), so every end is a qualified reference and
+  an end in another UML package resolves. `ttr-mdg/1` still resolves every reference by name, so a multi-package XM
+  world splits but does not link across packages.
+- The reader's rename delta reads the previous `<package>.sources.json` files under `--out` that were generated from
+  the same input (their `generated-from` path; the hash is not compared), and pairs foreign ids across packages: an
+  element moved between UML packages is a `delta.renamed` entry with `package: {from, to}`. Another input's sidecars in
+  the same `--out` are not compared, and a renamed input starts a fresh generation. A previous package the run emits
+  nothing for is listed in `delta.emptied` with its two paths, and its entries that went nowhere are `delta.removed`
+  (`{qname, foreignId?}`); the run does not delete that package's files.
+- `rename`, `shape` and `link` take `required: warn`: a record where `at` selects nothing or `null` gets one warning, the new
+  catalogued `ys/key-missing`, located at the record and naming the property not written; the run goes on
+  (✅D-MW-98). `ttr-mdg/1` and `ea-erd/1` declare it on a relation's two ends, so an association without EA's
+  connector ends is reported instead of passing silently.
+
 ### Fixed — 0.22.10: an obligation action's `working_days` due declares the calendar read (AU-core S2.4f, D-249/D-251)
 
 - `ttrp-graph` `ActionCalendarReads`: the Server counts an obligation action's due date over the governed calendar,

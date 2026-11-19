@@ -90,7 +90,8 @@ data class SourceEntry(
 
 /**
  * Where one record of the run came from (review-350 F6): its [qname], [kind] and [pkg] as emitted, and the input [file]
- * (the tree's label) and node [path] that made it — the record's identity, which a reader joins its own reads to.
+ * (the tree's label) and node [path] that made it — the record's identity, which a reader joins its own reads to. [tree]
+ * is the tree's own file (review-378 F2): with [file], the key of [byIdentity].
  */
 data class RecordOrigin(
     val qname: String,
@@ -98,6 +99,7 @@ data class RecordOrigin(
     val pkg: String,
     val file: String,
     val path: String,
+    val tree: String = file,
 )
 
 /** [sources] are the run's records as sidecar entries (MW S3.6 T4), in record order; [origins] the same records' inputs. */

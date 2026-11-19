@@ -869,22 +869,38 @@ export function createSchemas(metadata) {
       if: { properties: { mapping: { minProperties: 2 } } },
       then: { required: ['kind'] },
     },
-    operation(
-      'package',
-      {
-        ...selectors,
-        mapping: { type: 'object', additionalProperties: identifier },
-        default: identifier,
-      },
-      ['mapping']
-    ),
-    operation('rename', { ...recordSelectors, to: ref('propertyTarget') }, ['in', 'at', 'to']),
-    operation('shape', { ...recordSelectors, to: { type: 'object' }, template: ref('profileTemplate') }, [
+    // ✅D-MW-91 (S5.3a): `verbatim: true` — the string at `at` is the package path (`/` → `.`), no mapping or default.
+    {
+      ...operation(
+        'package',
+        {
+          ...selectors,
+          mapping: { type: 'object', additionalProperties: identifier },
+          default: identifier,
+          verbatim: { const: true },
+        },
+        []
+      ),
+      if: { required: ['verbatim'] },
+      then: { required: ['at'], not: { anyOf: [{ required: ['mapping'] }, { required: ['default'] }] } },
+      else: { required: ['mapping'] },
+    },
+    // ✅D-MW-98 (S5.3a T4c): `required: warn` — a record where `at` selects nothing gets one `ys/key-missing` warning.
+    operation('rename', { ...recordSelectors, to: ref('propertyTarget'), required: { const: 'warn' } }, [
+      'in',
       'at',
       'to',
-      'template',
-      'in',
     ]),
+    operation(
+      'shape',
+      {
+        ...recordSelectors,
+        to: { type: 'object' },
+        template: ref('profileTemplate'),
+        required: { const: 'warn' },
+      },
+      ['at', 'to', 'template', 'in']
+    ),
     ...['nest', 'unnest'].map((op) =>
       operation(op, { ...recordSelectors, to: ref('propertyTarget') }, ['in', 'at', 'to'])
     ),
@@ -898,6 +914,7 @@ export function createSchemas(metadata) {
       ['mapping']
     ),
     // ✅D-MW-72 (S3.7b): `kind` names the referent kind where the target property names none.
+    // ✅D-MW-101 (S5.3a): `as: ref` writes `{ref: <qualified qname>}` (a reference the loader resolves), no import.
     operation(
       'link',
       {
@@ -905,6 +922,8 @@ export function createSchemas(metadata) {
         to: ref('propertyTarget'),
         by: { enum: ['sourceName', 'iri', 'path'] },
         kind: canonicalKind,
+        as: { const: 'ref' },
+        required: { const: 'warn' },
       },
       ['in', 'at', 'to', 'by']
     ),
@@ -1061,6 +1080,9 @@ export function createSchemas(metadata) {
                 split: string,
                 unmapped: string,
                 missing: string,
+                verbatim: { type: 'boolean' },
+                as: string,
+                required: string,
               },
               ['op']
             ),

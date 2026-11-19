@@ -1,0 +1,8 @@
+{
+  "generated-from": "generated-from: ../sources/sales-billing.xmi@cd784056e9352d385cf1b3aa591ccc43ce79d7a758ded9306a657ddab62f4318 profile ea-erd/1 generator 0.0.1-LOCAL — do not edit",
+  "entries": [
+    {"qname":"sales.billing.er.entity.Invoice","kind":"entity","foreignId":"5d2a62bd-8b3f-5be6-9a3e-190df23181ae","sourceName":"EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D13","locator":"Invoice"},
+    {"qname":"sales.billing.er.entity.Invoice.total","kind":"attribute","foreignId":"f2077dc4-7025-58ff-be14-ed4f7faad021","sourceName":"EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D23","locator":"Invoice/total"},
+    {"qname":"sales.billing.er.relation.billed_to","kind":"relation","foreignId":"5aae9e62-40b3-5c5c-b12f-3412dc018732","sourceName":"EAID_7B1C2D3E_4F5A_4B6C_8D7E_9F0A1B2C3D32","locator":"billed_to"}
+  ]
+}

@@ -1,0 +1,5 @@
+profile: demo-verbatim/1
+grammar: '>=0.22 <1.0'
+operations:
+  - {op: package, at: /oblast, verbatim: true}
+  - {op: kinds, at: /entity, mapping: {entita: entity}}
