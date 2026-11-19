@@ -1185,7 +1185,7 @@ export function createServerConnection(
   // must watch `**/.ttrlint.toml`). The Designer / browser host (and tests) can
   // also trigger a reload deterministically via `modeler/reloadLintConfig`.
   connection.onDidChangeWatchedFiles(async (params) => {
-    const yamlChanges = params.changes.filter(c => isYaml(c.uri) || c.uri.endsWith('/model.ignore'));
+    const yamlChanges = params.changes.filter(c => isYaml(c.uri) || c.uri.endsWith('/model.ignore') || c.uri.endsWith('.sources.json'));
     if (yamlChanges.length && (opts.yamlFilesChanged?.(yamlChanges) ?? yamlChanges.some(c => yamlResults.has(c.uri) || /\/(?:ttr|ttr-profile)\.yaml$/.test(c.uri) || c.type !== FileChangeType.Changed))) scheduleYamlRefresh();
     if (params.changes.some((c) => c.uri.endsWith('.ttrlint.toml'))) {
       await refreshLintConfig();

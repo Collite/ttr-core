@@ -375,4 +375,21 @@ describe('YAML lint input', { timeout: 30_000 }, () => {
       );
       expect(loader.notify([{ uri: uri(root, 'shared/scratch/new.yaml'), type: 1 }])).toBe(true);
     }));
+  it('invalidates a cached group when a sidecar input changes', () =>
+    workspace((root) => {
+      const sidecar = join(root, 'model/demo.sources.json');
+      writeFileSync(sidecar, '{"entries": []}');
+      const loader = new YamlWorkspaceLoader([root]);
+      const apply = vi.spyOn(ProfileEngine, 'apply');
+      try {
+        loader.load();
+        apply.mockClear();
+        writeFileSync(sidecar, '{"entries": [], "revision": 2}');
+        expect(loader.notify([{ uri: uri(root, 'model/demo.sources.json'), type: 2 }])).toBe(true);
+        loader.load();
+        expect(apply).toHaveBeenCalledTimes(1);
+      } finally {
+        apply.mockRestore();
+      }
+    }));
 });

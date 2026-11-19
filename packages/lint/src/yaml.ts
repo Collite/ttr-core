@@ -37,6 +37,7 @@ const empty = (uri: string): ParseResult => ({ sourceFile: uri, errors: [] });
 export class YamlWorkspaceLoader {
   private markerSignature = '';
   private files?: string[];
+  private sidecars: string[] = [];
   private readonly disk = new Map<string, { stamp: string; text: string }>();
   private readonly headers = new Map<
     string,
@@ -233,6 +234,7 @@ export class YamlWorkspaceLoader {
       return this.read(file);
     };
     const found: string[] = [];
+    const sidecars: string[] = [];
     const walk = (directory: string, inTree = false): void => {
       inTree ||= existsSync(join(directory, 'ttr.yaml')) || typeof this.profile === 'string';
       let entries;
@@ -249,6 +251,7 @@ export class YamlWorkspaceLoader {
           (inTree || !['node_modules', 'build', 'dist'].includes(entry.name))
         )
           walk(file, inTree);
+        else if (entry.isFile() && entry.name.endsWith('.sources.json')) sidecars.push(file);
         else if (entry.isFile() && isYamlFile(file)) {
           // Read admitted models below; plain YAML must remain untouched, including malformed bytes.
           const uri = uriOf(file);
@@ -260,6 +263,7 @@ export class YamlWorkspaceLoader {
     if (!this.files) {
       this.roots.forEach((root) => walk(root));
       this.files = found;
+      this.sidecars = sidecars;
     }
     for (const uri of this.files) {
       texts.set(uri, '');
@@ -451,6 +455,8 @@ export class YamlWorkspaceLoader {
     };
     this.groupDependencies.clear();
     for (const [key, group] of groups) {
+      const sidecars = this.sidecars.filter((file) => file.startsWith(group.root + sep));
+      for (const file of sidecars) this.groupDependencies.add(physicalPath(file));
       for (const profile of group.chain) {
         if (typeof profile.overlay === 'string')
           this.groupDependencies.add(physicalPath(resolve(dirname(profile.file), profile.overlay)));
@@ -459,6 +465,7 @@ export class YamlWorkspaceLoader {
         [
           dependencyText(join(group.root, 'ttr.yaml')),
           dependencyText(join(group.root, 'renames.yaml')),
+          sidecars.map((file) => [file, dependencyText(file)]),
           group.chain.map((p) => [
             p.file,
             p.operations,

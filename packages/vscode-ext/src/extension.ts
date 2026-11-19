@@ -48,7 +48,7 @@ export function activate(context: vscode.ExtensionContext) {
       // Notify the server when `.ttrm` files change on disk outside the editor
       // (external edits, git operations, create/delete) so the whole-project
       // symbol table stays current for cross-file reference resolution.
-      fileEvents: [vscode.workspace.createFileSystemWatcher('**/*.ttrm'), vscode.workspace.createFileSystemWatcher('**/*.{yaml,yml}'), vscode.workspace.createFileSystemWatcher('**/model.ignore')],
+      fileEvents: [vscode.workspace.createFileSystemWatcher('**/*.ttrm'), vscode.workspace.createFileSystemWatcher('**/*.{yaml,yml}'), vscode.workspace.createFileSystemWatcher('**/model.ignore'), vscode.workspace.createFileSystemWatcher('**/*.sources.json')],
     },
   });
 
