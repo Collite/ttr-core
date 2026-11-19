@@ -123,7 +123,7 @@ operations:
   - {"op": "ignore", "in": "fk", "at": "/ParentTable", "reason": "reference joins are resolved as column pairs from child to parent"}
   - {"op": "ignore", "in": "fk", "at": "/ChildTable", "reason": "reference joins are resolved as column pairs from child to parent"}
   - {"op": "ignore", "in": "fk", "at": "/ParentKey", "reason": "reference joins are resolved as column pairs from child to parent"}
-  - {"op": "kinds", "in": "fk", "at": "/Joins", "kind": "/@pd/type", "unmapped": "skip", "mapping": {"PDM.ReferenceJoin": null}}
+  - {"op": "ignore", "in": "fk", "at": "/Joins", "reason": "reference joins are resolved as complete column pairs; incomplete pairs are reported at their XML position"}
   - {"op": "link", "in": "cn2er_kind", "at": "/source", "to": {"kind": "cn2er_kind", "path": ["kind"]}, "by": "sourceName", "kind": "kind"}
   - {"op": "link", "in": "cn2er_kind", "at": "/target", "to": {"kind": "cn2er_kind", "path": ["target"]}, "by": "sourceName", "kind": "entity"}
   - {"op": "shape", "in": "cn2er_kind", "at": "/Name", "to": {"kind": "cn2er_kind", "path": ["description"]}, "template": {"en": {"input": ""}}}

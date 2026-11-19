@@ -51,7 +51,7 @@ class PdmRealFilesSpec : FunSpec({
         val columns = pdObject("Column", "pk", "id") + pdObject("Column", "fk", "parent_id")
         val table = pdObject("Table", "t", "t", "<c:Columns>$columns</c:Columns>")
         val join = pdObject("ReferenceJoin", "j", "j", pdRef("Object1", "Column", "pk") + pdRef("Object2", "Column", "fk"))
-        val target = pdObject("Reference", "target", "target", "<a:History>ORG {${pdId("rel")}}</a:History><c:Joins>$join</c:Joins>")
+        val target = pdObject("Reference", "target", "generated_fk", "<a:History>ORG {${pdId("rel")}}</a:History><c:Joins>$join</c:Joins>")
         val origin = pdObject("Shortcut", "origin", "origin", "<a:TargetID>${pdId("ldm")}</a:TargetID>")
         for ((ldm,pdm) in listOf("a.ldm" to "z.pdm", "z.ldm" to "a.pdm")) {
             Files.list(root).use { it.forEach(Files::delete) }
@@ -109,4 +109,73 @@ class PdmRealFilesSpec : FunSpec({
         result.report.warnings.joinToString() shouldContain "BELONGS_TO"
         result.files.values.forEach { it shouldNotContain "grounds:" }
     }
+    test("C5 extended SQL spellings keep semantic sizes only on text and decimal") {
+        data class Case(val raw: String, val type: String, val length: Int? = null, val precision: Int? = null)
+        val cases = listOf(Case("double precision", "float"), Case("timestamp with time zone", "datetime"),
+            Case("TIMESTAMP(6) WITH TIME ZONE", "datetime"), Case("VARCHAR2(80 CHAR)", "text", 80),
+            Case("NUMBER(*,0)", "decimal", precision = 0), Case("datetime2(7)", "datetime"),
+            Case("INT(11)", "int"), Case("DECIMAL(10, 2)", "decimal", 10, 2))
+        val root = pdDir()
+        for (kind in listOf("PDM", "LDM")) {
+            val member = if (kind == "PDM") "Column" else "EntityAttribute"
+            val parent = if (kind == "PDM") "Table" else "Entity"
+            val collection = if (kind == "PDM") "Columns" else "Attributes"
+            val members = cases.mapIndexed { i,c -> pdObject(member,"c$i","c$i","<a:DataType>${c.raw}</a:DataType>") }.joinToString()
+            root.resolve("types.pdm").writeText(pdModel(kind,"typed","<c:${parent}s>" + pdObject(parent,"t","Sized","<c:$collection>$members</c:$collection>") + "</c:${parent}s>"))
+            val text = pdRun(root).files.values.single()
+            cases.forEachIndexed { i,c ->
+                val body = text.substringAfter("def ${if (kind == "PDM") "column" else "attribute"} c$i {").substringBefore("},")
+                if (c.length == null && c.precision == null) body shouldContain "type: ${c.type}" else body shouldContain "type: ${c.type}"
+                if (c.length == null) body shouldNotContain "length:" else body shouldContain "length: ${c.length}"
+                if (c.precision == null) body shouldNotContain "precision:" else body shouldContain "precision: ${c.precision}"
+            }
+        }
+    }
+    test("C6 emptied-package lexicons require this input's generated header, including linked paths") {
+        val root = pdDir().parent
+        val input = root.resolve("input.ttl").also { it.writeText("old") }
+        val other = root.resolve("other.ttl").also { it.writeText("other") }
+        val out = root.resolve("out").createDirectories()
+        val owned = org.tatrman.ttr.metadata.export.GeneratedInputs(input,null,"skos/1","test",out)
+        val foreign = org.tatrman.ttr.metadata.export.GeneratedInputs(other,null,"skos/1","test",out)
+        val entry = org.tatrman.ttr.profile.SourceEntry("glossary.cn.kind.Item","kind","","item","item","Item")
+        out.resolve("glossary.sources.json").writeText(org.tatrman.ttr.profile.SourcesJsonWriter.write(owned.header("glossary.sources.json").text,listOf(entry)))
+        fun lex(locale: String, header: String) {
+            out.resolve("glossary/lexicon.$locale.ttrm").also { it.parent.createDirectories() }.writeText(header+"body")
+        }
+        lex("cs",owned.header("glossary/lexicon.cs.ttrm").line(org.tatrman.ttr.metadata.export.GeneratedHeader.Form.TTRM))
+        lex("en",foreign.header("glossary/lexicon.en.ttrm").line(org.tatrman.ttr.metadata.export.GeneratedHeader.Form.TTRM))
+        lex("fr", "// hand-authored\n")
+        lex("de", "// generated-from: invalid\n")
+        input.writeText("new bytes; the snapshot hash must not be compared")
+        val linked = root.resolve("linked-input.ttl")
+        Files.createSymbolicLink(linked,input)
+        SidecarDelta.of(out,linked,emptyList()).emptiedFiles.getValue("glossary") shouldBe listOf("glossary/cn.ttrm","glossary/lexicon.cs.ttrm")
+    }
+    test("C7 and C9 zero-pair FK is skipped; missing ends and missing ObjectIDs get one readable entry each") {
+        val root = pdDir()
+        val missingId = "<o:Column Id=\"bad\"><a:Code>bad</a:Code></o:Column>"
+        val cols = pdObject("Column","pk","pk") + missingId
+        val absent = pdObject("ReferenceJoin","absent","absent",pdRef("Object1","Column","pk"))
+        val noId = pdObject("ReferenceJoin","noId","noId",pdRef("Object1","Column","pk")+pdRef("Object2","Column","bad"))
+        root.resolve("bad.pdm").writeText(pdModel("PDM","db","<c:Tables>"+pdObject("Table","t","Items","<c:Columns>$cols</c:Columns>")+"</c:Tables>\n<c:References>"+pdObject("Reference","ref","broken_fk","<c:Joins>\n$absent\n$noId\n</c:Joins>")+"</c:References>"))
+        val result = pdRun(root)
+        result.files.values.single() shouldNotContain "def fk"
+        val ignored = result.report.ignored.filter { it.reason?.startsWith("incomplete ReferenceJoin") == true }
+        ignored.size shouldBe 2
+        ignored[0].reason!! shouldContain "missing Object1 or Object2"
+        ignored[1].reason!! shouldContain "no ObjectID"
+        ignored[0].line + 1 shouldBe ignored[1].line
+        result.report.ignored.count { it.reason?.contains("foreign key skipped") == true } shouldBe 1
+        result.report.ignored.any { it.reason == "kind mapping null" } shouldBe false
+    }
+    test("C8 empty XMI retains the short diagnostic without a StAX prefix") {
+        val file = pdDir().resolve("empty.xmi").also { it.writeText("") }
+        val e = shouldThrow<ProfileException> { XmiFrontEnd.parse(listOf(file)) }
+        e.message!! shouldNotContain "ParseError at"
+        e.message!! shouldNotContain "Message:"
+        e.location.line shouldBe 1
+        e.location.column shouldBe 1
+    }
+
 })
