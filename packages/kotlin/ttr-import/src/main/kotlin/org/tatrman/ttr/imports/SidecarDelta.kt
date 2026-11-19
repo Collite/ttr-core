@@ -98,7 +98,7 @@ internal object SidecarDelta {
                     .distinct()
                     .sorted()
                     .map { outputPath(pkg, "$it.ttrm") }
-                    .plus(lexicons(out, pkg))
+                    .plus(lexicons(out, pkg, real(input)))
                     .distinct()
                     .sorted()
             }
@@ -109,6 +109,7 @@ internal object SidecarDelta {
     private fun lexicons(
         out: Path,
         pkg: String,
+        input: Path,
     ): List<String> =
         try {
             val dir = out.resolve(pkg.replace('.', '/'))
@@ -118,7 +119,15 @@ internal object SidecarDelta {
                 Files.list(dir).use { paths ->
                     paths
                         .filter { Files.isRegularFile(it) && it.fileName.toString().matches(LEXICON) }
-                        .map { outputPath(pkg, it.fileName.toString()) }
+                        .filter { path ->
+                            try {
+                                val firstLine = Files.newBufferedReader(path).use { it.readLine() }.orEmpty()
+                                val header = GeneratedHeader.parse(firstLine)
+                                header != null && real(path.parent).resolve(header.snapshot.path).normalize() == input
+                            } catch (e: IOException) {
+                                false
+                            }
+                        }.map { outputPath(pkg, it.fileName.toString()) }
                         .sorted()
                         .toList()
                 }

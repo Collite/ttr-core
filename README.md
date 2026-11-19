@@ -126,3 +126,17 @@ Policy](TRADEMARKS.md)**.
 - **[GOVERNANCE.md](GOVERNANCE.md)** — steward model and the control-room RFC process.
 - **[SECURITY.md](SECURITY.md)** — report a vulnerability privately.
 - **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** — Contributor Covenant 2.1.
+
+## PowerDesigner imports — `pdm/16`
+
+`ttr-metadata import-pdm --from <file-or-directory> --profile pdm/16 --out <directory>`
+reads PowerDesigner 16 CDM/LDM/PDM models and their generation bindings. Package Codes
+are lower-cased; directory input labels are relative paths, and reused labels are refused.
+Duplicate relationship Codes are ordered by ObjectID: the first keeps its Code, later
+ones receive `__<first-8-ObjectID-hex>` and a located warning. Repeated identities remain
+errors. See the [reader fixtures and rules](tests/conformance/readers/pdm/README.md),
+including the opt-in public PD 16.7 regression (`TTR_PDM_PUBLIC_CDM` points at a local
+[upstream file](https://github.com/DeytaLevel39/PowerDesigner_Docs/blob/master/src/testpdm/project.cdm),
+SHA-256 `e4448550a611932e00e122c381b802a74d052c4ba3bf0c8bef0970ab12873bf5`).
+The public-file test is skipped when unset; no third-party fixture is committed.
+PD 15 is refused; multidimensional imports remain deferred.

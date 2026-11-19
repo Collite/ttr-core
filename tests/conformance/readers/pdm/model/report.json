@@ -710,10 +710,10 @@
         },
         {
             "file": "sales.pdm",
-            "line": 97,
+            "line": 96,
             "column": 1,
-            "path": "/objects/o303/Joins/0",
-            "reason": "kind mapping null (/@pd/type = PDM.ReferenceJoin)"
+            "path": "/objects/o303/Joins",
+            "reason": "reference joins are resolved as complete column pairs; incomplete pairs are reported at their XML position"
         },
         {
             "file": "sales.pdm",

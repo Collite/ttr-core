@@ -308,6 +308,7 @@ data class ImportReport(
             removed: List<Removed> = emptyList(),
             emptied: List<String> = emptyList(),
             emptiedFiles: Map<String, List<String>> = emptyMap(),
+            frontEndIgnored: List<Ignored> = emptyList(),
         ): ImportReport =
             ImportReport(
                 frontEnd,
@@ -322,7 +323,8 @@ data class ImportReport(
                             it.reason,
                             it.record,
                         )
-                    }.distinct()
+                    }.plus(frontEndIgnored)
+                    .distinct()
                     .sortedWith(
                         compareBy<Ignored, String>(Bytewise) { it.file }
                             .thenBy { it.line }
