@@ -83,6 +83,8 @@ export interface TaggedBlockValue {
 export interface NumberValue {
   kind: 'number';
   value: number;
+  /** Resolved YAML numeric spelling; value may be approximate for large integers. */
+  text?: string;
   /** 0.16 — the number as written (automation values only; parameter values feed the D-13 fingerprint). */
   raw?: string;
   source: SourceLocation;

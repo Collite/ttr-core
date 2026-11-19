@@ -88,6 +88,7 @@ export class YamlCoordinates {
 export class YamlInput {
   readonly nodes = new Map<string, Node>();
   readonly keys = new Map<string, Node>();
+  readonly scalars = new Map<string, { value: number; text: string }>();
   readonly pl = new Set<string>();
   readonly value: RecordValue;
   constructor(
@@ -180,6 +181,13 @@ export class YamlInput {
     if (typeof value === 'number' && Number.isFinite(value)) {
       if ((node.source?.length ?? 0) > 1000)
         throw new YamlFailure(path, 'Number literal too long (maximum 1000 characters)');
+      const source = node.source ?? String(value);
+      const text = /^-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$/.test(source)
+        ? source
+        : /^0[xo]/.test(source)
+          ? BigInt(source).toString()
+          : String(value);
+      this.scalars.set(path, { value, text });
       return value;
     }
     throw new YamlFailure(path, 'Expected a finite scalar');
@@ -224,8 +232,6 @@ export class YamlInput {
   }
 
   number(path: string, value: number): string {
-    const node = this.node(path);
-    const raw = isScalar(node) ? node.source : undefined;
-    return raw && /^-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$/.test(raw) ? raw : String(value);
+    return this.scalars.get(path)?.text ?? String(value);
   }
 }
