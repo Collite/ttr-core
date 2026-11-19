@@ -135,7 +135,7 @@ describe('record discovery and structural emission', () => {
     ]);
     expect(props(result)).toMatchObject({
       description: 'Buyer',
-      semantics: { role: 'Buyer' },
+      semantics: new Map([['role', 'Buyer']]),
       labelPlural: 'Buyers',
     });
     const error = errorOf(() =>

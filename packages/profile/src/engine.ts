@@ -4,7 +4,14 @@ import {
   type SourceLocation,
   type Document as AstDocument,
 } from '@tatrman/parser';
-import { ForeignTree, ForeignNode, JsonPointer, type Json } from './input.js';
+import {
+  ForeignTree,
+  ForeignNode,
+  isRecord,
+  NumericScalar,
+  JsonPointer,
+  type Json,
+} from './input.js';
 import {
   ProfileException,
   type ProfileSpan,
@@ -24,9 +31,10 @@ import {
   type Overridden,
 } from './links.js';
 
+import { entries, jsonText } from './scalars.js';
+
 type ObjectValue = { [key: string]: Json };
-const object = (v: Json | undefined): ObjectValue =>
-  v !== null && typeof v === 'object' && !Array.isArray(v) ? v : {};
+const object = (v: Json | undefined): ObjectValue => (isRecord(v) ? v : {});
 const escape = (v: string) => v.replace(/~/g, '~0').replace(/\//g, '~1');
 const resolve = (p: string, n: ForeignNode, includeNull = false) =>
   new JsonPointer(p).resolve(n, includeNull);
@@ -158,7 +166,7 @@ export class ConsumptionLedger {
     const visit = (node: ForeignNode) => {
       if (this.consumed.has(node.path)) return;
       if (Array.isArray(node.value)) node.entries().forEach(visit);
-      else if (node.value !== null && typeof node.value === 'object')
+      else if (isRecord(node.value))
         for (const child of node.entries()) {
           if (!this.consumed.has(child.path) && !this.opened.has(child.path)) drop(child, true);
           else visit(child);
@@ -226,7 +234,7 @@ export class RecordPlan {
           if (!selection) continue;
           this.consumption.open(selection);
           if (selection.value === null) continue;
-          if (op.value.at !== '' && typeof selection.value !== 'object') {
+          if (op.value.at !== '' && !Array.isArray(selection.value) && !isRecord(selection.value)) {
             if (!refusals.has(selection.path))
               refusals.set(
                 selection.path,
@@ -587,7 +595,7 @@ export class CanonicalBuilder {
       const originalAuthored = [...authored];
       authored.clear();
       for (const path of originalAuthored) authored.add(normalizedPaths.get(path) ?? path);
-      const json = JSON.stringify(raw);
+      const json = jsonText(raw);
       if ([...json].length > 6_000_000)
         fail(
           'ys/profile-invalid',
@@ -713,15 +721,15 @@ function jsonRanges(raw: Json): { path: string; start: number; end: number }[] {
   const ranges: { path: string; start: number; end: number }[] = [];
   const visit = (value: Json, path: string) => {
     const start = offset;
-    if (value !== null && typeof value === 'object') {
+    if (value !== null && typeof value === 'object' && !(value instanceof NumericScalar)) {
       offset++;
-      Object.entries(value).forEach(([key, child], i) => {
+      entries(value).forEach(([key, child], i) => {
         if (i) offset++;
         if (!Array.isArray(value)) offset += [...JSON.stringify(key)].length + 1;
         visit(child, path + '/' + escape(key));
       });
       offset++;
-    } else offset += [...JSON.stringify(value)].length;
+    } else offset += [...jsonText(value)].length;
     ranges.push({ path, start, end: offset });
   };
   visit(raw, '');
@@ -1093,8 +1101,16 @@ function canonicalPaths(before: Json, after: Json): Map<string, string> {
   const result = new Map<string, string>();
   const walk = (a: Json, b: Json, from: string, to: string) => {
     result.set(from, to);
-    if (!a || typeof a !== 'object' || !b || typeof b !== 'object') return;
-    if (!Array.isArray(a) && Array.isArray(b)) {
+    if (
+      !a ||
+      typeof a !== 'object' ||
+      !b ||
+      typeof b !== 'object' ||
+      a instanceof NumericScalar ||
+      b instanceof NumericScalar
+    )
+      return;
+    if (isRecord(a) && Array.isArray(b)) {
       b.forEach((entry, i) => {
         if (entry && typeof entry === 'object' && !Array.isArray(entry))
           for (const [key, value] of Object.entries(entry))
@@ -1106,9 +1122,11 @@ function canonicalPaths(before: Json, after: Json): Map<string, string> {
         if (i < b.length) walk(value, b[i], from + '/' + i, to + '/' + i);
       });
     else if (!Array.isArray(a) && !Array.isArray(b))
-      for (const [key, value] of Object.entries(a))
-        if (Object.hasOwn(b, key))
-          walk(value, b[key], from + '/' + escape(key), to + '/' + escape(key));
+      for (const [key, value] of entries(a)) {
+        const selected = b instanceof Map ? b.get(key) : isRecord(b) ? b[key] : undefined;
+        if (selected !== undefined)
+          walk(value, selected, from + '/' + escape(key), to + '/' + escape(key));
+      }
   };
   walk(before, after, '', '');
   return result;

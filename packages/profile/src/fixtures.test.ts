@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { parseString, parseYamlDocument } from '@tatrman/parser';
 import { dump } from '../../../tests/conformance/dump.js';
+import { jsonText } from './scalars.js';
 import { ForeignTree } from './input.js';
 import { DeclarationReader, ProfileReader, ProfileResolver } from './loading.js';
 import { ProfileEngine } from './engine.js';
@@ -329,7 +330,10 @@ function definitions(result: Result) {
   );
 }
 function properties(definition: ReturnType<typeof definitions>[number]) {
-  return Object.assign({}, ...definition.properties) as Record<string, unknown>;
+  return JSON.parse(jsonText(Object.assign({}, ...definition.properties))) as Record<
+    string,
+    unknown
+  >;
 }
 const subject = (
   name: string,

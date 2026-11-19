@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect, vi } from 'vitest';
-import { ForeignTree, JsonPointer, type Json } from './input.js';
+import { ForeignTree, JsonPointer, NumericScalar, type Json } from './input.js';
 import { Record, PlannedOp, type RecordPlan, type CanonicalBuilder } from './engine.js';
 import { ValuesOp, ShapeOp, EachOp, JoinPairsOp, LinkOp, fillTemplate, Missing } from './values.js';
 import { LinkIndex } from './links.js';
@@ -177,7 +177,7 @@ describe('each amended key behaviour', () => {
       shape: { input: '$item/x' },
     });
     new EachOp(h.op).apply(h.plan, h.builder);
-    expect(h.output()).toEqual({ en: 10 });
+    expect(h.output()).toEqual({ en: new NumericScalar(10, '10') });
   });
   it('refuses scalar at the authored key', () => {
     const h = harness('v: no', { op: 'each', shape: {} });

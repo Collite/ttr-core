@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { modelForKind } from '@tatrman/semantics';
 import { canonicalMetadata } from './generated/resources.js';
-import type { Json } from './input.js';
+import { isRecord, type Json } from './input.js';
+import { NumericScalar, entries as outputEntries, jsonText } from './scalars.js';
 import { ProfileException } from './loading.js';
 
 interface Expr {
@@ -124,26 +125,25 @@ export const ProfileVocabulary = {
   },
 };
 
-const object = (value: Json): value is { [key: string]: Json } =>
-  !!value && typeof value === 'object' && !Array.isArray(value);
+const object = isRecord;
 const utf8 = (a: string, b: string): number => {
   const x = new TextEncoder().encode(a),
     y = new TextEncoder().encode(b);
   for (let i = 0; i < Math.min(x.length, y.length); i++) if (x[i] !== y[i]) return x[i] - y[i];
   return x.length - y.length;
 };
-function sorted(entries: [string, Json][], order: string[] = []): { [key: string]: Json } {
+function sorted(entries: [string, Json][], order: string[] = []): Map<string, Json> {
   const rank = (s: string) => {
     const i = order.indexOf(s);
     return i < 0 ? order.length : i;
   };
-  return Object.fromEntries(entries.sort(([a], [b]) => rank(a) - rank(b) || utf8(a, b)));
+  return new Map(entries.sort(([a], [b]) => rank(a) - rank(b) || utf8(a, b)));
 }
 function data(value: Json): Json {
   return Array.isArray(value)
     ? value.map(data)
-    : object(value)
-      ? sorted(Object.entries(value).map(([k, v]) => [k, data(v)]))
+    : object(value) || value instanceof Map
+      ? sorted(outputEntries(value).map(([k, v]) => [k, data(v)]))
       : value;
 }
 function definition(
@@ -160,15 +160,12 @@ function definition(
 function properties(name: string, value: Json, model: string): Json {
   const body = metadata.bodies[name];
   if (!body) return data(value);
-  if ('fields' in body)
-    return Object.fromEntries(
-      Object.entries(value as { [key: string]: Json }).map(([k, v]) => [k, data(v)])
-    );
+  if ('fields' in body) return new Map(outputEntries(value).map(([k, v]) => [k, data(v)]));
   const props = new Map(body.properties.map((p) => [p.key, p]));
   const entries: [string, Json][] = (
     Array.isArray(value)
       ? value.flatMap((v) => Object.entries(v as { [key: string]: Json }))
-      : Object.entries(value as { [key: string]: Json })
+      : outputEntries(value)
   ).map(([k, v]) => {
     if (
       body.members.length &&
@@ -182,11 +179,8 @@ function properties(name: string, value: Json, model: string): Json {
           return name === 'storageDef'
             ? {
                 id: obj.id,
-                fields: Object.fromEntries(
-                  Object.entries(obj.fields as { [key: string]: Json }).map(([key, value]) => [
-                    key,
-                    data(value),
-                  ])
+                fields: new Map(
+                  outputEntries(obj.fields).map(([key, value]) => [key, data(value)])
                 ),
               }
             : definition(obj, model, body.members.find((b) => b.kind === obj.kind)!.body);
@@ -204,9 +198,11 @@ function properties(name: string, value: Json, model: string): Json {
   });
   return body.ordered && !(name === 'roleDef' && model !== 'cn')
     ? entries.map(([k, v]) => ({ [k]: v }))
-    : sorted(
-        entries,
-        body.properties.map((p) => p.key)
+    : Object.fromEntries(
+        sorted(
+          entries,
+          body.properties.map((p) => p.key)
+        )
       );
 }
 function property(expr: Expr, value: Json, model: string): Json {
@@ -229,10 +225,10 @@ function property(expr: Expr, value: Json, model: string): Json {
   if (symbol === 'bindingValue' && object(value)) return properties('bindingBlock', value, model);
   if (symbol === 'restrictBlock' && object(value))
     return sorted(
-      Object.entries(value).map(([k, v]) => [
+      outputEntries(value).map(([k, v]) => [
         k,
         object(v) && !('ref' in v || 'triple' in v || 'call' in v || 'range' in v || 'object' in v)
-          ? Object.fromEntries(Object.entries(v).map(([a, b]) => [a, data(b)]))
+          ? new Map(outputEntries(v).map(([a, b]) => [a, data(b)]))
           : data(v),
       ])
     );
@@ -265,7 +261,7 @@ export function canonicalWrite(raw: { [key: string]: Json }): string {
     const pad = ' '.repeat(indent);
     const entries: [string, Json][] = Array.isArray(value)
       ? value.map((v) => ['-', v])
-      : Object.entries(value as { [key: string]: Json });
+      : outputEntries(value);
     for (const [key, v] of entries) {
       const label = Array.isArray(value)
         ? '-'
@@ -285,8 +281,13 @@ export function canonicalWrite(raw: { [key: string]: Json }): string {
         const lines = v.split('\n');
         if (trailing) lines.pop();
         for (const line of lines) out += (line ? ' '.repeat(indent + 2) + line : '') + '\n';
-      } else if (v === null || typeof v !== 'object' || Object.keys(v).length === 0)
-        out += prefix + (typeof v === 'string' ? quoted(v) : JSON.stringify(v)) + '\n';
+      } else if (
+        v === null ||
+        typeof v !== 'object' ||
+        v instanceof NumericScalar ||
+        (v instanceof Map ? v.size : Object.keys(v).length) === 0
+      )
+        out += prefix + (typeof v === 'string' ? quoted(v) : jsonText(v)) + '\n';
       else {
         out += prefix.trimEnd() + '\n';
         emit(v, indent + 2);

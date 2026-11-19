@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { isRecord, NumericScalar } from './input.js';
 import { readdirSync, realpathSync, existsSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { ForeignData, ForeignTree, JsonPointer, type Json } from './input.js';
@@ -54,8 +55,7 @@ const span = (file: string, path = ''): ProfileSpan => ({
   endColumn: 1,
   path,
 });
-const object = (v: Json | undefined): v is { [key: string]: Json } =>
-  v !== null && typeof v === 'object' && !Array.isArray(v);
+const object = isRecord;
 export const SourcesJsonReader = {
   read(root: string): LinkEntry[] {
     let top: string;
@@ -347,6 +347,8 @@ export const OverlayApplier = {
 /** Kotlin JsonObject equality ignores insertion order; array order remains significant. */
 export function jsonEqual(a: Json | undefined, b: Json | undefined): boolean {
   if (a === b) return true;
+  if (a instanceof NumericScalar || b instanceof NumericScalar)
+    return a instanceof NumericScalar && b instanceof NumericScalar && a.text === b.text;
   if (
     a === undefined ||
     b === undefined ||

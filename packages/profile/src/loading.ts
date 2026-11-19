@@ -142,7 +142,7 @@ function validate(
     });
     validators.set(branch, validator);
   }
-  if (!validator(value)) {
+  if (!validator(JSON.parse(JSON.stringify(value)))) {
     const errorPath = (e: ErrorObject) =>
       e.keyword === 'additionalProperties'
         ? pointer(e.instancePath, String(e.params.additionalProperty))
