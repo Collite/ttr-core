@@ -46,6 +46,7 @@ internal object SidecarDelta {
         val renamed: List<ImportReport.Renamed>,
         val removed: List<ImportReport.Removed>,
         val emptied: List<String> = emptyList(),
+        val emptiedFiles: Map<String, List<String>> = emptyMap(),
     )
 
     /** The delta of [current] (generated from [input]) against the previous generation of [input] under [out]. */
@@ -90,7 +91,15 @@ internal object SidecarDelta {
                 .flatten()
                 .filter { it.foreignId == null || it.foreignId !in now }
                 .map { ImportReport.Removed(it.qname, it.foreignId) }
-        return Delta(renamed, removed, emptied.keys.toList())
+        val emptiedFiles =
+            emptied.mapValues { (pkg, entries) ->
+                entries
+                    .map { it.qname.removePrefix("$pkg.").substringBefore('.') }
+                    .distinct()
+                    .sorted()
+                    .map { "${pkg.replace('.', '/')}/$it.ttrm" }
+            }
+        return Delta(renamed, removed, emptied.keys.toList(), emptiedFiles)
     }
 
     private fun rename(

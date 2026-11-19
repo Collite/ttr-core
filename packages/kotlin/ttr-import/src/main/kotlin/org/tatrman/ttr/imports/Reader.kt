@@ -153,6 +153,7 @@ object Reader {
                 delta.renamed,
                 delta.removed,
                 delta.emptied,
+                delta.emptiedFiles,
             ),
         )
     }
