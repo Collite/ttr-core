@@ -97,7 +97,10 @@ export class ShapeOp {
   apply(plan: RecordPlan, builder: CanonicalBuilder): void {
     for (const record of plan.records.filter((r) => r.kind === this.op.scope)) {
       const base = this.op.at.resolve(record.source, true);
-      if (!base) continue;
+      if (!base) {
+        this.op.missing(plan, record, targetPath(this.op));
+        continue;
+      }
       plan.consumption.open(base);
       const filled = fillTemplate(
         this.op.value.template,
@@ -105,7 +108,8 @@ export class ShapeOp {
         (n) => plan.consumption.consume(n)
       );
       if (!filled.inputs) plan.consumption.consume(base);
-      if (base.value !== null && filled.value !== Missing)
+      if (base.value === null) this.op.missing(plan, record, targetPath(this.op));
+      else if (filled.value !== Missing)
         builder.write(plan, record, targetPath(this.op), filled.value, base);
     }
   }
@@ -255,9 +259,15 @@ export class LinkOp {
     };
     for (const record of plan.records.filter((r) => r.kind === this.op.scope)) {
       const source = this.op.at.resolve(record.source, true);
-      if (!source) continue;
+      if (!source) {
+        this.op.missing(plan, record, path);
+        continue;
+      }
       plan.consumption.consume(source);
-      if (source.value === null) continue;
+      if (source.value === null) {
+        this.op.missing(plan, record, path);
+        continue;
+      }
       const value = Array.isArray(source.value)
         ? source.entries().map((n) => resolve(n, record))
         : resolve(source, record);

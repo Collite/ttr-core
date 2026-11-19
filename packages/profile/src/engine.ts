@@ -94,6 +94,13 @@ export class PlannedOp {
       new FileSelector(this.value.files as string[]).matches(tree.file)
     );
   }
+  missing(plan: RecordPlan, record: Record, target: string[]): void {
+    if (this.value.required !== 'warn') return;
+    plan.warnings.push({
+      location: record.source.span(),
+      message: `ys/key-missing: ${record.id} has no ${String(this.value.at ?? '')}, so ${record.kind}.${target.join('.')} is not written`,
+    });
+  }
 }
 export class ConsumptionLedger {
   private consumed = new Set<string>();
@@ -832,6 +839,20 @@ export class ProfileEngine {
             ? op.at.resolve(plan.tree.root, true)
             : undefined;
           if (selected) plan.consumption.consume(selected);
+          if (op.value.verbatim === true) {
+            if (!plan.records.length) return '';
+            const written = selected?.value;
+            const path = typeof written === 'string' ? written.replace(/\//g, '.') : undefined;
+            if (path !== undefined && /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/.test(path))
+              return path;
+            throw new ProfileException(
+              'ys/package-invalid',
+              plan.records[0].source.span(true),
+              typeof written === 'string'
+                ? `"${written}" is no TTR package path (verbatim: lower-case names, \`/\` → \`.\`)`
+                : `no package path at ${String(op.value.at)}`
+            );
+          }
           const file = plan.tree.file.split('/').at(-1)!;
           const key = Object.hasOwn(op.value, 'at')
             ? typeof selected?.value === 'string'
@@ -888,10 +909,13 @@ export class ProfileEngine {
           case 'unnest':
             for (const record of plan.records.filter((r) => r.kind === op.scope)) {
               const source = op.at.resolve(record.source, true);
-              if (!source) continue;
+              if (!source) {
+                op.missing(plan, record, targetPath(op));
+                continue;
+              }
               plan.consumption.consume(source);
-              if (source.value !== null)
-                builder.write(plan, record, targetPath(op), source.value, source);
+              if (source.value === null) op.missing(plan, record, targetPath(op));
+              else builder.write(plan, record, targetPath(op), source.value, source);
             }
             break;
           case 'ignore': {
