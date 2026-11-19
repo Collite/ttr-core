@@ -217,7 +217,8 @@ export class LinkOp {
     const operand = typeof this.op.value.kind === 'string' ? this.op.value.kind : undefined;
     const kind = operand ?? ProfileVocabulary.referentKind(path);
     const by = this.op.value.by as 'sourceName' | 'iri' | 'path';
-    const resolve = (node: ForeignNode, record: Record): string => {
+    const asRef = this.op.value.as === 'ref';
+    const resolve = (node: ForeignNode, record: Record): Json => {
       if (typeof node.value !== 'string')
         throw new ProfileException(
           'xm/link-unresolved',
@@ -248,6 +249,7 @@ export class LinkOp {
           `${by} ${node.value}${accepted} matches ${candidates.map((e) => e.qname).join(', ')}`
         );
       const target = candidates[0];
+      if (asRef) return { ref: target.qname };
       if (target.pkg && target.pkg !== this.ownPackage) builder.import(plan, record, target.pkg);
       return target.qname;
     };
