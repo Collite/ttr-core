@@ -18,3 +18,10 @@ workspace dependencies. `scripts/generate-resources.mjs --check` is a local stal
 guard for copied grammar resources and the diagnostic catalogue. CI regenerates them
 in `prebuild`, so this does not detect cross-engine drift; shared fixture parity
 provides the cross-engine evidence.
+
+Numeric input values carry `NumericScalar { value, text }`: `value` is an approximate
+JavaScript number, and `text` preserves Kotlin's resolved decimal spelling without
+rounding. The canonical reader exposes numeric `text` on its AST as well. Generic
+output mappings are `Map<string, Json>` so integer-like keys keep canonical UTF-8
+ordering. Use `document.write()` for canonical bytes; `JSON.stringify` is not a
+lossless serializer for these values.

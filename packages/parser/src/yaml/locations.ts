@@ -99,8 +99,10 @@ export class YamlLocations {
         }
       }
     }
-    if (src && p && original.kind === 'number' && 'raw' in original)
-      result.raw = this.input.number(p.path, Number(original.value));
+    if (src && p && original.kind === 'number') {
+      result.text = this.input.number(p.path, Number(original.value));
+      if ('raw' in original) result.raw = result.text;
+    }
     // World schema fields name a key, rather than the type value.
     if (
       src &&

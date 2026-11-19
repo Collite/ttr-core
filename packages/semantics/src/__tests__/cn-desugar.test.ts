@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, it, expect } from 'vitest';
-import { parseString, DiagnosticCode } from '@tatrman/parser';
+import { parseString, parseYamlDocument, DiagnosticCode } from '@tatrman/parser';
 import type { ConceptStereotype, Document } from '@tatrman/parser';
 import { ProjectSymbolTable } from '../project-symbols.js';
 import { Resolver } from '../resolver.js';
@@ -30,7 +30,9 @@ interface Project {
 function project(files: Array<{ uri: string; src: string }>): Project {
   const symbols = new ProjectSymbolTable();
   const docs: CnDocument[] = files.map(({ uri, src }) => {
-    const ast = parse(src);
+    const yaml = uri.endsWith('.yaml') ? parseYamlDocument(src, uri) : undefined;
+    if (yaml) expect(yaml.diagnostics).toEqual([]);
+    const ast = yaml ? yaml.ast! : parse(src);
     return {
       uri,
       ast,
@@ -376,6 +378,30 @@ def kind Party { }
     expect(merged('role: Buyer, event: cn.Purchase', 'def role Buyer { of: Party, event: Purchase }')).toEqual([]);
     expect(merged('role: Buyer, event: Purchase', 'def role Buyer { of: Party }')).toEqual([]);
   });
+
+  it.each(['5', '5.0', '5e0'])(
+    'compares YAML number %s by value with a native grounding',
+    (number) => {
+      const p = project([
+        {
+          uri: 'c.yaml',
+          src: `ttr: '0.22'\npackage: hartland.stores\nmodel: cn\ndefs: [{kind: role, id: Buyer, properties: [{weight: ${number}}]}]`,
+        },
+        {
+          uri: 'e.ttrm',
+          src: 'package hartland.stores\nmodel er\ndef entity customer { concept: { role: Buyer, weight: 5 } }',
+        },
+      ]);
+      expect(analyzeGroundings(p.docs, p.resolver).diagnostics).toEqual([]);
+      const yamlDef = p.docs[0].ast.definitions[0];
+      const nativeDef = parse('package p\nmodel cn\ndef role Buyer { weight: 5 }').definitions[0];
+      if (yamlDef.kind !== 'concept' || nativeDef.kind !== 'concept')
+        throw new Error('not concepts');
+      expect(propertyFingerprint(yamlDef.properties[0])).toBe(
+        propertyFingerprint(nativeDef.properties[0])
+      );
+    }
+  );
 
   it('another stereotype is `cn/duplicate-grounding` at the declaring slot', () => {
     const d = merged('role: Buyer, event: Purchase', 'def kind Buyer { }');

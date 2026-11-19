@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { parseString, parseYamlDocument } from '@tatrman/parser';
 import { dump } from '../../../tests/conformance/dump.js';
+import { jsonText } from './scalars.js';
 import { ForeignTree } from './input.js';
 import { DeclarationReader, ProfileReader, ProfileResolver } from './loading.js';
 import { ProfileEngine } from './engine.js';
@@ -223,6 +224,15 @@ function failure(run: () => unknown, expected: Annotation, root: string) {
 }
 
 describe('shared negative corpus: codes and one-based authored positions', () => {
+  test('C3: the ruled TS-only continuation negative is refused at its authored position', () => {
+    const directory = join(conformance, 'dialect-negative/ts-strict-continuation');
+    const [expected] = annotations(join(directory, 'expected-github.txt'));
+    failure(
+      () => ForeignTree.read(read(join(directory, 'tree/input.yaml')), 'input.yaml'),
+      expected,
+      directory
+    );
+  });
   const directory = join(conformance, 'dialect-negative/demo-cs');
   const root = join(directory, 'tree');
   const expected = annotations(join(directory, 'expected-github.txt'));
@@ -329,7 +339,10 @@ function definitions(result: Result) {
   );
 }
 function properties(definition: ReturnType<typeof definitions>[number]) {
-  return Object.assign({}, ...definition.properties) as Record<string, unknown>;
+  return JSON.parse(jsonText(Object.assign({}, ...definition.properties))) as Record<
+    string,
+    unknown
+  >;
 }
 const subject = (
   name: string,

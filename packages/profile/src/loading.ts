@@ -4,6 +4,7 @@ import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import Ajv2020Module from 'ajv/dist/2020.js';
 import type { ErrorObject, ValidateFunction } from 'ajv';
 import { ForeignData, isRecord, pointer, type Json, type RecordValue } from './input.js';
+import { NumericScalar } from './scalars.js';
 import { readProfileFile } from './file-input.js';
 import {
   profileSchema,
@@ -142,7 +143,7 @@ function validate(
     });
     validators.set(branch, validator);
   }
-  if (!validator(value)) {
+  if (!validator(JSON.parse(JSON.stringify(value)))) {
     const errorPath = (e: ErrorObject) =>
       e.keyword === 'additionalProperties'
         ? pointer(e.instancePath, String(e.params.additionalProperty))
@@ -262,7 +263,11 @@ export class DeclarationReader {
     const data = new ForeignData(source, file, '/ttr');
     if (!isRecord(data.value) || data.value.ttr == null) return { type: 'absent' };
     const header = data.value.ttr;
-    if (typeof header !== 'object') return { type: 'canonical', version: String(header) };
+    if (!isRecord(header) && !Array.isArray(header))
+      return {
+        type: 'canonical',
+        version: header instanceof NumericScalar ? header.text : String(header),
+      };
     // Use authored keys: JS reorders integer property names.
     if (data.keys.keys().next().value !== '/ttr')
       invalid(data, '/ttr', 'ttr header must be the first mapping key');

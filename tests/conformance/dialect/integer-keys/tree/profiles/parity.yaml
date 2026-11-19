@@ -1,0 +1,6 @@
+profile: parity/1
+grammar: '>=0.22 <1.0'
+operations:
+  - {op: package, mapping: {}, default: parity}
+  - {op: kinds, at: /attributes, mapping: {attribute: attribute}}
+  - {op: rename, in: attribute, at: /data, to: {kind: attribute, property: valueLabels}}

@@ -199,3 +199,5 @@ export async function parseDirectory(rootPath: string, recursive = true): Promis
   return results;
 }
 export { decodeTtrString, encodeTtrString } from './strings.js';
+
+export { decimalText } from './yaml/numbers.js';
