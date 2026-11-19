@@ -1,0 +1,889 @@
+{
+    "frontEnd": "pdm",
+    "profile": "pdm/16",
+    "packages": [
+        {
+            "package": "cn_sales",
+            "model": "cn",
+            "file": "cn_sales/cn.ttrm",
+            "defs": 3
+        },
+        {
+            "package": "db_sales.audit",
+            "model": "db",
+            "file": "db_sales/audit/db.ttrm",
+            "defs": 1
+        },
+        {
+            "package": "db_sales",
+            "model": "binding",
+            "file": "db_sales/binding.ttrm",
+            "defs": 8
+        },
+        {
+            "package": "db_sales",
+            "model": "db",
+            "file": "db_sales/db.ttrm",
+            "defs": 3
+        },
+        {
+            "package": "er_sales",
+            "model": "binding",
+            "file": "er_sales/binding.ttrm",
+            "defs": 1
+        },
+        {
+            "package": "er_sales",
+            "model": "er",
+            "file": "er_sales/er.ttrm",
+            "defs": 3
+        }
+    ],
+    "ignored": [
+        {
+            "file": "sales.cdm",
+            "line": 1,
+            "column": 2,
+            "path": "/model",
+            "reason": "PD model header; package is the model/package Code path"
+        },
+        {
+            "file": "sales.cdm",
+            "line": 11,
+            "column": 9,
+            "path": "/objects/o101/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.cdm",
+            "line": 12,
+            "column": 1,
+            "path": "/objects/o101/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.cdm",
+            "line": 13,
+            "column": 1,
+            "path": "/objects/o101/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.cdm",
+            "line": 17,
+            "column": 9,
+            "path": "/objects/o102/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.cdm",
+            "line": 18,
+            "column": 1,
+            "path": "/objects/o102/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.cdm",
+            "line": 19,
+            "column": 1,
+            "path": "/objects/o102/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.cdm",
+            "line": 25,
+            "column": 1,
+            "path": "/objects/o103",
+            "record": "person_subtypes",
+            "reason": "kind unmapped (CDM.Inheritance)"
+        },
+        {
+            "file": "sales.cdm",
+            "line": 35,
+            "column": 1,
+            "path": "/objects/o104",
+            "reason": "kind unmapped (CDM.InheritanceLink)"
+        },
+        {
+            "file": "sales.cdm",
+            "line": 46,
+            "column": 9,
+            "path": "/objects/o105/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.cdm",
+            "line": 47,
+            "column": 1,
+            "path": "/objects/o105/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.cdm",
+            "line": 48,
+            "column": 1,
+            "path": "/objects/o105/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.cdm",
+            "line": 56,
+            "column": 1,
+            "path": "/objects/o105/Entity1ToEntity2RoleCardinality",
+            "reason": "CDM relationships are open-tier relation types; participants require authored semantics"
+        },
+        {
+            "file": "sales.cdm",
+            "line": 57,
+            "column": 1,
+            "path": "/objects/o105/Entity2ToEntity1RoleCardinality",
+            "reason": "CDM relationships are open-tier relation types; participants require authored semantics"
+        },
+        {
+            "file": "sales.cdm",
+            "line": 57,
+            "column": 42,
+            "path": "/objects/o105/Object1",
+            "reason": "CDM relationships are open-tier relation types; participants require authored semantics"
+        },
+        {
+            "file": "sales.cdm",
+            "line": 57,
+            "column": 108,
+            "path": "/objects/o105/Object2",
+            "reason": "CDM relationships are open-tier relation types; participants require authored semantics"
+        },
+        {
+            "file": "sales.cdm",
+            "line": 57,
+            "column": 178,
+            "path": "/diagrams",
+            "reason": "PD diagrams, symbols and display preferences are not model facts"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 1,
+            "column": 2,
+            "path": "/model",
+            "reason": "PD model header; package is the model/package Code path"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 11,
+            "column": 1,
+            "path": "/objects/o1100",
+            "record": "source_model",
+            "reason": "kind unmapped (LDM.Shortcut)"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 19,
+            "column": 9,
+            "path": "/objects/o201/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 20,
+            "column": 1,
+            "path": "/objects/o201/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 21,
+            "column": 1,
+            "path": "/objects/o201/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 23,
+            "column": 1,
+            "path": "/objects/o201/History",
+            "reason": "PD generation history; cross-model ORG links are in generationLinks"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 26,
+            "column": 2,
+            "path": "/objects/o201/Attributes/0/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 27,
+            "column": 1,
+            "path": "/objects/o201/Attributes/0/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 28,
+            "column": 1,
+            "path": "/objects/o201/Attributes/0/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 30,
+            "column": 1,
+            "path": "/objects/o201/Attributes/0/DataType",
+            "reason": "PD type syntax is decomposed in @dataType; the mapping table is in this profile"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 33,
+            "column": 2,
+            "path": "/objects/o201/Attributes/1/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 34,
+            "column": 1,
+            "path": "/objects/o201/Attributes/1/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 35,
+            "column": 1,
+            "path": "/objects/o201/Attributes/1/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 37,
+            "column": 1,
+            "path": "/objects/o201/Attributes/1/DataType",
+            "reason": "PD type syntax is decomposed in @dataType; the mapping table is in this profile"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 42,
+            "column": 9,
+            "path": "/objects/o202/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 43,
+            "column": 1,
+            "path": "/objects/o202/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 44,
+            "column": 1,
+            "path": "/objects/o202/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 47,
+            "column": 2,
+            "path": "/objects/o202/Attributes/0/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 48,
+            "column": 1,
+            "path": "/objects/o202/Attributes/0/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 49,
+            "column": 1,
+            "path": "/objects/o202/Attributes/0/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 51,
+            "column": 1,
+            "path": "/objects/o202/Attributes/0/DataType",
+            "reason": "PD type syntax is decomposed in @dataType; the mapping table is in this profile"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 54,
+            "column": 2,
+            "path": "/objects/o202/Attributes/1/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 55,
+            "column": 1,
+            "path": "/objects/o202/Attributes/1/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 56,
+            "column": 1,
+            "path": "/objects/o202/Attributes/1/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 58,
+            "column": 1,
+            "path": "/objects/o202/Attributes/1/DataType",
+            "reason": "PD type syntax is decomposed in @dataType; the mapping table is in this profile"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 61,
+            "column": 2,
+            "path": "/objects/o202/Attributes/2/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 62,
+            "column": 1,
+            "path": "/objects/o202/Attributes/2/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 63,
+            "column": 1,
+            "path": "/objects/o202/Attributes/2/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 65,
+            "column": 1,
+            "path": "/objects/o202/Attributes/2/DataType",
+            "reason": "PD type syntax is decomposed in @dataType; the mapping table is in this profile"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 72,
+            "column": 9,
+            "path": "/objects/o203/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 73,
+            "column": 1,
+            "path": "/objects/o203/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 74,
+            "column": 1,
+            "path": "/objects/o203/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 83,
+            "column": 42,
+            "path": "/objects/o203/Object1",
+            "reason": "relationship endpoint resolved by its PD object reference"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 83,
+            "column": 107,
+            "path": "/objects/o203/Object2",
+            "reason": "relationship endpoint resolved by its PD object reference"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 83,
+            "column": 177,
+            "path": "/diagrams",
+            "reason": "PD diagrams, symbols and display preferences are not model facts"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 83,
+            "column": 392,
+            "path": "/generationLinks/g_00000000_0000_4000_8000_000000000201_00000000_0000_4000_8000_000000000102/ObjectID",
+            "reason": "generation-link identity retained in the sidecar"
+        },
+        {
+            "file": "sales.ldm",
+            "line": 83,
+            "column": 481,
+            "path": "/generationLinks/g_00000000_0000_4000_8000_000000000201_00000000_0000_4000_8000_000000000102/@pd",
+            "reason": "generation link class and package path"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 1,
+            "column": 2,
+            "path": "/model",
+            "reason": "PD model header; package is the model/package Code path"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 11,
+            "column": 1,
+            "path": "/objects/o1200",
+            "record": "source_model",
+            "reason": "kind unmapped (PDM.Shortcut)"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 19,
+            "column": 9,
+            "path": "/objects/o301/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 20,
+            "column": 1,
+            "path": "/objects/o301/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 21,
+            "column": 1,
+            "path": "/objects/o301/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 23,
+            "column": 1,
+            "path": "/objects/o301/History",
+            "reason": "PD generation history; cross-model ORG links are in generationLinks"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 26,
+            "column": 2,
+            "path": "/objects/o301/Columns/0/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 27,
+            "column": 1,
+            "path": "/objects/o301/Columns/0/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 28,
+            "column": 1,
+            "path": "/objects/o301/Columns/0/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 30,
+            "column": 1,
+            "path": "/objects/o301/Columns/0/History",
+            "reason": "PD generation history; cross-model ORG links are in generationLinks"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 32,
+            "column": 1,
+            "path": "/objects/o301/Columns/0/DataType",
+            "reason": "PD type syntax is decomposed in @dataType; the mapping table is in this profile"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 35,
+            "column": 2,
+            "path": "/objects/o301/Columns/1/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 36,
+            "column": 1,
+            "path": "/objects/o301/Columns/1/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 37,
+            "column": 1,
+            "path": "/objects/o301/Columns/1/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 39,
+            "column": 1,
+            "path": "/objects/o301/Columns/1/History",
+            "reason": "PD generation history; cross-model ORG links are in generationLinks"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 41,
+            "column": 1,
+            "path": "/objects/o301/Columns/1/DataType",
+            "reason": "PD type syntax is decomposed in @dataType; the mapping table is in this profile"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 46,
+            "column": 9,
+            "path": "/objects/o302/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 47,
+            "column": 1,
+            "path": "/objects/o302/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 48,
+            "column": 1,
+            "path": "/objects/o302/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 50,
+            "column": 1,
+            "path": "/objects/o302/History",
+            "reason": "PD generation history; cross-model ORG links are in generationLinks"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 53,
+            "column": 2,
+            "path": "/objects/o302/Columns/0/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 54,
+            "column": 1,
+            "path": "/objects/o302/Columns/0/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 55,
+            "column": 1,
+            "path": "/objects/o302/Columns/0/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 57,
+            "column": 1,
+            "path": "/objects/o302/Columns/0/History",
+            "reason": "PD generation history; cross-model ORG links are in generationLinks"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 59,
+            "column": 1,
+            "path": "/objects/o302/Columns/0/DataType",
+            "reason": "PD type syntax is decomposed in @dataType; the mapping table is in this profile"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 62,
+            "column": 2,
+            "path": "/objects/o302/Columns/1/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 63,
+            "column": 1,
+            "path": "/objects/o302/Columns/1/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 64,
+            "column": 1,
+            "path": "/objects/o302/Columns/1/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 66,
+            "column": 1,
+            "path": "/objects/o302/Columns/1/History",
+            "reason": "PD generation history; cross-model ORG links are in generationLinks"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 68,
+            "column": 1,
+            "path": "/objects/o302/Columns/1/DataType",
+            "reason": "PD type syntax is decomposed in @dataType; the mapping table is in this profile"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 71,
+            "column": 2,
+            "path": "/objects/o302/Columns/2/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 72,
+            "column": 1,
+            "path": "/objects/o302/Columns/2/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 73,
+            "column": 1,
+            "path": "/objects/o302/Columns/2/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 75,
+            "column": 1,
+            "path": "/objects/o302/Columns/2/History",
+            "reason": "PD generation history; cross-model ORG links are in generationLinks"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 77,
+            "column": 1,
+            "path": "/objects/o302/Columns/2/DataType",
+            "reason": "PD type syntax is decomposed in @dataType; the mapping table is in this profile"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 84,
+            "column": 9,
+            "path": "/objects/o303/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 85,
+            "column": 1,
+            "path": "/objects/o303/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 86,
+            "column": 1,
+            "path": "/objects/o303/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 88,
+            "column": 1,
+            "path": "/objects/o303/History",
+            "reason": "PD generation history; cross-model ORG links are in generationLinks"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 90,
+            "column": 1,
+            "path": "/objects/o303/ParentTable",
+            "reason": "reference joins are resolved as column pairs from child to parent"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 93,
+            "column": 1,
+            "path": "/objects/o303/ChildTable",
+            "reason": "reference joins are resolved as column pairs from child to parent"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 96,
+            "column": 1,
+            "path": "/objects/o303/Joins",
+            "reason": "reference joins are resolved as column pairs from child to parent"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 115,
+            "column": 9,
+            "path": "/objects/o351/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 116,
+            "column": 1,
+            "path": "/objects/o351/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 117,
+            "column": 1,
+            "path": "/objects/o351/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 120,
+            "column": 2,
+            "path": "/objects/o351/Columns/0/@pd",
+            "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 121,
+            "column": 1,
+            "path": "/objects/o351/Columns/0/ObjectID",
+            "reason": "stable object identity in the sidecar"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 122,
+            "column": 1,
+            "path": "/objects/o351/Columns/0/Name",
+            "reason": "PD display name; the Code is the generated identifier"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 124,
+            "column": 1,
+            "path": "/objects/o351/Columns/0/DataType",
+            "reason": "PD type syntax is decomposed in @dataType; the mapping table is in this profile"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 124,
+            "column": 55,
+            "path": "/diagrams",
+            "reason": "PD diagrams, symbols and display preferences are not model facts"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 136,
+            "column": 240,
+            "path": "/generationLinks/g_00000000_0000_4000_8000_000000000301_00000000_0000_4000_8000_000000000201/ObjectID",
+            "reason": "generation-link identity retained in the sidecar"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 136,
+            "column": 329,
+            "path": "/generationLinks/g_00000000_0000_4000_8000_000000000301_00000000_0000_4000_8000_000000000201/@pd",
+            "reason": "generation link class and package path"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 136,
+            "column": 607,
+            "path": "/generationLinks/g_00000000_0000_4000_8000_000000000311_00000000_0000_4000_8000_000000000211/ObjectID",
+            "reason": "generation-link identity retained in the sidecar"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 136,
+            "column": 696,
+            "path": "/generationLinks/g_00000000_0000_4000_8000_000000000311_00000000_0000_4000_8000_000000000211/@pd",
+            "reason": "generation link class and package path"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 136,
+            "column": 993,
+            "path": "/generationLinks/g_00000000_0000_4000_8000_000000000312_00000000_0000_4000_8000_000000000212/ObjectID",
+            "reason": "generation-link identity retained in the sidecar"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 136,
+            "column": 1082,
+            "path": "/generationLinks/g_00000000_0000_4000_8000_000000000312_00000000_0000_4000_8000_000000000212/@pd",
+            "reason": "generation link class and package path"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 136,
+            "column": 1386,
+            "path": "/generationLinks/g_00000000_0000_4000_8000_000000000302_00000000_0000_4000_8000_000000000202/ObjectID",
+            "reason": "generation-link identity retained in the sidecar"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 136,
+            "column": 1475,
+            "path": "/generationLinks/g_00000000_0000_4000_8000_000000000302_00000000_0000_4000_8000_000000000202/@pd",
+            "reason": "generation link class and package path"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 136,
+            "column": 1753,
+            "path": "/generationLinks/g_00000000_0000_4000_8000_000000000321_00000000_0000_4000_8000_000000000221/ObjectID",
+            "reason": "generation-link identity retained in the sidecar"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 136,
+            "column": 1842,
+            "path": "/generationLinks/g_00000000_0000_4000_8000_000000000321_00000000_0000_4000_8000_000000000221/@pd",
+            "reason": "generation link class and package path"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 136,
+            "column": 2151,
+            "path": "/generationLinks/g_00000000_0000_4000_8000_000000000322_00000000_0000_4000_8000_000000000222/ObjectID",
+            "reason": "generation-link identity retained in the sidecar"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 136,
+            "column": 2240,
+            "path": "/generationLinks/g_00000000_0000_4000_8000_000000000322_00000000_0000_4000_8000_000000000222/@pd",
+            "reason": "generation link class and package path"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 136,
+            "column": 2549,
+            "path": "/generationLinks/g_00000000_0000_4000_8000_000000000323_00000000_0000_4000_8000_000000000223/ObjectID",
+            "reason": "generation-link identity retained in the sidecar"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 136,
+            "column": 2638,
+            "path": "/generationLinks/g_00000000_0000_4000_8000_000000000323_00000000_0000_4000_8000_000000000223/@pd",
+            "reason": "generation link class and package path"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 136,
+            "column": 2948,
+            "path": "/generationLinks/g_00000000_0000_4000_8000_000000000303_00000000_0000_4000_8000_000000000203/ObjectID",
+            "reason": "generation-link identity retained in the sidecar"
+        },
+        {
+            "file": "sales.pdm",
+            "line": 136,
+            "column": 3037,
+            "path": "/generationLinks/g_00000000_0000_4000_8000_000000000303_00000000_0000_4000_8000_000000000203/@pd",
+            "reason": "generation link class and package path"
+        }
+    ],
+    "overridden": [],
+    "warnings": []
+}

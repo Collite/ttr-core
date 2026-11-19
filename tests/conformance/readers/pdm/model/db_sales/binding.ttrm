@@ -1,0 +1,29 @@
+// generated-from: ../../sources@4a1b0705283d5812982d6ca46a43a642bb2dfbf5dfa0fb45e44c6dacdc724b91 profile pdm/16 generator 0.0.1-LOCAL — do not edit
+package db_sales
+import er_sales.*
+model binding
+
+def er2db_entity g_00000000_0000_4000_8000_000000000301_00000000_0000_4000_8000_000000000201 { description: { en: "customers" }, entity: er_sales.er.entity.Customer, target: { table: "db_sales.db.dbo.customers" },
+}
+
+def er2db_entity g_00000000_0000_4000_8000_000000000302_00000000_0000_4000_8000_000000000202 { description: { en: "orders" }, entity: er_sales.er.entity.Order, target: { table: "db_sales.db.dbo.orders" },
+}
+
+def er2db_relation g_00000000_0000_4000_8000_000000000303_00000000_0000_4000_8000_000000000203 { description: { en: "fk_orders_customer" }, relation: er_sales.er.relation.placed_by, fk: db_sales.db.dbo.fk_orders_customer,
+}
+
+def er2db_attribute g_00000000_0000_4000_8000_000000000311_00000000_0000_4000_8000_000000000211 { description: { en: "id" }, attribute: er_sales.er.entity.Customer.id, target: { column: "db_sales.db.dbo.customers.id" },
+}
+
+def er2db_attribute g_00000000_0000_4000_8000_000000000312_00000000_0000_4000_8000_000000000212 { description: { en: "email" }, attribute: er_sales.er.entity.Customer.email, target: { column: "db_sales.db.dbo.customers.email" },
+}
+
+def er2db_attribute g_00000000_0000_4000_8000_000000000321_00000000_0000_4000_8000_000000000221 { description: { en: "order_no" }, attribute: er_sales.er.entity.Order.order_no, target: { column: "db_sales.db.dbo.orders.order_no" },
+}
+
+def er2db_attribute g_00000000_0000_4000_8000_000000000322_00000000_0000_4000_8000_000000000222 { description: { en: "customer_id" }, attribute: er_sales.er.entity.Order.customer_id, target: { column: "db_sales.db.dbo.orders.customer_id" },
+}
+
+def er2db_attribute g_00000000_0000_4000_8000_000000000323_00000000_0000_4000_8000_000000000223 { description: { en: "total" }, attribute: er_sales.er.entity.Order.total, target: { column: "db_sales.db.dbo.orders.total" },
+}
+

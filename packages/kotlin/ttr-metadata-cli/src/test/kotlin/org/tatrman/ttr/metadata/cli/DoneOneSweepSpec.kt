@@ -40,6 +40,22 @@ class DoneOneSweepSpec :
                     val out = runMetadataCommand(listOf("lint", "--root", "$root", "--strict", "--format", "github"))
                     out.stdout + out.stderr
                 }
+                "import-pdm" in entry -> {
+                    val root = Files.createTempDirectory("s54-sweep")
+                    val result =
+                        runMetadataCommand(
+                            listOf(
+                                "import-pdm",
+                                "--from",
+                                conformance.resolve(entry.text("import-pdm")).toString(),
+                                "--profile",
+                                "pdm/16",
+                                "--out",
+                                root.resolve("model").toString(),
+                            ),
+                        )
+                    result.stdout + result.stderr
+                }
                 "snapshot" in entry -> {
                     // A 6 MiB export (three-byte padding keeps it inside the reader's budget) captured with the fixture's
                     // profiles as the working directory's catalogue, without --large.
@@ -90,7 +106,7 @@ class DoneOneSweepSpec :
             val file = Regex.escape(at.substringBeforeLast(':'))
             val line = at.substringAfterLast(':')
             val github = Regex("""^::(?:error|warning) file=(?:.*/)?$file,line=$line,col=\d+::$code """)
-            val plain = Regex("""^(?:.*/)?$file:$line: error $code:""")
+            val plain = Regex("""^(?:.*/)?$file:$line(?::\d+)?: error $code(?:[: ]|$)""")
             return output.lines().any { github.containsMatchIn(it) || plain.containsMatchIn(it) }
         }
 

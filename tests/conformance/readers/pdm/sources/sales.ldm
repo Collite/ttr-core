@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?PowerDesigner signature="LDM_DATA_MODEL_XML" version="16.7.0.6367"?>
+<Model xmlns:a="attribute" xmlns:c="collection" xmlns:o="object">
+  <o:RootObject Id="root">
+    <c:Children>
+      <o:Model Id="o200">
+        <a:ObjectID>00000000-0000-4000-8000-000000000200</a:ObjectID>
+        <a:Name>er_sales</a:Name>
+        <a:Code>er_sales</a:Code>
+        <c:GenerationOrigins>
+          <o:Shortcut Id="o1100">
+            <a:ObjectID>00000000-0000-4000-8000-000000001100</a:ObjectID>
+            <a:Name>source_model</a:Name>
+            <a:Code>source_model</a:Code>
+            <a:TargetID>00000000-0000-4000-8000-000000000100</a:TargetID>
+          </o:Shortcut>
+        </c:GenerationOrigins>
+        <c:Entities>
+          <o:Entity Id="o201">
+            <a:ObjectID>00000000-0000-4000-8000-000000000201</a:ObjectID>
+            <a:Name>Customer</a:Name>
+            <a:Code>Customer</a:Code>
+            <a:History>ORG {00000000-0000-4000-8000-000000000102}
+DAT 1234567890</a:History>
+            <c:Attributes>
+              <o:EntityAttribute Id="o211">
+                <a:ObjectID>00000000-0000-4000-8000-000000000211</a:ObjectID>
+                <a:Name>id</a:Name>
+                <a:Code>id</a:Code>
+                <a:DataType>I</a:DataType>
+                <a:BaseAttribute.Mandatory>1</a:BaseAttribute.Mandatory>
+              </o:EntityAttribute>
+              <o:EntityAttribute Id="o212">
+                <a:ObjectID>00000000-0000-4000-8000-000000000212</a:ObjectID>
+                <a:Name>email</a:Name>
+                <a:Code>email</a:Code>
+                <a:DataType>VA80</a:DataType>
+                <a:BaseAttribute.Mandatory>0</a:BaseAttribute.Mandatory>
+              </o:EntityAttribute>
+            </c:Attributes>
+          </o:Entity>
+          <o:Entity Id="o202">
+            <a:ObjectID>00000000-0000-4000-8000-000000000202</a:ObjectID>
+            <a:Name>Order</a:Name>
+            <a:Code>Order</a:Code>
+            <c:Attributes>
+              <o:EntityAttribute Id="o221">
+                <a:ObjectID>00000000-0000-4000-8000-000000000221</a:ObjectID>
+                <a:Name>order_no</a:Name>
+                <a:Code>order_no</a:Code>
+                <a:DataType>I</a:DataType>
+                <a:BaseAttribute.Mandatory>1</a:BaseAttribute.Mandatory>
+              </o:EntityAttribute>
+              <o:EntityAttribute Id="o222">
+                <a:ObjectID>00000000-0000-4000-8000-000000000222</a:ObjectID>
+                <a:Name>customer_id</a:Name>
+                <a:Code>customer_id</a:Code>
+                <a:DataType>I</a:DataType>
+                <a:BaseAttribute.Mandatory>1</a:BaseAttribute.Mandatory>
+              </o:EntityAttribute>
+              <o:EntityAttribute Id="o223">
+                <a:ObjectID>00000000-0000-4000-8000-000000000223</a:ObjectID>
+                <a:Name>total</a:Name>
+                <a:Code>total</a:Code>
+                <a:DataType>N12,2</a:DataType>
+                <a:BaseAttribute.Mandatory>1</a:BaseAttribute.Mandatory>
+              </o:EntityAttribute>
+            </c:Attributes>
+          </o:Entity>
+        </c:Entities>
+        <c:Relationships>
+          <o:Relationship Id="o203">
+            <a:ObjectID>00000000-0000-4000-8000-000000000203</a:ObjectID>
+            <a:Name>placed_by</a:Name>
+            <a:Code>placed_by</a:Code>
+            <c:Object1>
+              <o:Entity Ref="o202" />
+            </c:Object1>
+            <c:Object2>
+              <o:Entity Ref="o201" />
+            </c:Object2>
+            <a:Entity1ToEntity2RoleCardinality>1..1</a:Entity1ToEntity2RoleCardinality>
+            <a:Entity2ToEntity1RoleCardinality>0..n</a:Entity2ToEntity1RoleCardinality>
+          </o:Relationship>
+        </c:Relationships>
+      </o:Model>
+    </c:Children>
+  </o:RootObject>
+</Model>

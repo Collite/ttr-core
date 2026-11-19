@@ -1,0 +1,7 @@
+{
+  "generated-from": "generated-from: ../sources@4a1b0705283d5812982d6ca46a43a642bb2dfbf5dfa0fb45e44c6dacdc724b91 profile pdm/16 generator 0.0.1-LOCAL — do not edit",
+  "entries": [
+    {"qname":"db_sales.audit.db.dbo.change_log","kind":"table","foreignId":"00000000-0000-4000-8000-000000000351","sourceName":"00000000-0000-4000-8000-000000000351","locator":"change_log"},
+    {"qname":"db_sales.audit.db.dbo.change_log.entry_id","kind":"column","foreignId":"00000000-0000-4000-8000-000000000352","sourceName":"00000000-0000-4000-8000-000000000352","locator":"change_log/entry_id"}
+  ]
+}

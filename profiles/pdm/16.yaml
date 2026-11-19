@@ -1,0 +1,147 @@
+# PowerDesigner 16 CDM/LDM/PDM -> cn skeleton, er/db and generation-link binding documents.
+# D-MW-109: multidimensional objects are deferred to S5.4b. No PD extension (ttr.xem) semantics are read.
+# Model/package Codes are verbatim package paths. Definitions use Code, not local XML ids or display names.
+# References keep their PD ids; @path is their resolved foreign Code ancestry, which link by:path matches.
+# History ORG ids resolve only through the supplied models' GenerationOrigins; unsupplied origins are skipped
+# with an ignored-record entry. The engine refuses ambiguous Code paths rather than guessing a package.
+# Types are data below: PD logical abbreviations and SQL type spellings map to canonical TTR types.
+profile: pdm/16
+grammar: '>=0.22 <1.0'
+skeleton: true
+sourceName: /ObjectID
+foreignId: /ObjectID
+unknown: ignore
+operations:
+  - {"op": "package", "at": "/model/package", "verbatim": true}
+  - {"op": "kinds", "at": "/objects", "id": "/Code", "kind": "/@pd/type", "unmapped": "skip", "mapping": {"CDM.Entity": "kind", "CDM.Relationship": "relation_type", "LDM.Entity": "entity", "LDM.Relationship": "relation", "PDM.Table": "table", "PDM.Reference": "fk"}}
+  - {"op": "kinds", "in": "entity", "at": "/Attributes", "id": "/Code", "mapping": {"EntityAttribute": "attribute"}}
+  - {"op": "kinds", "in": "table", "at": "/Columns", "id": "/Code", "mapping": {"Column": "column"}}
+  - {"op": "kinds", "at": "/generationLinks", "id": "/Code", "kind": "/@pd/type", "unmapped": "skip", "mapping": {"CDM.Entity->LDM.Entity": "cn2er_kind", "LDM.Entity->PDM.Table": "er2db_entity", "LDM.EntityAttribute->PDM.Column": "er2db_attribute", "LDM.Relationship->PDM.Reference": "er2db_relation"}}
+  - {"op": "rename", "in": "kind", "at": "/Comment", "to": {"kind": "kind", "path": ["description"]}}
+  - {"op": "ignore", "in": "kind", "at": "/@pd", "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"}
+  - {"op": "ignore", "in": "kind", "at": "/ObjectID", "reason": "stable object identity in the sidecar"}
+  - {"op": "ignore", "in": "kind", "at": "/Name", "reason": "PD display name; the Code is the generated identifier"}
+  - {"op": "ignore", "in": "kind", "at": "/History", "reason": "PD generation history; cross-model ORG links are in generationLinks"}
+  - {"op": "ignore", "in": "kind", "at": "/CreationDate", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "kind", "at": "/Creator", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "kind", "at": "/ModificationDate", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "kind", "at": "/Modifier", "reason": "PD edit bookkeeping"}
+  - {"op": "rename", "in": "relation_type", "at": "/Comment", "to": {"kind": "relation_type", "path": ["description"]}}
+  - {"op": "ignore", "in": "relation_type", "at": "/@pd", "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"}
+  - {"op": "ignore", "in": "relation_type", "at": "/ObjectID", "reason": "stable object identity in the sidecar"}
+  - {"op": "ignore", "in": "relation_type", "at": "/Name", "reason": "PD display name; the Code is the generated identifier"}
+  - {"op": "ignore", "in": "relation_type", "at": "/History", "reason": "PD generation history; cross-model ORG links are in generationLinks"}
+  - {"op": "ignore", "in": "relation_type", "at": "/CreationDate", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "relation_type", "at": "/Creator", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "relation_type", "at": "/ModificationDate", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "relation_type", "at": "/Modifier", "reason": "PD edit bookkeeping"}
+  - {"op": "rename", "in": "entity", "at": "/Comment", "to": {"kind": "entity", "path": ["description"]}}
+  - {"op": "ignore", "in": "entity", "at": "/@pd", "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"}
+  - {"op": "ignore", "in": "entity", "at": "/ObjectID", "reason": "stable object identity in the sidecar"}
+  - {"op": "ignore", "in": "entity", "at": "/Name", "reason": "PD display name; the Code is the generated identifier"}
+  - {"op": "ignore", "in": "entity", "at": "/History", "reason": "PD generation history; cross-model ORG links are in generationLinks"}
+  - {"op": "ignore", "in": "entity", "at": "/CreationDate", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "entity", "at": "/Creator", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "entity", "at": "/ModificationDate", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "entity", "at": "/Modifier", "reason": "PD edit bookkeeping"}
+  - {"op": "rename", "in": "attribute", "at": "/Comment", "to": {"kind": "attribute", "path": ["description"]}}
+  - {"op": "ignore", "in": "attribute", "at": "/@pd", "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"}
+  - {"op": "ignore", "in": "attribute", "at": "/ObjectID", "reason": "stable object identity in the sidecar"}
+  - {"op": "ignore", "in": "attribute", "at": "/Name", "reason": "PD display name; the Code is the generated identifier"}
+  - {"op": "ignore", "in": "attribute", "at": "/History", "reason": "PD generation history; cross-model ORG links are in generationLinks"}
+  - {"op": "ignore", "in": "attribute", "at": "/CreationDate", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "attribute", "at": "/Creator", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "attribute", "at": "/ModificationDate", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "attribute", "at": "/Modifier", "reason": "PD edit bookkeeping"}
+  - {"op": "rename", "in": "relation", "at": "/Comment", "to": {"kind": "relation", "path": ["description"]}}
+  - {"op": "ignore", "in": "relation", "at": "/@pd", "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"}
+  - {"op": "ignore", "in": "relation", "at": "/ObjectID", "reason": "stable object identity in the sidecar"}
+  - {"op": "ignore", "in": "relation", "at": "/Name", "reason": "PD display name; the Code is the generated identifier"}
+  - {"op": "ignore", "in": "relation", "at": "/History", "reason": "PD generation history; cross-model ORG links are in generationLinks"}
+  - {"op": "ignore", "in": "relation", "at": "/CreationDate", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "relation", "at": "/Creator", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "relation", "at": "/ModificationDate", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "relation", "at": "/Modifier", "reason": "PD edit bookkeeping"}
+  - {"op": "rename", "in": "table", "at": "/Comment", "to": {"kind": "table", "path": ["description"]}}
+  - {"op": "ignore", "in": "table", "at": "/@pd", "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"}
+  - {"op": "ignore", "in": "table", "at": "/ObjectID", "reason": "stable object identity in the sidecar"}
+  - {"op": "ignore", "in": "table", "at": "/Name", "reason": "PD display name; the Code is the generated identifier"}
+  - {"op": "ignore", "in": "table", "at": "/History", "reason": "PD generation history; cross-model ORG links are in generationLinks"}
+  - {"op": "ignore", "in": "table", "at": "/CreationDate", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "table", "at": "/Creator", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "table", "at": "/ModificationDate", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "table", "at": "/Modifier", "reason": "PD edit bookkeeping"}
+  - {"op": "rename", "in": "column", "at": "/Comment", "to": {"kind": "column", "path": ["description"]}}
+  - {"op": "ignore", "in": "column", "at": "/@pd", "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"}
+  - {"op": "ignore", "in": "column", "at": "/ObjectID", "reason": "stable object identity in the sidecar"}
+  - {"op": "ignore", "in": "column", "at": "/Name", "reason": "PD display name; the Code is the generated identifier"}
+  - {"op": "ignore", "in": "column", "at": "/History", "reason": "PD generation history; cross-model ORG links are in generationLinks"}
+  - {"op": "ignore", "in": "column", "at": "/CreationDate", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "column", "at": "/Creator", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "column", "at": "/ModificationDate", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "column", "at": "/Modifier", "reason": "PD edit bookkeeping"}
+  - {"op": "rename", "in": "fk", "at": "/Comment", "to": {"kind": "fk", "path": ["description"]}}
+  - {"op": "ignore", "in": "fk", "at": "/@pd", "reason": "PowerDesigner identity, model class and package path (identity is retained by the sidecar)"}
+  - {"op": "ignore", "in": "fk", "at": "/ObjectID", "reason": "stable object identity in the sidecar"}
+  - {"op": "ignore", "in": "fk", "at": "/Name", "reason": "PD display name; the Code is the generated identifier"}
+  - {"op": "ignore", "in": "fk", "at": "/History", "reason": "PD generation history; cross-model ORG links are in generationLinks"}
+  - {"op": "ignore", "in": "fk", "at": "/CreationDate", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "fk", "at": "/Creator", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "fk", "at": "/ModificationDate", "reason": "PD edit bookkeeping"}
+  - {"op": "ignore", "in": "fk", "at": "/Modifier", "reason": "PD edit bookkeeping"}
+  - {"op": "link", "in": "kind", "at": "/@parents", "to": {"kind": "kind", "path": ["is_a"]}, "by": "path", "kind": "kind", "as": "ref"}
+  - {"op": "ignore", "in": "kind", "at": "/Attributes", "reason": "CDM emits only a cn skeleton: entities, inheritance and open-tier relationship types"}
+  - {"op": "ignore", "in": "kind", "at": "/Identifiers", "reason": "CDM emits only a cn skeleton: entities, inheritance and open-tier relationship types"}
+  - {"op": "ignore", "in": "kind", "at": "/PrimaryIdentifier", "reason": "CDM emits only a cn skeleton: entities, inheritance and open-tier relationship types"}
+  - {"op": "ignore", "in": "kind", "at": "/Inheritances", "reason": "CDM emits only a cn skeleton: entities, inheritance and open-tier relationship types"}
+  - {"op": "shape", "in": "relation_type", "at": "/Name", "to": {"kind": "relation_type", "path": ["label"]}, "template": {"en": {"input": ""}}}
+  - {"op": "ignore", "in": "relation_type", "at": "/Object1", "reason": "CDM relationships are open-tier relation types; participants require authored semantics"}
+  - {"op": "ignore", "in": "relation_type", "at": "/Object2", "reason": "CDM relationships are open-tier relation types; participants require authored semantics"}
+  - {"op": "ignore", "in": "relation_type", "at": "/Entity1ToEntity2Role", "reason": "CDM relationships are open-tier relation types; participants require authored semantics"}
+  - {"op": "ignore", "in": "relation_type", "at": "/Entity1ToEntity2RoleCardinality", "reason": "CDM relationships are open-tier relation types; participants require authored semantics"}
+  - {"op": "ignore", "in": "relation_type", "at": "/Entity2ToEntity1Role", "reason": "CDM relationships are open-tier relation types; participants require authored semantics"}
+  - {"op": "ignore", "in": "relation_type", "at": "/Entity2ToEntity1RoleCardinality", "reason": "CDM relationships are open-tier relation types; participants require authored semantics"}
+  - {"op": "values", "in": "attribute", "at": "/@dataType/name", "to": {"kind": "attribute", "path": ["type", "type"]}, "mapping": {"I": "int", "INT": "int", "INTEGER": "int", "SMALLINT": "int", "TINYINT": "int", "LI": "bigint", "BIGINT": "bigint", "A": "text", "VA": "text", "CHAR": "text", "VARCHAR": "text", "TEXT": "text", "CLOB": "text", "UUID": "text", "BL": "bool", "BOOLEAN": "bool", "BOOL": "bool", "BIT": "bool", "N": "decimal", "NM": "decimal", "NUMERIC": "decimal", "NUMBER": "decimal", "DECIMAL": "decimal", "MONEY": "decimal", "F": "float", "FLOAT": "float", "DOUBLE": "float", "REAL": "float", "D": "date", "DATE": "date", "T": "time", "TIME": "time", "DT": "datetime", "DATETIME": "datetime", "TIMESTAMP": "datetime"}, "default": "text"}
+  - {"op": "rename", "in": "attribute", "at": "/@dataType/length", "to": {"kind": "attribute", "path": ["type", "length"]}}
+  - {"op": "rename", "in": "attribute", "at": "/@dataType/precision", "to": {"kind": "attribute", "path": ["type", "precision"]}}
+  - {"op": "values", "in": "attribute", "at": "/BaseAttribute.Mandatory", "to": {"kind": "attribute", "path": ["optional"]}, "mapping": {"1": false, "0": true}, "default": true}
+  - {"op": "ignore", "in": "attribute", "at": "/DataType", "reason": "PD type syntax is decomposed in @dataType; the mapping table is in this profile"}
+  - {"op": "values", "in": "column", "at": "/@dataType/name", "to": {"kind": "column", "path": ["type", "type"]}, "mapping": {"I": "int", "INT": "int", "INTEGER": "int", "SMALLINT": "int", "TINYINT": "int", "LI": "bigint", "BIGINT": "bigint", "A": "text", "VA": "text", "CHAR": "text", "VARCHAR": "text", "TEXT": "text", "CLOB": "text", "UUID": "text", "BL": "bool", "BOOLEAN": "bool", "BOOL": "bool", "BIT": "bool", "N": "decimal", "NM": "decimal", "NUMERIC": "decimal", "NUMBER": "decimal", "DECIMAL": "decimal", "MONEY": "decimal", "F": "float", "FLOAT": "float", "DOUBLE": "float", "REAL": "float", "D": "date", "DATE": "date", "T": "time", "TIME": "time", "DT": "datetime", "DATETIME": "datetime", "TIMESTAMP": "datetime"}, "default": "text"}
+  - {"op": "rename", "in": "column", "at": "/@dataType/length", "to": {"kind": "column", "path": ["type", "length"]}}
+  - {"op": "rename", "in": "column", "at": "/@dataType/precision", "to": {"kind": "column", "path": ["type", "precision"]}}
+  - {"op": "values", "in": "column", "at": "/Column.Mandatory", "to": {"kind": "column", "path": ["optional"]}, "mapping": {"1": false, "0": true}, "default": true}
+  - {"op": "ignore", "in": "column", "at": "/DataType", "reason": "PD type syntax is decomposed in @dataType; the mapping table is in this profile"}
+  - {"op": "link", "in": "relation", "at": "/Object1/0/@path", "to": {"kind": "relation", "path": ["from"]}, "by": "path", "kind": "entity", "as": "ref", "required": "warn"}
+  - {"op": "ignore", "in": "relation", "at": "/Object1", "reason": "relationship endpoint resolved by its PD object reference"}
+  - {"op": "link", "in": "relation", "at": "/Object2/0/@path", "to": {"kind": "relation", "path": ["to"]}, "by": "path", "kind": "entity", "as": "ref", "required": "warn"}
+  - {"op": "ignore", "in": "relation", "at": "/Object2", "reason": "relationship endpoint resolved by its PD object reference"}
+  - {"op": "values", "in": "relation", "at": "/Entity2ToEntity1RoleCardinality", "to": {"kind": "relation", "path": ["cardinality", "from"]}, "mapping": {"0..1": "0..1", "1..1": "1..1", "0..n": "0..*", "1..n": "1..*"}}
+  - {"op": "values", "in": "relation", "at": "/Entity1ToEntity2RoleCardinality", "to": {"kind": "relation", "path": ["cardinality", "to"]}, "mapping": {"0..1": "0..1", "1..1": "1..1", "0..n": "0..*", "1..n": "1..*"}}
+  - {"op": "link", "in": "fk", "at": "/@joinFrom", "to": {"kind": "fk", "path": ["from"]}, "by": "path", "kind": "column", "as": "ref"}
+  - {"op": "link", "in": "fk", "at": "/@joinTo", "to": {"kind": "fk", "path": ["to"]}, "by": "path", "kind": "column", "as": "ref"}
+  - {"op": "ignore", "in": "fk", "at": "/ParentTable", "reason": "reference joins are resolved as column pairs from child to parent"}
+  - {"op": "ignore", "in": "fk", "at": "/ChildTable", "reason": "reference joins are resolved as column pairs from child to parent"}
+  - {"op": "ignore", "in": "fk", "at": "/ParentKey", "reason": "reference joins are resolved as column pairs from child to parent"}
+  - {"op": "ignore", "in": "fk", "at": "/Joins", "reason": "reference joins are resolved as column pairs from child to parent"}
+  - {"op": "link", "in": "cn2er_kind", "at": "/source", "to": {"kind": "cn2er_kind", "path": ["kind"]}, "by": "path", "kind": "kind"}
+  - {"op": "link", "in": "cn2er_kind", "at": "/target", "to": {"kind": "cn2er_kind", "path": ["target"]}, "by": "path", "kind": "entity"}
+  - {"op": "shape", "in": "cn2er_kind", "at": "/Name", "to": {"kind": "cn2er_kind", "path": ["description"]}, "template": {"en": {"input": ""}}}
+  - {"op": "ignore", "in": "cn2er_kind", "at": "/@pd", "reason": "generation link class and package path"}
+  - {"op": "ignore", "in": "cn2er_kind", "at": "/ObjectID", "reason": "generation-link identity retained in the sidecar"}
+  - {"op": "link", "in": "er2db_entity", "at": "/source", "to": {"kind": "er2db_entity", "path": ["entity"]}, "by": "path", "kind": "entity"}
+  - {"op": "link", "in": "er2db_entity", "at": "/target", "to": {"kind": "er2db_entity", "path": ["target", "table"]}, "by": "path", "kind": "table"}
+  - {"op": "shape", "in": "er2db_entity", "at": "/Name", "to": {"kind": "er2db_entity", "path": ["description"]}, "template": {"en": {"input": ""}}}
+  - {"op": "ignore", "in": "er2db_entity", "at": "/@pd", "reason": "generation link class and package path"}
+  - {"op": "ignore", "in": "er2db_entity", "at": "/ObjectID", "reason": "generation-link identity retained in the sidecar"}
+  - {"op": "link", "in": "er2db_attribute", "at": "/source", "to": {"kind": "er2db_attribute", "path": ["attribute"]}, "by": "path", "kind": "attribute"}
+  - {"op": "link", "in": "er2db_attribute", "at": "/target", "to": {"kind": "er2db_attribute", "path": ["target", "column"]}, "by": "path", "kind": "column"}
+  - {"op": "shape", "in": "er2db_attribute", "at": "/Name", "to": {"kind": "er2db_attribute", "path": ["description"]}, "template": {"en": {"input": ""}}}
+  - {"op": "ignore", "in": "er2db_attribute", "at": "/@pd", "reason": "generation link class and package path"}
+  - {"op": "ignore", "in": "er2db_attribute", "at": "/ObjectID", "reason": "generation-link identity retained in the sidecar"}
+  - {"op": "link", "in": "er2db_relation", "at": "/source", "to": {"kind": "er2db_relation", "path": ["relation"]}, "by": "path", "kind": "relation"}
+  - {"op": "link", "in": "er2db_relation", "at": "/target", "to": {"kind": "er2db_relation", "path": ["fk"]}, "by": "path", "kind": "fk"}
+  - {"op": "shape", "in": "er2db_relation", "at": "/Name", "to": {"kind": "er2db_relation", "path": ["description"]}, "template": {"en": {"input": ""}}}
+  - {"op": "ignore", "in": "er2db_relation", "at": "/@pd", "reason": "generation link class and package path"}
+  - {"op": "ignore", "in": "er2db_relation", "at": "/ObjectID", "reason": "generation-link identity retained in the sidecar"}
+  - {"op": "ignore", "at": "/model", "reason": "PD model header; package is the model/package Code path"}
+  - {op: ignore, at: /diagrams, reason: "PD diagrams, symbols and display preferences are not model facts"}

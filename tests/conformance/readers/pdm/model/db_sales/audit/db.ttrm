@@ -1,0 +1,10 @@
+// generated-from: ../../../sources@4a1b0705283d5812982d6ca46a43a642bb2dfbf5dfa0fb45e44c6dacdc724b91 profile pdm/16 generator 0.0.1-LOCAL — do not edit
+package db_sales.audit
+model db
+
+def table change_log {
+    columns: [
+        def column entry_id { type: bigint, optional: true, },
+    ]
+}
+
