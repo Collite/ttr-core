@@ -30,10 +30,30 @@ object PdmFrontEnd : FrontEnd {
     private val extensions = setOf("cdm", "ldm", "pdm")
     private val containers = setOf("Model", "Package")
     private val nonDefinitions = containers + "RootObject"
+    private val relationshipObjects = setOf("Relationship", "Reference")
+    private val whitespace = Regex("\\s+")
     private val piAttributes = Regex("""([A-Za-z]+)="([^"]*)"""")
     private val version16 = Regex("16(?:\\.[0-9]+)+")
     private val historyOrigins = Regex("(?m)^ORG \\{([^}]+)}")
-    private val sqlType = Regex("([A-Za-z][A-Za-z0-9_ ]*?)(?:\\(([0-9]+)(?:,\\s*([0-9]+))?\\))?")
+    private val sqlType =
+        Regex(
+            """([A-Z][A-Z0-9_ ]*?)(?:\(\s*([0-9]+|\*)(?:\s+(?:CHAR|BYTE))?(?:\s*,\s*([0-9]+))?\s*\))?(?:\s+(WITH(?:OUT)? TIME ZONE))?""",
+        )
+
+    // These spellings have a display width or fractional-second precision, not a character/decimal size.
+    private val unsizedTypes =
+        (
+            "I INT INTEGER SMALLINT TINYINT LI BIGINT SI BT NO INT2 INT4 SERIAL INT8 BIGSERIAL " +
+                "BL BOOLEAN BOOL BIT F FLOAT DOUBLE REAL SF LF BINARY_DOUBLE BINARY_FLOAT FLOAT4 FLOAT8 " +
+                "D DATE T TIME DT DATETIME TIMESTAMP TS DATETIME2 SMALLDATETIME"
+        ).split(' ').toSet() +
+            setOf(
+                "DOUBLE PRECISION",
+                "TIMESTAMP WITH TIME ZONE",
+                "TIMESTAMP WITHOUT TIME ZONE",
+                "TIME WITH TIME ZONE",
+                "TIME WITHOUT TIME ZONE",
+            )
 
     // Only PD logical abbreviations take bare lengths: INT4 and FLOAT8 are whole SQL names.
     private val logicalType =
@@ -49,7 +69,10 @@ object PdmFrontEnd : FrontEnd {
 
     override fun parse(files: List<Path>): List<ForeignTree> = parseReported(files).trees
 
-    internal fun parseReported(files: List<Path>): Parsed {
+    internal fun parseReported(
+        files: List<Path>,
+        xmlReader: (ByteArray, String) -> javax.xml.stream.XMLStreamReader = XmlInput::reader,
+    ): Parsed {
         val expanded =
             try {
                 files.flatMap { input ->
@@ -79,10 +102,15 @@ object PdmFrontEnd : FrontEnd {
         expanded.groupBy { it.second }.values.firstOrNull { it.size > 1 }?.let { repeated ->
             throw ReaderInputException(
                 "two inputs are labelled ${repeated.first().second}: " +
-                    repeated.joinToString { it.first.toAbsolutePath().normalize().toString() },
+                    repeated.joinToString {
+                        it.first
+                            .toAbsolutePath()
+                            .normalize()
+                            .toString()
+                    },
             )
         }
-        val documents = expanded.map { (file, label) -> read(file, label) }
+        val documents = expanded.map { (file, label) -> read(file, label, xmlReader) }
         // Case-folding is a collision only inside the same output model (er and db may share a package).
         val packageCodes = mutableMapOf<Pair<String, String>, Pair<String, String>>()
         documents.forEach { d ->
@@ -114,52 +142,66 @@ object PdmFrontEnd : FrontEnd {
         disambiguate(documents)
         // Project every document before any generation link: either end may have been skipped in another file.
         documents.forEach { it.prepare() }
-        val trees = documents.flatMap { document ->
-            val whole = ForeignTree.read(document.json(global), document.label.substringBeforeLast('.'), document.label)
-            val value = whole.root.value.jsonObject
-            val objects = value.getValue("objects").jsonObject
-            val links = value.getValue("generationLinks").jsonObject
-            val packages =
-                (objects.values + links.values)
-                    .map {
-                        it.jsonObject
-                            .getValue("@pd")
-                            .jsonObject
-                            .getValue("package")
-                            .jsonPrimitive.content
-                    }.distinct()
-            (packages.ifEmpty { listOf(document.packagePath(document.model)) }).map { pkg ->
-                fun own(items: JsonObject) =
-                    JsonObject(
-                        items.filterValues {
+        val trees =
+            documents.flatMap { document ->
+                val whole =
+                    ForeignTree.read(
+                        document.json(global),
+                        document.label.substringBeforeLast('.'),
+                        document.label,
+                    )
+                val value = whole.root.value.jsonObject
+                val objects = value.getValue("objects").jsonObject
+                val links = value.getValue("generationLinks").jsonObject
+                val packages =
+                    (objects.values + links.values)
+                        .map {
                             it.jsonObject
                                 .getValue("@pd")
-                                .jsonObject["package"]
-                                ?.jsonPrimitive
-                                ?.content ==
-                                pkg
+                                .jsonObject
+                                .getValue("package")
+                                .jsonPrimitive.content
+                        }.distinct()
+                (packages.ifEmpty { listOf(document.packagePath(document.model)) }).map { pkg ->
+                    fun own(items: JsonObject) =
+                        JsonObject(
+                            items.filterValues {
+                                it.jsonObject
+                                    .getValue("@pd")
+                                    .jsonObject["package"]
+                                    ?.jsonPrimitive
+                                    ?.content ==
+                                    pkg
+                            },
+                        )
+                    whole.view(
+                        buildJsonObject {
+                            put(
+                                "model",
+                                JsonObject(
+                                    value.getValue("model").jsonObject + ("package" to JsonPrimitive(pkg)),
+                                ),
+                            )
+                            put("objects", own(objects))
+                            put("generationLinks", own(links))
+                            put("diagrams", own(value.getValue("diagrams").jsonObject))
                         },
+                        "${whole.file}/$pkg",
                     )
-                whole.view(
-                    buildJsonObject {
-                        put("model", JsonObject(value.getValue("model").jsonObject + ("package" to JsonPrimitive(pkg))))
-                        put("objects", own(objects))
-                        put("generationLinks", own(links))
-                        put("diagrams", own(value.getValue("diagrams").jsonObject))
-                    },
-                    "${whole.file}/$pkg",
-                )
+                }
             }
-        }
         return Parsed(trees, documents.flatMap { it.ignored }, documents.flatMap { it.warnings })
     }
 
     /** Relationship Codes are names, not identities: ObjectID order makes the rename independent of XML order. */
     private fun disambiguate(documents: List<Document>) {
-        val groups = documents.flatMap { d ->
-            d.objects.values.filter { it.tag in setOf("Relationship", "Reference") && it.scalar("Code") != null }
-                .map { d to it }
-        }.groupBy { (d, n) -> Triple(d.kind, d.packagePath(n), n.tag) }
+        val groups =
+            documents
+                .flatMap { d ->
+                    d.objects.values
+                        .filter { it.tag in relationshipObjects && it.scalar("Code") != null }
+                        .map { d to it }
+                }.groupBy { (d, n) -> Triple(d.kind, d.packagePath(n), n.tag) }
         groups.values.forEach { scope ->
             val used = scope.mapNotNull { it.second.scalar("Code") }.toMutableSet()
             scope.groupBy { it.second.scalar("Code")!! }.filterValues { it.size > 1 }.forEach { (code, duplicates) ->
@@ -167,14 +209,30 @@ object PdmFrontEnd : FrontEnd {
                 val ids = ordered.map { (_, n) -> n.scalar("ObjectID")?.let(::uuid) }
                 if (ids.any { it == null } || ids.distinct().size != ids.size) {
                     val (d, n) = ordered.last()
-                    fail(d.label, n, "Cannot disambiguate PD relationship Code '$code': missing or repeated ObjectID in ${ordered.joinToString { it.first.label }}")
+                    val files = ordered.joinToString { it.first.label }
+                    fail(
+                        d.label,
+                        n,
+                        "Cannot disambiguate PD relationship Code '$code': missing or repeated ObjectID " +
+                            "in $files",
+                    )
                 }
                 ordered.drop(1).forEach { (d, n) ->
                     val id = n.scalar("ObjectID")!!
                     val renamed = code + "__" + uuid(id).replace("-", "").take(8).lowercase(Locale.ROOT)
-                    if (!used.add(renamed)) fail(d.label, n, "Cannot disambiguate PD relationship Code '$code': '$renamed' already exists")
+                    if (!used.add(
+                            renamed,
+                        )
+                    ) {
+                        fail(
+                            d.label,
+                            n,
+                            "Cannot disambiguate PD relationship Code '$code': '$renamed' already exists",
+                        )
+                    }
                     d.codes[n] = renamed
-                    d.warnings += "${d.label}:${n.line}:${n.column}: renamed PD ${n.tag} Code '$code' to '$renamed' (ObjectID $id)"
+                    d.warnings +=
+                        "${d.label}:${n.line}:${n.column}: renamed PD ${n.tag} Code '$code' to '$renamed' (ObjectID $id)"
                 }
             }
         }
@@ -223,8 +281,9 @@ object PdmFrontEnd : FrontEnd {
     private fun read(
         file: Path,
         label: String,
+        xmlReader: (ByteArray, String) -> javax.xml.stream.XMLStreamReader,
     ): Document {
-        val reader = XmlInput.reader(XmiFrontEnd.bytes(file, label), label)
+        val reader = xmlReader(XmiFrontEnd.bytes(file, label), label)
         try {
             val stack = mutableListOf<Node>()
             var root: Node? = null
@@ -417,45 +476,61 @@ object PdmFrontEnd : FrontEnd {
             return doc.resolved(target, seen + node)
         }
 
-        private fun ref(node: Node): JsonObject = references.getOrPut(node) {
-            val id = node.attrs["Ref"]!!
-            val target = objects[id]
-            val found = target?.let(::resolved)
-            buildJsonObject {
-                put("\$ref", id)
-                put("@path", found?.let { (d, n) -> d.path(n) } ?: id)
-                if (found != null) {
-                    val (doc, n) = found
-                    n.scalar("ObjectID")?.let { put("@objectId", it) }
-                    put("@type", "${doc.kind}.${n.tag}")
-                } else if (target?.tag == "Shortcut") {
-                    val reason = "shortcut to ${target.scalar("TargetID")} outside the supplied models"
-                    put("@skip", reason)
+        private fun ref(node: Node): JsonObject =
+            references.getOrPut(node) {
+                val id = node.attrs["Ref"]!!
+                val target = objects[id]
+                val found = target?.let(::resolved)
+                buildJsonObject {
+                    put("\$ref", id)
+                    put("@path", found?.let { (d, n) -> d.path(n) } ?: id)
+                    if (found != null) {
+                        val (doc, n) = found
+                        n.scalar("ObjectID")?.let { put("@objectId", it) }
+                        put("@type", "${doc.kind}.${n.tag}")
+                    } else if (target?.tag == "Shortcut") {
+                        val reason = "shortcut to ${target.scalar("TargetID")} outside the supplied models"
+                        put("@skip", reason)
+                    }
                 }
             }
-        }
 
-        private fun ignore(node: Node, at: String, reason: String) {
+        private fun ignore(
+            node: Node,
+            at: String,
+            reason: String,
+        ) {
             ignored += ImportReport.Ignored(label, node.line, node.column, at, reason, node.scalar("Code") ?: node.id)
         }
 
-        private fun pairs(node: Node, at: String): List<Pair<JsonElement, JsonElement>> = joins.getOrPut(node) {
-            node.collection("Joins").mapIndexedNotNull { i, join ->
-                val ends = listOf("Object1", "Object2").map { key -> join.collection(key).firstOrNull() }
-                val refs = ends.map { it?.let(::ref) }
-                val parent = refs[0]?.get("@objectId")
-                val child = refs[1]?.get("@objectId")
-                if (parent != null && child != null) child to parent else {
-                    val reason = when {
-                        ends.any { it == null } -> "missing Object1 or Object2"
-                        refs.any { it?.containsKey("@skip") == true } -> refs.firstNotNullOf { it?.get("@skip")?.jsonPrimitive?.content }
-                        else -> "Object1 or Object2 target has no ObjectID"
+        private fun pairs(
+            node: Node,
+            at: String,
+        ): List<Pair<JsonElement, JsonElement>> =
+            joins.getOrPut(node) {
+                node.collection("Joins").mapIndexedNotNull { i, join ->
+                    val ends = listOf("Object1", "Object2").map { key -> join.collection(key).firstOrNull() }
+                    val refs = ends.map { it?.let(::ref) }
+                    val parent = refs[0]?.get("@objectId")
+                    val child = refs[1]?.get("@objectId")
+                    if (parent != null && child != null) {
+                        child to parent
+                    } else {
+                        val reason =
+                            when {
+                                ends.any { it == null } -> "missing Object1 or Object2"
+                                refs.any {
+                                    it?.containsKey(
+                                        "@skip",
+                                    ) == true
+                                } -> refs.firstNotNullOf { it?.get("@skip")?.jsonPrimitive?.content }
+                                else -> "Object1 or Object2 target has no ObjectID"
+                            }
+                        ignore(join, "$at/Joins/$i", "incomplete ReferenceJoin: $reason; whole pair skipped")
+                        null
                     }
-                    ignore(join, "$at/Joins/$i", "incomplete ReferenceJoin: $reason; whole pair skipped")
-                    null
                 }
             }
-        }
 
         fun prepare() {
             objects.values.filter { top(it) && it.tag == "Reference" }.forEach { n ->
@@ -470,8 +545,10 @@ object PdmFrontEnd : FrontEnd {
                     ignore(n, at, "Reference has no complete column pairs; foreign key skipped")
                 }
             }
-            projected = objects.filterValues { top(it) && !it.tag.endsWith("Diagram") && it !in skippedRecords }
-                .mapValues { value(it.value, "/objects/${escape(it.key)}") }
+            projected =
+                objects
+                    .filterValues { top(it) && !it.tag.endsWith("Diagram") && it !in skippedRecords }
+                    .mapValues { value(it.value, "/objects/${escape(it.key)}") }
         }
 
         private fun value(
@@ -498,7 +575,15 @@ object PdmFrontEnd : FrontEnd {
                 )
                 node.children.filter { it.ns == "attribute" }.forEach { child ->
                     positions["$at/${escape(child.tag)}"] = child
-                    (if (child.tag == "Code") codes[node] ?: node.scalar(child.tag) else node.scalar(child.tag))?.let { put(child.tag, it) }
+                    (
+                        if (child.tag ==
+                            "Code"
+                        ) {
+                            codes[node] ?: node.scalar(child.tag)
+                        } else {
+                            node.scalar(child.tag)
+                        }
+                    )?.let { put(child.tag, it) }
                 }
                 node.children.filter { it.ns == "collection" }.forEach { group ->
                     positions["$at/${escape(group.tag)}"] = group
@@ -534,9 +619,19 @@ object PdmFrontEnd : FrontEnd {
                         put(
                             "@dataType",
                             buildJsonObject {
-                                put("name", match.groupValues[1].trim().uppercase())
-                                match.groupValues[2].toIntOrNull()?.let { put("length", it) }
-                                match.groupValues[3].toIntOrNull()?.let { put("precision", it) }
+                                val name =
+                                    (
+                                        match.groupValues[1].trim() +
+                                            match.groupValues
+                                                .getOrNull(4)
+                                                .orEmpty()
+                                                .let { if (it.isEmpty()) "" else " $it" }
+                                    ).replace(whitespace, " ")
+                                put("name", name)
+                                if (name !in unsizedTypes) {
+                                    match.groupValues[2].toIntOrNull()?.let { put("length", it) }
+                                    match.groupValues[3].toIntOrNull()?.let { put("precision", it) }
+                                }
                             },
                         )
                     }
@@ -585,7 +680,11 @@ object PdmFrontEnd : FrontEnd {
                     val sourceDoc = found?.first
                     val source = found?.second
                     if (target in skippedRecords || (source != null && source in sourceDoc!!.skippedRecords)) {
-                        ignore(target, "/objects/${escape(target.id!!)}", "generation link $origin skipped: source or target record was skipped")
+                        ignore(
+                            target,
+                            "/objects/${escape(target.id!!)}",
+                            "generation link $origin skipped: source or target record was skipped",
+                        )
                         continue
                     }
                     val id = "g_${uuid(

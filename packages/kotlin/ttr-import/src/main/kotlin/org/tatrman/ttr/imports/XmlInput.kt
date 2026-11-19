@@ -42,5 +42,10 @@ internal object XmlInput {
         line: Int,
         column: Int,
         message: String,
-    ): Nothing = throw ProfileException("ys/profile-invalid", span(label, line, column), message)
+    ): Nothing =
+        throw ProfileException(
+            "ys/profile-invalid",
+            span(label, line, column),
+            message.substringAfter("Message: ").trim(),
+        )
 }

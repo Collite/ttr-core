@@ -323,7 +323,8 @@ data class ImportReport(
                             it.reason,
                             it.record,
                         )
-                    }.plus(frontEndIgnored).distinct()
+                    }.plus(frontEndIgnored)
+                    .distinct()
                     .sortedWith(
                         compareBy<Ignored, String>(Bytewise) { it.file }
                             .thenBy { it.line }

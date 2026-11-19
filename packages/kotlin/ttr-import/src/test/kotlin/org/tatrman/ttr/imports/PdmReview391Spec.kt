@@ -209,7 +209,7 @@ class PdmReview391Spec :
                 listOf(
                     Case("MN8,2", "decimal", 8, 2),
                     Case("VARCHAR2(80)", "text", 80),
-                    Case("datetime2(7)", "datetime", 7),
+                    Case("datetime2(7)", "datetime"),
                     Case("INT4", "int"),
                     Case("float8", "float"),
                     Case("BINARY_DOUBLE", "float"),
