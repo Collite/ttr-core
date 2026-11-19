@@ -6,6 +6,20 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — PowerDesigner real-file imports (MW-P5 S5.4c)
+
+- `pdm/16` disambiguates duplicate relationship Codes by ObjectID order, with located
+  rename warnings; the unmodified public PD 16.7 `project.cdm` imports and strict-loads.
+- Input labels stay relative to each `--from` directory; overlapping labels are refused
+  with both absolute paths. Package case collisions are checked per output model.
+- Unavailable shortcut ends preserve conceptual/logical relationships and warn on
+  unresolved logical ends. Generation links check both ends after every input is projected.
+- SQL type spellings include multi-word names, character units and unbounded precision;
+  display widths and fractional-second precision never become TTR integer/date lengths.
+- Empty foreign keys are skipped; incomplete joins get one readable located entry each.
+  Emptied-package lexicons must carry this input's generated header. Shared XML errors
+  retain concise messages and positive positions, including provider failures.
+
 ### Fixed — 0.22.12: YAML layout carry-over (MW-P4 S4.3c, review-388)
 
 - Closure card ids use the captured storage-path package provenance, including the `#<model>` suffix

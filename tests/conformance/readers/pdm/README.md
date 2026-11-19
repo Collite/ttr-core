@@ -29,19 +29,42 @@ Schema references used when authoring these fixtures:
   object's History ORG UUIDs identify origin objects. No example content was copied into these fixtures.
 
 The front-end resolves only the files supplied to this run. Each Model/Package Code segment is lower-cased with
-`Locale.ROOT`; distinct raw paths that collide after lower-casing are refused with `ys/package-invalid` naming both.
-Definition Codes stay verbatim. `$ref` retains the local XML id, and `@path` carries the target's model/package and
+`Locale.ROOT`; distinct raw paths that collide after lower-casing in the same output model are refused with
+`ys/package-invalid` naming both paths and their files. LDM `Billing` and PDM `BILLING` may share the lower-case package
+because they write `er.ttrm` and `db.ttrm`. Definition Codes stay verbatim except for the relationship rule below. `$ref` retains the local XML id, and `@path` carries the target's model/package and
 Code ancestry as readable provenance. All links match the resolved `ObjectID` through `by: sourceName` (control room
 §66, amending R391-B); repeated table/entity/column Codes in different packages or models are therefore distinct.
 `ObjectID` is also the stable sidecar identity. Generation origins join exact ObjectIDs, with no Code-based guess.
 An origin not present among the model's supplied GenerationOrigins produces an ignored generation record.
-Shortcuts follow `TargetID` only among supplied models; an FK or relationship through an unavailable shortcut is
-skipped with an ignored entry naming the missing target. Incomplete ReferenceJoins are skipped as whole pairs and
-reported at the join. No external model is opened implicitly. Directory inputs keep `/`-separated paths relative
-to `--from` in diagnostics; archive copies that repeat ObjectIDs are ambiguous and the error names both paths.
+Shortcuts follow `TargetID` only among supplied models. An unavailable shortcut end is reported without discarding
+its CDM/LDM relationship; an LDM missing end also gets the profile's `required: warn` warning. Foreign keys retain only
+complete ReferenceJoin pairs; zero complete pairs skip the FK. Each bad join has one readable ignored entry at its XML
+position, distinguishing a missing end from an end without ObjectID. Generation links check both ends after every
+input has been projected; a link to a skipped record is skipped with a reason. No external model is opened implicitly. Directory inputs keep `/`-separated paths relative
+to `--from` in diagnostics. A label reused across multiple input roots is refused, naming both absolute files;
+`dev/sales.pdm` and `prod/sales.pdm` inside one root remain distinct. Archive copies that repeat ObjectIDs are ambiguous
+and the error names both paths.
 
 The profile's type mapping is data: SQL spellings and PD logical abbreviations (`I`, `VA80`, `N12,2`, etc.) map through
 `values`, after lexical decomposition of the type name/length/precision. Unlisted type names fall back to text. TTR-M has no binary primitive, so binary spellings also map to text.
 Diagrams and display preferences have an explicit ignore reason. Other PD metadata not selected by the generic
 profile stays visible in `ignored[]` and aggregated warnings (`unknown: ignore`). CDM attributes and participants are
 not asserted as conceptual semantics: entities are abstract kinds and relationships are open-tier relation types.
+
+## `pdm/16` on public exports
+
+Same-package relationship Codes (CDM/LDM Relationships and PDM References) are ordered by ObjectID: the first keeps
+`<code>`, and each later record becomes `<code>__<first-8-ObjectID-hex>` (lower-case hex, hyphens omitted). Each rename
+has one located warning. Missing/repeated ObjectIDs, a repeated short prefix, or a suffix colliding with an existing
+Code remain located refusals. All references and sidecar foreign ids retain the original ObjectID.
+
+SQL names include `DOUBLE PRECISION`, `TIMESTAMP WITH TIME ZONE`, and `TIMESTAMP(6) WITH TIME ZONE`;
+`VARCHAR2(80 CHAR)` keeps length 80, and `NUMBER(*,0)` keeps precision 0 without inventing a length. Integer display
+widths and temporal precision (`INT(11)`, `datetime2(7)`) produce no TTR length/precision; those fields are for text and
+decimal. Unknown names and binary spellings still map to text.
+
+The additional, byte-exact public `project.cdm` regression is under
+`packages/kotlin/ttr-import/src/test/resources/pdm-public/` (upstream GPL-2.0 licence and provenance beside it).
+It imports end to end twice with equal outputs, reports duplicate-Code renames, and strict-loads. The public
+`project.pdm` is PD 15.3 and remains refused. The invented fixture's model/sidecar bytes are unchanged by S5.4c;
+only its join-report entry changed. Emptied lexicons are listed only when their generated header names this input.
