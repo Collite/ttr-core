@@ -10,6 +10,28 @@ const oracle = new URL(
   import.meta.url
 );
 describe('canonical profile codec', () => {
+  it.each(['unordered-entity', 'ordered-kind'])(
+    'matches Kotlin %s free-key codec bytes (D-MW-107)',
+    (name) => {
+      const fixture = new URL(
+        `../../../tests/conformance/dialect/integer-keys/codec/${name}`,
+        import.meta.url
+      );
+      const raw = JSON.parse(readFileSync(new URL(fixture.href + '.json'), 'utf8'));
+      const expected = readFileSync(new URL(fixture.href + '.yaml'), 'utf8');
+      expect(canonicalWrite(raw)).toBe(expected);
+      const normalized = normalizeCanonical(raw);
+      expect(canonicalWrite(normalized)).toBe(expected);
+      const properties = (
+        normalized.defs as { properties: Map<string, unknown> | Record<string, unknown>[] }[]
+      )[0].properties;
+      const keys =
+        properties instanceof Map ? [...properties.keys()] : properties.flatMap(Object.keys);
+      expect(keys).toEqual(name === 'unordered-entity' ? ['10', '9', 'b'] : ['10', '2', 'b', '1']);
+      if (name === 'unordered-entity') expect(properties).toBeInstanceOf(Map);
+    }
+  );
+
   it.each(['search', 'concept'])('keeps a numeric %s block value scalar', (property) => {
     const bytes = canonicalWrite({
       ttr: '0.22',

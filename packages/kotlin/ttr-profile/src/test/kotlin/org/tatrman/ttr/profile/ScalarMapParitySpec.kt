@@ -26,9 +26,10 @@ class ScalarMapParitySpec :
             }
         }
         test("numeric ttr remains unconsumed") {
-            val error = io.kotest.assertions.throwables.shouldThrow<ProfileException> {
-                runOps("ttr: 1\nentity: {Customer: {}}", entityOps)
-            }
+            val error =
+                io.kotest.assertions.throwables.shouldThrow<ProfileException> {
+                    runOps("ttr: 1\nentity: {Customer: {}}", entityOps)
+                }
             error.code shouldBe "ys/unknown-key"
             error.location.path shouldBe "/ttr"
             error.location.line shouldBe 1
