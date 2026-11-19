@@ -10,7 +10,6 @@
 ## Co čte
 
 - `er.entity.customer_price`
-- `er.entity.date_dim`
 - `er.entity.inventory`
 - `er.entity.invoice`
 - Objednávka (`er.entity.order`)

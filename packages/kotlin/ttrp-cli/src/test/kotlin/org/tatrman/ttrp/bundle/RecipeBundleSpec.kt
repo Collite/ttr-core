@@ -257,7 +257,6 @@ class RecipeBundleSpec :
             rec.objectsRead shouldContainExactly
                 listOf(
                     "er.entity.customer_price",
-                    "er.entity.date_dim", // AU S2.4f: `due: 2 working_days`
                     "er.entity.inventory",
                     "er.entity.invoice",
                     "er.entity.order",
