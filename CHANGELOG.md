@@ -6,6 +6,25 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — 0.22.12: YAML layout carry-over (MW-P4 S4.3c, review-388)
+
+- Closure card ids use the captured storage-path package provenance, including the `#<model>` suffix
+  of a dialect file's second model, and agree with the catalog and authored layouts (F1).
+- YAML sources retain `.ttrg` graphs and their `.ttrl` sidecars alongside native YAML layouts (F2).
+  Duplicate names across formats reject both layouts through the existing duplicate-name issue.
+- Layout collection honours the prepared `model.ignore` matcher and the tree profile's whole-file
+  `ignore` selectors. An invalid or unreadable `model.ignore` fails closed for layouts too (F4).
+- The exact 0.22.10 `LayoutFileRef` constructor and its default-argument JVM bridge are restored,
+  delegating to format `TTRG`. The constructor is restored; `copy` with the old arity is not (F5).
+  Kotlin/JVM consumers must still rebuild together with this grammar-family patch; grammar stays 0.22.
+- Newer-format diagnostics preserve the authored version (`layout format 2 is newer than this reader`),
+  and schema error locations guard nullable property names (F6/F7).
+- In a YAML model tree, top-level `layouts/` is reserved for layouts and is never model content,
+  even when layout serving is disabled (F8).
+- Known limit — F3 is carried by ✅D-MW-112 to S4.3d / 0.23.0: with `layouts = false`, a YAML layout
+  write still changes a filesystem YAML source's version and can produce a spurious `modelChanged`.
+  The model data is unaffected. No storage SPI or version hashing changes in this patch.
+
 ### Fixed — TS profile operands match Kotlin (MW-P7 S7.2b)
 
 - `@tatrman/profile` resolves links from live run records first, falling back lazily

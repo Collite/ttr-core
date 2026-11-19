@@ -160,7 +160,18 @@ data class LayoutFileRef(
     val unreadable: LayoutReadFailure? = null,
     /** MW S4.3: only yaml sources collect the native VL format. TTR/sidecar behaviour stays the default. */
     val format: LayoutFileFormat = LayoutFileFormat.TTRG,
-)
+) {
+    /** The 0.22.10 JVM constructor, including its default-argument bridge (review-388 F5). */
+    constructor(
+        path: String,
+        source: String,
+        content: String,
+        sidecarPath: String? = null,
+        sidecarContent: String? = null,
+        sidecarSource: String? = null,
+        unreadable: LayoutReadFailure? = null,
+    ) : this(path, source, content, sidecarPath, sidecarContent, sidecarSource, unreadable, LayoutFileFormat.TTRG)
+}
 
 enum class LayoutFileFormat { TTRG, YAML }
 
@@ -349,7 +360,9 @@ class FileBasedSource(
             listed
                 .filter { it.underRoot() in setOf("connections.toml", "renames.yaml") }
                 .associate { it.underRoot() to storage.read(it) }
-        val layoutFiles = if (layouts) collectLayoutFiles(listed, storage) else emptyList()
+        val read = reader?.read(listed, storage, sourceId)
+        val layoutFiles =
+            if (layouts) collectLayoutFiles(listed, storage, read?.includesLayout ?: { true }) else emptyList()
         val warnings = mutableListOf<LoadWarning>()
         val errors = mutableListOf<LoadWarning>()
         val loadedFiles = mutableListOf<LoadedFile>()
@@ -373,7 +386,7 @@ class FileBasedSource(
         val automation = mutableMapOf<QualifiedName, org.tatrman.ttr.metadata.model.AutomationObject>()
 
         val parsed =
-            reader?.read(listed, storage, sourceId)?.let { read ->
+            read?.let { read ->
                 errors += read.errors
                 warnings += read.warnings
                 droppedFiles += read.dropped
@@ -680,25 +693,22 @@ class FileBasedSource(
     private fun collectLayoutFiles(
         listed: List<StorageFile>,
         storage: ModelStorage,
+        includesLayout: (String) -> Boolean,
     ): List<LayoutFileRef> {
         val yaml = reader is YamlTreeReader
-        val sidecars =
-            if (yaml) {
-                emptyMap()
-            } else {
-                listed.filter { it.extension() == "ttrl" }.associateBy { it.path.removeSuffix(".ttrl") }
-            }
-        return listed
+        val candidates = listed.filter { !yaml || includesLayout(it.underRoot()) }
+        val sidecars = candidates.filter { it.extension() == "ttrl" }.associateBy { it.path.removeSuffix(".ttrl") }
+        return candidates
             .filter {
-                if (yaml) {
-                    val path = it.underRoot()
-                    it.extension() in setOf("yaml", "yml") &&
-                        path.startsWith("layouts/") &&
-                        !path.startsWith("layouts/agent/") &&
-                        TreeContent.includes(path.split('/'))
-                } else {
-                    it.extension() == "ttrg"
-                }
+                val path = it.underRoot()
+                it.extension() == "ttrg" ||
+                    (
+                        yaml &&
+                            it.extension() in setOf("yaml", "yml") &&
+                            path.startsWith("layouts/") &&
+                            !path.startsWith("layouts/agent/") &&
+                            TreeContent.includes(path.split('/'))
+                    )
             }.map { file ->
                 val sidecar = sidecars[file.path.removeSuffix(".ttrg")]
                 val ref =
@@ -708,7 +718,7 @@ class FileBasedSource(
                         content = "",
                         sidecarPath = sidecar?.path,
                         sidecarSource = sidecar?.underRoot(),
-                        format = if (yaml) LayoutFileFormat.YAML else LayoutFileFormat.TTRG,
+                        format = if (file.extension() == "ttrg") LayoutFileFormat.TTRG else LayoutFileFormat.YAML,
                     )
                 val content =
                     try {

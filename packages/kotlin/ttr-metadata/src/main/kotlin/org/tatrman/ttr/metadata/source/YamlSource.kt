@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.metadata.source
 
+import kotlinx.serialization.json.*
 import org.tatrman.ttr.parser.loader.ParseResult
 import org.tatrman.ttr.profile.ApplyResult
 import org.tatrman.ttr.profile.DeclarationReader
@@ -87,7 +88,7 @@ class YamlFileSource(
             storage,
             layouts,
             allMdHopIssues,
-            shared ?: YamlTreeReader(profile, catalog),
+            shared ?: YamlTreeReader(profile, catalog, layouts),
         ).load()
 
     companion object {
@@ -107,6 +108,7 @@ internal class ReadFiles(
     val errors: List<LoadWarning> = emptyList(),
     val warnings: List<LoadWarning> = emptyList(),
     val dropped: List<LoadWarning> = emptyList(),
+    val includesLayout: (String) -> Boolean = { true },
 )
 
 internal interface ModelFileReader {
@@ -123,6 +125,7 @@ internal interface ModelFileReader {
 internal class YamlTreeReader(
     private val profile: String?,
     private val catalog: Map<String, Path>,
+    private val layouts: Boolean = false,
 ) : ModelFileReader {
     // `sources.json`: the `<package>.sources.json` link sidecars change what a dialect file loads to; `ignore`:
     // `model.ignore` changes what is content. Both version the source; storages match extensions by suffix.
@@ -244,6 +247,8 @@ internal class YamlTreeReader(
          * the tree's own profiles are not fully known (review-287 R4, ✅R287-B): the guard gives no override verdict.
          */
         val unresolved: Boolean = false,
+        /** The same prepared ignore policy used for the model walk; false when model.ignore failed closed. */
+        val includesLayout: (String) -> Boolean = { true },
     )
 
     override fun read(
@@ -260,7 +265,13 @@ internal class YamlTreeReader(
             parsed +=
                 apply(requireNotNull(plan.root), chain, files, problems, warnings)
         }
-        return ReadFiles(parsed.sortedBy { it.file.path }, problems.errors, warnings, problems.dropped)
+        return ReadFiles(
+            parsed.sortedBy { it.file.path },
+            problems.errors,
+            warnings,
+            problems.dropped,
+            plan.includesLayout,
+        )
     }
 
     /** The walk (C-4) and each content file's declaration; files that fail either are dropped into the problems. */
@@ -321,7 +332,14 @@ internal class YamlTreeReader(
             ignoreFile?.let { modelIgnore(it, storage, problems) }?.getOrElse { e ->
                 // Fail closed (review-260 F4): without the ignore list no file is known to be content.
                 candidates.forEach { problems.drop(it, (e as Recorded).issue) }
-                return Plan(profiles.root, emptyList(), emptyList(), problems, unresolved = true)
+                return Plan(
+                    profiles.root,
+                    emptyList(),
+                    emptyList(),
+                    problems,
+                    unresolved = true,
+                    includesLayout = { false },
+                )
             }
         val content = candidates.filter { ignore?.matches(it.underRoot()) != true }
         // Resolved on the first file that falls back to it, so a tree without such a file raises nothing (RR1-1).
@@ -355,7 +373,34 @@ internal class YamlTreeReader(
                 dialect.getOrPut(chain.map { it.file }) { chain to mutableListOf() }.second += file to text
             }
         }
-        return Plan(profiles.root, canonical, dialect.values.toList(), problems, unresolved)
+        // Layouts are not profile input, but the tree profile's whole-file ignores still govern their paths.
+        // Reuse the model.ignore matcher above, and the same whole-file ignore shape as StructuralExecutor.
+        val layoutProfile = if (layouts) tree else null
+        val layoutIgnores =
+            if (layouts) {
+                layoutProfile
+                    ?.getOrNull()
+                    .orEmpty()
+                    .flatMap { it.operations }
+                    .filter {
+                        it.value["op"]?.jsonPrimitive?.content == "ignore" &&
+                            "in" !in it.value &&
+                            "at" !in it.value
+                    }.map { op ->
+                        op.value["files"]
+                            ?.jsonArray
+                            ?.map { it.jsonPrimitive.content }
+                            ?.let(::FileSelector)
+                    }
+            } else {
+                emptyList()
+            }
+        val includesLayout: (String) -> Boolean = { path ->
+            layoutProfile?.isFailure != true &&
+                ignore?.matches(path) != true &&
+                layoutIgnores.none { it == null || it.matches(path) }
+        }
+        return Plan(profiles.root, canonical, dialect.values.toList(), problems, unresolved, includesLayout)
     }
 
     private fun modelIgnore(

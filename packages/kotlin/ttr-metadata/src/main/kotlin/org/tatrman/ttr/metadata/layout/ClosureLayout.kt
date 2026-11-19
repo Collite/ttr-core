@@ -22,15 +22,7 @@ fun closureLayout(
     schema: String = "er",
 ): ResolvedLayout {
     require(schema in setOf("er", "db")) { "layout schema must be er or db" }
-    val declarations = snapshot.definitions.entries.groupBy { Triple(it.def.source.file, it.kind, it.qname) }
-
-    fun packageOf(obj: ModelObject): String =
-        declarations[Triple(obj.sourceFile, obj.kind, obj.qname.dotted())]
-            ?.map { it.pkg }
-            ?.distinct()
-            ?.singleOrNull()
-            ?: obj.qname.`package`
-
+    val packageOf = snapshot.layoutPackageOf
     val selected = closure.map { it.qname }.toSet()
     val cardsInScope =
         snapshot.model
@@ -41,7 +33,7 @@ fun closureLayout(
             .toSet()
     val cards =
         LayoutResolver
-            .indexOf(snapshot, ::packageOf)
+            .indexOf(snapshot, packageOf)
             .cards
             .filter { it.schema == schema && (it.pkg to it.qname) in cardsInScope }
     val order = LayoutDocument.ALPHABETICAL_ORDER

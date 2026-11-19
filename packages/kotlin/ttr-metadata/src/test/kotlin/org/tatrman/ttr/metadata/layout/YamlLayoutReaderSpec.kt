@@ -84,6 +84,13 @@ class YamlLayoutReaderSpec :
                 e.detail.lowercase() shouldContain message.lowercase()
             }
         }
+        "a newer format diagnostic preserves the authored version number" {
+            val e =
+                shouldThrow<CanonicalYamlException> {
+                    YamlLayoutReader.read(valid.replace("layout: 1", "layout: 2"), "x.yaml")
+                }
+            e.detail shouldBe "layout format 2 is newer than this reader"
+        }
         "an unknown key reports its exact authored key span" {
             val e =
                 shouldThrow<CanonicalYamlException> { YamlLayoutReader.read(valid + "title: unsupported\n", "x.yaml") }
