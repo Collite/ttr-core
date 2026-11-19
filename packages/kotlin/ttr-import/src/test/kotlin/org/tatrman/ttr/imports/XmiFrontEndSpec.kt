@@ -280,6 +280,17 @@ class XmiFrontEndSpec :
             tree(early).getValue("elements") shouldBe tree(applied).getValue("elements")
         }
 
+        test(
+            "review-378 F5: a UML package above an element with an empty name or one containing '/' is a located error",
+        ) {
+            listOf("", "db/retail").forEach { name ->
+                refused(model.replace("""name="db.retail"""", """name="$name"""").toByteArray()).also {
+                    it.message.orEmpty() shouldContain "uml:Package P1 has no usable name (empty or containing '/')"
+                    it.location.line shouldBe 4
+                }
+            }
+        }
+
         test("S5.3a: one tree per UML package that holds an element, model.package its path, its own elements only") {
             val source = Path.of("../../../tests/conformance/readers/xmi/sources/sales-billing.xmi").toAbsolutePath()
             val trees = XmiFrontEnd.parse(listOf(source))

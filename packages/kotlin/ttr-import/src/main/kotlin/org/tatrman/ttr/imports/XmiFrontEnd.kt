@@ -275,14 +275,18 @@ object XmiFrontEnd : FrontEnd {
             node.children.forEach(::index)
         }
 
-        /** Every non-package `packagedElement` below [node], with its package path. */
+        /**
+         * Every non-package `packagedElement` below [node], with its package path. review-378 F5: a `uml:Package` above an
+         * element whose `name` is empty or contains `/` would give a path another package can have (`a/b` vs `a` → `b`),
+         * so it is `ys/profile-invalid` at that package; a package with no element below it is not checked.
+         */
         private fun collect(
             node: XNode,
-            packages: List<String>,
+            packages: List<XNode>,
         ) {
             for (child in node.children.filter { it.name == "packagedElement" }) {
                 if (child.attr("xmi:type") == "uml:Package") {
-                    collect(child, packages + (child.attr("name") ?: ""))
+                    collect(child, packages + child)
                 } else {
                     val id =
                         child.id ?: fail(
@@ -297,7 +301,19 @@ object XmiFrontEnd : FrontEnd {
                                 "packagedElement has no xmi:id"
                             },
                         )
-                    elements += Element(id, child, packages.joinToString("/"))
+                    packages
+                        .firstOrNull {
+                            val name = it.attr("name")
+                            name.isNullOrEmpty() || '/' in name
+                        }?.let {
+                            fail(
+                                label,
+                                it.line,
+                                it.column,
+                                "uml:Package ${it.id ?: "(no xmi:id)"} has no usable name (empty or containing '/')",
+                            )
+                        }
+                    elements += Element(id, child, packages.joinToString("/") { it.attr("name")!! })
                 }
             }
         }
