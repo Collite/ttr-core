@@ -56,13 +56,24 @@ object YamlLayoutReader {
             throw CanonicalYamlException(file, at.line, at.column + 1, message, path)
         }
         val version = (root["layout"] as? JsonPrimitive)?.doubleOrNull
-        if (version != null && version > 1) fail("/layout", "layout format $version is newer than this reader")
+        if (version != null && version > 1) {
+            fail(
+                "/layout",
+                "layout format ${(root.getValue("layout") as JsonPrimitive).content} is newer than this reader",
+            )
+        }
         val errors = schema.validate(mapper.readTree(root.toString()))
         if (errors.isNotEmpty()) {
             val error = errors.sortedWith(compareBy({ it.instanceLocation.toString() }, { it.message })).first()
             val path =
                 error.instanceLocation.toString() +
-                    if (error.type == "additionalProperties") "/${pointer(error.property)}" else ""
+                    if (error.type == "additionalProperties" &&
+                        error.property != null
+                    ) {
+                        "/${pointer(error.property)}"
+                    } else {
+                        ""
+                    }
             fail(path, error.message)
         }
 

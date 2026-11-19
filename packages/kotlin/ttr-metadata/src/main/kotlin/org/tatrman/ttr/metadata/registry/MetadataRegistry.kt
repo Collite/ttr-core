@@ -7,7 +7,9 @@ import org.tatrman.ttr.metadata.export.ExportGrammar
 import org.tatrman.ttr.metadata.source.LoadedFile
 import org.tatrman.ttr.metadata.graph.ModelGraph
 import org.tatrman.ttr.metadata.layout.LayoutIndex
+import org.tatrman.ttr.metadata.layout.LayoutResolver
 import org.tatrman.ttr.metadata.model.Model
+import org.tatrman.ttr.metadata.model.ModelObject
 import org.tatrman.ttr.metadata.source.LoadWarning
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
@@ -60,7 +62,7 @@ class MetadataRegistry {
                 definitions = definitions,
                 recentIdSets = history.toMap(),
                 exportSidecars = exportSidecars.toMap(),
-            )
+            ).also { it.layoutPackageOf = LayoutResolver.packagesFromFiles(files) }
         ref.set(snapshot)
         listeners.forEach { it.runCatching { invoke(snapshot) } }
     }
@@ -83,4 +85,7 @@ data class RegistrySnapshot(
     val definitions: DefinitionSet = DefinitionSet.from(emptyList(), model, ExportGrammar.version, model.version.value),
     val recentIdSets: Map<String, Set<String>> = emptyMap(),
     val exportSidecars: Map<String, String> = emptyMap(),
-)
+) {
+    /** Captured before publication; storage paths include dialect fan-out suffixes, unlike AST span files. */
+    internal var layoutPackageOf: (ModelObject) -> String = { "" }
+}

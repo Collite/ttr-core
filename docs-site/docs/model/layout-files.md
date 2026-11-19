@@ -12,6 +12,9 @@ graph file; the two say the same thing in the same words, and every reader accep
 You rarely write one by hand: the Studio draws it — pick the cards, drag them, **Save as…** — and
 opens one back.
 
+In a YAML model tree, the top-level `layouts/` directory is reserved for layouts and is never
+model content, including when layout serving is disabled.
+
 ## The document
 
 | field | required | what it is |
