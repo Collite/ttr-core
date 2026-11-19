@@ -174,7 +174,6 @@
     "onLanguage:ttr",
     "onLanguage:ttrg",
     "onLanguage:ttr-yaml",
-    "onLanguage:yaml",
     "workspaceContains:**/ttr.yaml"
   ]
 }

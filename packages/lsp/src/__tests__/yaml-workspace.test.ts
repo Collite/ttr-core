@@ -138,6 +138,14 @@ describe('S7.3 demo-cs/1 mixed workspace', () => {
     const uri = (file: string) => pathToFileURL(join(root, file)).href;
     expect(JSON.stringify(await client.sendRequest('textDocument/documentSymbol', { textDocument: { uri: uri('model/entities.yaml') } }))).toContain('Customer');
     expect(await client.sendRequest('textDocument/definition', { textDocument: { uri: uri('model/relations.yaml') }, position: { line: 2, character: 15 } })).toMatchObject({ uri: uri('model/entities.yaml'), range: { start: { line: 1, character: 2 } } });
+    // Admission requests reuse discovered markers; the file watcher owns invalidation.
+    mkdirSync(join(root, 'model/nested'));
+    const request = {uri: uri('model/nested/e.yaml'), text: 'entity: {Nested: {popis: value}}'};
+    expect(await client.sendRequest('modeler/yamlLanguage', request)).toBe('ttr-yaml');
+    writeFileSync(join(root, 'model/nested/ttr.yaml'), 'other: plain YAML settings\n');
+    expect(await client.sendRequest('modeler/yamlLanguage', request)).toBe('ttr-yaml');
+    client.sendNotification('workspace/didChangeWatchedFiles', {changes: [{uri: uri('model/nested/ttr.yaml'), type: 1}]});
+    expect(await client.sendRequest('modeler/yamlLanguage', request)).toBe('yaml');
   });
 
   it('uses the original shared demo-cs chain for default-string links, hover and symbols', async () => {

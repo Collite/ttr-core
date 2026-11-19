@@ -101,5 +101,6 @@ it('extension events preserve manual languages, never select on keystrokes, and 
   expect(doc.languageId).toBe('ttr-yaml');
   expect(ask).toHaveBeenCalledTimes(2);
   const packageJson = JSON.parse(readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
-  expect(packageJson.activationEvents).toContain('onLanguage:yaml');
+  expect(packageJson.activationEvents).toContain('workspaceContains:**/ttr.yaml');
+  expect(packageJson.activationEvents).not.toContain('onLanguage:yaml');
 });

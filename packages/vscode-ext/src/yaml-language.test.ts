@@ -59,6 +59,7 @@ describe('YAML language selection', () => {
   it('contributes a marker-activated language without global YAML associations and reuses the YAML grammar', () => {
     const pkg = JSON.parse(readFileSync(require.resolve('../package.json'), 'utf8'));
     expect(pkg.activationEvents).toContain('workspaceContains:**/ttr.yaml');
+    expect(pkg.activationEvents).not.toContain('onLanguage:yaml');
     expect(
       pkg.contributes.languages.find((l: { id: string }) => l.id === 'ttr-yaml').extensions
     ).toBeUndefined();

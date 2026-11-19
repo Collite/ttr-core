@@ -508,11 +508,9 @@ export class YamlWorkspaceLoader {
             const uri = uriOf(warning.location.file);
             const result = out.get(uri) ?? empty(uri);
             result.errors.push({
-              code: (warning.origin === 'each'
+              code: (warning.origin === 'each' || warning.origin === 'unknown'
                 ? 'other'
-                : warning.origin === 'unknown'
-                  ? 'ys/unknown-key'
-                  : 'ys/key-missing') as ParseError['code'],
+                : 'ys/key-missing') as ParseError['code'],
               severity: 'warning',
               message: warning.message,
               source: spanSource(warning.location, uri, safeRead(uri)),
