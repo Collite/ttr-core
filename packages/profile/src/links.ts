@@ -1,8 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
-import { isRecord, NumericScalar } from './input.js';
+import { parseAllDocuments } from 'yaml';
 import { readdirSync, realpathSync, existsSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
-import { ForeignData, ForeignTree, JsonPointer, type Json } from './input.js';
+import {
+  ForeignData,
+  ForeignTree,
+  JsonPointer,
+  isRecord,
+  NumericScalar,
+  Coordinates,
+  type Json,
+} from './input.js';
 import { readProfileFile } from './file-input.js';
 import { ProfileException, type ProfileSpan, type ProfileDefinition } from './loading.js';
 import type { Record, RecordPlan, CanonicalBuilder, SourceEntry } from './engine.js';
@@ -232,13 +240,42 @@ export const Renames = {
     }
     // Empty/comment-only ledgers contain no document and therefore no renames.
     if (source.split(/\r\n?|\n/).every((line) => /^\s*(?:#.*)?$/.test(line))) return [];
-    const data = new ForeignData(source, 'renames.yaml', '', true);
+    // This ledger uses Kotlin's plain Load, not the dialect reader's safety policy.
+    source = source.replace(/\r(?!\n)/g, '\n');
+    const documents = parseAllDocuments(source, { schema: 'core', merge: false });
+    const error = documents[0]?.errors[0] ?? documents[0]?.warnings[0];
+    const offset = error?.pos[0] ?? documents[1]?.range?.[0];
+    if (offset !== undefined) {
+      const mark = new Coordinates(source, 'renames.yaml').span([offset, offset]);
+      throw new ProfileException(
+        'ys/profile-invalid',
+        {
+          file: 'renames.yaml',
+          line: mark.line,
+          column: mark.column + 1,
+          endLine: mark.line,
+          endColumn: mark.column + 1,
+          path: '',
+        },
+        'renames.yaml is not YAML: ' + (error?.message ?? 'Expected a single document')
+      );
+    }
+    let value: unknown;
+    try {
+      value = documents[0]?.toJS({ maxAliasCount: 50 }) ?? null;
+    } catch (error) {
+      throw new ProfileException(
+        'ys/profile-invalid',
+        span('renames.yaml'),
+        'renames.yaml is not YAML: ' + String(error)
+      );
+    }
     const invalid = (path: string, detail: string): never => {
       throw new ProfileException('ys/profile-invalid', span('renames.yaml', path), detail);
     };
-    if (data.value === null) return [];
-    if (!Array.isArray(data.value)) return invalid('', 'renames.yaml must be a list');
-    return data.value.map((entry, i) => {
+    if (value === null) return [];
+    if (!Array.isArray(value)) return invalid('', 'renames.yaml must be a list');
+    return value.map((entry: unknown, i: number) => {
       if (!object(entry) || Object.keys(entry).sort().join(',') !== 'from,since,to')
         return invalid(`/${i}`, 'rename requires from, to, since');
       const text = (key: string): string =>

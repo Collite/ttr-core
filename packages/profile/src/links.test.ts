@@ -316,6 +316,41 @@ describe('rename ledger parity', () => {
     writeFileSync(join(root, 'renames.yaml'), source);
     expect(Renames.read(root)).toEqual([]);
   });
+  it.each([
+    ['anchors and aliases', '- &a {from: Old, to: New, since: v1}\n- *a', 2],
+    [
+      'YAML 1.1 directive with core scalar resolution',
+      '%YAML 1.1\n---\n- {from: yes, to: New, since: 2026-11-17}',
+      1,
+    ],
+  ])('C2: accepts %s with plain-load semantics', (_name, source, count) => {
+    const root = dir();
+    writeFileSync(join(root, 'renames.yaml'), source);
+    const ledger = Renames.read(root);
+    expect(ledger).toHaveLength(count);
+    if (count === 2)
+      expect(ledger).toEqual([
+        { from: 'Old', to: 'New', since: 'v1' },
+        { from: 'Old', to: 'New', since: 'v1' },
+      ]);
+    else expect(ledger).toEqual([{ from: 'yes', to: 'New', since: '2026-11-17' }]);
+  });
+  it.each([
+    ['unmerged merge key', '- {<<: {since: v1}, from: Old, to: New}', 1, 1, '/0'],
+    ['duplicate key', '- {from: Old, from: Other, to: New, since: v1}', 1, 15, ''],
+    ['unknown tag', '!unknown []', 1, 1, ''],
+    ['second document', '[]\n---\n[]', 2, 1, ''],
+    ['non-string field', '- {from: 1, to: New, since: v1}', 1, 1, '/0/from'],
+  ])('C2: %s uses Kotlin ledger positions and paths', (_name, source, line, column, path) => {
+    const root = dir();
+    writeFileSync(join(root, 'renames.yaml'), source);
+    expect(() => Renames.read(root)).toThrow(
+      expect.objectContaining({
+        code: 'ys/profile-invalid',
+        location: expect.objectContaining({ file: 'renames.yaml', line, column, path }),
+      })
+    );
+  });
   it('ignores a directory ledger and locates malformed YAML at the ledger', () => {
     const root = dir();
     mkdirSync(join(root, 'renames.yaml'));

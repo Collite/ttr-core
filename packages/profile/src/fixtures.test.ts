@@ -224,6 +224,15 @@ function failure(run: () => unknown, expected: Annotation, root: string) {
 }
 
 describe('shared negative corpus: codes and one-based authored positions', () => {
+  test('C3: the ruled TS-only continuation negative is refused at its authored position', () => {
+    const directory = join(conformance, 'dialect-negative/ts-strict-continuation');
+    const [expected] = annotations(join(directory, 'expected-github.txt'));
+    failure(
+      () => ForeignTree.read(read(join(directory, 'tree/input.yaml')), 'input.yaml'),
+      expected,
+      directory
+    );
+  });
   const directory = join(conformance, 'dialect-negative/demo-cs');
   const root = join(directory, 'tree');
   const expected = annotations(join(directory, 'expected-github.txt'));
