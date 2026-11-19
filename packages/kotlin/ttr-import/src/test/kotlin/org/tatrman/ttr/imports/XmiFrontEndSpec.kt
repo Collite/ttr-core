@@ -280,6 +280,26 @@ class XmiFrontEndSpec :
             tree(early).getValue("elements") shouldBe tree(applied).getValue("elements")
         }
 
+        test("review-378 F2: a 2000-package input is parsed once; every package tree is a view of that one parse") {
+            val packages =
+                (1..2000).joinToString("\n") {
+                    """    <packagedElement xmi:type="uml:Package" xmi:id="P$it" name="p$it">""" +
+                        """<packagedElement xmi:type="uml:Class" xmi:id="C$it" name="C$it"/></packagedElement>"""
+                }
+            val input =
+                java.nio.file.Files.createTempDirectory("s53a-f2").resolve("many.xmi").also {
+                    it.toFile().writeText(
+                        head + "  <uml:Model xmi:id=\"M\" name=\"world\">\n$packages\n  </uml:Model>\n</xmi:XMI>\n",
+                    )
+                }
+            val trees = XmiFrontEnd.parse(listOf(input))
+            trees.size shouldBe 2000
+            trees.all { it.sharesInput(trees.first()) } shouldBe true
+            trees.last().file shouldBe "many/p2000"
+            JsonPointer("/elements/C2000").resolve(trees.last().root)!!.span().line shouldBe 2003
+            JsonPointer("/elements/C1").resolve(trees.last().root) shouldBe null
+        }
+
         test(
             "review-378 F5: a UML package above an element with an empty name or one containing '/' is a located error",
         ) {

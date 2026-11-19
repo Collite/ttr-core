@@ -13,8 +13,22 @@ class ForeignTree private constructor(
     internal val data: YamlData,
     val file: String,
     val label: String,
+    private val value: JsonElement = data.value,
 ) {
-    val root: ForeignNode get() = ForeignNode(this, data.value, "")
+    val root: ForeignNode get() = ForeignNode(this, value, "")
+
+    /**
+     * review-378 F2: a tree named [file] whose root is [value], over this tree's positions: a front-end that reads one
+     * input as several trees (the `xmi` front-end's tree per UML package) parses the input once and derives each tree
+     * from it. Every path of [value] must be a path of this tree, so it sits on the same input line.
+     */
+    fun view(
+        value: JsonObject,
+        file: String,
+    ): ForeignTree = ForeignTree(data, file, label, value)
+
+    /** True when [other] reads its positions from the same parse as this tree (one is a [view] of the other). */
+    fun sharesInput(other: ForeignTree): Boolean = data === other.data
 
     companion object {
         fun read(
@@ -71,19 +85,11 @@ data class ForeignNode internal constructor(
 }
 
 /**
- * The tree of [this] labelled [label] that holds [path] (a JSON Pointer), else the first so labelled. A front-end may read
- * one input as several trees under its one label (the `xmi` front-end's tree per UML package, MW-P5 S5.3a): their record
- * paths are disjoint, and a path they share sits on the same input line in each.
+ * review-378 F2: the trees of a run by identity, (label, file), built once. A front-end may read one input as several
+ * trees under its one label (the `xmi` front-end's tree per UML package, MW-P5 S5.3a), so the label alone names no tree;
+ * a pair that names none is absent, never another tree.
  */
-fun List<ForeignTree>.holding(
-    label: String,
-    path: String,
-): ForeignTree? {
-    val labelled = filter { it.label == label }
-    if (labelled.size < 2) return labelled.firstOrNull()
-    val pointer = runCatching { JsonPointer(path) }.getOrNull() ?: return labelled.first()
-    return labelled.firstOrNull { pointer.resolve(it.root, includeNull = true) != null } ?: labelled.first()
-}
+fun List<ForeignTree>.byIdentity(): Map<Pair<String, String>, ForeignTree> = associateBy { it.label to it.file }
 
 internal fun escapePointer(key: String) = key.replace("~", "~0").replace("/", "~1")
 

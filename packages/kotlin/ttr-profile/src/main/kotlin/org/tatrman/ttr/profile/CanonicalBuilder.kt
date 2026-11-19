@@ -182,12 +182,17 @@ internal class CanonicalBuilder(
     private val rekindOrigins = mutableMapOf<Record, Pair<String, ProfileSpan>>()
     private val children = mutableMapOf<Record, MutableMap<String, MutableList<Record>>>()
 
-    /**
-     * The dialect trees, built once: relocation looks a span's file (a label) and path up for every emitted document (F9);
-     * one label may name several trees ([holding], MW-P5 S5.3a).
-     */
-    private val trees = plans.map { it.tree }
     private val origins = mutableMapOf<Record, MutableMap<String, ProfileSpan>>()
+
+    /**
+     * review-378 F2: the tree each dialect span was taken from, by the span instance, so relocation reads that tree's
+     * positions directly — no lookup by label (one label may name several trees, MW-P5 S5.3a), no fallback. A span not
+     * in it (an overlay value's origin is the overlay or profile file) is outside the dialect trees.
+     */
+    private val spanTrees = java.util.IdentityHashMap<ProfileSpan, ForeignTree>()
+
+    private fun ForeignNode.located(key: Boolean = false): ProfileSpan = span(key).also { spanTrees[it] = tree }
+
     private val imports = mutableMapOf<DocumentKey, MutableSet<String>>()
 
     init {
@@ -289,7 +294,7 @@ internal class CanonicalBuilder(
         }
         val canonicalPath = path.joinToString("/", prefix = "/") { escapePointer(it) }
         // The authored key: a diagnostic on the transformed value names it (contracts §3).
-        origins.getValue(record)[canonicalPath] = source.span(key = true)
+        origins.getValue(record)[canonicalPath] = source.located(key = true)
     }
 
     private fun group(
@@ -364,7 +369,7 @@ internal class CanonicalBuilder(
         val cache = HashMap<String, SourceLocation?>()
 
         fun located(span: ProfileSpan): SourceLocation? {
-            val data = trees.holding(span.file, span.path)?.data ?: return null
+            val data = spanTrees[span]?.data ?: return null
             val value = data.source(span.path)
             val key = data.source(span.path, key = true)
             return if (key.line == span.line && key.column + 1 == span.column) key else value
@@ -398,7 +403,7 @@ internal class CanonicalBuilder(
                 while (at.isNotEmpty() && at !in locations) at = at.substringBeforeLast('/', "")
                 val span = locations[at] ?: return null
                 val path = span.path + pointer.removePrefix(at)
-                return trees.holding(span.file, path)?.data?.block(path, text)
+                return spanTrees[span]?.data?.block(path, text)
             }
         }
     }
@@ -422,7 +427,7 @@ internal class CanonicalBuilder(
                 nested: Boolean,
             ): JsonObject {
                 val propertyKey = if (ProfileVocabulary.storageMember(record)) "fields" else "properties"
-                locations[path] = record.source.span()
+                locations[path] = record.source.located()
                 origins.getValue(record).forEach { (target, origin) ->
                     locations["$path/$propertyKey$target"] = origin
                     authored += "$path/$propertyKey$target"

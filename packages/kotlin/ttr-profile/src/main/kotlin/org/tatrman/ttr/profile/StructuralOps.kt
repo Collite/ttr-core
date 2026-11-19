@@ -250,7 +250,9 @@ internal object StructuralExecutor {
             index.sources(),
             plans.flatMap { plan ->
                 val pkg = packages.getValue(plan)
-                plan.records.map { RecordOrigin(Qnames.of(it, pkg), it.kind, pkg, plan.tree.label, it.source.path) }
+                plan.records.map {
+                    RecordOrigin(Qnames.of(it, pkg), it.kind, pkg, plan.tree.label, it.source.path, plan.tree.file)
+                }
             },
         )
     }

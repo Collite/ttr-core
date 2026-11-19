@@ -136,6 +136,11 @@ class PerFileEmissionSpec :
                     .single()
                     .source.file shouldBe label
             }
+            // review-378 F2: trees are found by (label, file); a pair naming no tree is absent, never another tree.
+            val trees =
+                listOf(ForeignTree.read("a: 1\n", "x/a", label), ForeignTree.read("b: 2\n", "x/b", label)).byIdentity()
+            trees.getValue(label to "x/b").file shouldBe "x/b"
+            trees[label to "x/c"] shouldBe null
         }
 
         test("review-260 F8: a relocated block maps its inner lines into the dialect file, never the generated text") {

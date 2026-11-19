@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 package org.tatrman.ttr.imports
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.tatrman.ttr.metadata.export.xmi.Uuid5
 import org.tatrman.ttr.profile.ForeignTree
 import org.tatrman.ttr.profile.ProfileException
@@ -87,12 +93,15 @@ object XmiFrontEnd : FrontEnd {
      * One tree per UML package that holds at least one element (MW-P5 S5.3a, ✅D-MW-91), in document order: the tree's
      * file is `<stem>/<package path>` (so a profile's file-scoped `package` operation applies per package), its label
      * the input's name (so a diagnostic names the XMI file and line). A document with no element is one tree, `<stem>`.
+     * review-378 F2: the whole document is written and parsed **once**; each package's tree is a [ForeignTree.view] of it
+     * (its own elements, `model.package` set), so the work grows with the document, not with packages × document.
      */
     override fun parse(files: List<Path>): List<ForeignTree> =
         labelled(files).flatMap { (file, name) ->
             val stem = name.substringBeforeLast('.', name)
-            trees(bytes(file), name).map { (pkg, json) ->
-                ForeignTree.read(json, if (pkg == null) stem else "$stem/$pkg", name)
+            val whole = ForeignTree.read(tree(bytes(file), name), stem, name)
+            split(whole.root.value.jsonObject).map { (pkg, value) ->
+                if (pkg == null) whole else whole.view(value, "$stem/$pkg")
             }
         }
 
@@ -135,21 +144,41 @@ object XmiFrontEnd : FrontEnd {
     internal fun tree(
         bytes: ByteArray,
         label: String,
-    ): String = Builder(read(bytes, label), label).json(null)
+    ): String = Builder(read(bytes, label), label).json()
 
     /**
-     * One JSON tree per UML package path that holds an element, in document order, each `model` with `package` (absent
-     * for the elements right below the model: path `""`); `@diagrams` ride on the first. No element → one tree, path null.
+     * One tree value per UML package path that holds an element, in document order (an element's `@xmi.package`, `""`
+     * right below the model), each `model` with `package` (absent for `""`) and that package's elements only;
+     * `@diagrams` ride on the first. No element → the whole tree, path null. Values only: [parse] makes them views.
      */
+    internal fun split(whole: JsonObject): List<Pair<String?, JsonObject>> {
+        val groups = LinkedHashMap<String, LinkedHashMap<String, JsonElement>>()
+        whole.getValue("elements").jsonObject.forEach { (id, element) ->
+            val pkg =
+                ((element as? JsonObject)?.get("@xmi") as? JsonObject)
+                    ?.get("package")
+                    ?.jsonPrimitive
+                    ?.content
+                    .orEmpty()
+            groups.getOrPut(pkg) { LinkedHashMap() }[id] = element
+        }
+        if (groups.isEmpty()) return listOf(null to whole)
+        val model = whole.getValue("model").jsonObject
+        return groups.entries.mapIndexed { i, (pkg, own) ->
+            pkg to
+                buildJsonObject {
+                    put("model", if (pkg.isEmpty()) model else JsonObject(model + ("package" to JsonPrimitive(pkg))))
+                    put("elements", JsonObject(own))
+                    if (i == 0) whole["@diagrams"]?.let { put("@diagrams", it) }
+                }
+        }
+    }
+
+    /** [split] of the whole document's tree, as package paths (a view for specs). */
     internal fun trees(
         bytes: ByteArray,
         label: String,
-    ): List<Pair<String?, String>> {
-        val builder = Builder(read(bytes, label), label)
-        val packages = builder.packages()
-        if (packages.isEmpty()) return listOf(null to builder.json(null))
-        return packages.mapIndexed { i, pkg -> pkg to builder.json(pkg, diagrams = i == 0) }
-    }
+    ): List<Pair<String?, JsonObject>> = split(Json.parseToJsonElement(tree(bytes, label)).jsonObject)
 
     private fun read(
         bytes: ByteArray,
@@ -429,17 +458,8 @@ object XmiFrontEnd : FrontEnd {
             out.append(": ")
         }
 
-        /** The package paths that hold an element, in document order. */
-        fun packages(): List<String> = elements.map { it.pkg }.distinct()
-
-        /**
-         * The tree as JSON text: with [pkg], only that package's elements and `model.package` = [pkg] (none for `""`);
-         * null, every element and no `model.package`. `@diagrams` only with [diagrams].
-         */
-        fun json(
-            pkg: String?,
-            diagrams: Boolean = true,
-        ): String {
+        /** The whole tree as JSON text: every element, no `model.package`, `@diagrams` ([split] makes the packages). */
+        fun json(): String {
             out.setLength(0)
             line = 1
             out.append("{")
@@ -465,22 +485,16 @@ object XmiFrontEnd : FrontEnd {
                     string(v)
                 }
             }
-            if (!pkg.isNullOrEmpty()) {
-                sep()
-                key("package")
-                string(pkg)
-            }
             out.append("}, ")
             key("elements")
             out.append("{")
-            elements.filter { pkg == null || it.pkg == pkg }.forEachIndexed { i, e ->
+            elements.forEachIndexed { i, e ->
                 if (i > 0) out.append(", ")
                 at(e.node.line)
                 key(e.id)
                 element(e.node, e.pkg)
             }
             out.append("}")
-            val diagrams = if (diagrams) this.diagrams else emptyList()
             if (diagrams.isNotEmpty()) {
                 out.append(", ")
                 at(diagrams.first().line)

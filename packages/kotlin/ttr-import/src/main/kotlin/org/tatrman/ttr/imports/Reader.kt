@@ -12,10 +12,10 @@ import org.tatrman.ttr.metadata.export.GeneratedInputs
 import org.tatrman.ttr.parser.model.Definition
 import org.tatrman.ttr.profile.Bytewise
 import org.tatrman.ttr.profile.ForeignTree
-import org.tatrman.ttr.profile.holding
 import org.tatrman.ttr.profile.JsonPointer
 import org.tatrman.ttr.profile.ProfileEngine
 import org.tatrman.ttr.profile.ProfileWarning
+import org.tatrman.ttr.profile.byIdentity
 import org.tatrman.ttr.profile.RecordOrigin
 import org.tatrman.ttr.profile.SourceEntry
 import org.tatrman.ttr.profile.SourcesJsonWriter
@@ -160,7 +160,8 @@ object Reader {
     /**
      * MW-P5 S5.3: with a `foreignId` pointer, each record's sidecar entry takes the string the pointer selects in the
      * record's own node (its input tree and path, [RecordOrigin]; the engine's sources and origins are both in record
-     * order); a record where it selects no string keeps none.
+     * order); a record where it selects no string keeps none. The tree is looked up by (label, file), once per run
+     * (review-378 F2).
      */
     private fun foreignIds(
         sources: List<SourceEntry>,
@@ -170,8 +171,9 @@ object Reader {
     ): List<SourceEntry> {
         if (pointer == null) return sources
         check(sources.size == origins.size) { "the engine's sources and origins differ in length" }
+        val byIdentity = trees.byIdentity()
         return sources.zip(origins).map { (entry, origin) ->
-            val tree = trees.holding(origin.file, origin.path) ?: return@map entry
+            val tree = byIdentity[origin.file to origin.tree] ?: return@map entry
             val node = JsonPointer(origin.path + pointer).resolve(tree.root)?.value as? JsonPrimitive
             node?.takeIf { it.isString }?.let { entry.copy(foreignId = it.content) } ?: entry
         }
