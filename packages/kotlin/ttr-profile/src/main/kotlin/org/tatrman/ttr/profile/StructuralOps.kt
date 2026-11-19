@@ -90,7 +90,11 @@ internal class WriteOp(
     ) {
         val path = op.targetPath()
         for (record in plan.records.filter { it.kind == op.scope }) {
-            val source = op.at.resolve(record.source, includeNull = true) ?: continue
+            val source =
+                op.at.resolve(record.source, includeNull = true) ?: run {
+                    op.missing(plan, record, path)
+                    continue
+                }
             plan.consumption.consume(source)
             if (source.value != JsonNull) builder.write(plan, record, path, source.value, source)
         }

@@ -475,6 +475,28 @@ class XmiReaderSpec :
                 )
         }
 
+        test("T4c ✅D-MW-98: an association without EA's connector ends is a relation with no ends and two warnings") {
+            val root = workspace()
+            val erd = root.resolve("sources/orders-erd.xmi").readText(charset("windows-1252"))
+            val endless =
+                erd
+                    .replace(Regex("<source xmi:idref=\"[^\"]+\">"), "<source>")
+                    .replace(Regex("<target xmi:idref=\"[^\"]+\">"), "<target>")
+            root.resolve("sources/endless.xmi").writeText(endless, charset("windows-1252"))
+            val generated = run(root, "endless.xmi", "ea-erd/1", "orders", out = "e")
+            body(generated.files.getValue("orders/er.ttrm")) shouldContain "def relation placed_by { description:"
+            body(generated.files.getValue("orders/er.ttrm")) shouldNotContain "from: orders"
+            val warnings = report(generated).getValue("warnings").jsonArray.map { it.jsonPrimitive.content }
+            warnings.filter { "ys/key-missing" in it }.map { it.substringBefore(" — ") }.sorted() shouldBe
+                listOf(
+                    "ys/key-missing: lists has no /@source/\$ref, so relation.from is not written",
+                    "ys/key-missing: lists has no /@target/\$ref, so relation.to is not written",
+                    "ys/key-missing: placed_by has no /@source/\$ref, so relation.from is not written",
+                    "ys/key-missing: placed_by has no /@target/\$ref, so relation.to is not written",
+                )
+            warnings.first { "placed_by has no" in it } shouldContain " — endless.xmi /elements/"
+        }
+
         test("F3: a foreign id with one qname on each side is a rename even when its kind changed") {
             val dir = Files.createTempDirectory("s53-delta")
             val previous = dir.resolve("p.sources.json")

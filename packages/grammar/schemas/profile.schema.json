@@ -443,6 +443,9 @@
               },
               "as": {
                 "type": "string"
+              },
+              "required": {
+                "type": "string"
               }
             },
             "required": [
@@ -842,6 +845,9 @@
                     },
                     "to": {
                       "$ref": "#/$defs/propertyTarget"
+                    },
+                    "required": {
+                      "const": "warn"
                     }
                   },
                   "required": [
@@ -957,6 +963,9 @@
                     },
                     "template": {
                       "$ref": "#/$defs/profileTemplate"
+                    },
+                    "required": {
+                      "const": "warn"
                     }
                   },
                   "required": [
@@ -1527,6 +1536,9 @@
                     },
                     "as": {
                       "const": "ref"
+                    },
+                    "required": {
+                      "const": "warn"
                     }
                   },
                   "required": [

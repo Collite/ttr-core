@@ -1,0 +1,6 @@
+profile: demo-required/1
+grammar: '>=0.22 <1.0'
+operations:
+  - {op: package, mapping: {}, default: demo}
+  - {op: kinds, at: /entity, mapping: {entita: entity}}
+  - {op: rename, in: entity, at: /popis, to: {kind: entity, property: description}, required: warn}

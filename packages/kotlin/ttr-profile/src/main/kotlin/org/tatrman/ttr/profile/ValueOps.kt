@@ -141,7 +141,11 @@ internal class ShapeOp(
         val path = op.targetPath()
         val template = op.value.getValue("template")
         for (record in plan.records.filter { it.kind == op.scope }) {
-            val base = op.at.resolve(record.source, includeNull = true) ?: continue
+            val base =
+                op.at.resolve(record.source, includeNull = true) ?: run {
+                    op.missing(plan, record, path)
+                    continue
+                }
             plan.consumption.open(base)
             val filled =
                 fillTemplate(
@@ -270,7 +274,11 @@ internal class LinkOp(
         val kind = operand ?: ProfileVocabulary.referentKind(path)
         val asRef = op.value.optionalString("as") == "ref"
         for (record in plan.records.filter { it.kind == op.scope }) {
-            val source = op.at.resolve(record.source, includeNull = true) ?: continue
+            val source =
+                op.at.resolve(record.source, includeNull = true) ?: run {
+                    op.missing(plan, record, path)
+                    continue
+                }
             plan.consumption.consume(source)
             val linked =
                 when (source.value) {

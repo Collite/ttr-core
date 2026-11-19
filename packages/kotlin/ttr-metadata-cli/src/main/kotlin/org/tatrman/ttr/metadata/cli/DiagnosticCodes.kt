@@ -68,6 +68,11 @@ object DiagnosticCodes {
                 "ttr-profile StructuralOps (at the tree's first record)",
             ),
             DiagnosticCode(
+                "ys/key-missing",
+                "An operation with `required: warn` selects nothing at `at` on a record (a warning; the run goes on)",
+                "ttr-profile RecordPlan (rename, shape, link; at the record)",
+            ),
+            DiagnosticCode(
                 "ys/profile-duplicate",
                 "Two catalogue profiles declare one identity: left out of the catalog (a warning); usage for a run naming it",
                 "ttr-metadata-cli lint, profile check|apply (the catalog read)",

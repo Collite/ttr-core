@@ -14,7 +14,7 @@
 # a property's `type`), so the generated package resolves on its own names. A property's `type` is read in both XMI
 # forms, the attribute `type="X"` and EA's child `<type xmi:idref="X"/>` (✅R372-A); a generalization's `general` only in
 # the attribute form, which is the one EA and the XM-P1 writer write (the child form needs an engine operand: S5.3
-# Found (g)). An association needs EA's connector ends (`xmi:Extension`): without them it has no `from`/`to` (✅R372-B). The sidecar keeps each element's xmi:id
+# Found (g)). An association needs EA's connector ends (`xmi:Extension`): without them it has no `from`/`to`, and each missing end is a `ys/key-missing` warning (✅R372-B, ✅D-MW-98). The sidecar keeps each element's xmi:id
 # (`sourceName`) and a UUIDv5 of it (`foreignId`, the xmi front-end's NAMESPACE), so a later snapshot's renames show as a
 # sidecar diff (`delta.renamed`).
 #
@@ -80,8 +80,8 @@ operations:
   - {op: ignore, in: attribute, at: /type/0/$ref, reason: 'type: the UML type, by name'}
   - {op: values, in: attribute, at: /@tags/nullable, to: {kind: attribute, property: optional}, mapping: {'true': true, 'false': false}}
   - {op: rename, in: relation, at: /@properties/documentation, to: {kind: relation, property: description}}
-  - {op: shape, in: relation, at: /@source, to: {kind: relation, property: from}, template: {ref: {input: /@name}}}
-  - {op: shape, in: relation, at: /@target, to: {kind: relation, property: to}, template: {ref: {input: /@name}}}
+  - {op: shape, in: relation, at: /@source, to: {kind: relation, property: from}, template: {ref: {input: /@name}}, required: warn}
+  - {op: shape, in: relation, at: /@target, to: {kind: relation, property: to}, template: {ref: {input: /@name}}, required: warn}
   - {op: rename, in: relation, at: /@source/multiplicity, to: {kind: relation, path: [cardinality, from]}}
   - {op: rename, in: relation, at: /@target/multiplicity, to: {kind: relation, path: [cardinality, to]}}
   - {op: ignore, in: relation, at: /@tags/cardinality, reason: 'cardinality: read from the association ends'}

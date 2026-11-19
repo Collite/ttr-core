@@ -51,7 +51,7 @@ class DiagnosticCodesSpec :
             entries.map { it.getValue("family").jsonPrimitive.content }.toSet() shouldBe setOf("ys", "xm")
             // Contracts §5's list, plus the codec's ys/canonical-invalid and the CLI's ys/profile-duplicate (S3.7 T1), and S3.7b's
             // link kind: and join-pairs codes, and S5.2a's each and split codes (✅D-MW-81),
-            // and S5.3a's package verbatim code (✅D-MW-91).
+            // and S5.3a's package verbatim code (✅D-MW-91) and required: warn code (✅D-MW-98).
             entries.map { it.getValue("code").jsonPrimitive.content }.toSet() shouldBe
                 setOf(
                     "ys/profile-invalid",
@@ -63,6 +63,7 @@ class DiagnosticCodesSpec :
                     "ys/profile-conflict",
                     "ys/value-unmapped",
                     "ys/package-invalid",
+                    "ys/key-missing",
                     "ys/profile-duplicate",
                     "ys/twin-missing",
                     "ys/record-id-missing",

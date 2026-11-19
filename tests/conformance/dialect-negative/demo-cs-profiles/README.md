@@ -12,6 +12,7 @@ names the profile that fails:
 | `cycle.yaml` → `profiles/cycle-a.yaml` ↔ `cycle-b.yaml` | `ys/profile-cycle` |
 | `unmapped.yaml` (tree profile) | `ys/value-unmapped` (`faktura` has no mapping and no default) |
 | `package-invalid.yaml` → `profiles/verbatim.yaml` | `ys/package-invalid` (`package: {verbatim: true}` reads `Prodej`, no TTR package path; MW-P5 S5.3a) |
+| `key-missing.yaml` → `profiles/required.yaml` | `ys/key-missing`, a warning (`rename … required: warn`; record `B` has no `popis`; MW-P5 S5.3a, ✅D-MW-98) |
 | `canonical-bad.yaml` | `ys/canonical-invalid` (`defs: 5`) |
 | `profiles/dup-1.yaml` + `dup-2.yaml` | `ys/profile-duplicate` (a warning: both declare `demo-dup/1`) |
 

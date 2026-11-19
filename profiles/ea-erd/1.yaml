@@ -12,7 +12,8 @@
 # Every UML class → `def entity <name>` (its EA notes → `description`), each owned attribute → `def attribute` (`type` =
 # EA's type name, `optional: true` when its lower bound is 0); every named association → `def relation <name>` from EA's
 # source end to its target end, with the ends' multiplicities as `cardinality` — EA's connector ends in `xmi:Extension`:
-# an export without them gives relations with no `from`/`to` (✅R372-B; UML's member ends carry no direction, and EA
+# an export without them gives relations with no `from`/`to` and one `ys/key-missing` warning per missing end
+# (✅R372-B, ✅D-MW-98; UML's member ends carry no direction, and EA
 # writes the destination end first). A property's `type` is consumed in both XMI forms (EA's type name is read from its
 # properties); a generalization's `general` in the attribute form EA writes (✅R372-A). Names are the UML names, so an unnamed
 # association is `ys/record-id-missing` at the association, and a name that is a TTR word (`number`, `date`, …) is
@@ -67,8 +68,8 @@ operations:
   - {op: ignore, in: attribute, at: /isOrdered, reason: UML property flags}
   - {op: ignore, in: attribute, at: /isUnique, reason: UML property flags}
   - {op: ignore, in: attribute, at: /isDerivedUnion, reason: UML property flags}
-  - {op: link, in: relation, at: /@source/$ref, to: {kind: relation, property: from}, by: sourceName, kind: entity, as: ref}
-  - {op: link, in: relation, at: /@target/$ref, to: {kind: relation, property: to}, by: sourceName, kind: entity, as: ref}
+  - {op: link, in: relation, at: /@source/$ref, to: {kind: relation, property: from}, by: sourceName, kind: entity, as: ref, required: warn}
+  - {op: link, in: relation, at: /@target/$ref, to: {kind: relation, property: to}, by: sourceName, kind: entity, as: ref, required: warn}
   - {op: rename, in: relation, at: /@source/multiplicity, to: {kind: relation, path: [cardinality, from]}}
   - {op: rename, in: relation, at: /@target/multiplicity, to: {kind: relation, path: [cardinality, to]}}
   - {op: rename, in: relation, at: /@properties/documentation, to: {kind: relation, property: description}}

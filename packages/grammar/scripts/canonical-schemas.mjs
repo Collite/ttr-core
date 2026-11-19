@@ -885,13 +885,22 @@ export function createSchemas(metadata) {
       then: { required: ['at'], not: { anyOf: [{ required: ['mapping'] }, { required: ['default'] }] } },
       else: { required: ['mapping'] },
     },
-    operation('rename', { ...recordSelectors, to: ref('propertyTarget') }, ['in', 'at', 'to']),
-    operation('shape', { ...recordSelectors, to: { type: 'object' }, template: ref('profileTemplate') }, [
+    // ✅D-MW-98 (S5.3a T4c): `required: warn` — a record where `at` selects nothing gets one `ys/key-missing` warning.
+    operation('rename', { ...recordSelectors, to: ref('propertyTarget'), required: { const: 'warn' } }, [
+      'in',
       'at',
       'to',
-      'template',
-      'in',
     ]),
+    operation(
+      'shape',
+      {
+        ...recordSelectors,
+        to: { type: 'object' },
+        template: ref('profileTemplate'),
+        required: { const: 'warn' },
+      },
+      ['at', 'to', 'template', 'in']
+    ),
     ...['nest', 'unnest'].map((op) =>
       operation(op, { ...recordSelectors, to: ref('propertyTarget') }, ['in', 'at', 'to'])
     ),
@@ -914,6 +923,7 @@ export function createSchemas(metadata) {
         by: { enum: ['sourceName', 'iri', 'path'] },
         kind: canonicalKind,
         as: { const: 'ref' },
+        required: { const: 'warn' },
       },
       ['in', 'at', 'to', 'by']
     ),
@@ -1072,6 +1082,7 @@ export function createSchemas(metadata) {
                 missing: string,
                 verbatim: { type: 'boolean' },
                 as: string,
+                required: string,
               },
               ['op']
             ),

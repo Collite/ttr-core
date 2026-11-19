@@ -9,3 +9,4 @@
 ::error file=canonical-bad.yaml,line=4,col=7::ys/canonical-invalid /defs: number found, array expected
 ::error file=package-invalid.yaml,line=4,col=3::ys/package-invalid "Prodej" is no TTR package path (verbatim: lower-case names, `/` → `.`)
 ::error file=unmapped.yaml,line=2,col=7::ys/value-unmapped Unmapped value faktura
+::warning file=key-missing.yaml,line=4,col=6::ys/key-missing B has no /popis, so entity.description is not written

@@ -26,6 +26,10 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   packages: an element moved between UML packages is a `delta.renamed` entry with `package: {from, to}`. A previous
   package the run emits nothing for lists its remaining entries as `delta.removed` (`{qname, foreignId?}`); the run
   does not delete that package's files.
+- `rename`, `shape` and `link` take `required: warn`: a record where `at` selects nothing gets one warning, the new
+  catalogued `ys/key-missing`, located at the record and naming the property not written; the run goes on
+  (✅D-MW-98). `ttr-mdg/1` and `ea-erd/1` declare it on a relation's two ends, so an association without EA's
+  connector ends is reported instead of passing silently.
 
 ### Added — `import-xmi`: the `xmi` front-end, `ttr-mdg/1`, `ea-erd/1`, the sidecar rename diff (MW-P5 S5.3)
 

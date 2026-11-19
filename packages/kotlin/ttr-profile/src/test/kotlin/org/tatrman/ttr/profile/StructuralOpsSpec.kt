@@ -337,6 +337,33 @@ class StructuralOpsSpec :
             ).properties()
                 .string("description") shouldBe "Faktura"
         }
+
+        test("✅D-MW-98 required: warn — rename, shape and link warn ys/key-missing at a record whose at is absent") {
+            val ops =
+                entityOps +
+                    "- {op: kinds, at: /vztahy, mapping: {vztah: relation}}\n" +
+                    "- {op: rename, in: relation, at: /popis, to: {kind: relation, property: description}, " +
+                    "required: warn}\n" +
+                    "- {op: shape, in: relation, at: /od, to: {kind: relation, property: from}, " +
+                    "template: {ref: {input: /jmeno}}, required: warn}\n" +
+                    "- {op: link, in: relation, at: /do, to: {kind: relation, property: to}, by: sourceName, " +
+                    "required: warn}"
+            val source = "entity:\n  A: {}\nvztahy:\n  R: {}\n  S: {popis: s, od: {jmeno: A}, do: A}\n"
+            val result = runOps(source, ops)
+            result.report.warnings.map { Triple(it.location.line, it.location.path, it.describe()) } shouldBe
+                listOf(
+                    Triple(4, "/vztahy/R", "ys/key-missing: R has no /popis, so relation.description is not written"),
+                    Triple(4, "/vztahy/R", "ys/key-missing: R has no /od, so relation.from is not written"),
+                    Triple(4, "/vztahy/R", "ys/key-missing: R has no /do, so relation.to is not written"),
+                )
+            // The run goes on: R has no ends, S has all three.
+            result.defs().map { it.string("id") to it.getValue("properties").jsonObject.keys } shouldBe
+                listOf("A" to emptySet(), "R" to emptySet(), "S" to setOf("description", "from", "to"))
+            // Without the operand an absent key stays silent; the operand takes no other value.
+            runOps(source, ops.replace(", required: warn", "")).report.warnings shouldBe emptyList()
+            shouldThrow<ProfileException> { recordProfile(ops.replace("required: warn", "required: error")) }
+                .code shouldBe "ys/profile-invalid"
+        }
     })
 
 private fun recordProfileOpsReversed() =

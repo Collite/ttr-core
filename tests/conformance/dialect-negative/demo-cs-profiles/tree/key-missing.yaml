@@ -1,0 +1,4 @@
+ttr: {profile: ./profiles/required.yaml, grammar: '>=0.22 <1.0'}
+entity:
+  A: {popis: Zakaznik}
+  B: {}
