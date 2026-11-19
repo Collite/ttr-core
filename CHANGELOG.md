@@ -6,6 +6,19 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Fixed — TS profile operands match Kotlin (MW-P7 S7.2b)
+
+- `@tatrman/profile` resolves links from live run records first, falling back lazily
+  to sidecars only when no record matches the key and kind. Stale names and packages
+  no longer make renamed or moved records ambiguous.
+- `link … as: ref` emits qualified `{ref}` values without adding package imports.
+- `package: {at, verbatim: true}` keeps the written path, converting `/` to `.`;
+  invalid paths raise located `ys/package-invalid` errors.
+- `rename`, `shape` and `link` honour `required: warn` for absent or explicit-null
+  inputs, reporting located `ys/key-missing` warnings while continuing the run.
+  Shared Kotlin-produced operand vectors include the captured sales/billing XMI
+  records, warning reports and refusal positions.
+
 ### Added — `package: {verbatim: true}`; `import-xmi` makes one TTR package per UML package (MW-P5 S5.3a, ✅D-MW-91)
 
 - The profile engine's `package` op takes `verbatim: true`: the string at `at` is the package path as written, `/` → `.`

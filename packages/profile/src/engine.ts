@@ -843,7 +843,7 @@ export class ProfileEngine {
             if (!plan.records.length) return '';
             const written = selected?.value;
             const path = typeof written === 'string' ? written.replace(/\//g, '.') : undefined;
-            if (path !== undefined && /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/.test(path))
+            if (path !== undefined && /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*(?![\s\S])/.test(path))
               return path;
             throw new ProfileException(
               'ys/package-invalid',

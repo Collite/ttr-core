@@ -14,7 +14,8 @@ The existing dialect/canonical corpus is unchanged.
 - `xmi-multi`: package-specific records captured once from Kotlin XmiFrontEnd's
   `sales-billing.xmi`, replayed as YAML inputs. TS needs no XMI front-end.
 - `verbatim*` and `package-*`: slash/dotted paths, no-record trees, mapping/default
-  schema refusals, and invalid/missing/null paths located at the first record.
+  schema refusals, and invalid/missing/null paths (including a terminal newline)
+  located at the first record.
 - `required-warn`: absent and explicit-null inputs on rename, shape and link,
   plus a populated record; the full report pins warning order, messages and
   authored positions. `required-silent` keeps the operand opt-in.
