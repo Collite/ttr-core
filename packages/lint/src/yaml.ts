@@ -440,6 +440,15 @@ export class YamlWorkspaceLoader {
       }
     }
     for (const uri of excluded) out.delete(uri);
+    const dependencyText = (file: string): string | undefined => {
+      try {
+        return read(file);
+      } catch (error) {
+        if (!(error instanceof ProfileException)) throw error;
+        // The engine owns this refusal; hashing a dependency must not throw outside its error path.
+        return `<invalid:${error.code}:${error.detail}>`;
+      }
+    };
     this.groupDependencies.clear();
     for (const [key, group] of groups) {
       for (const profile of group.chain) {
@@ -448,13 +457,15 @@ export class YamlWorkspaceLoader {
       }
       const signature = JSON.stringify(
         [
-          read(join(group.root, 'ttr.yaml')),
-          read(join(group.root, 'renames.yaml')),
+          dependencyText(join(group.root, 'ttr.yaml')),
+          dependencyText(join(group.root, 'renames.yaml')),
           group.chain.map((p) => [
             p.file,
             p.operations,
             p.overlay,
-            typeof p.overlay === 'string' ? read(resolve(dirname(p.file), p.overlay)) : null,
+            typeof p.overlay === 'string'
+              ? dependencyText(resolve(dirname(p.file), p.overlay))
+              : null,
           ]),
           group.trees.map((t) => [t.label, this.trees.get(t.label)?.text]),
           [...this.chains.values()]
