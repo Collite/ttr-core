@@ -135,7 +135,7 @@ class ClosureLayoutSpec :
                                         it.toPair()
                                     },
                             ),
-                    )
+                    ).also { it.layoutPackageOf = captured.layoutPackageOf }
             closureLayout(reversed, closure().reversed() + closure()) shouldBe expected
             expected.positions.values
                 .toSet()
