@@ -1,0 +1,1 @@
+{"code":"ys/profile-invalid","file":"one.yaml","line":2,"column":7,"path":"/entity/A/role","message":"one.yaml:2:7: ys/profile-invalid /entity/A/role: /defs/0/properties/roles/0: object found, string expected"}

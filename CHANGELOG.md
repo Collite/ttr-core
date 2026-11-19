@@ -25,6 +25,21 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   write still changes a filesystem YAML source's version and can produce a spurious `modelChanged`.
   The model data is unaffected. No storage SPI or version hashing changes in this patch.
 
+### Fixed — TS profile operands match Kotlin (MW-P7 S7.2b)
+
+- `@tatrman/profile` resolves links from live run records first, falling back lazily
+  to sidecars only when no record matches the key and kind. Stale names and packages
+  no longer make renamed or moved records ambiguous.
+- `link … as: ref` emits qualified `{ref}` values without adding package imports.
+- `package: {at, verbatim: true}` keeps the written path, converting `/` to `.`;
+  invalid paths raise located `ys/package-invalid` errors.
+- `rename`, `shape` and `link` honour `required: warn` for absent or explicit-null
+  inputs, reporting located `ys/key-missing` warnings while continuing the run.
+  Shared Kotlin-produced operand vectors include the captured sales/billing XMI
+  records, warning reports and refusal positions. Both Kotlin and TS replay the
+  exact operand roster in CI, including full refusal messages. Profile schema
+  negations and canonical type refusals now use Kotlin's diagnostic text in TS.
+
 ### Added — Native YAML layouts (MW-P4 S4.3, library reader)
 
 - `YamlFileSource(layouts = true)` reads authored `layouts/**/*.yaml` / `.yml` as VL format-1 layouts,

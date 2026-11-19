@@ -137,7 +137,12 @@ function validate(
   if (!validator) {
     const root = profileSchema as unknown as { oneOf: object[]; [key: string]: unknown };
     const { oneOf, ...rest } = root;
-    validator = new Ajv({ allErrors: true, strict: false, ownProperties: true }).compile({
+    validator = new Ajv({
+      allErrors: true,
+      strict: false,
+      ownProperties: true,
+      verbose: true,
+    }).compile({
       ...rest,
       ...oneOf[branch],
     });
@@ -151,7 +156,12 @@ function validate(
     const error = [...(validator.errors ?? [])].sort(
       (a, b) => b.instancePath.length - a.instancePath.length
     )[0];
-    invalid(data, prefix + (error ? errorPath(error) : ''), error?.message ?? 'Invalid profile');
+    // Networknt includes the failed `not` schema in this refusal; retain the same text as Kotlin.
+    const message =
+      error?.keyword === 'not'
+        ? `${error.instancePath}: must not be valid to the schema "${error.schemaPath.replace(/^#/, '')}" : ${JSON.stringify(error.schema)}`
+        : (error?.message ?? 'Invalid profile');
+    invalid(data, prefix + (error ? errorPath(error) : ''), message);
   }
   return value as RecordValue;
 }

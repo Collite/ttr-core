@@ -61,7 +61,7 @@ const builder = () =>
   }) as unknown as CanonicalBuilder;
 
 describe('link index and sidecars', () => {
-  it('reads sidecars once, only on resolve; deduplicates after filtering kind', () => {
+  it('resolves live records first; loads sidecars once after filtering kind', () => {
     const run = candidate('entity', 'p.er.entity.R');
     const sidecars = vi.fn(() => [
       { qname: run.qname, kind: 'entity', pkg: 'p', sourceName: 'R' },
@@ -71,7 +71,10 @@ describe('link index and sidecars', () => {
     expect(index.qname(run.qname)).toEqual([run]);
     expect(index.sources()).toHaveLength(1);
     expect(sidecars).not.toHaveBeenCalled();
-    expect(index.resolve('sourceName', 'R')).toHaveLength(2);
+    expect(index.resolve('sourceName', 'R')).toEqual([run]);
+    expect(sidecars).not.toHaveBeenCalled();
+    expect(index.resolve('sourceName', 'R', 'table')).toHaveLength(1);
+    expect(index.resolve('sourceName', 'R')).toEqual([run]);
     expect(index.resolve('sourceName', 'R', 'table')).toHaveLength(1);
     expect(sidecars).toHaveBeenCalledTimes(1);
   });

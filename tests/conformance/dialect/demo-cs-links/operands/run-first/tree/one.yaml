@@ -1,0 +1,3 @@
+entity:
+  - {name: Client, guid: G1, role: [G1, G2, G3]}
+  - {name: Order, guid: G2}

@@ -1,0 +1,18 @@
+ttr: "0.22"
+package: "demo"
+imports:
+  - "sklad.*"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "Client"
+    properties:
+      roles:
+        - "demo.er.entity.Client"
+        - "demo.er.entity.Order"
+        - "sklad.er.entity.Product"
+  -
+    kind: "entity"
+    id: "Order"
+    properties: {}

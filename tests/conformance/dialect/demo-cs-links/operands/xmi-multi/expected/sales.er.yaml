@@ -1,0 +1,36 @@
+ttr: "0.22"
+package: "sales"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "Customer"
+    properties:
+      description: "A buyer of record."
+      attributes:
+        -
+          id: "id"
+          properties:
+            type: "int"
+            optional: false
+  -
+    kind: "entity"
+    id: "Order"
+    properties:
+      attributes:
+        -
+          id: "order_no"
+          properties:
+            type: "String"
+            optional: false
+  -
+    kind: "relation"
+    id: "placed_by"
+    properties:
+      from:
+        ref: "sales.er.entity.Order"
+      to:
+        ref: "sales.er.entity.Customer"
+      cardinality:
+        from: "0..*"
+        to: "1"

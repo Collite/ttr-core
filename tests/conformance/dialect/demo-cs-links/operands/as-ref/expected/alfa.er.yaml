@@ -1,0 +1,8 @@
+ttr: "0.22"
+package: "alfa"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "A"
+    properties: {}

@@ -1,0 +1,24 @@
+ttr: "0.22"
+package: "beta"
+model: "er"
+defs:
+  -
+    kind: "entity"
+    id: "B"
+    properties: {}
+  -
+    kind: "relation"
+    id: "R1"
+    properties:
+      from:
+        ref: "beta.er.entity.B"
+      to:
+        ref: "alfa.er.entity.A"
+  -
+    kind: "relation"
+    id: "R2"
+    properties:
+      from:
+        ref: "beta.er.entity.B"
+      to:
+        ref: "sklad.er.entity.Product"

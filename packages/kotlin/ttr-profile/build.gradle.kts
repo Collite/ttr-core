@@ -22,6 +22,7 @@ tasks.test {
     // The generated-document budget regression constructs 70,000 located records.
     maxHeapSize = "2g"
     inputs.dir("../../../tests/conformance/fixtures")
+    inputs.dir("../../../tests/conformance/dialect/demo-cs-links/operands")
     inputs.file("../../grammar/schemas/profile.schema.json")
     inputs.file("build.gradle.kts")
     inputs.file(rootProject.file("settings.gradle.kts"))

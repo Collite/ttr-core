@@ -1,0 +1,5 @@
+entity:
+  B: {}
+vztahy:
+  R1: {od: B, do: A}
+  R2: {od: B, do: P}
