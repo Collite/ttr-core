@@ -160,7 +160,18 @@ data class LayoutFileRef(
     val unreadable: LayoutReadFailure? = null,
     /** MW S4.3: only yaml sources collect the native VL format. TTR/sidecar behaviour stays the default. */
     val format: LayoutFileFormat = LayoutFileFormat.TTRG,
-)
+) {
+    /** The 0.22.10 JVM constructor, including its default-argument bridge (review-388 F5). */
+    constructor(
+        path: String,
+        source: String,
+        content: String,
+        sidecarPath: String? = null,
+        sidecarContent: String? = null,
+        sidecarSource: String? = null,
+        unreadable: LayoutReadFailure? = null,
+    ) : this(path, source, content, sidecarPath, sidecarContent, sidecarSource, unreadable, LayoutFileFormat.TTRG)
+}
 
 enum class LayoutFileFormat { TTRG, YAML }
 
