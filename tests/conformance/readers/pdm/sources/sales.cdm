@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?PowerDesigner signature="CDM_DATA_MODEL_XML" version="16.7.0.6367"?>
+<Model xmlns:a="attribute" xmlns:c="collection" xmlns:o="object">
+  <o:RootObject Id="root">
+    <c:Children>
+      <o:Model Id="o100">
+        <a:ObjectID>00000000-0000-4000-8000-000000000100</a:ObjectID>
+        <a:Name>cn_sales</a:Name>
+        <a:Code>cn_sales</a:Code>
+        <c:Entities>
+          <o:Entity Id="o101">
+            <a:ObjectID>00000000-0000-4000-8000-000000000101</a:ObjectID>
+            <a:Name>Person</a:Name>
+            <a:Code>Person</a:Code>
+            <a:Comment>A person of record.</a:Comment>
+          </o:Entity>
+          <o:Entity Id="o102">
+            <a:ObjectID>00000000-0000-4000-8000-000000000102</a:ObjectID>
+            <a:Name>Customer</a:Name>
+            <a:Code>Customer</a:Code>
+            <a:Comment>A customer in the conceptual model.</a:Comment>
+          </o:Entity>
+        </c:Entities>
+        <c:Inheritances>
+          <o:Inheritance Id="o103">
+            <a:ObjectID>00000000-0000-4000-8000-000000000103</a:ObjectID>
+            <a:Name>person_subtypes</a:Name>
+            <a:Code>person_subtypes</a:Code>
+            <c:ParentEntity>
+              <o:Entity Ref="o101" />
+            </c:ParentEntity>
+          </o:Inheritance>
+        </c:Inheritances>
+        <c:InheritanceLinks>
+          <o:InheritanceLink Id="o104">
+            <a:ObjectID>00000000-0000-4000-8000-000000000104</a:ObjectID>
+            <c:Object1>
+              <o:Inheritance Ref="o103" />
+            </c:Object1>
+            <c:Object2>
+              <o:Entity Ref="o102" />
+            </c:Object2>
+          </o:InheritanceLink>
+        </c:InheritanceLinks>
+        <c:Relationships>
+          <o:Relationship Id="o105">
+            <a:ObjectID>00000000-0000-4000-8000-000000000105</a:ObjectID>
+            <a:Name>orders</a:Name>
+            <a:Code>orders</a:Code>
+            <c:Object1>
+              <o:Entity Ref="o101" />
+            </c:Object1>
+            <c:Object2>
+              <o:Entity Ref="o102" />
+            </c:Object2>
+            <a:Entity1ToEntity2RoleCardinality>0..n</a:Entity1ToEntity2RoleCardinality>
+            <a:Entity2ToEntity1RoleCardinality>1..1</a:Entity2ToEntity1RoleCardinality>
+          </o:Relationship>
+        </c:Relationships>
+        <c:ConceptualDiagrams>
+          <o:ConceptualDiagram Id="o106">
+            <a:ObjectID>00000000-0000-4000-8000-000000000106</a:ObjectID>
+            <a:Name>overview</a:Name>
+            <a:Code>overview</a:Code>
+            <a:DisplayPreferences>canvas-only</a:DisplayPreferences>
+          </o:ConceptualDiagram>
+        </c:ConceptualDiagrams>
+      </o:Model>
+    </c:Children>
+  </o:RootObject>
+</Model>

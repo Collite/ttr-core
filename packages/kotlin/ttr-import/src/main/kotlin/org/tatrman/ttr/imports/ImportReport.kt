@@ -41,6 +41,8 @@ data class ImportReport(
      * Written as `delta.emptied` only when there is one.
      */
     val emptied: List<String> = emptyList(),
+    /** Each emptied package's own model files, derived from its previous sidecar (S5.4 T0, review-378 N1). */
+    val emptiedFiles: Map<String, List<String>> = emptyMap(),
 ) {
     /**
      * One rename: the record with this foreign id was [from] in the previous generation and is [to] now; [moved] names
@@ -243,7 +245,10 @@ data class ImportReport(
                     "These packages are no longer generated; delete their files under `--out` (the run does not):",
                 )
                 appendLine()
-                emptied.forEach { appendLine("- `$it`: `$it.sources.json` and `${it.replace('.', '/')}/`") }
+                emptied.forEach { pkg ->
+                    val paths = listOf("$pkg.sources.json") + emptiedFiles[pkg].orEmpty()
+                    appendLine("- `$pkg`: ${paths.joinToString(" and ") { "`$it`" }}")
+                }
             }
             if (removed.isNotEmpty()) {
                 appendLine()
@@ -302,6 +307,7 @@ data class ImportReport(
             renamed: List<Renamed> = emptyList(),
             removed: List<Removed> = emptyList(),
             emptied: List<String> = emptyList(),
+            emptiedFiles: Map<String, List<String>> = emptyMap(),
         ): ImportReport =
             ImportReport(
                 frontEnd,
@@ -332,6 +338,7 @@ data class ImportReport(
                 renamed.sortedWith(compareBy<Renamed, String>(Bytewise) { it.from }.thenBy(Bytewise) { it.to }),
                 removed.sortedWith(compareBy(Bytewise) { it.qname }),
                 emptied.sortedWith(Bytewise),
+                emptiedFiles,
             )
     }
 }

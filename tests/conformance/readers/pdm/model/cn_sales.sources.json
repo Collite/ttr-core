@@ -1,0 +1,8 @@
+{
+  "generated-from": "generated-from: ../sources@4a1b0705283d5812982d6ca46a43a642bb2dfbf5dfa0fb45e44c6dacdc724b91 profile pdm/16 generator 0.0.1-LOCAL — do not edit",
+  "entries": [
+    {"qname":"cn_sales.cn.kind.Customer","kind":"kind","foreignId":"00000000-0000-4000-8000-000000000102","sourceName":"00000000-0000-4000-8000-000000000102","locator":"Customer"},
+    {"qname":"cn_sales.cn.kind.Person","kind":"kind","foreignId":"00000000-0000-4000-8000-000000000101","sourceName":"00000000-0000-4000-8000-000000000101","locator":"Person"},
+    {"qname":"cn_sales.cn.relation_type.orders","kind":"relation_type","foreignId":"00000000-0000-4000-8000-000000000105","sourceName":"00000000-0000-4000-8000-000000000105","locator":"orders"}
+  ]
+}

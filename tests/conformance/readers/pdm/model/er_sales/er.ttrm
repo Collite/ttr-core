@@ -1,0 +1,22 @@
+// generated-from: ../../sources@4a1b0705283d5812982d6ca46a43a642bb2dfbf5dfa0fb45e44c6dacdc724b91 profile pdm/16 generator 0.0.1-LOCAL — do not edit
+package er_sales
+model er
+
+def entity Customer {
+    attributes: [
+        def attribute id { type: int, },
+        def attribute email { type: { type: text, length: 80 }, optional: true, },
+    ]
+}
+
+def entity Order {
+    attributes: [
+        def attribute order_no { type: int, },
+        def attribute customer_id { type: int, },
+        def attribute total { type: { type: decimal, length: 12, precision: 2 }, },
+    ]
+}
+
+def relation placed_by { from: er_sales.er.entity.Order, to: er_sales.er.entity.Customer, cardinality: { from: "0..*", to: "1..1" },
+}
+

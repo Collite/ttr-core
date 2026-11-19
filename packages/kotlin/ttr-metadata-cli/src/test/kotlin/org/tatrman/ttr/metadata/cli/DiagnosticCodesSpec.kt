@@ -78,6 +78,7 @@ class DiagnosticCodesSpec :
                     "xm/generated-stale",
                     "xm/generated-edited",
                     "xm/snapshot-size",
+                    "xm/pdm-version",
                 )
         }
     })

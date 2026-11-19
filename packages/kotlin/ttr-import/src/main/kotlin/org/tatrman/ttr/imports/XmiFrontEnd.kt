@@ -13,12 +13,10 @@ import org.tatrman.ttr.profile.ForeignTree
 import org.tatrman.ttr.profile.ProfileException
 import org.tatrman.ttr.profile.ProfileSpan
 import org.tatrman.ttr.yaml.MAX_YAML_CODE_POINTS
-import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
-import javax.xml.stream.XMLInputFactory
 import javax.xml.stream.XMLStreamConstants
 import javax.xml.stream.XMLStreamException
 import javax.xml.stream.XMLStreamReader
@@ -106,7 +104,10 @@ object XmiFrontEnd : FrontEnd {
         }
 
     /** The raw bytes, refused above 4 × the reader budget before anything is decoded. */
-    internal fun bytes(file: Path): ByteArray {
+    internal fun bytes(
+        file: Path,
+        label: String = file.fileName.toString(),
+    ): ByteArray {
         if (!Files.isRegularFile(file)) throw ReaderInputException("no input file $file")
         val limit = 4 * MAX_YAML_CODE_POINTS
         val bytes =
@@ -118,7 +119,7 @@ object XmiFrontEnd : FrontEnd {
         if (bytes.size > limit) {
             throw ProfileException(
                 "ys/profile-invalid",
-                ProfileSpan(file.fileName.toString(), 1, 1, 1, 1, ""),
+                ProfileSpan(label, 1, 1, 1, 1, ""),
                 "Input exceeds $limit bytes",
             )
         }
@@ -184,16 +185,9 @@ object XmiFrontEnd : FrontEnd {
         bytes: ByteArray,
         label: String,
     ): XNode {
-        val factory =
-            XMLInputFactory.newFactory().apply {
-                setProperty(XMLInputFactory.SUPPORT_DTD, false)
-                setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false)
-                setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, true)
-                setProperty(XMLInputFactory.IS_COALESCING, true)
-            }
         var reader: XMLStreamReader? = null
         try {
-            reader = factory.createXMLStreamReader(ByteArrayInputStream(bytes))
+            reader = XmlInput.reader(bytes, label)
             val stack = ArrayList<XNode>()
             var root: XNode? = null
             while (reader.hasNext()) {
@@ -251,9 +245,7 @@ object XmiFrontEnd : FrontEnd {
         column: Int,
         message: String,
     ): Nothing {
-        val l = line.coerceAtLeast(1)
-        val c = column.coerceAtLeast(1)
-        throw ProfileException("ys/profile-invalid", ProfileSpan(label, l, c, l, c, ""), message)
+        XmlInput.fail(label, line, column, message)
     }
 
     /** Folds the parsed document into the tree and writes it as JSON text, element objects on their XML lines. */

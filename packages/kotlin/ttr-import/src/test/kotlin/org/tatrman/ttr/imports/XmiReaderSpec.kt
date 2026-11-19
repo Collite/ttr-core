@@ -443,7 +443,8 @@ class XmiReaderSpec :
             report(moved).getValue("delta").jsonObject.getValue("emptied") shouldBe
                 Json.parseToJsonElement("""["sales.billing"]""")
             moved.report.markdown() shouldContain "#### Emptied since the last generation (1)"
-            moved.report.markdown() shouldContain "- `sales.billing`: `sales.billing.sources.json` and `sales/billing/`"
+            moved.report.markdown() shouldContain
+                "- `sales.billing`: `sales.billing.sources.json` and `sales/billing/er.ttrm`"
             moved.report.markdown() shouldNotContain "shop."
             val delta = report(moved).getValue("delta").jsonObject
             delta.getValue("renamed").jsonArray.map { it.jsonObject.toString() } shouldBe
@@ -526,7 +527,52 @@ class XmiReaderSpec :
                     listOf(ImportReport.Renamed("c.er.entity.V", "a.er.entity.V", "u4", ImportReport.Moved("c", "a"))),
                     listOf(ImportReport.Removed("b.er.entity.Z", "u3"), ImportReport.Removed("b.er.entity.W", null)),
                     listOf("b", "c"),
+                    mapOf("b" to listOf("b/er.ttrm"), "c" to listOf("c/er.ttrm")),
                 )
+        }
+
+        test("S5.4 T0: an emptied parent lists only its own files beside a live child package") {
+            val root = workspace()
+            val input = root.resolve("sources/nested.xmi")
+
+            fun snapshot(parentEntity: String) =
+                """
+                <xmi:XMI xmlns:xmi="http://schema.omg.org/spec/XMI/2.1" xmlns:uml="http://schema.omg.org/spec/UML/2.1">
+                  <uml:Model name="model">
+                    <packagedElement xmi:type="uml:Package" xmi:id="sales" name="sales">
+                      <packagedElement xmi:type="uml:Package" xmi:id="billing" name="billing">
+                        $parentEntity
+                        <packagedElement xmi:type="uml:Package" xmi:id="tax" name="tax">
+                          <packagedElement xmi:type="uml:Class" xmi:id="rate" name="Rate"/>
+                        </packagedElement>
+                      </packagedElement>
+                    </packagedElement>
+                  </uml:Model>
+                </xmi:XMI>
+                """.trimIndent()
+            input.writeText(snapshot("""<packagedElement xmi:type="uml:Class" xmi:id="invoice" name="Invoice"/>"""))
+            // Opt in to both er and cn, so the previous sidecar names two model files (deduplicated per model).
+            val profile = root.resolve("both.yaml")
+            profile.writeText(
+                "profile: both/1\nextends: ea-erd/1\ngrammar: '>=0.22 <1.0'\ncn-from-uml: true\noperations: []\n",
+            )
+            write(root, "m", run(root, "nested.xmi", profile.toString(), null, out = "m"))
+            input.writeText(snapshot(""))
+            val current = run(root, "nested.xmi", profile.toString(), null, out = "m")
+            current.files.keys shouldContainExactly listOf("sales/billing/tax/cn.ttrm", "sales/billing/tax/er.ttrm")
+            val markdown = current.report.markdown()
+            markdown shouldContain
+                "- `sales.billing`: `sales.billing.sources.json` and `sales/billing/cn.ttrm` and `sales/billing/er.ttrm`"
+            markdown shouldNotContain "`sales/billing/`"
+            // The suggested deletion paths are files; deleting them preserves the child's generated models.
+            val emptiedLine = markdown.lineSequence().single { it.startsWith("- `sales.billing`:") }
+            Regex("`([^`]+)`").findAll(emptiedLine).drop(1).forEach {
+                root.resolve("m").resolve(it.groupValues[1]).deleteExisting()
+            }
+            current.files.keys.forEach { root.resolve("m").resolve(it).isRegularFile() shouldBe true }
+            report(current).getValue("delta").jsonObject.getValue("emptied") shouldBe
+                Json.parseToJsonElement("""["sales.billing"]""")
+            report(current).getValue("delta").jsonObject.keys shouldBe setOf("emptied", "removed")
         }
 
         test("review-378 F4: a package mapping keys on the input's stem; a files: glob sees <stem>/<package path>") {

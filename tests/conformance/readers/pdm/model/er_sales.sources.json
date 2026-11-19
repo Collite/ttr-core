@@ -1,0 +1,14 @@
+{
+  "generated-from": "generated-from: ../sources@4a1b0705283d5812982d6ca46a43a642bb2dfbf5dfa0fb45e44c6dacdc724b91 profile pdm/16 generator 0.0.1-LOCAL — do not edit",
+  "entries": [
+    {"qname":"er_sales.binding.cn2er_kind.g_00000000_0000_4000_8000_000000000201_00000000_0000_4000_8000_000000000102","kind":"cn2er_kind","foreignId":"g_00000000_0000_4000_8000_000000000201_00000000_0000_4000_8000_000000000102","sourceName":"g_00000000_0000_4000_8000_000000000201_00000000_0000_4000_8000_000000000102","locator":"g_00000000_0000_4000_8000_000000000201_00000000_0000_4000_8000_000000000102"},
+    {"qname":"er_sales.er.entity.Customer","kind":"entity","foreignId":"00000000-0000-4000-8000-000000000201","sourceName":"00000000-0000-4000-8000-000000000201","locator":"Customer"},
+    {"qname":"er_sales.er.entity.Customer.email","kind":"attribute","foreignId":"00000000-0000-4000-8000-000000000212","sourceName":"00000000-0000-4000-8000-000000000212","locator":"Customer/email"},
+    {"qname":"er_sales.er.entity.Customer.id","kind":"attribute","foreignId":"00000000-0000-4000-8000-000000000211","sourceName":"00000000-0000-4000-8000-000000000211","locator":"Customer/id"},
+    {"qname":"er_sales.er.entity.Order","kind":"entity","foreignId":"00000000-0000-4000-8000-000000000202","sourceName":"00000000-0000-4000-8000-000000000202","locator":"Order"},
+    {"qname":"er_sales.er.entity.Order.customer_id","kind":"attribute","foreignId":"00000000-0000-4000-8000-000000000222","sourceName":"00000000-0000-4000-8000-000000000222","locator":"Order/customer_id"},
+    {"qname":"er_sales.er.entity.Order.order_no","kind":"attribute","foreignId":"00000000-0000-4000-8000-000000000221","sourceName":"00000000-0000-4000-8000-000000000221","locator":"Order/order_no"},
+    {"qname":"er_sales.er.entity.Order.total","kind":"attribute","foreignId":"00000000-0000-4000-8000-000000000223","sourceName":"00000000-0000-4000-8000-000000000223","locator":"Order/total"},
+    {"qname":"er_sales.er.relation.placed_by","kind":"relation","foreignId":"00000000-0000-4000-8000-000000000203","sourceName":"00000000-0000-4000-8000-000000000203","locator":"placed_by"}
+  ]
+}
