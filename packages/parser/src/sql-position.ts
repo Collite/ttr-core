@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { mappedPoint } from './coordinates.js';
 import type { TaggedBlockValue } from './ast.js';
 
 /**
@@ -27,8 +28,13 @@ export interface SqlTokenPos {
 
 export function sqlPosToFile(
   tok: SqlTokenPos,
-  block: Pick<TaggedBlockValue, 'valueSource' | 'indentWidth'>,
+  block: Pick<TaggedBlockValue, 'valueSource' | 'indentWidth'> & Partial<Pick<TaggedBlockValue, 'value' | 'textMapping'>>,
 ): { line: number; column: number } {
+  if (block.textMapping) {
+    const offset = (block.value ?? '').split('\n').slice(0, tok.line - 1).reduce((n, line) => n + [...line].length + 1, 0) + tok.column;
+    const { line, column } = mappedPoint(block.textMapping, offset);
+    return { line, column };
+  }
   const sqlLine = tok.line - 1; // ANTLR line is 1-indexed; DESIGN §8 sqlLine is 0-indexed
   return {
     line: block.valueSource.line + sqlLine,
@@ -47,10 +53,18 @@ export function sqlPosToFile(
  * 0-indexed lines, so callers pass `position.line + 1`).
  */
 export function fileToSqlOffset(
-  block: Pick<TaggedBlockValue, 'value' | 'valueSource' | 'indentWidth'>,
+  block: Pick<TaggedBlockValue, 'value' | 'valueSource' | 'indentWidth' | 'textMapping'>,
   fileLine: number,
   fileColumn: number,
 ): number | undefined {
+  if (block.textMapping) {
+    const { offsets, lineStarts, startLine } = block.textMapping;
+    const start = lineStarts[fileLine - startLine];
+    if (start === undefined) return undefined;
+    const index = offsets.indexOf(start + fileColumn);
+    if (index < 0) return undefined;
+    return [...block.value].slice(0, index).join('').length;
+  }
   const sqlLine0 = fileLine - block.valueSource.line;
   if (sqlLine0 < 0) return undefined;
   const sqlColumn = fileColumn - block.indentWidth;

@@ -66,7 +66,7 @@ function lineOf(g: { uri: string; source: SourceLocation }): string {
 
 /** Keys a structural fingerprint ignores — where a thing was written, not what it says. */
 const PLACE_KEYS: ReadonlySet<string> = new Set([
-  'source', 'leadingTrivia', 'trailingTrivia', 'textSource', 'lineOffsets', 'indentWidth', 'escapes', 'parts',
+  'source', 'leadingTrivia', 'trailingTrivia', 'textSource', 'textMapping', 'lineOffsets', 'indentWidth', 'escapes', 'parts',
 ]);
 
 /**

@@ -29,10 +29,13 @@ export class YamlLocations {
   }
   private value(path: string): Json {
     let value: Json = this.input.value;
-    for (const part of path.split('/').slice(1))
+    let at = '';
+    for (const part of path.split('/').slice(1)) {
       value = Array.isArray(value)
         ? value[Number(part)]
-        : record(value)[part.replace(/~1/g, '/').replace(/~0/g, '~')];
+        : record(value, at)[part.replace(/~1/g, '/').replace(/~0/g, '~')];
+      at += '/' + part;
+    }
     return value;
   }
   copy<T>(value: T): T {
@@ -50,7 +53,7 @@ export class YamlLocations {
       else result[key] = this.copy(child);
     }
     if (src && literal) {
-      const syntax = record(this.value(literal.path));
+      const syntax = record(this.value(literal.path), literal.path);
       if (literal.literal === 'triple' && original.kind === 'string') {
         result.kind = 'tripleString';
         result.value = syntax.triple;
@@ -60,14 +63,18 @@ export class YamlLocations {
         const text = String(syntax.block);
         const content = yamlContent(this.input, literal.path, text);
         if (original.kind === 'embeddedBlock') {
-          result.text = text;
-          result.form = tag ? 'tagged' : (syntax.form ?? 'tripleString');
+          const expressionTag = tag && resolveExpressionTag(tag);
+          const plain = tag && !expressionTag;
+          result.text = plain ? `${tag}\n${text}\n` : text;
+          result.form = expressionTag ? 'tagged' : (syntax.form ?? 'tripleString');
           result.language = (tag && resolveExpressionTag(tag)) || 'pl';
           result.textSource = content.source;
           result.lineOffsets = content.lines;
           result.indentWidth = content.indent;
           result.escapes = [];
-          result.textMapping = content.mapping;
+          result.textMapping = plain
+            ? { ...content.mapping, offsets: [content.source.offsetStart] }
+            : content.mapping;
           if (tag) {
             const key = literal.path.split('/').at(-1)!;
             const diagnostic = expressionTagDiagnostic(
@@ -88,6 +95,7 @@ export class YamlLocations {
             result.tagSource = this.input.source(pointer(literal.path, 'tag'));
             result.valueSource = content.source;
             result.indentWidth = content.indent;
+            result.textMapping = content.mapping;
           } else {
             result.kind = 'tripleString';
             result.value = text;

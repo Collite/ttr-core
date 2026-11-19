@@ -420,6 +420,14 @@ def kind Party { }
     const b = parse('package p\nmodel cn\n\n\ndef role Buyer {\n    event: Purchase\n}').definitions[0];
     if (a.kind !== 'concept' || b.kind !== 'concept') throw new Error('not a concept');
     expect(propertyFingerprint(a.properties[0])).toBe(propertyFingerprint(b.properties[0]));
+    const yaml = 'ttr: "0.22"\nmodel: cn\ndefs:\n- kind: phase\n  id: Overdue\n  properties:\n    definition: {form: string, block: "invoice_status = 5"}\n';
+    const native = parse('model cn def phase Overdue { definition: "invoice_status = 5" }').definitions[0];
+    const first = parseYamlDocument(yaml).ast!.definitions[0];
+    const shifted = parseYamlDocument('# another position\n\n' + yaml).ast!.definitions[0];
+    if (native.kind !== 'concept' || first.kind !== 'concept' || shifted.kind !== 'concept') throw new Error('not a concept');
+    expect(propertyFingerprint(first.properties[0])).toBe(propertyFingerprint(shifted.properties[0]));
+    expect(propertyFingerprint(first.properties[0])).toBe(propertyFingerprint(native.properties[0]));
+
   });
 });
 
