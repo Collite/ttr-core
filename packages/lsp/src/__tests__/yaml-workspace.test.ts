@@ -3,7 +3,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import * as lsp from 'vscode-languageserver/node';
 import { PassThrough } from 'node:stream';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, cpSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, cpSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -24,7 +24,7 @@ async function workspace(shared = false, extra: ServerOptions = {}) {
   const server = lsp.createConnection(new lsp.StreamMessageReader(b), new lsp.StreamMessageWriter(a));
   cleanup.push(() => { client.dispose(); server.dispose(); });
   const loader = new YamlWorkspaceLoader([root]);
-  createServerConnection(server, { ...extra, loadYamlDocuments: buffers => loader.load(buffers) });
+  createServerConnection(server, { ...extra, loadYamlDocuments: buffers => loader.load(buffers), yamlFilesChanged: changes => loader.notify(changes), yamlLanguage: (uri, text) => loader.language(uri, text) });
   client.listen(); server.listen();
   const diagnostics = new Map<string, lsp.Diagnostic[]>();
   client.onNotification('textDocument/publishDiagnostics', (p: lsp.PublishDiagnosticsParams) => diagnostics.set(p.uri, p.diagnostics));
@@ -32,14 +32,17 @@ async function workspace(shared = false, extra: ServerOptions = {}) {
   const uri = (file: string) => pathToFileURL(join(root, file)).href;
   const open = async (file: string, text = readFileSync(join(root, file), 'utf8')) => {
     client.sendNotification('textDocument/didOpen', { textDocument: { uri: uri(file), languageId: 'yaml', version: 1, text } });
+    await new Promise(resolve => setTimeout(resolve, 250));
     await client.sendRequest('textDocument/documentSymbol', { textDocument: { uri: uri(file) } });
   };
   const change = async (file: string, text: string) => {
     client.sendNotification('textDocument/didChange', { textDocument: { uri: uri(file), version: 2 }, contentChanges: [{ text }] });
+    await new Promise(resolve => setTimeout(resolve, 250));
     await client.sendRequest('textDocument/documentSymbol', { textDocument: { uri: uri(file) } });
   };
   const close = async (file: string) => {
     client.sendNotification('textDocument/didClose', { textDocument: { uri: uri(file) } });
+    await new Promise(resolve => setTimeout(resolve, 250));
     await client.sendRequest('textDocument/documentSymbol', { textDocument: { uri: uri(file) } });
   };
   return { root, client, diagnostics, uri, open, change, close };
@@ -115,7 +118,7 @@ describe('S7.3 demo-cs/1 mixed workspace', () => {
     const w = await workspace(); await w.open('model/entities.yaml');
     const textDocument = { uri: w.uri('model/entities.yaml') }, position = { line: 1, character: 4 };
     expect(await w.client.sendRequest('textDocument/prepareRename', { textDocument, position })).toBeNull();
-    expect(await w.client.sendRequest('textDocument/rename', { textDocument, position, newName: 'Changed' })).toEqual({ documentChanges: [] });
+    await expect(w.client.sendRequest('textDocument/rename', { textDocument, position, newName: 'Changed' })).rejects.toThrow(/entities.yaml:2 is a dialect YAML file/);
     expect(await w.client.sendRequest('textDocument/formatting', { textDocument, options: { tabSize: 2, insertSpaces: true } })).toEqual([]);
     expect(await w.client.sendRequest('textDocument/codeAction', { textDocument, range: { start: position, end: position }, context: { diagnostics: [] } })).toEqual([]);
     expect(await w.client.sendRequest('textDocument/completion', { textDocument, position })).toEqual({ isIncomplete: false, items: [] });
@@ -166,7 +169,49 @@ describe('S7.3 demo-cs/1 mixed workspace', () => {
     const textDocument = { uri: w.uri('table.ttrm') }, position = { line: 2, character: 12 };
     const refs = await w.client.sendRequest<lsp.Location[]>('textDocument/references', { textDocument, position, context: { includeDeclaration: true } });
     expect(refs.some(ref => ref.uri === w.uri('model/sql.yaml'))).toBe(true);
-    expect(await w.client.sendRequest('textDocument/rename', { textDocument, position, newName: 'Renamed' })).toEqual({ documentChanges: [] });
+    await expect(w.client.sendRequest('textDocument/rename', { textDocument, position, newName: 'Renamed' })).rejects.toThrow(/sql.yaml:.*dialect YAML/);
+  });
+
+  it('renames native-only packages and symbols, refusing only actual YAML dependencies', async () => {
+    const w = await workspace();
+    await w.open('native.ttrm', 'package isolated\nmodel er\ndef entity Solo {}');
+    const request = (line: number, character: number, newName: string) => w.client.sendRequest<lsp.WorkspaceEdit>('textDocument/rename', {textDocument: {uri: w.uri('native.ttrm')}, position: {line, character}, newName});
+    expect((await request(0, 10, 'other')).documentChanges?.length).toBeGreaterThan(0);
+    expect((await request(2, 12, 'Other')).documentChanges?.length).toBeGreaterThan(0);
+    await w.open('native.ttrm', 'package demo\nmodel er\ndef entity Solo {}');
+    await expect(request(0, 10, 'other')).rejects.toThrow(/entities.yaml:.*dialect YAML/);
+    await w.open('native.ttrm', 'package external\nmodel er\ndef entity External {}');
+    await w.open('model/relations.yaml', 'relations:\n  ExternalUse:\n    od: external.er.entity.External\n    do: demo.er.entity.Customer\n');
+    await expect(request(0, 10, 'other')).rejects.toThrow(/relations.yaml:3 is a dialect YAML file/);
+    await expect(request(2, 12, 'Other')).rejects.toThrow(/\.yaml:\d+ is a dialect YAML file/);
+  });
+  it('coalesces a burst of YAML keystrokes into one load and ignores unrelated watchers', async () => {
+    let calls = 0;
+    const w = await workspace(false, { });
+    // A separate injected loader keeps the assertion independent of cache internals.
+    const a = new PassThrough(), b = new PassThrough();
+    const client = lsp.createConnection(new lsp.StreamMessageReader(a), new lsp.StreamMessageWriter(b));
+    const server = lsp.createConnection(new lsp.StreamMessageReader(b), new lsp.StreamMessageWriter(a));
+    const loader = new YamlWorkspaceLoader([w.root]);
+    createServerConnection(server, { loadYamlDocuments: buffers => { calls++; return loader.load(buffers); } });
+    cleanup.push(() => {client.dispose(); server.dispose();}); client.listen(); server.listen();
+    await client.sendRequest('initialize', {processId: null, rootUri: pathToFileURL(w.root).href, capabilities: {}});
+    client.sendNotification('textDocument/didOpen', {textDocument: {uri: w.uri('model/entities.yaml'), languageId: 'ttr-yaml', version: 1, text: 'entity: {Customer: {popis: x}}'}});
+    await new Promise(resolve => setTimeout(resolve, 300)); calls = 0;
+    for (let i = 0; i < 10; i++) client.sendNotification('textDocument/didChange', {textDocument: {uri: w.uri('model/entities.yaml'), version: i + 2}, contentChanges: [{text: `entity: {Customer: {popis: x${i}}}`} ]});
+    await new Promise(resolve => setTimeout(resolve, 350));
+    expect(calls).toBe(1);
+    client.sendNotification('workspace/didChangeWatchedFiles', {changes: [{uri: w.uri('notes.yaml'), type: 2}]});
+    await new Promise(resolve => setTimeout(resolve, 300)); expect(calls).toBe(1);
+  });
+
+  it('keeps ignored CI YAML plain and answers canonical-header admission from the loader', async () => {
+    const w = await workspace();
+    mkdirSync(join(w.root, 'model/.github/workflows'), {recursive: true});
+    await w.open('model/.github/workflows/ci.yml', 'notInProfile: CI');
+    expect(w.diagnostics.has(w.uri('model/.github/workflows/ci.yml'))).toBe(false);
+    expect(await w.client.sendRequest('modeler/yamlLanguage', {uri: w.uri('canonical.yaml'), text: '"ttr": 0.22\nmodel: er\ndefs: []'})).toBe('ttr-yaml');
+    expect(await w.client.sendRequest('modeler/yamlLanguage', {uri: w.uri('model/.github/workflows/ci.yml'), text: 'notInProfile: CI'})).toBe('yaml');
   });
 
 });

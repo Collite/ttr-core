@@ -24,7 +24,7 @@ export type RuleId = string; // kebab, no `ttr/` prefix
  * a lint-tool code (`ttrlint/*`, contracts §5.6) emitted by the runner/config
  * for suppression/config problems. Kept as a union so both flow through one type.
  */
-export type LintCode = DiagnosticCode | `ys/${string}` | `xm/${string}` | `ttrlint/${string}`;
+export type LintCode = DiagnosticCode | 'other' | `ys/${string}` | `xm/${string}` | `ttrlint/${string}`;
 
 export interface LintDiagnostic {
   ruleId: RuleId;

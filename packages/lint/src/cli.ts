@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Command } from 'commander';
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve, isAbsolute } from 'node:path';
 import { YamlWorkspaceLoader } from './yaml.js';
 import { fileURLToPath } from 'node:url';
 import { parseString } from '@tatrman/parser';
@@ -64,11 +64,11 @@ program
         process.exit(2);
       }
 
+      if (typeof opts.profile === 'string' && (isAbsolute(opts.profile) || opts.profile.startsWith('.') || /\.ya?ml$/.test(opts.profile))) opts.profile = resolve(process.cwd(), opts.profile);
       let diagnostics = lintAll(root, files, config, ruleSubset, opts.profile);
 
       if (opts.fix && config.applyFixes !== 'none') {
-        diagnostics = applyFixesToFixpoint(root, files, config, ruleSubset);
-        if (opts.profile) diagnostics = lintAll(root, files, config, ruleSubset, opts.profile);
+        diagnostics = applyFixesToFixpoint(root, files, config, ruleSubset, opts.profile);
       }
 
       report(diagnostics, config, opts);
@@ -190,7 +190,8 @@ function manifestDiagnostics(root: string, manifest: ResolvedManifest): LintDiag
   }));
 }
 
-function applyFixesToFixpoint(root: string, files: string[], config: ResolvedLintConfig, rules: Rule[] | undefined): LintDiagnostic[] {
+function applyFixesToFixpoint(root: string, files: string[], config: ResolvedLintConfig, rules: Rule[] | undefined, profile?: string | boolean): LintDiagnostic[] {
+  const yaml = profile ? new YamlWorkspaceLoader([root], profile).load() : new Map<string, import('@tatrman/parser').ParseResult>();
   const MAX_PASSES = 10;
   const texts = new Map(files.map((f) => [f, readFileSync(f, 'utf-8')]));
   const manifest = loadManifestFromRoot(root);
@@ -207,10 +208,19 @@ function applyFixesToFixpoint(root: string, files: string[], config: ResolvedLin
       symbols.upsertDocument(file, ast, ast.modelDirective?.modelCode ?? '', effectiveSchemaId(ast.modelDirective?.schema, packageName, manifest), packageName);
       synthesizeMappings(symbols, file, ast);
     }
+    for (const [uri, result] of yaml) {
+      if (!result.ast) continue;
+      const ast = result.ast, file = fileURLToPath(uri);
+      documents.set(uri, ast);
+      const packageName = effectivePackage(ast, file, root, manifest.packages);
+      symbols.upsertDocument(uri, ast, ast.modelDirective?.modelCode ?? '', effectiveSchemaId(ast.modelDirective?.schema, packageName, manifest), packageName);
+      synthesizeMappings(symbols, uri, ast);
+    }
     const resolver = new Resolver(symbols, manifest.packages.root, manifest);
 
     let anyApplied = false;
     for (const [file, ast] of documents) {
+      if (!texts.has(file)) continue; // Dialect models inform fixes but are never rewritten.
       const text = texts.get(file)!;
       const diags = lintDocument(file, ast, { manifest, symbols, resolver }, config, rules);
       const ctx = {
@@ -228,7 +238,7 @@ function applyFixesToFixpoint(root: string, files: string[], config: ResolvedLin
 
   // Write back changed files, then re-lint for the remainder.
   for (const [file, text] of texts) writeFileSync(file, text, 'utf-8');
-  return lintAll(root, files, config, rules);
+  return lintAll(root, files, config, rules, profile);
 }
 
 function report(diagnostics: LintDiagnostic[], config: ResolvedLintConfig, opts: CliOptions): void {

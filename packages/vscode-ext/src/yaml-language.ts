@@ -1,23 +1,40 @@
 // SPDX-License-Identifier: Apache-2.0
-import * as path from 'path';
-
-/** No filename association: a nearest marker or an explicit dialect header opts in. */
-export async function isTtrYaml(
-  file: string,
-  text: string,
-  workspaceRoot: string,
-  read: (file: string) => Promise<string | undefined>
-): Promise<boolean> {
-  if (!/\.ya?ml$/i.test(file) || /(?:^|[/\\])(?:ttr|ttr-profile)\.ya?ml$/.test(file)) return false;
-  if (/^ttr:\s*(?:\{[^\n]*\bprofile\s*:|\r?\n(?:[ \t]+[^\n]*\r?\n)*?[ \t]+profile\s*:)/m.test(text))
-    return true;
-  let dir = path.dirname(file);
-  while (dir === workspaceRoot || dir.startsWith(workspaceRoot + path.sep)) {
-    const marker = await read(path.join(dir, 'ttr.yaml'));
-    // The nearest marker is authoritative even when it does not declare a profile.
-    if (marker !== undefined) return /^profile\s*:/m.test(marker);
-    if (dir === workspaceRoot) break;
-    dir = path.dirname(dir);
+/** Session policy only. The server owns YAML admission and header interpretation. */
+export interface YamlLanguageDocument {
+  uri: { toString(): string; scheme: string };
+  languageId: string;
+  isClosed: boolean;
+  getText(): string;
+}
+export class YamlLanguageSelector {
+  private readonly decisions = new Map<string, { language: string; manual: boolean }>();
+  constructor(
+    private readonly ask: (uri: string, text: string) => Promise<'ttr-yaml' | 'yaml'>,
+    private readonly setLanguage: (
+      document: YamlLanguageDocument,
+      language: string
+    ) => Promise<unknown>
+  ) {}
+  async select(document: YamlLanguageDocument, reconsider = false): Promise<void> {
+    if (document.uri.scheme !== 'file') return;
+    const uri = document.uri.toString();
+    const previous = this.decisions.get(uri);
+    if (previous && document.languageId !== previous.language) previous.manual = true;
+    if (
+      previous?.manual ||
+      (previous && !reconsider) ||
+      !['yaml', 'ttr-yaml'].includes(document.languageId)
+    )
+      return;
+    // Record before awaiting the request: a language change reopens the document.
+    const decision = { language: document.languageId, manual: false };
+    this.decisions.set(uri, decision);
+    const language = await this.ask(uri, document.getText());
+    if (document.isClosed || document.languageId !== decision.language) {
+      decision.manual = true;
+      return;
+    }
+    decision.language = language;
+    if (document.languageId !== language) await this.setLanguage(document, language);
   }
-  return false;
 }

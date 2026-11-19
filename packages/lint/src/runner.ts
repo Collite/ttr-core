@@ -235,7 +235,7 @@ export function lintInputDiagnostics(
     if (rule.scope !== 'input') continue;
     const severity = config.severityOf(rule.id);
     if (severity === 'off') continue;
-    rule.check({ scope: 'input', diagnostics, report: d => emit(out, rule, severity, undefined, d) });
+    rule.check({ scope: 'input', diagnostics, report: d => emit(out, rule, severity, undefined, { ...d, severity }) });
   }
   return out;
 }

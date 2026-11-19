@@ -48,6 +48,8 @@ export interface Ignored {
   record?: string | null;
 }
 export interface ProfileWarning {
+  /** Internal provenance; canonical report JSON deliberately keeps its shared shape. */
+  origin?: 'required' | 'unknown' | 'each';
   location: ProfileSpan;
   message: string;
   record?: string | null;
@@ -98,6 +100,7 @@ export class PlannedOp {
   missing(plan: RecordPlan, record: Record, target: string[]): void {
     if (this.value.required !== 'warn') return;
     plan.warnings.push({
+      origin: 'required',
       location: record.source.span(),
       message: `ys/key-missing: ${record.id} has no ${String(this.value.at ?? '')}, so ${record.kind}.${target.join('.')} is not written`,
     });
@@ -158,6 +161,7 @@ export class ConsumptionLedger {
       let group = groups.get(id);
       if (!group) {
         const warning: ProfileWarning = {
+          origin: 'unknown',
           location: node.span(node.mappingKey !== undefined),
           message: 'not in this profile',
           ...(owner ? { in: owner.kind } : {}),

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Desktop adapter. Kept off the browser-safe lint entry point. */
-import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
@@ -13,6 +13,8 @@ import {
 } from '@tatrman/parser';
 import {
   DeclarationReader,
+  FileSelector,
+  ProfileReader,
   ProfileResolver,
   ProfileEngine,
   ForeignTree,
@@ -20,6 +22,7 @@ import {
   ForeignData,
   isRecord,
   type ProfileDefinition,
+  type ProfileDeclaration,
   type ProfileSpan,
 } from '@tatrman/profile';
 
@@ -33,6 +36,149 @@ const empty = (uri: string): ParseResult => ({ sourceFile: uri, errors: [] });
 /** Nearest marker discovery is cached per workspace; invalidate on profile or marker changes. */
 export class YamlWorkspaceLoader {
   private markerSignature = '';
+  private files?: string[];
+  private readonly disk = new Map<string, { stamp: string; text: string }>();
+  private readonly headers = new Map<
+    string,
+    { text: string; header: ReturnType<typeof DeclarationReader.header> }
+  >();
+  private readonly trees = new Map<string, { text: string; rootPath: string; tree: ForeignTree }>();
+  private readonly canonical = new Map<string, { text: string; result: ParseResult }>();
+  private readonly declarations = new Map<
+    string,
+    { text: string; declaration: ProfileDeclaration | null }
+  >();
+  private readonly ignores = new Map<string, FileSelector>();
+  private readonly chains = new Map<
+    string,
+    { chain: ProfileDefinition[]; dependencies: Map<string, string | undefined> }
+  >();
+  private readonly applied = new Map<
+    string,
+    { signature: string; results: Map<string, ParseResult> }
+  >();
+  private lastResults = new Set<string>();
+  private readonly groupDependencies = new Set<string>();
+  /** Disk notifications invalidate only affected dependencies; create/delete also invalidates the walk. */
+  notify(changes: readonly { uri: string; type: number }[]): boolean {
+    let relevant = false;
+    for (const change of changes) {
+      const file = pathOf(change.uri);
+      if (!this.roots.some((root) => file.startsWith(root + sep))) continue;
+      this.disk.delete(file);
+      if (change.type !== 2) {
+        this.files = undefined;
+        this.markers.clear();
+      }
+      if (
+        this.lastResults.has(change.uri) ||
+        this.groupDependencies.has(physicalPath(file)) ||
+        /(?:^|[/\\])(?:ttr\.yaml|model\.ignore|renames\.yaml)$/.test(file) ||
+        [...this.chains.values()].some((c) =>
+          [...c.dependencies.keys()].some((p) => physicalPath(p) === physicalPath(file))
+        ) ||
+        (change.type !== 2 && this.marker(file, (p) => this.read(p)) !== undefined)
+      )
+        relevant = true;
+    }
+
+    return relevant;
+  }
+  private read(file: string): string | undefined {
+    try {
+      const stat = statSync(file);
+      const stamp = `${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}`;
+      const cached = this.disk.get(file);
+      if (cached?.stamp === stamp) return cached.text;
+      const text = new TextDecoder('utf-8', { fatal: true }).decode(readFileSync(file));
+      this.disk.set(file, { stamp, text });
+      return text;
+    } catch (error) {
+      if (!existsSync(file)) return undefined;
+      if (!(error instanceof TypeError)) throw error;
+      throw new ProfileException(
+        'ys/profile-invalid',
+        { file, line: 1, column: 1, endLine: 1, endColumn: 1, path: '' },
+        'Malformed UTF-8'
+      );
+    }
+  }
+  private header(text: string, file: string) {
+    const cached = this.headers.get(file);
+    if (cached?.text === text) return cached.header;
+    const header = DeclarationReader.header(text, file);
+    this.headers.set(file, { text, header });
+    return header;
+  }
+  /** The desktop host asks this same admission path; it never parses a second header grammar. */
+  language(uri: string, text: string, refreshMarkers = true): 'ttr-yaml' | 'yaml' {
+    if (refreshMarkers) this.markers.clear();
+    const file = pathOf(uri);
+    if (
+      !isYamlFile(file) ||
+      /\/ttr\.yaml$/.test(file) ||
+      [...this.chains.values()].some((c) =>
+        c.chain.some((p) => !p.file.startsWith('<') && physicalPath(p.file) === physicalPath(file))
+      )
+    )
+      return 'yaml';
+    const marker = this.marker(file, (p) => this.read(p));
+    const boundary = marker
+      ? dirname(marker)
+      : this.roots
+          .filter((root) => file.startsWith(root + sep))
+          .sort((a, b) => b.length - a.length)[0];
+    if (boundary && this.excluded(file, boundary, (p) => this.read(p))) return 'yaml';
+    try {
+      const header = this.header(text, file);
+      if (header.type !== 'absent') return 'ttr-yaml';
+      if (marker) {
+        const data = new ForeignData(this.read(marker)!, marker).value;
+        if (isRecord(data) && data.profile !== undefined) return 'ttr-yaml';
+      }
+    } catch {
+      if (marker || /^ttr\s*:/m.test(text)) return 'ttr-yaml';
+    }
+    return 'yaml';
+  }
+  private excluded(
+    file: string,
+    root: string,
+    read: (file: string) => string | undefined
+  ): boolean {
+    const path = relative(root, file).split(sep).join('/');
+    const parts = path.split('/');
+    if (
+      parts.some((p) => p.startsWith('.')) ||
+      parts[0] === 'agents' ||
+      parts[0] === 'profiles' ||
+      ['ttr.yaml', 'renames.yaml'].includes(path)
+    )
+      return true;
+    const ignore = read(join(root, 'model.ignore'));
+    try {
+      if (ignore === undefined) return false;
+      let selector = this.ignores.get(ignore);
+      if (!selector) {
+        selector = new FileSelector(ignore.split(/\r\n|\r|\n/));
+        this.ignores.set(ignore, selector);
+      }
+      return selector.matches(path);
+    } catch (error) {
+      throw new ProfileException(
+        'ys/profile-invalid',
+        {
+          file: join(root, 'model.ignore'),
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 1,
+          path: '',
+        },
+        String(error instanceof Error ? error.message : error)
+      );
+    }
+  }
   private readonly markers = new Map<string, string | undefined>();
   private readonly roots: string[];
   constructor(
@@ -43,6 +189,7 @@ export class YamlWorkspaceLoader {
   }
   invalidate(): void {
     this.markers.clear();
+    this.files = undefined;
   }
   private marker(file: string, read: (file: string) => string | undefined): string | undefined {
     let directory = dirname(file);
@@ -74,13 +221,7 @@ export class YamlWorkspaceLoader {
   ): Map<string, ParseResult & { text: string }> {
     const texts = new Map<string, string>();
     const aliases = new Map<string, string>();
-    const physical = (file: string): string => {
-      try {
-        return realpathSync(file);
-      } catch {
-        return resolve(file);
-      }
-    };
+    const physical = physicalPath;
     for (const uri of buffers.keys())
       if (uri.startsWith('file:')) aliases.set(physical(pathOf(uri)), uri);
     const uriOf = (file: string): string =>
@@ -88,19 +229,11 @@ export class YamlWorkspaceLoader {
     const read = (file: string): string | undefined => {
       const uri = uriOf(file);
       if (buffers.has(uri)) return buffers.get(uri);
-      try {
-        return new TextDecoder('utf-8', { fatal: true }).decode(readFileSync(file));
-      } catch (error) {
-        if (!existsSync(file)) return undefined;
-        if (!(error instanceof TypeError)) throw error;
-        throw new ProfileException(
-          'ys/profile-invalid',
-          { file, line: 1, column: 1, endLine: 1, endColumn: 1, path: '' },
-          'Malformed UTF-8'
-        );
-      }
+      return this.read(file);
     };
-    const walk = (directory: string): void => {
+    const found: string[] = [];
+    const walk = (directory: string, inTree = false): void => {
+      inTree ||= existsSync(join(directory, 'ttr.yaml')) || typeof this.profile === 'string';
       let entries;
       try {
         entries = readdirSync(directory, { withFileTypes: true });
@@ -109,17 +242,28 @@ export class YamlWorkspaceLoader {
       }
       for (const entry of entries) {
         const file = join(directory, entry.name);
-        if (entry.isDirectory() && !['.git', 'node_modules', 'build', 'dist'].includes(entry.name))
-          walk(file);
+        if (entry.name.startsWith('.')) continue;
+        if (
+          entry.isDirectory() &&
+          (inTree || !['node_modules', 'build', 'dist'].includes(entry.name))
+        )
+          walk(file, inTree);
         else if (entry.isFile() && isYamlFile(file)) {
           // Read admitted models below; plain YAML must remain untouched, including malformed bytes.
           const uri = uriOf(file);
           aliases.set(physical(file), uri);
-          texts.set(uri, '');
+          found.push(uri);
         }
       }
     };
-    this.roots.forEach(walk);
+    if (!this.files) {
+      this.roots.forEach((root) => walk(root));
+      this.files = found;
+    }
+    for (const uri of this.files) {
+      texts.set(uri, '');
+      aliases.set(physical(pathOf(uri)), uri);
+    }
     for (const [uri, text] of buffers)
       if (uri.startsWith('file:') && isYamlFile(uri)) texts.set(uri, text);
     const signature = [...texts.keys()]
@@ -134,7 +278,7 @@ export class YamlWorkspaceLoader {
       })
       .join('\0');
     if (signature !== this.markerSignature) {
-      this.invalidate();
+      this.markers.clear();
       this.markerSignature = signature;
     }
     const out = new Map<string, ParseResult>();
@@ -169,42 +313,108 @@ export class YamlWorkspaceLoader {
     };
     for (const uri of texts.keys()) {
       const file = pathOf(uri);
-      if (/\/(?:ttr|ttr-profile)\.ya?ml$/.test(file)) continue;
+      if (/\/ttr\.yaml$/.test(file)) continue;
       let marker: string | undefined;
       try {
         marker = this.marker(file, read);
-        // Only a literal ttr header can opt in outside a marker tree.
-        const text = read(file) ?? '';
-        if (!marker && !this.profile && !/^ttr\s*:/m.test(text)) continue;
         const boundary = marker
           ? dirname(marker)
           : (this.roots
               .filter((root) => file.startsWith(root + sep))
               .sort((a, b) => b.length - a.length)[0] ?? dirname(file));
-        const header = DeclarationReader.header(text, file);
+        if (this.excluded(file, boundary, read)) continue;
+        const text = read(file) ?? '';
+        if (!marker && !this.profile && this.language(uri, text, false) === 'yaml') continue;
+        const header = this.header(text, file);
         if (header.type === 'canonical') {
-          out.set(uri, parseYamlDocument(text, uri));
+          let cached = this.canonical.get(uri);
+          if (cached?.text !== text) {
+            cached = { text, result: parseYamlDocument(text, uri) };
+            this.canonical.set(uri, cached);
+          }
+          out.set(uri, cached.result);
           continue;
         }
         let treeDeclaration = null;
         if (header.type === 'absent' && marker) {
           const source = read(marker)!;
-          const value = new ForeignData(source, marker).value;
-          if (isRecord(value) && value.profile !== undefined)
-            treeDeclaration = DeclarationReader.readTree(source, marker);
+          let cached = this.declarations.get(marker);
+          if (cached?.text !== source) {
+            const value = new ForeignData(source, marker).value;
+            cached = {
+              text: source,
+              declaration:
+                isRecord(value) && value.profile !== undefined
+                  ? DeclarationReader.readTree(source, marker)
+                  : null,
+            };
+            this.declarations.set(marker, cached);
+          }
+          treeDeclaration = cached.declaration;
         }
         const declaration = header.type === 'declared' ? header.declaration : treeDeclaration;
         if (!declaration && typeof this.profile !== 'string') continue;
-        const resolver = new ProfileResolver(
-          boundary,
-          new Map(),
-          () => null,
-          (path) => read(path)!
-        );
-        const chain =
+        const reference =
           typeof this.profile === 'string' && header.type === 'absent'
-            ? resolver.resolve(this.profile, marker ?? join(boundary, 'ttr.yaml'))
-            : resolver.resolve(declaration);
+            ? this.profile
+            : declaration!;
+        const chainKey =
+          boundary +
+          '\0' +
+          (typeof reference === 'string'
+            ? reference
+            : JSON.stringify([
+                reference.profile,
+                reference.grammarRange.text,
+                reference.location.file,
+              ]));
+        let cachedChain = this.chains.get(chainKey);
+        if (
+          cachedChain &&
+          [...cachedChain.dependencies].some(([path, text]) => read(path) !== text)
+        )
+          cachedChain = undefined;
+        if (!cachedChain) {
+          const dependencies = new Map<string, string | undefined>();
+          const dependencyRead = (path: string) => {
+            const text = read(path);
+            dependencies.set(path, text);
+            return text!;
+          };
+          const catalog = new Map<string, string>();
+          // Identities resolve from the tree catalog, while CLI paths arrive absolute.
+          for (const catalogUri of typeof reference === 'string' && !/\.ya?ml$/.test(reference)
+            ? texts.keys()
+            : []) {
+            const path = pathOf(catalogUri);
+            if (dirname(path) !== join(boundary, 'profiles')) continue;
+            const profile = ProfileReader.read(dependencyRead(path), path);
+            catalog.set(`${profile.name}/${profile.major}`, path);
+          }
+          const resolver = new ProfileResolver(boundary, catalog, () => null, dependencyRead);
+          const chain =
+            typeof reference === 'string'
+              ? resolver.resolve(reference, reference)
+              : resolver.resolve(reference);
+          cachedChain = { chain, dependencies };
+          this.chains.set(chainKey, cachedChain);
+        }
+        const chain = cachedChain.chain;
+        // Whole-file ignore ops exclude content before it can contribute diagnostics.
+        const rootPath = relative(boundary, file).split(sep).join('/');
+        if (
+          chain.some((p) =>
+            p.operations.some(
+              ({ value: op }) =>
+                op.op === 'ignore' &&
+                op.in === undefined &&
+                op.at === undefined &&
+                Array.isArray(op.files) &&
+                new FileSelector(op.files as string[]).matches(rootPath)
+            )
+          )
+        )
+          continue;
         chain.forEach((profile) => {
           if (!profile.file.startsWith('<')) excluded.add(uriOf(profile.file));
         });
@@ -214,9 +424,12 @@ export class YamlWorkspaceLoader {
           group = { root: boundary, chain, trees: [] };
           groups.set(key, group);
         }
-        group.trees.push(
-          ForeignTree.read(text, relative(boundary, file).split(sep).join('/'), uri)
-        );
+        let cachedTree = this.trees.get(uri);
+        if (cachedTree?.text !== text || cachedTree.rootPath !== rootPath) {
+          cachedTree = { text, rootPath, tree: ForeignTree.read(text, rootPath, uri) };
+          this.trees.set(uri, cachedTree);
+        }
+        group.trees.push(cachedTree.tree);
         out.set(uri, empty(uri));
       } catch (error) {
         if (!(error instanceof ProfileException)) throw error;
@@ -226,7 +439,35 @@ export class YamlWorkspaceLoader {
       }
     }
     for (const uri of excluded) out.delete(uri);
-    for (const group of groups.values()) {
+    this.groupDependencies.clear();
+    for (const [key, group] of groups) {
+      for (const profile of group.chain) {
+        if (typeof profile.overlay === 'string')
+          this.groupDependencies.add(physicalPath(resolve(dirname(profile.file), profile.overlay)));
+      }
+      const signature = JSON.stringify(
+        [
+          read(join(group.root, 'ttr.yaml')),
+          read(join(group.root, 'renames.yaml')),
+          group.chain.map((p) => [
+            p.file,
+            p.operations,
+            p.overlay,
+            typeof p.overlay === 'string' ? read(resolve(dirname(p.file), p.overlay)) : null,
+          ]),
+          group.trees.map((t) => [t.label, this.trees.get(t.label)?.text]),
+          [...this.chains.values()]
+            .filter((c) => c.chain === group.chain)
+            .flatMap((c) => [...c.dependencies]),
+        ],
+        (_key, value) => (typeof value === 'bigint' ? value.toString() : value)
+      );
+      const cached = this.applied.get(key);
+      if (cached?.signature === signature) {
+        for (const [uri, result] of cached.results) out.set(uri, result);
+        continue;
+      }
+      const before = new Map(out);
       let pending = group.trees.filter((tree) => !excluded.has(tree.label));
       while (pending.length) {
         try {
@@ -248,9 +489,11 @@ export class YamlWorkspaceLoader {
             const uri = uriOf(warning.location.file);
             const result = out.get(uri) ?? empty(uri);
             result.errors.push({
-              code: (warning.key !== undefined
-                ? 'ys/unknown-key'
-                : 'ys/key-missing') as ParseError['code'],
+              code: (warning.origin === 'each'
+                ? 'other'
+                : warning.origin === 'unknown'
+                  ? 'ys/unknown-key'
+                  : 'ys/key-missing') as ParseError['code'],
               severity: 'warning',
               message: warning.message,
               source: spanSource(warning.location, uri, safeRead(uri)),
@@ -266,8 +509,25 @@ export class YamlWorkspaceLoader {
           pending = next;
         }
       }
+      const results = new Map(
+        [...out].filter(
+          ([uri, result]) =>
+            group.trees.some((t) => t.label === uri && !excluded.has(uri)) ||
+            before.get(uri) !== result
+        )
+      );
+      this.applied.set(key, { signature, results });
     }
+    this.lastResults = new Set(out.keys());
     return new Map([...out].map(([uri, result]) => [uri, { ...result, text: safeRead(uri) }]));
+  }
+}
+
+function physicalPath(file: string): string {
+  try {
+    return realpathSync(file);
+  } catch {
+    return resolve(file);
   }
 }
 

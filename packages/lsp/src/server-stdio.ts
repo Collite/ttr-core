@@ -11,14 +11,20 @@ import type { SqlDialect } from '@tatrman/parser';
 let yamlLoader: YamlWorkspaceLoader | undefined;
 let yamlRoots = '';
 
+function loaderFor(roots: readonly string[]): YamlWorkspaceLoader {
+  const key = JSON.stringify(roots);
+  if (!yamlLoader || yamlRoots !== key) { yamlLoader = new YamlWorkspaceLoader([...roots]); yamlRoots = key; }
+  return yamlLoader;
+}
+
 const connection = createConnection(ProposedFeatures.all, process.stdin, process.stdout);
 
 createServerConnection(connection, {
   loadYamlDocuments(buffers, roots) {
-    const key = JSON.stringify(roots);
-    if (!yamlLoader || yamlRoots !== key) { yamlLoader = new YamlWorkspaceLoader([...roots]); yamlRoots = key; }
-    return yamlLoader.load(buffers);
+    return loaderFor(roots).load(buffers);
   },
+  yamlFilesChanged(changes) { return yamlLoader?.notify(changes) ?? true; },
+  yamlLanguage(uri, text, roots) { return loaderFor(roots).language(uri, text); },
   analyzeSqlBlock(value: string, dialect: SqlDialect) {
     const { tree } = parseSql(value, dialect);
     return tree ? extract(tree, dialect) : undefined;

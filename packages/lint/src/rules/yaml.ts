@@ -2,6 +2,7 @@
 import type { Rule, LintCode } from '../rule.js';
 
 const codes: [LintCode, string][] = [
+  ['other', 'Profile value-op warning (Kotlin lint’s generic warning code)'],
   [
     'ys/profile-invalid',
     'Invalid profile syntax, schema, operands or safety policy; an invalid model.ignore',
@@ -64,7 +65,7 @@ export const YAML_RULES: Rule[] = codes.map(([code, docs]) => ({
   scope: 'input',
   category: 'correctness',
   defaultSeverity:
-    code === 'ys/key-missing' || code === 'ys/profile-duplicate' ? 'warning' : 'error',
+    code === 'other' || code === 'ys/key-missing' || code === 'ys/profile-duplicate' ? 'warning' : 'error',
   check(ctx) {
     if (ctx.scope !== 'input') return;
     for (const d of ctx.diagnostics) if (d.code === code) ctx.report(d);

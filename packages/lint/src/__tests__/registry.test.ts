@@ -33,7 +33,8 @@ describe('rule registry', () => {
       // Rule codes are namespaced: ttr/* (core), md/* and the one er/* MD code, cn/* (0.17,
       // the conceptual model), plus the stable TTR-SEM-2xx grounding family (grammar 4.2 —
       // these are the cross-repo wire codes mirrored by ai-platform's proto enums).
-      expect(/^(ttr|md|er|cn|ys|xm)\/|^TTR-SEM-\d{3}$/.test(rule.code)).toBe(true);
+      // Kotlin lint uses its existing generic `other` code for each value-op warnings.
+      expect(/^(ttr|md|er|cn|ys|xm)\/|^TTR-SEM-\d{3}$|^other$/.test(rule.code)).toBe(true);
     }
   });
 

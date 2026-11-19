@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { isTtrYaml } from './yaml-language';
+import { YamlLanguageSelector } from './yaml-language';
 import { LanguageClient, TransportKind, NodeModule } from 'vscode-languageclient';
 
 // Resolve the LSP server entry point.
@@ -48,28 +48,23 @@ export function activate(context: vscode.ExtensionContext) {
       // Notify the server when `.ttrm` files change on disk outside the editor
       // (external edits, git operations, create/delete) so the whole-project
       // symbol table stays current for cross-file reference resolution.
-      fileEvents: [vscode.workspace.createFileSystemWatcher('**/*.ttrm'), vscode.workspace.createFileSystemWatcher('**/*.{yaml,yml}')],
+      fileEvents: [vscode.workspace.createFileSystemWatcher('**/*.ttrm'), vscode.workspace.createFileSystemWatcher('**/*.{yaml,yml}'), vscode.workspace.createFileSystemWatcher('**/model.ignore')],
     },
   });
 
-  const read = async (file: string): Promise<string | undefined> => {
-    try { return new TextDecoder('utf-8', { fatal: true }).decode(await vscode.workspace.fs.readFile(vscode.Uri.file(file))); }
-    catch { return undefined; }
+  const started = client.start();
+  const selector = new YamlLanguageSelector(async (uri, text) => {
+    await started;
+    return client.sendRequest<'ttr-yaml' | 'yaml'>('modeler/yamlLanguage', {uri, text});
+  }, (doc, language) => Promise.resolve(vscode.languages.setTextDocumentLanguage(doc as vscode.TextDocument, language)));
+  const reselectYaml = (uri: vscode.Uri) => {
+    if (!/(?:^|[/\\])(?:ttr|ttr-profile)\.ya?ml$/.test(uri.fsPath) && !/(?:^|[/\\])profiles[/\\]/.test(uri.fsPath)) return;
+    for (const doc of vscode.workspace.textDocuments) void selector.select(doc, true);
   };
-  const selectYamlLanguage = async (doc: vscode.TextDocument): Promise<void> => {
-    if (doc.uri.scheme !== 'file' || !['yaml', 'ttr-yaml'].includes(doc.languageId)) return;
-    const folder = vscode.workspace.getWorkspaceFolder(doc.uri);
-    if (!folder) return;
-    const selected = await isTtrYaml(doc.uri.fsPath, doc.getText(), folder.uri.fsPath, read);
-    const language = selected ? 'ttr-yaml' : 'yaml';
-    if (doc.languageId !== language && !doc.isClosed) await vscode.languages.setTextDocumentLanguage(doc, language);
-  };
-  const reselectYaml = () => { for (const doc of vscode.workspace.textDocuments) void selectYamlLanguage(doc); };
   const yamlWatcher = vscode.workspace.createFileSystemWatcher('**/*.{yaml,yml}');
   context.subscriptions.push(yamlWatcher, yamlWatcher.onDidCreate(reselectYaml), yamlWatcher.onDidChange(reselectYaml), yamlWatcher.onDidDelete(reselectYaml),
-    vscode.workspace.onDidOpenTextDocument(doc => { void selectYamlLanguage(doc); }),
-    vscode.workspace.onDidChangeTextDocument(e => { void selectYamlLanguage(e.document); }));
-  reselectYaml();
+    vscode.workspace.onDidOpenTextDocument(doc => { void selector.select(doc); }));
+  for (const doc of vscode.workspace.textDocuments) void selector.select(doc);
 
   context.subscriptions.push(
     // Invoked by the "N references" code lens.
@@ -111,7 +106,6 @@ export function activate(context: vscode.ExtensionContext) {
     }),
   );
 
-  client.start();
 }
 
 export function deactivate(): Thenable<void> | undefined {

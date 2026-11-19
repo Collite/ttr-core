@@ -127,6 +127,8 @@ import type { ModelerEditParams, ModelerEditResult } from './hosted-protocol.js'
 
 export interface ServerOptions {
   /** Desktop YAML adapter; the browser host retains its existing file-map contract. */
+  yamlFilesChanged?: (changes: readonly {uri: string; type: number}[]) => boolean;
+  yamlLanguage?: (uri: string, text: string, roots: readonly string[]) => 'ttr-yaml' | 'yaml';
   loadYamlDocuments?: (buffers: ReadonlyMap<string, string>, roots: readonly string[]) => Map<string, ParseResult & { text: string }>;
 
   /**
@@ -410,10 +412,21 @@ export function createServerConnection(
   const yamlResults = new Map<string, ParseResult>();
   const isYaml = (uri: string): boolean => /\.ya?ml$/i.test(uri);
   const isTtr = (uri: string): boolean => /\.ttr[mg]$/.test(uri) || yamlResults.has(uri);
-  function withoutDialectEdits(edit: WorkspaceEdit): WorkspaceEdit {
-    const uris = [...Object.keys(edit.changes ?? {}), ...(edit.documentChanges ?? []).flatMap(change =>
-      'textDocument' in change ? [change.textDocument.uri] : 'uri' in change ? [change.uri] : [change.oldUri, change.newUri])];
-    return uris.some(isYaml) ? { documentChanges: [] } : edit;
+  function refuseDialectLocation(name: string, uri: string, line: number): never {
+    throw new ResponseError(ErrorCodes.InvalidParams, `Cannot rename '${name}': ${uri.split('/').pop()}:${line} is a dialect YAML file, and the editor does not rewrite dialect files (MW-26). Edit it first, then rename.`);
+  }
+  function refuseDialectEdits(edit: WorkspaceEdit, name: string): WorkspaceEdit {
+    for (const [uri, edits] of Object.entries(edit.changes ?? {}))
+      if (isYaml(uri) && edits.length) refuseDialectLocation(name, uri, edits[0].range.start.line + 1);
+    for (const change of edit.documentChanges ?? []) {
+      if ('textDocument' in change) {
+        if (isYaml(change.textDocument.uri) && change.edits.length) refuseDialectLocation(name, change.textDocument.uri, change.edits[0].range.start.line + 1);
+      } else {
+        const uri = 'uri' in change ? change.uri : change.oldUri;
+        if (isYaml(uri)) refuseDialectLocation(name, uri, 1);
+      }
+    }
+    return edit;
   }
   function fileSnapshot(): Map<string, string> {
     const files = new Map(diskDocs);
@@ -458,23 +471,31 @@ export function createServerConnection(
     return result.ast;
   }
 
+  let yamlRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+  function scheduleYamlRefresh(): void {
+    if (yamlRefreshTimer !== undefined) clearTimeout(yamlRefreshTimer);
+    yamlRefreshTimer = setTimeout(() => { yamlRefreshTimer = undefined; refreshYamlDocuments(); }, 200);
+  }
   function refreshYamlDocuments(): void {
     if (!opts.loadYamlDocuments) return;
     const buffers = new Map(documents.all().map(doc => [doc.uri, doc.getText()]));
     const next = opts.loadYamlDocuments(buffers, workspaceRoots);
-    const previous = [...yamlResults.keys()];
-    for (const uri of previous) {
+    const changed = new Set<string>();
+    for (const [uri, result] of yamlResults) {
+      if (next.get(uri)?.ast === result.ast && next.get(uri)?.text === getDocument(uri)?.getText() && next.has(uri)) continue;
+      changed.add(uri);
       projectSymbols.removeDocument(uri); refIndex.removeDocument(uri); sqlRefIndex.removeDocument(uri);
       parseCache.delete(uri);
-      if (!next.has(uri)) { diskDocs.delete(uri); connection.sendDiagnostics({ uri, diagnostics: [] }); }
+      if (!next.has(uri)) { diskDocs.delete(uri); if (publishedYamlDiagnostics.get(uri) !== '[]') connection.sendDiagnostics({ uri, diagnostics: [] }); publishedYamlDiagnostics.delete(uri); }
     }
-    yamlResults.clear();
     for (const [uri, result] of next) {
+      if (!yamlResults.has(uri) || yamlResults.get(uri)?.ast !== result.ast) changed.add(uri);
       yamlResults.set(uri, result);
       if (!isOpen(uri)) diskDocs.set(uri, result.text);
     }
+    for (const uri of yamlResults.keys()) if (!next.has(uri)) yamlResults.delete(uri);
     // Two passes: all symbols must exist before indexing cross-file references.
-    for (const [uri, result] of next) updateSymbolTable(uri, result.text);
+    for (const [uri, result] of next) if (changed.has(uri)) updateSymbolTable(uri, result.text, true);
     for (const [uri, result] of next) {
       if (!result.ast) continue;
       const context = projectSymbols.documentContext(uri)!;
@@ -734,8 +755,14 @@ export function createServerConnection(
     return diagnostics;
   }
 
+  const publishedYamlDiagnostics = new Map<string, string>();
   function publishDiagnostics(uri: string, content: string, projectDiagnostics?: Map<string, LintDiagnostic[]>): void {
-    if (isTtr(uri)) connection.sendDiagnostics({ uri, diagnostics: collectDiagnostics(uri, content, projectDiagnostics) });
+    if (!isTtr(uri)) return;
+    const diagnostics = collectDiagnostics(uri, content, projectDiagnostics);
+    const serialized = JSON.stringify(diagnostics);
+    if (isYaml(uri) && publishedYamlDiagnostics.get(uri) === serialized) return;
+    if (isYaml(uri)) publishedYamlDiagnostics.set(uri, serialized);
+    connection.sendDiagnostics({ uri, diagnostics });
   }
 
   /**
@@ -901,7 +928,7 @@ export function createServerConnection(
       : DiagnosticSeverity.Error;
   }
 
-  function updateSymbolTable(uri: string, content: string): void {
+  function updateSymbolTable(uri: string, content: string, symbolsOnly = false): void {
     if (!isTtr(uri)) return;
     packageGraph = null;
     invalidateSymbols();
@@ -916,8 +943,10 @@ export function createServerConnection(
     const namespace = effectiveSchemaId(result.ast.modelDirective?.schema, packageName, manifest);
     projectSymbols.upsertDocument(uri, result.ast, schemaCode, namespace, packageName);
     synthesizeMappings(projectSymbols, uri, result.ast);
-    refIndex.upsertDocument(uri, result.ast, schemaCode, namespace, resolver, packageName);
-    indexSqlReferences(uri, result.ast);
+    if (!symbolsOnly) {
+      refIndex.upsertDocument(uri, result.ast, schemaCode, namespace, resolver, packageName);
+      indexSqlReferences(uri, result.ast);
+    }
   }
 
   // On-disk text of every project `.ttrm` file, keyed by URI. Seeded by
@@ -1003,7 +1032,7 @@ export function createServerConnection(
 
   documents.onDidChangeContent((event: TextDocumentChangeEvent<TextDocument>) => {
     const uri = event.document.uri;
-    if (isYaml(uri) && opts.loadYamlDocuments) { refreshYamlDocuments(); return; }
+    if (isYaml(uri) && opts.loadYamlDocuments) { scheduleYamlRefresh(); return; }
     const pending = pendingTexts.get(uri) ?? [];
     const acknowledged = pending.indexOf(event.document.getText());
     if (acknowledged >= 0 && acknowledged < pending.length - 1) {
@@ -1018,7 +1047,7 @@ export function createServerConnection(
 
   documents.onDidClose((event: TextDocumentChangeEvent<TextDocument>) => {
     const uri = event.document.uri;
-    if (isYaml(uri) && opts.loadYamlDocuments) { refreshYamlDocuments(); return; }
+    if (isYaml(uri) && opts.loadYamlDocuments) { scheduleYamlRefresh(); return; }
     editDocs.delete(uri);
     pendingTexts.delete(uri);
     const disk = diskDocs.get(uri);
@@ -1156,7 +1185,8 @@ export function createServerConnection(
   // must watch `**/.ttrlint.toml`). The Designer / browser host (and tests) can
   // also trigger a reload deterministically via `modeler/reloadLintConfig`.
   connection.onDidChangeWatchedFiles(async (params) => {
-    if (params.changes.some(c => isYaml(c.uri))) refreshYamlDocuments();
+    const yamlChanges = params.changes.filter(c => isYaml(c.uri) || c.uri.endsWith('/model.ignore'));
+    if (yamlChanges.length && (opts.yamlFilesChanged?.(yamlChanges) ?? yamlChanges.some(c => yamlResults.has(c.uri) || /\/(?:ttr|ttr-profile)\.yaml$/.test(c.uri) || c.type !== FileChangeType.Changed))) scheduleYamlRefresh();
     if (params.changes.some((c) => c.uri.endsWith('.ttrlint.toml'))) {
       await refreshLintConfig();
     }
@@ -1167,6 +1197,7 @@ export function createServerConnection(
     // they're skipped here.
     let touched = false;
     for (const change of params.changes) {
+      if (isYaml(change.uri)) continue;
       if ((!isTtr(change.uri) && !/\/model\/tests\/.+\.mjs$/.test(change.uri)) || isOpen(change.uri) || editDocs.has(change.uri)) continue;
       if (change.type === FileChangeType.Deleted) {
         diskDocs.delete(change.uri);
@@ -1194,6 +1225,8 @@ export function createServerConnection(
       }
     }
   });
+  connection.onRequest('modeler/yamlLanguage', (params: {uri: string; text: string}) => opts.yamlLanguage?.(params.uri, params.text, workspaceRoots) ?? 'yaml');
+
   connection.onRequest('modeler/reloadLintConfig', async () => {
     await refreshLintConfig();
     return { reloaded: true };
@@ -1940,7 +1973,7 @@ export function createServerConnection(
    */
   function buildSymbolRenameWithSql(targetQname: string, symbol: ReturnType<typeof projectSymbols.get>, newBareName: string, fallbackContent: string): WorkspaceEdit {
     const sym = symbol!;
-    if (isYaml(sym.documentUri) || refIndex.findByQname(targetQname).some(ref => isYaml(ref.documentUri))) return { documentChanges: [] };
+    if (isYaml(sym.documentUri)) refuseDialectLocation(sym.name, sym.documentUri, sym.source.line);
     const ttrgDocs = new Map<string, string>();
     for (const d of cachedDocuments()) ttrgDocs.set(d.uri, d.getText());
     const defContent = getDocument(sym.documentUri)?.getText() ?? fallbackContent;
@@ -2026,7 +2059,7 @@ export function createServerConnection(
 
   connection.onRenameRequest((params) => {
     const uri = params.textDocument.uri;
-    if (isYaml(uri)) return { documentChanges: [] };
+    if (isYaml(uri)) refuseDialectLocation(params.newName, uri, params.position.line + 1);
     const doc = getDocument(uri);
     if (!doc) return { documentChanges: [] };
 
@@ -2045,7 +2078,18 @@ export function createServerConnection(
       const nameStart = lineText.indexOf(ast.packageDecl.name);
       if (nameStart >= 0) {
         const allDocs = new Map<string, string>();
-        for (const d of cachedDocuments()) { if (isYaml(d.uri)) return { documentChanges: [] }; allDocs.set(d.uri, d.getText()); }
+        for (const d of cachedDocuments()) {
+          if (!isYaml(d.uri)) { allDocs.set(d.uri, d.getText()); continue; }
+          const yaml = parseDocument(d.getText(), d.uri);
+          if (!yaml) continue;
+          const packageName = ast.packageDecl.name;
+          const inPackage = (name: string) => name === packageName || name.startsWith(packageName + '.');
+          if (inPackage(effPkg(d.uri, yaml))) refuseDialectLocation(packageName, d.uri, yaml.packageDecl?.source.line ?? yaml.definitions[0]?.source.line ?? 1);
+          const reference = collectAllReferences(yaml).find(ref => inPackage(ref.ref.path));
+          if (reference) refuseDialectLocation(packageName, d.uri, reference.ref.source.line);
+          const imported = yaml.imports.find(imp => inPackage(imp.target));
+          if (imported) refuseDialectLocation(packageName, d.uri, imported.source.line);
+        }
         return buildRenamePackageEdit({
           oldPackageName: ast.packageDecl.name,
           newPackageName: params.newName,
@@ -2095,7 +2139,8 @@ export function createServerConnection(
 
     if (!targetQname) return { documentChanges: [] };
     const symbol = labelSymbol ?? projectSymbols.get(targetQname);
-    if (!symbol || isYaml(symbol.documentUri) || refIndex.findByQname(targetQname).some(ref => isYaml(ref.documentUri))) return { documentChanges: [] };
+    if (!symbol) return { documentChanges: [] };
+    if (isYaml(symbol.documentUri)) refuseDialectLocation(symbol.name, symbol.documentUri, symbol.source.line);
 
     // Surface invalid / colliding renames as LSP errors (I1.5) so VS Code shows
     // a refusal dialog, instead of silently producing an empty edit.
@@ -2118,7 +2163,7 @@ export function createServerConnection(
           `Cannot rename label '${symbol.name}': the definition of '${read.owner}' (${read.uri.split('/').pop()}:${read.source.line}) reads it (\`${read.text}\`), and the editor does not rewrite definition blocks. Edit the definition first, then rename.`,
         );
       }
-      return withoutDialectEdits(buildParticipantRename(symbol, newBareName));
+      return refuseDialectEdits(buildParticipantRename(symbol, newBareName), symbol.name);
     }
 
     // TTR-side edit (def + references + imports + .ttrg) plus in-SQL usages.
@@ -2127,7 +2172,7 @@ export function createServerConnection(
       keepParticipantLabels(edit, targetQname, newBareName);
       renameConceptImports(edit, symbol, newBareName);
     }
-    return withoutDialectEdits(edit);
+    return refuseDialectEdits(edit, symbol.name);
   });
 
   /**

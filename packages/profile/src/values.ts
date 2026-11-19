@@ -150,7 +150,7 @@ export class EachOp {
       const warn = (message: string) => {
         if (messages.has(message)) return;
         messages.add(message);
-        plan.warnings.push({ location: source.span(true), message, record: record.id });
+        plan.warnings.push({ origin: 'each', location: source.span(true), message, record: record.id });
       };
       for (const { element, value } of shaped) {
         if (value === Missing) continue;
