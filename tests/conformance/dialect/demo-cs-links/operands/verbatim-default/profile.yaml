@@ -3,4 +3,3 @@ grammar: '>=0.22 <1.0'
 operations:
   - {op: package, at: /model/package, verbatim: true, default: demo}
   - {op: kinds, at: /entity, mapping: {e: entity}}
-

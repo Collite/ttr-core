@@ -4,4 +4,3 @@ operations:
   - {op: package, at: /model/package, verbatim: true}
   - {op: kinds, at: /entity, mapping: {e: entity}}
   - {op: ignore, at: /model}
-
