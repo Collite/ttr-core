@@ -152,6 +152,7 @@ export class YamlWorkspaceLoader {
       parts.some((p) => p.startsWith('.')) ||
       parts[0] === 'agents' ||
       parts[0] === 'profiles' ||
+      parts[0] === 'layouts' ||
       ['ttr.yaml', 'renames.yaml'].includes(path)
     )
       return true;

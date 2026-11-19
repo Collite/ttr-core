@@ -13,9 +13,12 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
   symbols and cross-file definition targets on authored YAML ranges.
 - VS Code contributes `ttr-yaml` without global YAML filename associations,
   activates on `ttr.yaml`, and reuses the YAML grammar. Profile changes invalidate
-  the index; dialect write-back remains unavailable.
+  the index; manual language choices are preserved, and dialect write-back remains unavailable.
+  Renames touching YAML explain the refusal; native-only renames continue to work.
 - `modeler-lint --profile [reference]` reads YAML roots and runs schema/profile
-  `ys/*` and link `xm/*` diagnostics through its configurable rule runner.
+  `ys/*` and link `xm/*` diagnostics through its configurable rule runner. The loader
+  honours tree exclusions and caches unchanged groups; editor refreshes are debounced.
+  Explicit profile paths resolve from the working directory, as in Kotlin.
 - Closed review-334 parser carry: position-independent concept fingerprints,
   quoted SQL locations, call-entry projections, precise bridge failure paths and
   unknown expression tags read as plain text. Profile type refusals match Kotlin

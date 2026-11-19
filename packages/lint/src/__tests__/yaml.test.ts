@@ -174,6 +174,7 @@ describe('YAML lint input', { timeout: 30_000 }, () => {
         'agents/a.yaml',
         'renames.yaml',
         'profiles/unused.yaml',
+        'layouts/layout.yaml',
         'scratch/x.yaml',
         'docker-compose.yml',
       ]) {
