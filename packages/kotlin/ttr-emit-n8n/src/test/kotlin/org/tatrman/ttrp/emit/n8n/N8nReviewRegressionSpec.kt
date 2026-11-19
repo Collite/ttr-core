@@ -142,6 +142,7 @@ class N8nReviewRegressionSpec :
                 f.calls.single { it.path.endsWith("/perform") }.body!!["keys"] shouldBe
                     JsonArray(listOf(row(1), row(2)))
             }
+            // review-379 L1: on master this body was a JS syntax error (`r => {…}` read as a block); the node never ran.
             WorkflowFixture().use { f ->
                 f.routes = mapOf("release" to lines)
                 f.run(workflow(performGraph(listOf("order.order_number", "order.line_no"))))["error"] shouldBe null
@@ -149,13 +150,30 @@ class N8nReviewRegressionSpec :
             }
             WorkflowFixture().use { f ->
                 f.routes = mapOf("mail" to listOf(row(1, "a@example.test"), row(2, "b@example.test")))
-                f.actions = JsonArray((1..2).map { actionPreview(it, "notify") })
+                // review-379 L3: the Server's preview keys are objects (`PreviewPlan` `key: JsonObject`).
+                f.actions = JsonArray((1..2).map { actionPreview(it, "notify", objectKey = true) })
                 f.run(workflow(mailGraph()))["error"] shouldBe null
                 f.calls
                     .filter { it.path.endsWith("/outcome") }
                     .flatMap { it.body!!.getValue("outcomes").jsonArray }
                     .map { it.jsonObject.getValue("key") }
                     .toSet() shouldBe setOf(row(1), row(2))
+            }
+        }
+        "S1.5.10 T1(d) the Open's port.key stays the caller's value: the bare key column, never an object (review-379 L2)" {
+            WorkflowFixture().use { f ->
+                f.run(
+                    workflow(bare()),
+                    buildJsonObject {
+                        put("order_number", 4711)
+                        put("at", "2026-10-31T12:00:00Z")
+                    },
+                )["error"] shouldBe null
+                f.calls
+                    .single { it.path.endsWith("/runs") }
+                    .body!!
+                    .getValue("port")
+                    .jsonObject["key"] shouldBe JsonPrimitive(4711)
             }
         }
         "R3 a duplicate live handle waits for closed or waiting without driving it; abandonment permits one reopen" {
@@ -482,8 +500,9 @@ private fun row(
 private fun actionPreview(
     key: Int,
     name: String,
+    objectKey: Boolean = false,
 ) = buildJsonObject {
-    put("key", key)
+    if (objectKey) put("key", buildJsonObject { put("order_number", key) }) else put("key", key)
     put("action", name)
     put("arguments", buildJsonObject {})
 }

@@ -107,6 +107,56 @@ class PerformKeySpec :
                 }
         }
 
+        /** Every `ttrOpenBody` input, evaluated with the caller's input `{key: 4711}` (a `port: key` program). */
+        fun openBodies(
+            graph: RecipeGraph,
+            dialect: Dialect,
+        ): List<JsonObject> {
+            val xml = CamundaRenderer(RecipeEmitRequest(graph, "{}", "", "{}"), dialect).render()
+            val doc =
+                DocumentBuilderFactory
+                    .newInstance()
+                    .apply { isNamespaceAware = true }
+                    .newDocumentBuilder()
+                    .parse(InputSource(StringReader(xml)))
+            val variables =
+                mapOf<String, Any>(
+                    "ttrInput" to mapOf("key" to 4711, "at" to "2026-11-01T10:00:00Z"),
+                    "ttrStepAt" to "2026-11-01T10:00:00Z",
+                    "ttrAnchor" to "first-run",
+                    "ttrExecutionId" to "execution",
+                    "execution" to C7Execution("execution"),
+                )
+            return if (dialect == Dialect.C7) {
+                val inputs = doc.getElementsByTagNameNS("http://camunda.org/schema/1.0/bpmn", "inputParameter")
+                val factory = ExpressionFactoryImpl()
+                val context = SimpleContext()
+                context.setFunction("", "S", Spin::class.java.getMethod("S", Any::class.java))
+                context.setFunction("", "dateTime", ReviewFunctions::class.java.getMethod("dateTime"))
+                variables.forEach { (name, value) ->
+                    context.setVariable(name, factory.createValueExpression(value, Any::class.java))
+                }
+                (0 until inputs.length)
+                    .map { inputs.item(it) as Element }
+                    .filter { it.getAttribute("name") == "ttrOpenBody" }
+                    .map {
+                        val value = factory.createValueExpression(context, it.textContent, Any::class.java).getValue(context)
+                        Json.parseToJsonElement(value.toString()).jsonObject
+                    }
+            } else {
+                val inputs = doc.getElementsByTagNameNS("http://camunda.org/schema/zeebe/1.0", "input")
+                val feel = FeelEngineBuilder.forJava().build()
+                (0 until inputs.length)
+                    .map { inputs.item(it) as Element }
+                    .filter { it.getAttribute("target") == "ttrOpenBody" }
+                    .map {
+                        val evaluated = feel.evaluateExpression(it.getAttribute("source").removePrefix("="), variables)
+                        require(evaluated.isSuccess) { evaluated.toString() }
+                        toJson(evaluated.result()).jsonObject
+                    }
+            }
+        }
+
         for (dialect in listOf(Dialect.C7, Dialect.C8)) {
             val target = if (dialect == Dialect.C7) "camunda_7" else "camunda_8"
             "$dialect: a one-column key's perform body sends keys [{order_number: value}], never a bare scalar" {
@@ -139,6 +189,13 @@ class PerformKeySpec :
                     }
                 }
             }
+            "$dialect: T1(d) the Open's port.key stays the caller's value, never an object (review-379 L2)" {
+                val opens = openBodies(releaseGraph(target), dialect)
+                opens.shouldNotBeEmpty()
+                opens.forEach { body ->
+                    withClue(body) { body.getValue("port").jsonObject["key"] shouldBe JsonPrimitive(4711) }
+                }
+            }
         }
     })
 
@@ -159,17 +216,7 @@ private fun toJson(value: Any?): JsonElement =
         is Map<*, *> -> JsonObject(value.entries.associate { (k, v) -> k.toString() to toJson(v) })
         is List<*> -> JsonArray(value.map(::toJson))
         is java.math.BigDecimal ->
-            JsonPrimitive(
-                value.stripTrailingZeros().let {
-                    if (it.scale() <=
-                        0
-                    ) {
-                        it.toBigInteger()
-                    } else {
-                        it
-                    }
-                },
-            )
+            value.stripTrailingZeros().let { JsonPrimitive(runCatching { it.toBigIntegerExact() }.getOrDefault(it)) }
         is Number -> JsonPrimitive(value)
         is Boolean -> JsonPrimitive(value)
         else -> JsonPrimitive(value.toString())
