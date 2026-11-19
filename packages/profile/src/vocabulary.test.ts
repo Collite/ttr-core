@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
+import { NumericScalar, jsonText } from './scalars.js';
 import { canonicalWrite, normalizeCanonical } from './vocabulary.js';
 
 const oracle = new URL(
@@ -9,6 +10,25 @@ const oracle = new URL(
   import.meta.url
 );
 describe('canonical profile codec', () => {
+  it.each(['search', 'concept'])('keeps a numeric %s block value scalar', (property) => {
+    const bytes = canonicalWrite({
+      ttr: '0.22',
+      model: 'er',
+      defs: [{ kind: 'attribute', id: 'A', properties: { [property]: new NumericScalar(5, '5') } }],
+    });
+    expect(bytes).toContain(`${property}: 5\n`);
+    expect(bytes).not.toContain('text:');
+    expect(bytes).not.toContain('value:');
+  });
+  it('keeps non-mapping entries in an ordered body scalar', () => {
+    const bytes = canonicalWrite({
+      ttr: '0.22',
+      model: 'er',
+      defs: [{ kind: 'attribute', id: 'A', properties: { search: [new NumericScalar(5, '5')] } }],
+    });
+    expect(bytes).toContain('search:\n        - 5\n');
+    expect(bytes).not.toContain('text:');
+  });
   for (const fixture of [
     '01-sequence/er.yaml',
     '03-mixed/er.yaml',
@@ -36,11 +56,9 @@ describe('canonical profile codec', () => {
       ],
     });
     expect(value.imports).toBeUndefined();
-    expect(Object.keys((value.defs as { properties: object }[])[0].properties)).toEqual([
-      'description',
-      'tags',
-      'label',
-    ]);
+    expect([
+      ...(value.defs as { properties: Map<string, unknown> }[])[0].properties.keys(),
+    ]).toEqual(['description', 'tags', 'label']);
   });
   it('quotes ambiguous keys and preserves multiline indentation and trailing newlines', () => {
     const raw = {
@@ -50,7 +68,7 @@ describe('canonical profile codec', () => {
       defs: [{ kind: 'kind', id: 'A', properties: { true: 'yes', description: '  content\n\n' } }],
     };
     const bytes = canonicalWrite(raw);
-    expect(parse(bytes)).toEqual(normalizeCanonical(raw));
+    expect(parse(bytes)).toEqual(JSON.parse(jsonText(normalizeCanonical(raw))));
     expect(bytes).toContain('|2+');
     expect(bytes).toContain('"true": "yes"');
   });

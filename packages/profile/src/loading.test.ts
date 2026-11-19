@@ -41,6 +41,14 @@ function failure(run: () => unknown, path?: string, code = 'ys/profile-invalid')
 }
 
 describe('profile loading contract', () => {
+  it.each([
+    ['0.22', '0.22'],
+    ['1', '1'],
+    ['1e3', '1E+3'],
+  ])('recognizes numeric canonical header %s', (source, version) => {
+    expect(DeclarationReader.header(`ttr: ${source}\n`)).toEqual({ type: 'canonical', version });
+    expect(DeclarationReader.select(`ttr: ${source}\n`, 'canonical.yaml')).toBeNull();
+  });
   it('requires a mapping root and retains pointers, key order and code-point source coordinates', () => {
     for (const source of ['[1, null, true]', '42', 'null', 'hello'])
       expect(failure(() => ForeignTree.read(source), '').location).toMatchObject({

@@ -29,7 +29,8 @@ const run = (source: string, ops: Json[] = [], unknown?: string): ApplyResult =>
     [profile([packageOp, entities, ...ops], unknown)]
   );
 const defs = (result: ApplyResult) => result.documents.flatMap((d) => d.value.defs as Obj[]);
-const props = (result: ApplyResult) => defs(result)[0].properties as Obj;
+const props = (result: ApplyResult) =>
+  Object.fromEntries(defs(result)[0].properties as Map<string, Json>) as Obj;
 function errorOf(action: () => unknown): ProfileException {
   try {
     action();
@@ -47,6 +48,11 @@ function nodes(value: unknown): { [key: string]: unknown }[] {
 }
 
 describe('record discovery and structural emission', () => {
+  test('a numeric ttr key remains subject to the unknown-key policy (Kotlin oracle)', () => {
+    const error = errorOf(() => run('ttr: 1\nentities: {Customer: {}}'));
+    expect(error.code).toBe('ys/unknown-key');
+    expect(error.location).toMatchObject({ path: '/ttr', line: 1, column: 1 });
+  });
   test('whole-file IDs and mapping-entry IDs remain authored, in source order', () => {
     const result = run('entities:\n  Zebra: {}\n  Alpha: {}\n');
     expect(defs(result).map((d) => d.id)).toEqual(['Zebra', 'Alpha']);
@@ -166,7 +172,10 @@ describe('record discovery and structural emission', () => {
     );
     const attributes = props(result).attributes as Obj[];
     expect(attributes.map((a) => a.id)).toEqual(['a', 'b']);
-    expect(attributes.map((a) => (a.properties as Obj).description)).toEqual(['Shared', 'Shared']);
+    expect(attributes.map((a) => (a.properties as Map<string, Json>).get('description'))).toEqual([
+      'Shared',
+      'Shared',
+    ]);
     const conflict = errorOf(() =>
       run('entities: {A: {columns: {a: {}}, x: []}}', [nested, write('rename', '/x', 'attributes')])
     );

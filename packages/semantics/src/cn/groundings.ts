@@ -103,7 +103,7 @@ export function propertyFingerprint(p: ConceptProperty): string {
       }
       const out: Record<string, unknown> = {};
       for (const k of Object.keys(v).sort()) {
-        if (PLACE_KEYS.has(k)) continue;
+        if (PLACE_KEYS.has(k) || (node.kind === 'number' && (k === 'text' || k === 'raw'))) continue;
         const x = (v as Record<string, unknown>)[k];
         out[k] = k === 'path' && typeof x === 'string' && x.startsWith('cn.') ? x.slice(3) : norm(x);
       }

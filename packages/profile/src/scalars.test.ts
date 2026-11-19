@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parseYamlDocument } from '@tatrman/parser';
-import { ForeignTree, NumericScalar } from './input.js';
+import { ForeignTree, NumericScalar, type Json } from './input.js';
 import { ProfileReader } from './loading.js';
 import { ProfileEngine } from './engine.js';
 import { canonicalWrite, normalizeCanonical } from './vocabulary.js';
@@ -139,11 +139,10 @@ describe('lossless scalars and output maps', () => {
       ],
     };
     const normalized = normalizeCanonical(raw);
-    const definition = (
-      normalized.defs as Array<{ properties: { valueLabels: Map<string, unknown> } }>
-    )[0];
-    expect(definition.properties.valueLabels).toBeInstanceOf(Map);
-    expect([...definition.properties.valueLabels.keys()]).toEqual(['1', '10', '2', 'b']);
+    const definition = (normalized.defs as Array<{ properties: Map<string, Json> }>)[0];
+    const labels = definition.properties.get('valueLabels') as Map<string, Json>;
+    expect(labels).toBeInstanceOf(Map);
+    expect([...labels.keys()]).toEqual(['1', '10', '2', 'b']);
     expect(canonicalWrite(normalized)).toBe(readFileSync(file, 'utf8'));
     expect(jsonText(normalized)).toContain(
       '"valueLabels":{"1":{"en":"one"},"10":{"en":"ten"},"2":{"en":"two"},"b":{"en":"bee"}}'

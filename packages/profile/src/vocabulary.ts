@@ -161,11 +161,11 @@ function properties(name: string, value: Json, model: string): Json {
   const body = metadata.bodies[name];
   if (!body) return data(value);
   if ('fields' in body) return new Map(outputEntries(value).map(([k, v]) => [k, data(v)]));
+  if (Array.isArray(value) && value.some((v) => !object(v) && !(v instanceof Map)))
+    return value.map((v) => (object(v) || v instanceof Map ? properties(name, v, model) : data(v)));
   const props = new Map(body.properties.map((p) => [p.key, p]));
   const entries: [string, Json][] = (
-    Array.isArray(value)
-      ? value.flatMap((v) => Object.entries(v as { [key: string]: Json }))
-      : outputEntries(value)
+    Array.isArray(value) ? value.flatMap(outputEntries) : outputEntries(value)
   ).map(([k, v]) => {
     if (
       body.members.length &&
@@ -198,16 +198,18 @@ function properties(name: string, value: Json, model: string): Json {
   });
   return body.ordered && !(name === 'roleDef' && model !== 'cn')
     ? entries.map(([k, v]) => ({ [k]: v }))
-    : Object.fromEntries(
-        sorted(
-          entries,
-          body.properties.map((p) => p.key)
-        )
+    : sorted(
+        entries,
+        body.properties.map((p) => p.key)
       );
 }
 function property(expr: Expr, value: Json, model: string): Json {
   const symbol = expr.symbol;
-  if (symbol && metadata.bodies[symbol] && typeof value === 'object' && value !== null)
+  if (
+    symbol &&
+    metadata.bodies[symbol] &&
+    (object(value) || Array.isArray(value) || value instanceof Map)
+  )
     return properties(symbol, value, model);
   const nested: { [key: string]: string } = {
     columnDefList: 'columnDef',

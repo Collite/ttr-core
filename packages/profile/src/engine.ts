@@ -819,12 +819,7 @@ export class ProfileEngine {
       }
       const plan = new RecordPlan(tree, ops);
       const value = object(tree.root.value);
-      if (
-        tree.root.entries()[0]?.mappingKey === 'ttr' &&
-        value.ttr !== null &&
-        typeof value.ttr === 'object' &&
-        !Array.isArray(value.ttr)
-      )
+      if (tree.root.entries()[0]?.mappingKey === 'ttr' && isRecord(value.ttr))
         plan.consumption.consume(tree.root.child('ttr', value.ttr));
       plans.push(plan);
     }
@@ -1112,8 +1107,8 @@ function canonicalPaths(before: Json, after: Json): Map<string, string> {
       return;
     if (isRecord(a) && Array.isArray(b)) {
       b.forEach((entry, i) => {
-        if (entry && typeof entry === 'object' && !Array.isArray(entry))
-          for (const [key, value] of Object.entries(entry))
+        if (isRecord(entry) || entry instanceof Map)
+          for (const [key, value] of entries(entry))
             if (Object.hasOwn(a, key))
               walk(a[key], value, from + '/' + escape(key), to + '/' + i + '/' + escape(key));
       });

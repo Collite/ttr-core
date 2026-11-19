@@ -25,6 +25,15 @@ class ScalarMapParitySpec :
                 CanonicalYaml.write(CanonicalYaml.read(yaml)) shouldContain "custom: $expected\n"
             }
         }
+        test("numeric ttr remains unconsumed") {
+            val error = io.kotest.assertions.throwables.shouldThrow<ProfileException> {
+                runOps("ttr: 1\nentity: {Customer: {}}", entityOps)
+            }
+            error.code shouldBe "ys/unknown-key"
+            error.location.path shouldBe "/ttr"
+            error.location.line shouldBe 1
+            error.location.column shouldBe 1
+        }
         listOf("numbers", "integer-keys").forEach { name ->
             test("shared $name canonical bytes") {
                 val fixture = Path.of("../../../tests/conformance/dialect/$name")
