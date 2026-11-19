@@ -3,7 +3,6 @@ import { parseAllDocuments } from 'yaml';
 import { readdirSync, realpathSync, existsSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import {
-  ForeignData,
   ForeignTree,
   JsonPointer,
   isRecord,
