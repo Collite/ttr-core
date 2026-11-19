@@ -1,0 +1,1 @@
+::error file=input.yaml,line=1,col=6::ys/profile-invalid Quoted-string continuation must be indented

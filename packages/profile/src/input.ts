@@ -1,14 +1,28 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Composer, Parser, isAlias, isMap, isNode, isScalar, isSeq, type Node } from 'yaml';
+import { NumericScalar, decimalText } from './scalars.js';
+export { NumericScalar } from './scalars.js';
 import { ProfileException, type ProfileSpan } from './loading.js';
 
-export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
+export type Json =
+  | null
+  | boolean
+  | number
+  | string
+  | NumericScalar
+  | Json[]
+  | Map<string, Json>
+  | { [key: string]: Json };
 export type RecordValue = { [key: string]: Json };
 export const escapePointer = (key: string): string => key.replace(/~/g, '~0').replace(/\//g, '~1');
 export const pointer = (parent: string, key: string | number): string =>
   `${parent}/${escapePointer(String(key))}`;
 export const isRecord = (value: unknown): value is RecordValue =>
-  value !== null && typeof value === 'object' && !Array.isArray(value);
+  value !== null &&
+  typeof value === 'object' &&
+  !Array.isArray(value) &&
+  !(value instanceof NumericScalar) &&
+  !(value instanceof Map);
 const propertyStart = (tokens?: readonly { type: string; offset: number }[]): number | undefined =>
   tokens?.find((token) => token.type === 'anchor' || token.type === 'tag')?.offset;
 
@@ -249,7 +263,11 @@ export class ForeignData {
     if (typeof value === 'number' && Number.isFinite(value)) {
       if ((node.source?.length ?? 0) > 1000)
         this.fail(path, 'Number literal too long (maximum 1000 characters)');
-      return value;
+      try {
+        return new NumericScalar(value, decimalText(node.source ?? String(value)));
+      } catch {
+        this.fail(path, 'Expected a finite number');
+      }
     }
     this.fail(path, 'Expected a finite scalar');
   }

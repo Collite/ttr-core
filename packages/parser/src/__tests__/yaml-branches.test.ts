@@ -23,7 +23,9 @@ const portable = (value: unknown) =>
         'trailingTrivia',
       ].includes(key)
         ? undefined
-        : v
+        : v && typeof v === 'object' && v.kind === 'number'
+          ? { ...v, text: undefined }
+          : v
     )
   );
 const vectors = JSON.parse(

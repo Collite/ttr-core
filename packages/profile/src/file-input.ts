@@ -42,8 +42,8 @@ function invalid(file: string, prefix: string, detail: string): never {
   let line = 1,
     column = 1;
   for (const character of prefix.replace(/\r\n?/g, '\n')) {
-    // SnakeYAML StreamReader's marks skip BOMs and count all YAML line separators.
-    if (['\n', '\u0085', '\u2028', '\u2029'].includes(character)) {
+    // YAML 1.2 StreamReader marks skip BOMs; only CR/LF are line breaks.
+    if (character === '\n') {
       line++;
       column = 1;
     } else if (character !== '\ufeff') column++;

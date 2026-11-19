@@ -334,7 +334,7 @@ describe('review-373: bounded strict UTF-8 file readers', () => {
       malformed(file, '\ufeff# first' + separator + '# ');
       expect(failure(() => readProfileFile(file))).toMatchObject({
         code: 'ys/profile-invalid',
-        location: { file, line: 2, column: 3, path: '' },
+        location: { file, line: 1, column: 11, path: '' },
       });
     }
   });

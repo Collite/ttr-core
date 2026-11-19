@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-import { JsonPointer, type Json, type ForeignNode } from './input.js';
+import { NumericScalar, isRecord, JsonPointer, type Json, type ForeignNode } from './input.js';
+import { jsonText } from './scalars.js';
 import { ProfileException } from './loading.js';
 import type { PlannedOp, RecordPlan, CanonicalBuilder, Record } from './engine.js';
 import { ProfileVocabulary } from './vocabulary.js';
@@ -20,7 +21,7 @@ export function fillTemplate(
   input: (text: string) => ForeignNode | null | undefined,
   consume: (node: ForeignNode) => void
 ): Filled {
-  if (template !== null && typeof template === 'object') {
+  if (Array.isArray(template) || isRecord(template)) {
     if (!Array.isArray(template) && Object.keys(template).length === 1 && 'input' in template) {
       const found = input(template.input as string);
       if (found) consume(found);
@@ -41,8 +42,8 @@ export function fillTemplate(
   }
   return { value: template, inputs: false };
 }
-const scalar = (value: Json): value is string | number | boolean =>
-  value !== null && typeof value !== 'object';
+const scalar = (value: Json): value is string | number | boolean | NumericScalar =>
+  value instanceof NumericScalar || (value !== null && typeof value !== 'object');
 
 export class ValuesOp {
   constructor(readonly op: PlannedOp) {}
@@ -164,7 +165,7 @@ export class EachOp {
         if (!Object.hasOwn(keyed, name)) keyed[name] = value;
         else {
           warn(`each key repeated (${name})`);
-          const text = (v: Json) => (typeof v === 'string' ? v : JSON.stringify(v));
+          const text = (v: Json) => (typeof v === 'string' ? v : jsonText(v));
           if (bytewise(text(value), text(keyed[name])) < 0) keyed[name] = value;
         }
       }
