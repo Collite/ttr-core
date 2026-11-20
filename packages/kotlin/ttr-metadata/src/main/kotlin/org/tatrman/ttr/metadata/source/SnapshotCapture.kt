@@ -2,19 +2,22 @@
 package org.tatrman.ttr.metadata.source
 
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.tatrman.ttr.profile.CaptureFilter
 import org.tatrman.ttr.profile.FileSnapshotSource
+import org.tatrman.ttr.profile.ForeignTree
+import org.tatrman.ttr.profile.ProfileDefinition
 import org.tatrman.ttr.profile.ProfileException
 import org.tatrman.ttr.profile.ProfileResolver
 import org.tatrman.ttr.profile.Sanitise
-import org.tatrman.ttr.profile.SnapshotSource
 import org.yaml.snakeyaml.DumperOptions
 import org.yaml.snakeyaml.Yaml
 import java.math.BigDecimal
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.exists
@@ -27,6 +30,10 @@ sealed interface Captured {
     class Written(
         val name: String,
         val text: String,
+    ) : Captured
+
+    class Batch(
+        val files: Map<String, String>,
     ) : Captured
 
     /** A diagnostic (`ys/…` or `xm/snapshot-size`) at [file]:[line]:[column]. */
@@ -65,9 +72,12 @@ object SnapshotCapture {
         root: Path,
         large: Boolean,
     ): Captured {
-        val source = source(from) ?: return Captured.Usage("--from: unknown adapter in '$from' (P3 has file:<path>)")
+        if (!from.startsWith("file:") || from == "file:") {
+            return Captured.Usage("--from: expected file:<path> or openmetadata with --url and --token-env")
+        }
+        val source = FileSnapshotSource(Path.of(from.removePrefix("file:")).toAbsolutePath().normalize())
         // A missing export is a command-line mistake, as a missing --profile file is (review-277 F9).
-        if (source is FileSnapshotSource && !(source.path.isRegularFile() && source.path.isReadable())) {
+        if (!(source.path.isRegularFile() && source.path.isReadable())) {
             return Captured.Usage("--from: no export file ${source.path}")
         }
         val top = root.toRealPath()
@@ -90,29 +100,67 @@ object SnapshotCapture {
             val plan = CaptureFilter.plan(tree, chain)
             val clean = Sanitise.counters(Sanitise.principals(tree.root.value, plan.records), plan.records)
             val text = yaml(CaptureFilter.prune(clean, plan.ignored))
-            val size = text.toByteArray(Charsets.UTF_8).size.toLong()
-            if (size > LIMIT && !large) {
-                return Captured.Refused(
-                    "${source.name}.yaml",
-                    1,
-                    1,
-                    "xm/snapshot-size: the snapshot is $size bytes, over the $LIMIT-byte limit; pass --large to write it",
-                )
-            }
-            Captured.Written("${source.name}.yaml", text)
+            val name = "${source.name}.yaml"
+            checkSize(name, text, large) ?: Captured.Written(name, text)
         } catch (e: ProfileException) {
             // The location is the Refused's own; the exception's message would print it a second time (F9).
             Captured.Refused(e.location.file, e.location.line, e.location.column, "${e.code}: ${e.detail}")
         }
     }
 
-    private fun source(from: String): SnapshotSource? =
-        when {
-            from.startsWith(
-                "file:",
-            ) -> FileSnapshotSource(Path.of(from.removePrefix("file:")).toAbsolutePath().normalize())
-            else -> null
+    fun captureOpenMetadata(
+        url: URI,
+        token: String,
+        chain: List<ProfileDefinition>,
+        large: Boolean,
+    ): Captured {
+        val tables = chain.firstOrNull { "${it.name}/${it.major}" == "om-tables/1" }
+        val glossary = chain.any { "${it.name}/${it.major}" == "om-glossary/1" }
+        val documents =
+            OpenMetadataSnapshotSource(url, token).use { source ->
+                when {
+                    tables != null -> {
+                        val mappedTypes =
+                            tables.operations.firstNotNullOfOrNull { operation ->
+                                (operation.value["mapping"] as? JsonObject)
+                                    ?.takeIf { (operation.value["at"] as? JsonPrimitive)?.content == "/dataType" }
+                            } ?: return Captured.Usage("--profile: om-tables/1 must map column data types")
+                        source.tables(mappedTypes.keys)
+                    }
+                    glossary -> source.glossary()
+                    else -> return Captured.Usage("--profile: openmetadata needs om-tables/1 or om-glossary/1")
+                }
+            }
+        val files = linkedMapOf<String, String>()
+        for ((name, document) in documents) {
+            val catalog = OpenMetadataSnapshotSource.catalogContent(document)
+            val tree = ForeignTree.read(catalog.toString(), name)
+            val plan = CaptureFilter.plan(tree, chain)
+            val clean = Sanitise.counters(catalog, plan.records)
+            // Keep the catalog fields the reader will account for in its ignored[] report.
+            val text = SNAPSHOT_JSON.encodeToString(JsonElement.serializer(), clean) + "\n"
+            checkSize(name, text, large)?.let { return it }
+            files[name] = text
         }
+        return Captured.Batch(files)
+    }
+
+    private val SNAPSHOT_JSON = Json { prettyPrint = true }
+
+    private fun checkSize(
+        name: String,
+        text: String,
+        large: Boolean,
+    ): Captured.Refused? {
+        val size = text.toByteArray(Charsets.UTF_8).size.toLong()
+        if (large || size <= LIMIT) return null
+        return Captured.Refused(
+            name,
+            1,
+            1,
+            "xm/snapshot-size: the snapshot is $size bytes, over the $LIMIT-byte limit; pass --large to write it",
+        )
+    }
 
     /**
      * `.gitattributes` in [directory] with [ATTRIBUTES] once: appended when missing, the file left as it is otherwise.

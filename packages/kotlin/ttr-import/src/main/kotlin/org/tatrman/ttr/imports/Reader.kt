@@ -85,7 +85,7 @@ object Reader {
         val result =
             ProfileEngine.apply(
                 trees,
-                profile.chain(request.overlay, request.packageName),
+                profile.chain(request.overlay, request.packageName, trees),
                 request.root,
                 sourceName = profile.options.sourceName,
             )

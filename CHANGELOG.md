@@ -6,6 +6,11 @@ changes (see [`PUBLISHING.md`](PUBLISHING.md) → Semver discipline).
 
 ## Unreleased
 
+### Added — OpenMetadata snapshot capture (MW P5 S5.5)
+
+- `snapshot --from openmetadata` captures tables or glossary terms as deterministic JSON with a bearer token read from the environment.
+- `import-schema` reads a directory of schema snapshots and resolves composite foreign keys by OpenMetadata column FQN. `import-glossary` reads normalized terms with parents, related terms and synonyms. Existing raw JSON and CSV imports remain supported.
+
 ### Fixed — PowerDesigner real-file imports (MW-P5 S5.4c)
 
 - `pdm/16` disambiguates duplicate relationship Codes by ObjectID order, with located

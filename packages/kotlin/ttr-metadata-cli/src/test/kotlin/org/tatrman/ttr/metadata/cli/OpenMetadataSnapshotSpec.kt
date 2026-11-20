@@ -2,6 +2,7 @@
 package org.tatrman.ttr.metadata.cli
 
 import com.sun.net.httpserver.HttpServer
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -23,6 +24,7 @@ class OpenMetadataSnapshotSpec :
               "databaseSchema":{"fullyQualifiedName":"shop.sales.east"},
               "updatedAt":123,"updatedBy":"private-editor","owners":[{"name":"private-owner"}],
               "usageSummary":{"count":9},"sourceHash":"volatile","domains":[],"dataProducts":[],
+              "extension":{"api_key":"private-api-key","setting":"public-setting"},
               "lifeCycle":{},"retentionPeriod":"P1Y","entityStatus":"Approved",
               "tableConstraints":[{"constraintType":"FOREIGN_KEY","columns":["customer_id","region"],
                   "referredColumns":["shop.sales.east.customers.id","shop.sales.east.customers.region"]}],
@@ -110,20 +112,61 @@ class OpenMetadataSnapshotSpec :
             url: String,
             profile: String = "om-tables/1",
             out: String = "sources",
-        ) = exec(work, "snapshot", "--from", "openmetadata", "--url", url, "--token-env", "OM_SPEC_TOKEN", "--profile", profile, "--out", out)
+        ) = exec(
+            work,
+            "snapshot",
+            "--from",
+            "openmetadata",
+            "--url",
+            url,
+            "--token-env",
+            "OM_SPEC_TOKEN",
+            "--profile",
+            profile,
+            "--out",
+            out,
+        )
 
         fun importTables(work: Path) =
-            exec(work, "import-schema", "--from", "file:sources", "--profile", "om-tables/1", "--out", "model", "--format", "json")
+            exec(
+                work,
+                "import-schema",
+                "--from",
+                "file:sources",
+                "--profile",
+                "om-tables/1",
+                "--out",
+                "model",
+                "--format",
+                "json",
+            )
 
         test("fetches every page with a bearer token and writes one file for each schema") {
             val work = Files.createTempDirectory("om-snapshot-paging")
             withServer(::tables) { url ->
-                val result = capture(work, url)
+                val result = capture(work, "$url/api/v1/")
                 withClueOutcome(result)
                 val east = work.resolve("sources/shop.sales.east.json").readText()
                 val west = work.resolve("sources/shop.sales.west.json").readText()
-                Json.parseToJsonElement(east).jsonObject.getValue("data").jsonArray.size shouldBe 2
-                Json.parseToJsonElement(west).jsonObject.getValue("data").jsonArray.size shouldBe 1
+                Json
+                    .parseToJsonElement(east)
+                    .jsonObject
+                    .getValue("data")
+                    .jsonArray.size shouldBe 2
+                Json
+                    .parseToJsonElement(west)
+                    .jsonObject
+                    .getValue("data")
+                    .jsonArray.size shouldBe 1
+            }
+            withServer({ _, query ->
+                if ("after=" in query) 401 to "invented-test-token" else 200 to firstPage
+            }) { url ->
+                val result = capture(work, url, out = "refused")
+                result.exitCode shouldBe 1
+                result.stdout shouldContain "HTTP 401"
+                (result.stdout + result.stderr) shouldNotContain "invented-test-token"
+                work.resolve("refused").exists() shouldBe false
             }
         }
 
@@ -133,14 +176,20 @@ class OpenMetadataSnapshotSpec :
                 withClueOutcome(capture(work, url, "om-glossary/1"))
                 val result =
                     exec(
-                        work, "import-glossary", "--from", "sources/glossary.json", "--profile", "om-glossary/1",
-                        "--out", "model",
+                        work,
+                        "import-glossary",
+                        "--from",
+                        "sources/glossary.json",
+                        "--profile",
+                        "om-glossary/1",
+                        "--out",
+                        "model",
                     )
                 withClueOutcome(result)
                 val model = work.resolve("model/glossary/cn.ttrm").readText()
                 model shouldContain "def kind Customer"
-                model shouldContain "is_a: [Party]"
-                model shouldContain "to: Supplier"
+                model shouldContain "is_a: [\"Party\"]"
+                model shouldContain "to: \"Supplier\""
                 model shouldNotContain "def kind Draft"
                 val lexicon = work.resolve("model/glossary/lexicon.en.ttrm").readText()
                 lexicon shouldContain "Buyer"
@@ -151,15 +200,28 @@ class OpenMetadataSnapshotSpec :
         test("key order and record page order do not change the sanitized snapshot bytes") {
             val work = Files.createTempDirectory("om-snapshot-stable")
             withServer(::tables) { url -> withClueOutcome(capture(work, url)) }
-            val allTables = listOf(secondPage, firstPage).flatMap {
-                Json.parseToJsonElement(it).jsonObject.getValue("data").jsonArray
-            }
-            withServer({ _, _ -> 200 to """{"paging":{},"data":${allTables}}""" }) { url ->
+            val allTables =
+                listOf(secondPage, firstPage).flatMap {
+                    Json
+                        .parseToJsonElement(it)
+                        .jsonObject
+                        .getValue("data")
+                        .jsonArray
+                }
+            withServer({ _, _ -> 200 to """{"paging":{},"data":$allTables}""" }) { url ->
                 withClueOutcome(capture(work, url, out = "recaptured"))
             }
             val first = work.resolve("sources/shop.sales.east.json").readText()
             first shouldBe work.resolve("recaptured/shop.sales.east.json").readText()
-            for (removed in listOf("invented-test-token", "private-editor", "private-owner", "updatedAt", "usageSummary", "dataLength")) {
+            for (removed in listOf(
+                "invented-test-token",
+                "private-editor",
+                "private-owner",
+                "private-api-key",
+                "updatedAt",
+                "usageSummary",
+                "dataLength",
+            )) {
                 first shouldNotContain removed
             }
             work.resolve("sources/.gitattributes").readText() shouldContain "linguist-generated=true"
@@ -182,8 +244,10 @@ class OpenMetadataSnapshotSpec :
             withClueOutcome(result)
             val model = work.resolve("model/om/shop/sales/east/db.ttrm").readText()
             model shouldContain "def fk fk_orders_1"
-            model shouldContain "from: [om.shop.sales.east.db.dbo.orders.customer_id, om.shop.sales.east.db.dbo.orders.region]"
-            model shouldContain "to: [om.shop.sales.east.db.dbo.customers.id, om.shop.sales.east.db.dbo.customers.region]"
+            model shouldContain
+                "from: [om.shop.sales.east.db.dbo.orders.customer_id, om.shop.sales.east.db.dbo.orders.region]"
+            model shouldContain
+                "to: [om.shop.sales.east.db.dbo.customers.id, om.shop.sales.east.db.dbo.customers.region]"
             result.stdout shouldContain "mapped to text"
             result.stdout shouldContain "retentionPeriod"
             result.stdout shouldContain "jsonSchema"
@@ -192,6 +256,7 @@ class OpenMetadataSnapshotSpec :
     })
 
 private fun withClueOutcome(result: CliOutcome) {
-    "${result.exitCode}: ${result.stderr}${result.stdout.takeIf { result.exitCode != 0 }.orEmpty()}" shouldContain "0:"
-    result.exitCode shouldBe 0
+    withClue(result.stderr + result.stdout.takeIf { result.exitCode != 0 }.orEmpty()) {
+        result.exitCode shouldBe 0
+    }
 }
