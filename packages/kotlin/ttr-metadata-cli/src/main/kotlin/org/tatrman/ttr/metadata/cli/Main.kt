@@ -135,19 +135,30 @@ class ProfileCheckCommand(
     override fun run() = output(LintCli.check(Path.of(root), profile, format))
 }
 
-/** MW S3.6 T5 — `snapshot`: the capture seam (contracts §6); P3's only adapter is `file:`. */
+/** MW S3.6 T5 and P5 S5.5 — `snapshot`: file and OpenMetadata capture. */
 class SnapshotCommand(
     private val output: (CliOutcome) -> Unit,
 ) : CliktCommand(name = "snapshot") {
     override fun help(context: Context) =
-        "Capture a foreign export through a profile: ignored keys, principal names and usage counters removed."
+        "Capture a foreign export through a profile with principal and usage data sanitized."
 
-    private val from by option("--from", help = "The source: file:<path> (an existing export)").required()
+    private val from by option(
+        "--from",
+        help = "The source: file:<path> (an existing export) or openmetadata",
+    ).required()
+    private val url by option("--url", help = "OpenMetadata base URL")
+    private val tokenEnv by option(
+        "--token-env",
+        help = "Name of the environment variable holding the OpenMetadata bearer token",
+    )
     private val profile by option("--profile", help = PROFILE_HELP).required()
-    private val out by option("--out", help = "Output directory; <out>/<name>.yaml").required()
+    private val out by option(
+        "--out",
+        help = "Output directory; file captures use YAML and OpenMetadata uses JSON",
+    ).required()
     private val large by option("--large", help = "Write a snapshot over 5 MiB").flag()
 
-    override fun run() = output(SnapshotCli.run(from, profile, Path.of(out), large))
+    override fun run() = output(SnapshotCli.run(from, profile, Path.of(out), large, url, tokenEnv))
 }
 
 /** MW-P5 S5.1 T5 — `import-schema --from file:`: a catalog export through the reader harness (contracts §2). */
@@ -157,8 +168,15 @@ class ImportSchemaCommand(
     override fun help(context: Context) =
         "Generate a db package from a catalog export: <out>/<package>/<model>.ttrm, <package>.sources.json, report.json."
 
-    private val from by option("--from", help = "The source: file:<path> (an export, e.g. OpenMetadata's tables)")
-        .required()
+    private val from by option(
+        "--from",
+        help = "The source: openmetadata or file:<path> (an export file or a snapshot directory)",
+    ).required()
+    private val url by option("--url", help = "OpenMetadata base URL")
+    private val tokenEnv by option(
+        "--token-env",
+        help = "Name of the environment variable holding the OpenMetadata bearer token",
+    )
     private val profile by option("--profile", help = "A shipped profile (om-tables/1) or a profile file").required()
     private val out by option("--out", help = "Output directory").required()
     private val root by option("--root", help = "The model root whose sidecars links and overlays read")
@@ -183,6 +201,8 @@ class ImportSchemaCommand(
                 packageName,
                 dryRun,
                 format == "json",
+                url,
+                tokenEnv,
             ),
         )
 }
@@ -195,9 +215,12 @@ class ImportGlossaryCommand(
         "Generate a cn skeleton and lexicon from a glossary export: <out>/<package>/cn.ttrm, lexicon.<locale>.ttrm, " +
             "<package>.sources.json, report.json."
 
-    private val from by option("--from", help = "The glossary file (Turtle, RDF/XML or CSV)").required()
+    private val from by option(
+        "--from",
+        help = "The glossary file (Turtle, RDF/XML, CSV or an OpenMetadata JSON snapshot)",
+    ).required()
     private val syntax by option("--syntax", help = "The file's syntax; default from its extension")
-        .choice("turtle", "rdfxml", "csv")
+        .choice("turtle", "rdfxml", "csv", "json")
     private val profile by option("--profile", help = "A shipped profile (skos/1, om-glossary/1) or a profile file")
         .required()
     private val out by option("--out", help = "Output directory").required()

@@ -9,6 +9,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import org.tatrman.ttr.metadata.export.GeneratedHeader
 import org.tatrman.ttr.metadata.export.GeneratedInputs
+import org.tatrman.ttr.metadata.export.Hashes
 import org.tatrman.ttr.parser.model.Definition
 import org.tatrman.ttr.profile.Bytewise
 import org.tatrman.ttr.profile.ForeignTree
@@ -40,6 +41,8 @@ data class ReaderRequest(
     val root: Path? = null,
     val overlay: Path? = null,
     val packageName: String? = null,
+    // Live capture can parse staged bytes before publishing them at this stable path.
+    val snapshotPath: Path? = null,
 )
 
 /**
@@ -85,17 +88,19 @@ object Reader {
         val result =
             ProfileEngine.apply(
                 trees,
-                profile.chain(request.overlay, request.packageName),
+                profile.chain(request.overlay, request.packageName, trees),
                 request.root,
                 sourceName = profile.options.sourceName,
             )
+        val provenance = request.snapshotPath ?: input
         val header =
             GeneratedInputs(
-                input,
+                provenance,
                 profile.overlayInput(request.overlay),
                 profile.identity,
                 request.generator,
                 request.out.toAbsolutePath().normalize(),
+                lazy { requireNotNull(Hashes.of(input)) { "no snapshot $input" } },
             )
         val files = TreeMap<String, String>(Bytewise)
         val packages = mutableListOf<ImportReport.Package>()
@@ -141,7 +146,7 @@ object Reader {
             sidecars[name] = SourcesJsonWriter.write(header.header(name).text, entries)
         }
         // S5.3a T4b: the delta against every previous sidecar of this input under --out (✅R378-A), across packages.
-        val delta = SidecarDelta.of(request.out, input, sources)
+        val delta = SidecarDelta.of(request.out, provenance, sources)
         return GeneratedPackage(
             files,
             sidecars,
