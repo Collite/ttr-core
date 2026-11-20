@@ -73,6 +73,12 @@ internal object OpenMetadataSnapshots {
         val manifest = current.entries.sortedBy { it.key }.joinToString("") { (name, hash) -> "$hash $name\n" }
         val payload = files + (MANIFEST to manifest)
         payload.keys.forEach { checkRegularFile(directory.resolve(it)) }
+        for (name in files.keys) {
+            val path = directory.resolve(name)
+            if (Files.isRegularFile(path, NOFOLLOW_LINKS) && Hashes.of(path) != previous[name]) {
+                throw ReaderInputException("$name is not an unchanged file from the previous capture")
+            }
+        }
 
         val pending = Files.createTempDirectory(directory, ".capture-")
         try {

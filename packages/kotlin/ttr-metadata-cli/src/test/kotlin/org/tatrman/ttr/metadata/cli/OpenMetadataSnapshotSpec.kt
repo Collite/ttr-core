@@ -133,11 +133,12 @@ class OpenMetadataSnapshotSpec :
         fun importTables(
             work: Path,
             out: String = "model",
+            source: String = "sources",
         ) = exec(
             work,
             "import-schema",
             "--from",
-            "file:sources",
+            "file:$source",
             "--profile",
             "om-tables/1",
             "--out",
@@ -328,6 +329,44 @@ class OpenMetadataSnapshotSpec :
             for (schema in listOf("east", "west")) {
                 val generated = work.resolve("model/om/shop/sales/$schema/db.ttrm").readText()
                 generated shouldContain "def table customers"
+            }
+        }
+
+        test("capture refuses to replace both user-owned files and locally edited current snapshots") {
+            val work = Files.createTempDirectory("om-name-collision")
+            val owned = Files.createDirectory(work.resolve("owned")).resolve("shop.sales.west.json")
+            owned.writeText("""{"authored":true}""")
+            withServer(::tables) { url ->
+                val collision = capture(work, url, out = "owned")
+                collision.exitCode shouldBe 2
+                collision.stderr shouldContain "shop.sales.west.json"
+                owned.readText() shouldBe """{"authored":true}"""
+                work.resolve("owned/shop.sales.east.json").exists() shouldBe false
+
+                withClueOutcome(capture(work, url))
+                val east = work.resolve("sources/shop.sales.east.json")
+                val west = work.resolve("sources/shop.sales.west.json")
+                val edited = west.readText() + "\n"
+                west.writeText(edited)
+                val unedited = east.readText()
+                val recapture = capture(work, url)
+                recapture.exitCode shouldBe 2
+                recapture.stderr shouldContain "shop.sales.west.json"
+                west.readText() shouldBe edited
+                east.readText() shouldBe unedited
+            }
+        }
+
+        test("directory import refuses output paths that would alter its snapshot") {
+            val work = Files.createTempDirectory("om-import-inside-source")
+            withServer(::tables) { url -> withClueOutcome(capture(work, url, out = "om")) }
+            for (out in listOf("om/generated", ".")) {
+                val result = importTables(work, out, source = "om")
+                result.exitCode shouldBe 2
+                result.stderr shouldContain "would write inside snapshot directory"
+                work.resolve("om/generated").exists() shouldBe false
+                work.resolve("om/shop/sales/east/db.ttrm").exists() shouldBe false
+                work.resolve("report.json").exists() shouldBe false
             }
         }
 

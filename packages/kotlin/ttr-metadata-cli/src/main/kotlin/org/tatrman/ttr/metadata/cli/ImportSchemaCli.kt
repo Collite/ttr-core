@@ -62,11 +62,12 @@ object ImportSchemaCli {
             )
         }
         return try {
-            OpenMetadataSnapshots.read(input) {
+            val snapshot = input.toRealPath()
+            OpenMetadataSnapshots.read(snapshot) {
                 generate(
                     "import-schema",
                     SchemaSnapshots,
-                    input,
+                    snapshot,
                     profile,
                     out,
                     root,
@@ -170,6 +171,10 @@ object ImportSchemaCli {
         if (output == null) {
             // review-330 R4: with --format json stdout is the report JSON alone; the diff goes to stderr.
             return if (json) CliOutcome(0, report, diff(out, files)) else CliOutcome(0, diff(out, files) + report, "")
+        }
+        if (frontEnd === SchemaSnapshots && files.keys.any { output.real.resolve(it).startsWith(input) }) {
+            output.discard()
+            return usage("--out $out would write inside snapshot directory $input")
         }
         files.keys.forEach { path ->
             LintCli.link(output.real, path)?.let { at ->
