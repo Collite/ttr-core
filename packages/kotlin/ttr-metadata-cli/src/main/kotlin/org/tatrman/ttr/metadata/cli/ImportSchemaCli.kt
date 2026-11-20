@@ -238,13 +238,14 @@ object ImportSchemaCli {
                 writing = path
                 Files.createDirectories(output.real.resolve(path).parent)
             }
-            if (snapshot != null && snapshotHash != null) {
+            if (snapshot != null) {
                 writing = requireNotNull(relativeSnapshot)
-                OpenMetadataSnapshots.retain(input, snapshot, snapshotHash)
-            }
-            files.forEach { (path, text) ->
-                writing = path
-                Files.writeString(output.real.resolve(path), text)
+                DirectImportOutputs.publish(output.real, input, snapshot, snapshotHash, files)
+            } else {
+                files.forEach { (path, text) ->
+                    writing = path
+                    Files.writeString(output.real.resolve(path), text)
+                }
             }
         } catch (e: ReaderInputException) {
             output.discard()

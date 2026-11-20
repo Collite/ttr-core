@@ -483,6 +483,47 @@ class OpenMetadataSnapshotSpec :
                 durableInput(work) shouldBe retained
             }
         }
+
+        test("direct import preserves authored and edited models and can update its own unchanged outputs") {
+            val modelPath = "model/om/shop/sales/east/db.ttrm"
+            val authoredWork = Files.createTempDirectory("om-live-authored")
+            val authored = authoredWork.resolve(modelPath)
+            Files.createDirectories(authored.parent)
+            authored.writeText("// authored model\n")
+            withServer(::tables) { url ->
+                val refusal = importLive(authoredWork, url)
+                refusal.exitCode shouldBe 2
+                refusal.stderr shouldContain "authored or edited output"
+                authored.readText() shouldBe "// authored model\n"
+                authoredWork.resolve("model/report.json").exists() shouldBe false
+            }
+
+            val work = Files.createTempDirectory("om-live-edited")
+            val model = work.resolve(modelPath)
+            withServer(::tables) { url ->
+                withClueOutcome(importLive(work, url))
+                val generated = model.readText()
+                val edited = generated + "// local edit\n"
+                model.writeText(edited)
+                val refusal = importLive(work, url)
+                refusal.exitCode shouldBe 2
+                refusal.stderr shouldContain "authored or edited output"
+                model.readText() shouldBe edited
+                model.writeText(generated)
+            }
+            withServer({ path, query ->
+                val (status, body) = tables(path, query)
+                status to
+                    body.replace(
+                        "\"name\":\"orders\",\"fullyQualifiedName\"",
+                        "\"name\":\"orders\",\"description\":\"Replacement description\",\"fullyQualifiedName\"",
+                    )
+            }) { url ->
+                withClueOutcome(importLive(work, url))
+                model.readText() shouldContain "Replacement description"
+                durableInput(work)
+            }
+        }
     })
 
 private fun withClueOutcome(result: CliOutcome) {
