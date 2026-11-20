@@ -9,6 +9,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import org.tatrman.ttr.profile.ForeignTree
+import org.tatrman.ttr.profile.JsonPointer
 import org.tatrman.ttr.profile.LocatedOp
 import org.tatrman.ttr.profile.ProfileDefinition
 import org.tatrman.ttr.profile.ProfileException
@@ -67,8 +69,9 @@ class ImportProfile internal constructor(
     internal fun chain(
         overlay: Path?,
         packageName: String?,
+        trees: List<ForeignTree>,
     ): List<ProfileDefinition> {
-        val packaged = packageName?.let { withPackage(it) } ?: chain
+        val packaged = packageName?.let { withPackage(it) } ?: withOmSchemaPackages(trees)
         val chain = if (options.cnFromUml == false) withoutCn(packaged) else packaged
         if (overlay == null) return chain
         refuseOverlay(overlay)
@@ -167,6 +170,33 @@ class ImportProfile internal constructor(
             leaf.copy(operations = leaf.operations + LocatedOp(op, leaf.locations.getValue(""), emptyMap()))
     }
 
+    /** A captured OM schema declares its package; raw exports keep the profile's default package. */
+    private fun withOmSchemaPackages(trees: List<ForeignTree>): List<ProfileDefinition> {
+        val tables = chain.firstOrNull { "${it.name}/${it.major}" == "om-tables/1" } ?: return chain
+        val mappings =
+            trees
+                .mapNotNull { tree ->
+                    val field = JsonPointer("/package").resolve(tree.root, includeNull = true) ?: return@mapNotNull null
+                    val name = (field.value as? JsonPrimitive)?.takeIf { it.isString }?.content
+                    if (name == null || !PACKAGE_PATH.matches(name)) {
+                        throw ProfileException(
+                            "ys/package-invalid",
+                            field.span(),
+                            "OpenMetadata snapshot needs a valid package path",
+                        )
+                    }
+                    tree.label.substringBeforeLast('.') to JsonPrimitive(name)
+                }.toMap()
+        if (mappings.isEmpty()) return chain
+        val operations =
+            tables.operations.map { op ->
+                if ((op.value["op"] as? JsonPrimitive)?.content != "package" || "at" in op.value) return@map op
+                val mapping = (op.value["mapping"] as? JsonObject).orEmpty() + mappings
+                op.copy(value = JsonObject(op.value + ("mapping" to JsonObject(mapping))))
+            }
+        return chain.map { if (it === tables) it.copy(operations = operations) else it }
+    }
+
     /**
      * A declared `cn-from-uml: false` (MW-P5 S5.3): every operation of the nearest declarer and of every profile above it
      * that only makes or fills cn definitions is dropped — one whose `in` is a cn kind, and a `kinds` op whose every
@@ -214,6 +244,8 @@ class ImportProfile internal constructor(
     }
 
     companion object {
+        private val PACKAGE_PATH = Regex("[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*")
+
         /** The cn stereotypes (contracts profiles §3, ✅D-MW-84): the kinds `cn-from-uml: false` drops operations for. */
         private val CN_KINDS = setOf("kind", "subkind", "variant", "role", "event", "phase", "quality", "relation_type")
 

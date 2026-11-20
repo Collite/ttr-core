@@ -10,8 +10,8 @@
 # Not carried by v1 (each listed with its reason in the report — MW-P5 S5.1 Found):
 # - tags: OM tag labels are objects (`{tagFQN, source, labelType, state, …}`); `tags[]` needs their `tagFQN`s, a list map
 #   the ten operations do not have (P-8).
-# - foreign keys and composite keys: OM lists them, unnamed, in each table's `tableConstraints`; a `def fk` is a
-#   top-level db definition with a name, which no operation can lift from a nested list.
+# - unnormalized table constraints: the OpenMetadata snapshot lifts FOREIGN_KEY entries into named records with
+#   ordered column FQNs. Other table constraints, and nested constraints in a raw export, are reported as ignored.
 # - owners: the db grammar has no `owner` property (0.22).
 #
 # Scope (review-330): v1 is written against the invented fixture (tests/conformance/readers/om-tables); MW-P5 S5.5
@@ -24,6 +24,9 @@ operations:
   - {op: package, mapping: {}, default: om}
   - {op: kinds, at: /data, id: /name, mapping: {table: table}}
   - {op: kinds, in: table, at: /columns, id: /name, mapping: {column: column}}
+  - {op: kinds, at: /foreignKeys, id: /name, mapping: {fk: fk}}
+  - {op: link, in: fk, at: /columns, to: {kind: fk, property: from}, by: sourceName, kind: column, as: ref}
+  - {op: link, in: fk, at: /referredColumns, to: {kind: fk, property: to}, by: sourceName, kind: column, as: ref}
 
   # Tables.
   - {op: rename, in: table, at: /description, to: {kind: table, property: description}}
@@ -76,6 +79,7 @@ operations:
     to: {kind: column, property: optional}
     mapping: {PRIMARY_KEY: false, UNIQUE: false, NOT_NULL: false, 'NULL': true}
   - {op: rename, in: column, at: /description, to: {kind: column, property: description}}
+  - {op: ignore, in: column, at: /typeFallback, reason: unsupported OpenMetadata data type mapped to text}
 
   # Carried outside the model.
   - {op: ignore, in: table, at: /fullyQualifiedName, reason: the sidecar's sourceName}
@@ -88,6 +92,7 @@ operations:
   - {op: ignore, in: table, at: /owners, reason: 'the db grammar has no owner property (S5.1 Found)'}
 
   # Catalog bookkeeping: identity, versioning and navigation of the OM instance, not the model.
+  - {op: ignore, at: /package, reason: schema package selected by the snapshot}
   - {op: ignore, at: /paging, reason: export paging}
   - {op: ignore, in: table, at: /id, reason: OM instance id}
   - {op: ignore, in: column, at: /id, reason: OM instance id}
@@ -109,7 +114,17 @@ operations:
   - {op: ignore, in: table, at: /database, reason: OM database reference (in the FQN)}
   - {op: ignore, in: table, at: /databaseSchema, reason: OM schema reference (in the FQN)}
   - {op: ignore, in: table, at: /tableType, reason: OM table type}
+  - {op: ignore, in: table, at: /sourceHash, reason: OM ingestion hash}
+  - {op: ignore, in: table, at: /domains, reason: OM governance assignments}
+  - {op: ignore, in: table, at: /dataProducts, reason: OM governance assignments}
+  - {op: ignore, in: table, at: /lifeCycle, reason: OM lifecycle bookkeeping}
+  - {op: ignore, in: table, at: /retentionPeriod, reason: OM retention policy has no db property}
+  - {op: ignore, in: table, at: /entityStatus, reason: OM workflow status}
+  - {op: ignore, in: table, at: /processedLineage, reason: OM lineage processing state}
   - {op: ignore, in: column, at: /dataTypeDisplay, reason: the source's type spelling (dataType is mapped)}
+  - {op: ignore, in: column, at: /children, reason: db columns do not carry nested structured members}
+  - {op: ignore, in: column, at: /arrayDataType, reason: db columns do not carry array element types}
+  - {op: ignore, in: column, at: /jsonSchema, reason: db columns do not carry JSON Schema}
   - {op: ignore, in: column, at: /ordinalPosition, reason: column order is the export's list order}
 
   # Usage and profiling statistics: measurements of the data, never model facts.

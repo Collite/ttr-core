@@ -7,8 +7,11 @@ import org.tatrman.ttr.imports.JsonFrontEnd
 import org.tatrman.ttr.imports.Reader
 import org.tatrman.ttr.imports.ReaderInputException
 import org.tatrman.ttr.imports.ReaderRequest
+import org.tatrman.ttr.profile.Bytewise
+import org.tatrman.ttr.profile.ForeignTree
 import org.tatrman.ttr.profile.ProfileException
 import java.io.IOException
+import java.io.UncheckedIOException
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
@@ -44,7 +47,67 @@ object ImportSchemaCli {
                 from.startsWith("file:") && from.length > "file:".length -> Path.of(from.removePrefix("file:"))
                 else -> return usage("--from must be file:<path> (an existing export)")
             }
-        return generate("import-schema", JsonFrontEnd, input, profile, out, root, overlay, packageName, dryRun, json)
+        if (!Files.isDirectory(input)) {
+            return generate(
+                "import-schema",
+                JsonFrontEnd,
+                input,
+                profile,
+                out,
+                root,
+                overlay,
+                packageName,
+                dryRun,
+                json,
+            )
+        }
+        return try {
+            OpenMetadataSnapshots.read(input) {
+                generate(
+                    "import-schema",
+                    SchemaSnapshots,
+                    input,
+                    profile,
+                    out,
+                    root,
+                    overlay,
+                    packageName,
+                    dryRun,
+                    json,
+                )
+            }
+        } catch (_: IOException) {
+            usage("cannot read snapshot directory $input")
+        }
+    }
+
+    /** Use the capture manifest when present. Older directories supply their visible JSON files. */
+    private object SchemaSnapshots : FrontEnd {
+        override val name = "json"
+
+        override fun parse(files: List<Path>): List<ForeignTree> {
+            val directory = files.single()
+            val snapshots =
+                try {
+                    OpenMetadataSnapshots.inputs(directory)?.let { return JsonFrontEnd.parse(it) }
+                    Files.list(directory).use { paths ->
+                        paths
+                            .filter { file ->
+                                val name = file.fileName.toString()
+                                !name.startsWith(".") &&
+                                    name.endsWith(".json") &&
+                                    Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)
+                            }.toList()
+                            .sortedWith(compareBy(Bytewise) { it.fileName.toString() })
+                    }
+                } catch (_: IOException) {
+                    throw ReaderInputException("cannot list snapshot directory $directory")
+                } catch (_: UncheckedIOException) {
+                    throw ReaderInputException("cannot list snapshot directory $directory")
+                }
+            if (snapshots.isEmpty()) throw ReaderInputException("no JSON snapshots in $directory")
+            return JsonFrontEnd.parse(snapshots)
+        }
     }
 
     /**
