@@ -10,11 +10,14 @@ import io.kotest.matchers.string.shouldNotContain
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import org.tatrman.ttr.metadata.export.GeneratedHeader
+import org.tatrman.ttr.metadata.export.Hashes
 import java.net.InetSocketAddress
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.readText
+import kotlin.io.path.writeText
 
 class OpenMetadataSnapshotSpec :
     FunSpec({
@@ -127,19 +130,55 @@ class OpenMetadataSnapshotSpec :
             out,
         )
 
-        fun importTables(work: Path) =
+        fun importTables(
+            work: Path,
+            out: String = "model",
+        ) = exec(
+            work,
+            "import-schema",
+            "--from",
+            "file:sources",
+            "--profile",
+            "om-tables/1",
+            "--out",
+            out,
+            "--format",
+            "json",
+        )
+
+        fun importGlossary(work: Path) =
             exec(
                 work,
-                "import-schema",
+                "import-glossary",
                 "--from",
-                "file:sources",
+                "sources/glossary.json",
                 "--profile",
-                "om-tables/1",
+                "om-glossary/1",
                 "--out",
                 "model",
-                "--format",
-                "json",
             )
+
+        fun importLive(
+            work: Path,
+            url: String,
+            vararg extra: String,
+        ) = exec(
+            work,
+            "import-schema",
+            "--from",
+            "openmetadata",
+            "--url",
+            url,
+            "--token-env",
+            "OM_SPEC_TOKEN",
+            "--profile",
+            "om-tables/1",
+            "--out",
+            "model",
+            "--format",
+            "json",
+            *extra,
+        )
 
         test("fetches every page with a bearer token and writes one file for each schema") {
             val work = Files.createTempDirectory("om-snapshot-paging")
@@ -174,27 +213,66 @@ class OpenMetadataSnapshotSpec :
             val work = Files.createTempDirectory("om-snapshot-glossary")
             withServer({ path, _ -> if (path == "/api/v1/glossaryTerms") 200 to glossaryPage else 404 to "" }) { url ->
                 withClueOutcome(capture(work, url, "om-glossary/1"))
-                val result =
-                    exec(
-                        work,
-                        "import-glossary",
-                        "--from",
-                        "sources/glossary.json",
-                        "--profile",
-                        "om-glossary/1",
-                        "--out",
-                        "model",
-                    )
-                withClueOutcome(result)
+                withClueOutcome(importGlossary(work))
                 val model = work.resolve("model/glossary/cn.ttrm").readText()
-                model shouldContain "def kind Customer"
-                model shouldContain "is_a: [\"Party\"]"
-                model shouldContain "to: \"Supplier\""
-                model shouldNotContain "def kind Draft"
+                model shouldContain "def kind om_Trade__Party__Customer"
+                model shouldContain "is_a: [\"om_Trade__Party\"]"
+                model shouldContain "to: \"om_Trade__Supplier\""
+                model shouldNotContain "def kind om_Trade__Draft"
                 val lexicon = work.resolve("model/glossary/lexicon.en.ttrm").readText()
                 lexicon shouldContain "Buyer"
                 lexicon shouldContain "Customer; retail"
             }
+        }
+
+        test("qualified glossary identities keep namesakes and their references distinct") {
+            val work = Files.createTempDirectory("om-glossary-namesakes")
+            val response =
+                """
+                {"data":[{"name":"Customer","fullyQualifiedName":"Sales.Customer","entityStatus":"Approved",
+                  "id":"sales-customer","synonyms":["Purchaser"]},
+                 {"name":"Customer","fullyQualifiedName":"Finance.Customer","entityStatus":"Approved",
+                  "id":"finance-customer","synonyms":["Account holder"]},
+                 {"name":"Retail","fullyQualifiedName":"Sales.Customer.Retail","entityStatus":"Approved",
+                  "parent":{"id":"sales-customer","name":"Customer"},
+                  "relatedTerms":[{"fullyQualifiedName":"Finance.Customer","name":"Customer"}]}],"paging":{}}
+                """.trimIndent()
+            withServer({ _, _ -> 200 to response }) { url -> withClueOutcome(capture(work, url, "om-glossary/1")) }
+            withClueOutcome(importGlossary(work))
+            val model = work.resolve("model/glossary/cn.ttrm").readText()
+            model shouldContain "def kind om_Sales__Customer "
+            model shouldContain "def kind om_Finance__Customer "
+            model shouldContain "is_a: [\"om_Sales__Customer\"]"
+            model shouldContain "to: \"om_Finance__Customer\""
+            val sidecar = work.resolve("model/glossary.sources.json").readText()
+            sidecar shouldContain "\"sourceName\":\"Sales.Customer\""
+            sidecar shouldContain "\"sourceName\":\"Finance.Customer\""
+            val lexicon = work.resolve("model/glossary/lexicon.en.ttrm").readText()
+            lexicon shouldContain "om_Sales__Customer"
+            lexicon shouldContain "om_Finance__Customer"
+        }
+
+        test("capture prunes ignored fields before writing glossary snapshot bytes") {
+            val work = Files.createTempDirectory("om-glossary-hygiene")
+            val secret = "invented-reference-api-key"
+            val response =
+                """
+                {"data":[{"name":"Party","fullyQualifiedName":"Trade.Party","entityStatus":"Approved",
+                   "references":[{"name":"Docs","endpoint":"https://example.invalid/doc?apiKey=$secret"}]},
+                 {"name":"Draft","fullyQualifiedName":"Trade.Draft","entityStatus":"Draft",
+                   "references":[{"name":"Docs","endpoint":"https://example.invalid/doc?apiKey=$secret"}]}],"paging":{}}
+                """.trimIndent()
+            withServer({ _, _ -> 200 to response }) { url ->
+                val result = capture(work, url, "om-glossary/1")
+                withClueOutcome(result)
+                (result.stdout + result.stderr) shouldNotContain secret
+            }
+            val snapshot = work.resolve("sources/glossary.json").readText()
+            snapshot shouldNotContain "\"references\""
+            snapshot shouldNotContain secret
+            val result = importGlossary(work)
+            withClueOutcome(result)
+            (result.stdout + result.stderr) shouldNotContain secret
         }
 
         test("key order and record page order do not change the sanitized snapshot bytes") {
@@ -221,10 +299,64 @@ class OpenMetadataSnapshotSpec :
                 "updatedAt",
                 "usageSummary",
                 "dataLength",
+                "retentionPeriod",
+                "jsonSchema",
             )) {
                 first shouldNotContain removed
             }
             work.resolve("sources/.gitattributes").readText() shouldContain "linguist-generated=true"
+        }
+
+        test("recapture retires removed schemas and preserves files outside the capture") {
+            val work = Files.createTempDirectory("om-removed-schema")
+            withServer(::tables) { url -> withClueOutcome(capture(work, url)) }
+            val west = work.resolve("sources/shop.sales.west.json")
+            west.exists() shouldBe true
+            withClueOutcome(importTables(work))
+            val unrelated = work.resolve("sources/unrelated.json")
+            unrelated.writeText("authored")
+            val east =
+                listOf(
+                    firstPage,
+                    secondPage,
+                ).flatMap {
+                    Json
+                        .parseToJsonElement(it)
+                        .jsonObject
+                        .getValue("data")
+                        .jsonArray
+                }.filter { "shop.sales.east" in it.toString() }
+            withServer({ _, _ -> 200 to """{"data":$east,"paging":{}}""" }) { url ->
+                withClueOutcome(capture(work, url))
+            }
+            west.exists() shouldBe false
+            unrelated.readText() shouldBe "authored"
+            withClueOutcome(importTables(work, "second-model"))
+            work.resolve("second-model/om/shop/sales/east/db.ttrm").exists() shouldBe true
+            work.resolve("second-model/om/shop/sales/west/db.ttrm").exists() shouldBe false
+            withServer({ _, _ -> 200 to """{"data":[],"paging":{}}""" }) { url -> withClueOutcome(capture(work, url)) }
+            withClueOutcome(importTables(work, "empty-model"))
+            work.resolve("empty-model/om").exists() shouldBe false
+        }
+
+        test("direct OpenMetadata import uses a durable snapshot and supports a clean dry run") {
+            val work = Files.createTempDirectory("om-direct-import")
+            withServer(::tables) { url ->
+                val dry = importLive(work, url, "--dry-run")
+                withClueOutcome(dry)
+                dry.stderr shouldContain "+++ b/om/shop/sales/east/db.ttrm"
+                work.resolve("model").exists() shouldBe false
+                withClueOutcome(importLive(work, url))
+                val model = work.resolve("model/om/shop/sales/east/db.ttrm")
+                model.readText() shouldContain "def fk fk_orders_1"
+                val header = requireNotNull(GeneratedHeader.parse(model.readText().lineSequence().first()))
+                val snapshot = model.parent.resolve(header.snapshot.path).normalize()
+                snapshot shouldBe work.resolve("model/.openmetadata")
+                header.snapshot.sha256 shouldBe Hashes.of(snapshot)
+                val again = importLive(work, url, "--dry-run")
+                withClueOutcome(again)
+                again.stderr shouldContain "No changes under model."
+            }
         }
 
         test("a directory import enumerates schema snapshots and keeps same-named tables in distinct packages") {
@@ -249,8 +381,6 @@ class OpenMetadataSnapshotSpec :
             model shouldContain
                 "to: [om.shop.sales.east.db.dbo.customers.id, om.shop.sales.east.db.dbo.customers.region]"
             result.stdout shouldContain "mapped to text"
-            result.stdout shouldContain "retentionPeriod"
-            result.stdout shouldContain "jsonSchema"
             work.resolve("model/report.json").exists() shouldBe true
         }
     })

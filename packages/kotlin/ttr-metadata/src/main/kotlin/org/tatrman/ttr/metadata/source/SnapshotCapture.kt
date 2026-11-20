@@ -132,13 +132,31 @@ object SnapshotCapture {
                 }
             }
         val files = linkedMapOf<String, String>()
+        val captureChain =
+            chain.map { profile ->
+                val annotations =
+                    when ("${profile.name}/${profile.major}") {
+                        "om-tables/1" -> TABLE_READER_ANNOTATIONS
+                        "om-glossary/1" -> GLOSSARY_READER_ANNOTATIONS
+                        else -> emptySet()
+                    }
+                profile.copy(
+                    operations =
+                        profile.operations.filterNot { operation ->
+                            val at = (operation.value["at"] as? JsonPrimitive)?.content
+                            val scope = (operation.value["in"] as? JsonPrimitive)?.content
+                            (operation.value["op"] as? JsonPrimitive)?.content == "ignore" &&
+                                (scope to at) in annotations
+                        },
+                )
+            }
         for ((name, document) in documents) {
             val catalog = OpenMetadataSnapshotSource.catalogContent(document)
             val tree = ForeignTree.read(catalog.toString(), name)
-            val plan = CaptureFilter.plan(tree, chain)
+            val plan = CaptureFilter.plan(tree, captureChain)
             val clean = Sanitise.counters(catalog, plan.records)
-            // Keep the catalog fields the reader will account for in its ignored[] report.
-            val text = SNAPSHOT_JSON.encodeToString(JsonElement.serializer(), clean) + "\n"
+            val text =
+                SNAPSHOT_JSON.encodeToString(JsonElement.serializer(), CaptureFilter.prune(clean, plan.ignored)) + "\n"
             checkSize(name, text, large)?.let { return it }
             files[name] = text
         }
@@ -146,6 +164,16 @@ object SnapshotCapture {
     }
 
     private val SNAPSHOT_JSON = Json { prettyPrint = true }
+
+    // These base-profile ignores acknowledge fields the reader uses for routing, provenance, or reporting.
+    private val TABLE_READER_ANNOTATIONS =
+        setOf(
+            null to "/package",
+            "table" to "/fullyQualifiedName",
+            "column" to "/fullyQualifiedName",
+            "column" to "/typeFallback",
+        )
+    private val GLOSSARY_READER_ANNOTATIONS = setOf("kind" to "/fullyQualifiedName", "kind" to "/synonyms")
 
     private fun checkSize(
         name: String,

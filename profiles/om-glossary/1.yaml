@@ -7,9 +7,10 @@
 # state this profile does not name (`kind unmapped (<state>)`), or with an empty `glossaryStatus` (`kind missing`,
 # ✅D-MW-87). `displayName`/`description` are English (OpenMetadata's glossaries are
 # monolingual) → `label`/`description` language maps; `synonyms` → the English lexicon document. The term's sidecar
-# `sourceName` is its name (the CSV carries no FQN column).
+# `sourceName` is its FQN when present, otherwise its name (the CSV carries no FQN column).
 #
-# The OpenMetadata snapshot normalizes REST parent and related term references to `parentName` and `relatedNames`.
+# The OpenMetadata snapshot encodes each term FQN in its ID and normalizes REST parent and related term references
+# to the corresponding IDs in `parentName` and `relatedNames`.
 # Those fields carry `is_a` and `relations` as in skos/1. Raw CSV FQNs stay visible in the ignored-field report.
 #
 # Dropped, each listed once in the report's warnings[] (`unknown: ignore`, ✅D-MW-89): a column outside OM's glossary
@@ -22,7 +23,7 @@ profile: om-glossary/1
 grammar: '>=0.22 <1.0'
 unknown: ignore
 skeleton: true
-sourceName: /name*
+sourceName: /fullyQualifiedName
 lexicon:
   - {target: kind, at: /rows, id: /name*, terms: /synonyms, split: ';', locale: en}
 operations:
@@ -39,6 +40,7 @@ operations:
   - {op: each, in: kind, at: /relatedNames, to: {kind: kind, property: relations}, shape: {type: related, to: {input: $item}}}
 
   # Read by the reader, not the engine.
+  - {op: ignore, in: kind, at: /fullyQualifiedName, reason: the sidecar's sourceName}
   - {op: ignore, in: kind, at: /synonyms, reason: lexicon entries (the reader's lexicon key)}
 
   # Not carried by v1 (see the header).

@@ -7,6 +7,7 @@ import org.tatrman.ttr.imports.JsonFrontEnd
 import org.tatrman.ttr.imports.Reader
 import org.tatrman.ttr.imports.ReaderInputException
 import org.tatrman.ttr.imports.ReaderRequest
+import org.tatrman.ttr.metadata.source.Captured
 import org.tatrman.ttr.profile.Bytewise
 import org.tatrman.ttr.profile.ForeignTree
 import org.tatrman.ttr.profile.ProfileException
@@ -39,16 +40,83 @@ object ImportSchemaCli {
         packageName: String?,
         dryRun: Boolean,
         json: Boolean,
+        url: String? = null,
+        tokenEnv: String? = null,
     ): CliOutcome {
-        val input =
-            when {
-                from == "openmetadata" ->
-                    return usage("--from openmetadata is the live adapter (MW-P5 S5.5); capture with snapshot first")
-                from.startsWith("file:") && from.length > "file:".length -> Path.of(from.removePrefix("file:"))
-                else -> return usage("--from must be file:<path> (an existing export)")
+        if (from == "openmetadata") {
+            val captured = SnapshotCli.captureOpenMetadata(url, tokenEnv, profile, large = false, schemaOnly = true)
+            val batch =
+                when (captured) {
+                    is Captured.Batch -> captured
+                    is Captured.Usage -> return SnapshotCli.failure(captured)
+                    is Captured.Refused -> return SnapshotCli.failure(captured)
+                    is Captured.Written -> error("OpenMetadata capture produces a batch")
+                }
+            val staging =
+                try {
+                    Files.createTempDirectory("ttr-openmetadata-")
+                } catch (_: IOException) {
+                    return usage("cannot create a temporary OpenMetadata snapshot")
+                }
+            try {
+                OpenMetadataSnapshots.write(staging, batch.files)
+                return generate(
+                    "import-schema",
+                    SchemaSnapshots,
+                    staging,
+                    profile,
+                    out,
+                    root,
+                    overlay,
+                    packageName,
+                    dryRun,
+                    json,
+                    batch,
+                )
+            } catch (_: IOException) {
+                return usage("cannot stage the OpenMetadata snapshot")
+            } finally {
+                Files.newDirectoryStream(staging).use { paths -> paths.forEach(Files::delete) }
+                Files.delete(staging)
             }
-        val frontEnd = if (Files.isDirectory(input)) SchemaSnapshots else JsonFrontEnd
-        return generate("import-schema", frontEnd, input, profile, out, root, overlay, packageName, dryRun, json)
+        }
+        if (url != null || tokenEnv != null) return usage("--url and --token-env require --from openmetadata")
+        if (!from.startsWith("file:") || from == "file:") {
+            return usage("--from must be openmetadata or file:<path> (an existing export)")
+        }
+        val input = Path.of(from.removePrefix("file:"))
+        if (!Files.isDirectory(input)) {
+            return generate(
+                "import-schema",
+                JsonFrontEnd,
+                input,
+                profile,
+                out,
+                root,
+                overlay,
+                packageName,
+                dryRun,
+                json,
+            )
+        }
+        return try {
+            OpenMetadataSnapshots.read(input) {
+                generate(
+                    "import-schema",
+                    SchemaSnapshots,
+                    input,
+                    profile,
+                    out,
+                    root,
+                    overlay,
+                    packageName,
+                    dryRun,
+                    json,
+                )
+            }
+        } catch (_: IOException) {
+            usage("cannot read snapshot directory $input")
+        }
     }
 
     /** The directory is the generated header's snapshot. Each visible JSON file contributes one schema tree. */
@@ -59,6 +127,7 @@ object ImportSchemaCli {
             val directory = files.single()
             val snapshots =
                 try {
+                    OpenMetadataSnapshots.inputs(directory)?.let { return JsonFrontEnd.parse(it) }
                     Files.list(directory).use { paths ->
                         paths
                             .filter { file ->
@@ -94,6 +163,7 @@ object ImportSchemaCli {
         packageName: String?,
         dryRun: Boolean,
         json: Boolean,
+        capture: Captured.Batch? = null,
     ): CliOutcome {
         val resolved =
             try {
@@ -113,6 +183,8 @@ object ImportSchemaCli {
                     return usage("--out $out: cannot create the directory (${e.javaClass.simpleName} ${e.message})")
                 }
             }
+        val snapshot =
+            capture?.let { (output?.real ?: out.toAbsolutePath().normalize()).resolve(OPENMETADATA_DIRECTORY) }
         val generated =
             try {
                 Reader.run(
@@ -125,6 +197,7 @@ object ImportSchemaCli {
                         root?.toAbsolutePath()?.normalize(),
                         overlay,
                         packageName,
+                        snapshot,
                     ),
                 )
             } catch (e: ReaderInputException) {
@@ -140,7 +213,8 @@ object ImportSchemaCli {
             // review-330 R4: with --format json stdout is the report JSON alone; the diff goes to stderr.
             return if (json) CliOutcome(0, report, diff(out, files)) else CliOutcome(0, diff(out, files) + report, "")
         }
-        files.keys.forEach { path ->
+        val paths = if (snapshot == null) files.keys else files.keys + OPENMETADATA_DIRECTORY
+        paths.forEach { path ->
             LintCli.link(output.real, path)?.let { at ->
                 output.discard()
                 return usage("--out $out contains a symbolic link at $at; $verb does not write through links")
@@ -153,10 +227,17 @@ object ImportSchemaCli {
                 writing = path
                 Files.createDirectories(output.real.resolve(path).parent)
             }
+            if (capture != null && snapshot != null) {
+                writing = OPENMETADATA_DIRECTORY
+                OpenMetadataSnapshots.write(snapshot, capture.files)
+            }
             files.forEach { (path, text) ->
                 writing = path
                 Files.writeString(output.real.resolve(path), text)
             }
+        } catch (e: ReaderInputException) {
+            output.discard()
+            return usage("--out $out: ${e.message}")
         } catch (e: IOException) {
             output.discard()
             return usage("--out $out: cannot write $writing (${e.javaClass.simpleName} ${e.message})")
@@ -190,6 +271,8 @@ object ImportSchemaCli {
         )
 
     private fun usage(message: String?) = CliOutcome(2, "", "ttr-metadata: $message\n")
+
+    private const val OPENMETADATA_DIRECTORY = ".openmetadata"
 }
 
 /**

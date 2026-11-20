@@ -73,30 +73,63 @@ internal class OpenMetadataSnapshotSource(
     }
 
     fun glossary(): Map<String, JsonObject> {
-        val terms = records("glossaryTerms", "parent,relatedTerms")
+        val endpoint = "glossaryTerms"
+        val terms = records(endpoint, "parent,relatedTerms")
+        val namesById =
+            terms
+                .mapNotNull { term ->
+                    term.text("id")?.let { it to term.requiredText("fullyQualifiedName", endpoint) }
+                }.toMap()
+
+        fun referenceId(node: JsonElement?): String? {
+            val ref = node as? JsonObject ?: return null
+            val name = ref.text("fullyQualifiedName") ?: namesById[ref.text("id")] ?: return null
+            return termId(name)
+        }
+
         val rows =
             terms
-                .sortedWith(compareBy(Bytewise) { it.requiredText("fullyQualifiedName", "glossaryTerms") })
+                .sortedWith(compareBy(Bytewise) { it.requiredText("fullyQualifiedName", endpoint) })
                 .map { term ->
                     val row = mutableMapOf<String, JsonElement>()
-                    row["name*"] = JsonPrimitive(term.requiredText("name", "glossaryTerms"))
+                    val qualified = term.requiredText("fullyQualifiedName", endpoint)
+                    row["name*"] = JsonPrimitive(termId(qualified))
+                    row["fullyQualifiedName"] = JsonPrimitive(qualified)
                     val status = term.text("entityStatus") ?: term.text("status")
                     status?.let { row["glossaryStatus"] = JsonPrimitive(it) }
-                    for (key in listOf("displayName", "description", "synonyms", "tags", "references")) {
-                        term[key]?.takeUnless { it == JsonNull }?.let { row[key] = it }
+                    if (status == "Approved") {
+                        row["displayName"] =
+                            JsonPrimitive(term.text("displayName") ?: term.requiredText("name", endpoint))
+                        for (key in listOf("description", "synonyms", "tags", "references")) {
+                            term[key]?.takeUnless { it == JsonNull }?.let { row[key] = it }
+                        }
+                        referenceId(term["parent"])?.let { row["parentName"] = JsonPrimitive(it) }
+                        val related =
+                            (term["relatedTerms"] as? JsonArray)
+                                ?.mapNotNull(::referenceId)
+                                .orEmpty()
+                                .distinct()
+                                .sortedWith(Bytewise)
+                        if (related.isNotEmpty()) row["relatedNames"] = JsonArray(related.map(::JsonPrimitive))
                     }
-                    referenceName(term["parent"])?.let { row["parentName"] = JsonPrimitive(it) }
-                    val related =
-                        (term["relatedTerms"] as? JsonArray)
-                            ?.mapNotNull(::referenceName)
-                            .orEmpty()
-                            .distinct()
-                            .sortedWith(Bytewise)
-                    if (related.isNotEmpty()) row["relatedNames"] = JsonArray(related.map(::JsonPrimitive))
                     JsonObject(row)
                 }
         return mapOf("glossary.json" to JsonObject(mapOf("rows" to JsonArray(rows))))
     }
+
+    /** Encode the complete FQN as a TTR identifier, including literal underscores and quoted path segments. */
+    private fun termId(qualified: String): String =
+        buildString {
+            append("om_")
+            for (byte in qualified.toByteArray(Charsets.UTF_8)) {
+                val char = byte.toInt().toChar()
+                when (char) {
+                    in 'A'..'Z', in 'a'..'z', in '0'..'9' -> append(char)
+                    '.' -> append("__")
+                    else -> append('_').append(byte.toHexString())
+                }
+            }
+        }
 
     private fun records(
         endpoint: String,
@@ -249,11 +282,6 @@ internal class OpenMetadataSnapshotSource(
             }
             ?: fail("tables", "a foreign key has no $key array")
 
-    private fun referenceName(node: JsonElement?): String? {
-        val ref = node as? JsonObject ?: return null
-        return ref.text("name") ?: ref.text("fullyQualifiedName")?.substringAfterLast('.')?.trim('"')
-    }
-
     private fun packageSegments(schema: String): String =
         schema.split('.').joinToString(".") { segment ->
             val simple = segment.trim('"').lowercase().replace(Regex("[^a-z0-9_]"), "_")
@@ -302,8 +330,7 @@ internal class OpenMetadataSnapshotSource(
             )
 
         /**
-         * Remove OM instance and principal bookkeeping before the normal snapshot filter runs. Catalog attributes the
-         * import profile deliberately ignores remain visible to its report.
+         * Remove OM instance and principal bookkeeping before the normal snapshot filter runs.
          */
         fun catalogContent(element: JsonElement): JsonElement =
             when (element) {

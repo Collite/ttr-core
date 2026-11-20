@@ -179,7 +179,7 @@ data class GeneratedInputs(
      * As above, with the snapshot's hash computed by the caller: `profile apply` shares one tree hash across its
      * chains. One builder for the `.ttrm` export and the YAML apply headers, so they cannot drift (S3.7 T0, N4 (c)).
      */
-    internal constructor(
+    constructor(
         snapshot: Path,
         overlay: Path?,
         profile: String,

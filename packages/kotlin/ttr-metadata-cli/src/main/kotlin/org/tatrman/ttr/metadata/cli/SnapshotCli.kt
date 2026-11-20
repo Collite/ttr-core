@@ -46,19 +46,27 @@ object SnapshotCli {
                 SnapshotCapture.capture(from, profile, cwd, large)
             }
         return when (captured) {
-            is Captured.Usage -> usage(captured.message)
-            is Captured.Refused ->
-                CliOutcome(1, "${captured.file}:${captured.line}: error ${captured.message}\n", "")
+            is Captured.Usage -> failure(captured)
+            is Captured.Refused -> failure(captured)
             is Captured.Written -> write(directory, out, mapOf(captured.name to captured.text), captured.name)
-            is Captured.Batch -> write(directory, out, captured.files, "${captured.files.size} OpenMetadata snapshots")
+            is Captured.Batch ->
+                try {
+                    OpenMetadataSnapshots.write(directory, captured.files)
+                    CliOutcome(0, "", "ttr-metadata: wrote ${captured.files.size} OpenMetadata snapshots to $out\n")
+                } catch (e: ReaderInputException) {
+                    usage("--out $out: ${e.message}")
+                } catch (_: IOException) {
+                    usage("--out $out: could not write the OpenMetadata snapshot")
+                }
         }
     }
 
-    private fun captureOpenMetadata(
+    internal fun captureOpenMetadata(
         url: String?,
         tokenEnv: String?,
         profile: String,
         large: Boolean,
+        schemaOnly: Boolean = false,
     ): Captured {
         val endpoint = url?.let(::endpoint) ?: return Captured.Usage("--url must be an HTTP(S) OpenMetadata base URL")
         val name =
@@ -68,7 +76,11 @@ object SnapshotCli {
             System.getenv(name)?.trim()?.takeIf { it.isNotEmpty() && it.all { char -> char in '!'..'~' } }
                 ?: return Captured.Usage("--token-env: the named variable has no valid bearer token")
         return try {
-            SnapshotCapture.captureOpenMetadata(endpoint, token, ImportProfile.resolve(profile).chain, large)
+            val chain = ImportProfile.resolve(profile).chain
+            if (schemaOnly && chain.none { "${it.name}/${it.major}" == "om-tables/1" }) {
+                return Captured.Usage("--profile: import-schema from openmetadata needs om-tables/1")
+            }
+            SnapshotCapture.captureOpenMetadata(endpoint, token, chain, large)
         } catch (e: ReaderInputException) {
             Captured.Usage(e.message.orEmpty())
         } catch (e: ProfileException) {
@@ -112,6 +124,11 @@ object SnapshotCli {
     }
 
     private fun usage(message: String) = CliOutcome(2, "", "ttr-metadata: $message\n")
+
+    internal fun failure(captured: Captured.Usage) = usage(captured.message)
+
+    internal fun failure(captured: Captured.Refused) =
+        CliOutcome(1, "${captured.file}:${captured.line}: error ${captured.message}\n", "")
 
     private val ENV_NAME = Regex("[A-Za-z_][A-Za-z0-9_]*")
 }
