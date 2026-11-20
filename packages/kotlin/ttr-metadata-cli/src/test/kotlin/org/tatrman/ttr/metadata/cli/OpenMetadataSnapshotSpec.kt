@@ -452,8 +452,13 @@ class OpenMetadataSnapshotSpec :
 
             val east =
                 listOf(firstPage, secondPage)
-                    .flatMap { Json.parseToJsonElement(it).jsonObject.getValue("data").jsonArray }
-                    .filter { "shop.sales.east" in it.toString() }
+                    .flatMap {
+                        Json
+                            .parseToJsonElement(it)
+                            .jsonObject
+                            .getValue("data")
+                            .jsonArray
+                    }.filter { "shop.sales.east" in it.toString() }
             withServer({ _, _ -> 200 to """{"data":$east,"paging":{}}""" }) { url ->
                 val result = importLive(work, url)
                 withClueOutcome(result)

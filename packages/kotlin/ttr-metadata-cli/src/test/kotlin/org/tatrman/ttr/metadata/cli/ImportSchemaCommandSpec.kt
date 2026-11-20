@@ -131,7 +131,7 @@ class ImportSchemaCommandSpec :
             fun usage(vararg args: String) = runMetadataCommand(listOf("import-schema") + args)
             usage("--from", "openmetadata", "--profile", "om-tables/1", "--out", "${empty.resolve("model")}").let {
                 it.exitCode shouldBe 2
-                it.stderr shouldContain "MW-P5 S5.5"
+                it.stderr shouldContain "--url"
             }
             usage("--from", "db:x", "--profile", "om-tables/1", "--out", "${empty.resolve("model")}").exitCode shouldBe
                 2

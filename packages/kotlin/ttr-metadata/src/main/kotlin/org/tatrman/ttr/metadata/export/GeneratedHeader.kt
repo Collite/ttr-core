@@ -190,6 +190,23 @@ data class GeneratedInputs(
         known = snapshotSha
     }
 
+    /** Hash the staged snapshot bytes while naming their retained location in the generated header. */
+    constructor(
+        snapshot: Path,
+        overlay: Path?,
+        profile: String,
+        generator: String,
+        out: Path,
+        stagedSnapshot: Path,
+    ) : this(
+        snapshot,
+        overlay,
+        profile,
+        generator,
+        out,
+        lazy { requireNotNull(Hashes.of(stagedSnapshot)) { "no snapshot $stagedSnapshot" } },
+    )
+
     private val snapshotSha by lazy {
         known?.value ?: requireNotNull(Hashes.of(snapshot)) { "no snapshot $snapshot" }
     }

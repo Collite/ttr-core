@@ -78,8 +78,17 @@ object Reader {
         frontEnd: FrontEnd,
         profile: ImportProfile,
         request: ReaderRequest,
+    ): GeneratedPackage = run(frontEnd, profile, request, retainedSnapshot = null)
+
+    /** [retainedSnapshot] names where this run's staged input will be retained before publishing its outputs. */
+    fun run(
+        frontEnd: FrontEnd,
+        profile: ImportProfile,
+        request: ReaderRequest,
+        retainedSnapshot: Path?,
     ): GeneratedPackage {
         val input = snapshot(request.inputs)
+        val provenance = retainedSnapshot ?: input
         val parsed = if (frontEnd === PdmFrontEnd) PdmFrontEnd.parseReported(request.inputs) else null
         val trees = parsed?.trees ?: frontEnd.parse(request.inputs)
         val result =
@@ -91,11 +100,12 @@ object Reader {
             )
         val header =
             GeneratedInputs(
-                input,
+                provenance,
                 profile.overlayInput(request.overlay),
                 profile.identity,
                 request.generator,
                 request.out.toAbsolutePath().normalize(),
+                stagedSnapshot = input,
             )
         val files = TreeMap<String, String>(Bytewise)
         val packages = mutableListOf<ImportReport.Package>()
@@ -141,7 +151,7 @@ object Reader {
             sidecars[name] = SourcesJsonWriter.write(header.header(name).text, entries)
         }
         // S5.3a T4b: the delta against every previous sidecar of this input under --out (✅R378-A), across packages.
-        val delta = SidecarDelta.of(request.out, input, sources)
+        val delta = SidecarDelta.of(request.out, provenance, sources)
         return GeneratedPackage(
             files,
             sidecars,

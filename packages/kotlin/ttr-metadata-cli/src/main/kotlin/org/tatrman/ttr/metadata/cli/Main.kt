@@ -170,8 +170,13 @@ class ImportSchemaCommand(
 
     private val from by option(
         "--from",
-        help = "The source: file:<path> (an export file or an OpenMetadata snapshot directory)",
+        help = "The source: openmetadata or file:<path> (an export file or a snapshot directory)",
     ).required()
+    private val url by option("--url", help = "OpenMetadata base URL")
+    private val tokenEnv by option(
+        "--token-env",
+        help = "Name of the environment variable holding the OpenMetadata bearer token",
+    )
     private val profile by option("--profile", help = "A shipped profile (om-tables/1) or a profile file").required()
     private val out by option("--out", help = "Output directory").required()
     private val root by option("--root", help = "The model root whose sidecars links and overlays read")
@@ -196,6 +201,8 @@ class ImportSchemaCommand(
                 packageName,
                 dryRun,
                 format == "json",
+                url,
+                tokenEnv,
             ),
         )
 }
