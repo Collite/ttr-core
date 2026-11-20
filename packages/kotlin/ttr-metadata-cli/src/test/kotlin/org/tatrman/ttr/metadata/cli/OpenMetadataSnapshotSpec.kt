@@ -10,6 +10,7 @@ import io.kotest.matchers.string.shouldNotContain
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.tatrman.ttr.metadata.export.GeneratedHeader
 import org.tatrman.ttr.metadata.export.Hashes
 import java.net.InetSocketAddress
@@ -158,6 +159,44 @@ class OpenMetadataSnapshotSpec :
                 "--out",
                 "model",
             )
+
+        fun importLive(
+            work: Path,
+            url: String,
+            vararg extra: String,
+        ) = exec(
+            work,
+            "import-schema",
+            "--from",
+            "openmetadata",
+            "--url",
+            url,
+            "--token-env",
+            "OM_SPEC_TOKEN",
+            "--profile",
+            "om-tables/1",
+            "--out",
+            "model",
+            "--format",
+            "json",
+            *extra,
+        )
+
+        fun durableInput(work: Path): Path {
+            val out = work.resolve("model")
+            val east = out.resolve("om/shop/sales/east/db.ttrm")
+            val model = requireNotNull(GeneratedHeader.read(east.readText()))
+            val snapshot = east.parent.resolve(model.snapshot.path).toRealPath()
+            snapshot.startsWith(out.toRealPath()) shouldBe true
+            val hash = Hashes.tree(snapshot)
+            model.snapshot.sha256 shouldBe hash
+            val source = Json.parseToJsonElement(out.resolve("om.shop.sales.east.sources.json").readText()).jsonObject
+            val header = source.getValue("generated-from").jsonPrimitive.content
+            val sidecar = requireNotNull(GeneratedHeader.parse("# $header"))
+            out.resolve(sidecar.snapshot.path).toRealPath() shouldBe snapshot
+            sidecar.snapshot.sha256 shouldBe hash
+            return snapshot
+        }
 
         test("fetches every page with a bearer token and writes one file for each schema") {
             val work = Files.createTempDirectory("om-snapshot-paging")
@@ -383,6 +422,107 @@ class OpenMetadataSnapshotSpec :
                 "to: [om.shop.sales.east.db.dbo.customers.id, om.shop.sales.east.db.dbo.customers.region]"
             result.stdout shouldContain "mapped to text"
             work.resolve("model/report.json").exists() shouldBe true
+        }
+
+        test("direct import retains its input and a dry run previews the same provenance without creating output") {
+            val work = Files.createTempDirectory("om-live-dry-run")
+            withServer(::tables) { url ->
+                val preview = importLive(work, url, "--dry-run")
+                withClueOutcome(preview)
+                preview.stderr shouldContain "+++ b/om/shop/sales/east/db.ttrm"
+                work.resolve("model").exists() shouldBe false
+
+                withClueOutcome(importLive(work, url))
+                durableInput(work)
+                val lint = exec(work, "lint", "--root", "model", "--strict")
+                (lint.stdout + lint.stderr) shouldNotContain "xm/generated-stale"
+                val repeat = importLive(work, url, "--dry-run")
+                withClueOutcome(repeat)
+                repeat.stderr shouldContain "No changes under model."
+            }
+        }
+
+        test("direct recapture preserves edited retired schemas and names the actual new input") {
+            val work = Files.createTempDirectory("om-live-recapture")
+            withServer(::tables) { url -> withClueOutcome(importLive(work, url)) }
+            val previous = durableInput(work)
+            val west = previous.resolve("shop.sales.west.json")
+            val edited = west.readText() + "\n"
+            west.writeText(edited)
+
+            val east =
+                listOf(firstPage, secondPage)
+                    .flatMap {
+                        Json
+                            .parseToJsonElement(it)
+                            .jsonObject
+                            .getValue("data")
+                            .jsonArray
+                    }.filter { "shop.sales.east" in it.toString() }
+            withServer({ _, _ -> 200 to """{"data":$east,"paging":{}}""" }) { url ->
+                val result = importLive(work, url)
+                withClueOutcome(result)
+                val packages = Json.parseToJsonElement(result.stdout).jsonObject.getValue("packages")
+                packages.toString() shouldNotContain "om.shop.sales.west"
+                val retained = durableInput(work)
+                retained.resolve("shop.sales.west.json").exists() shouldBe false
+                west.readText() shouldBe edited
+            }
+        }
+
+        test("direct import retains provenance when publication fails and can retry successfully") {
+            val work = Files.createTempDirectory("om-live-retry")
+            val report = Files.createDirectories(work.resolve("model/report.json"))
+            withServer(::tables) { url ->
+                val failed = importLive(work, url)
+                failed.exitCode shouldBe 2
+                failed.stderr shouldContain "report.json"
+                val retained = durableInput(work)
+                Files.delete(report)
+                withClueOutcome(importLive(work, url))
+                durableInput(work) shouldBe retained
+            }
+        }
+
+        test("direct import preserves authored and edited models and can update its own unchanged outputs") {
+            val modelPath = "model/om/shop/sales/east/db.ttrm"
+            val authoredWork = Files.createTempDirectory("om-live-authored")
+            val authored = authoredWork.resolve(modelPath)
+            Files.createDirectories(authored.parent)
+            authored.writeText("// authored model\n")
+            withServer(::tables) { url ->
+                val refusal = importLive(authoredWork, url)
+                refusal.exitCode shouldBe 2
+                refusal.stderr shouldContain "authored or edited output"
+                authored.readText() shouldBe "// authored model\n"
+                authoredWork.resolve("model/report.json").exists() shouldBe false
+            }
+
+            val work = Files.createTempDirectory("om-live-edited")
+            val model = work.resolve(modelPath)
+            withServer(::tables) { url ->
+                withClueOutcome(importLive(work, url))
+                val generated = model.readText()
+                val edited = generated + "// local edit\n"
+                model.writeText(edited)
+                val refusal = importLive(work, url)
+                refusal.exitCode shouldBe 2
+                refusal.stderr shouldContain "authored or edited output"
+                model.readText() shouldBe edited
+                model.writeText(generated)
+            }
+            withServer({ path, query ->
+                val (status, body) = tables(path, query)
+                status to
+                    body.replace(
+                        "\"name\":\"orders\",\"fullyQualifiedName\"",
+                        "\"name\":\"orders\",\"description\":\"Replacement description\",\"fullyQualifiedName\"",
+                    )
+            }) { url ->
+                withClueOutcome(importLive(work, url))
+                model.readText() shouldContain "Replacement description"
+                durableInput(work)
+            }
         }
     })
 

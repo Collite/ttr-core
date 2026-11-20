@@ -62,11 +62,12 @@ object SnapshotCli {
         }
     }
 
-    private fun captureOpenMetadata(
+    internal fun captureOpenMetadata(
         url: String?,
         tokenEnv: String?,
         profile: String,
         large: Boolean,
+        tablesOnly: Boolean = false,
     ): Captured {
         val endpoint = url?.let(::endpoint) ?: return Captured.Usage("--url must be an HTTP(S) OpenMetadata base URL")
         val name =
@@ -76,7 +77,11 @@ object SnapshotCli {
             System.getenv(name)?.trim()?.takeIf { it.isNotEmpty() && it.all { char -> char in '!'..'~' } }
                 ?: return Captured.Usage("--token-env: the named variable has no valid bearer token")
         return try {
-            SnapshotCapture.captureOpenMetadata(endpoint, token, ImportProfile.resolve(profile).chain, large)
+            val chain = ImportProfile.resolve(profile).chain
+            if (tablesOnly && chain.none { "${it.name}/${it.major}" == "om-tables/1" }) {
+                return Captured.Usage("--profile: import-schema from openmetadata needs om-tables/1")
+            }
+            SnapshotCapture.captureOpenMetadata(endpoint, token, chain, large)
         } catch (e: ReaderInputException) {
             Captured.Usage(e.message.orEmpty())
         } catch (e: ProfileException) {

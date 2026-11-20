@@ -64,6 +64,42 @@ internal object OpenMetadataSnapshots {
         }
     }
 
+    /** Publish a complete capture at its content address, then leave its bytes for any generated files that name it. */
+    fun retain(
+        staged: Path,
+        dest: Path,
+        hash: String,
+    ) {
+        fun matches(): Boolean =
+            Files.isDirectory(dest, NOFOLLOW_LINKS) &&
+                Files.newDirectoryStream(dest).use { files -> files.all { Files.isRegularFile(it, NOFOLLOW_LINKS) } } &&
+                Hashes.tree(dest) == hash
+
+        if (Files.exists(dest, NOFOLLOW_LINKS)) {
+            if (!matches()) throw ReaderInputException("retained snapshot $dest contains changed files")
+            return
+        }
+        Files.createDirectories(dest.parent)
+        val pending = Files.createTempDirectory(dest.parent, ".capture-")
+        try {
+            Files.newDirectoryStream(staged).use { files ->
+                files.forEach { Files.copy(it, pending.resolve(it.fileName)) }
+            }
+            if (Hashes.tree(pending) != hash) throw IOException("staged snapshot changed before publication")
+            try {
+                Files.move(pending, dest, ATOMIC_MOVE)
+            } catch (e: IOException) {
+                // A concurrent invocation can have retained the same complete capture.
+                if (!matches()) throw e
+            }
+        } finally {
+            if (Files.exists(pending, NOFOLLOW_LINKS)) {
+                Files.newDirectoryStream(pending).use { files -> files.forEach(Files::delete) }
+                Files.delete(pending)
+            }
+        }
+    }
+
     private fun publish(
         directory: Path,
         files: Map<String, String>,
