@@ -1,6 +1,6 @@
 {
   "name": "ttr-modeler-vsc",
-  "version": "0.9.9",
+  "version": "0.10.0",
   "private": true,
   "type": "commonjs",
   "displayName": "TTR Modeler",
@@ -174,7 +174,6 @@
     "onLanguage:ttr",
     "onLanguage:ttrg",
     "onLanguage:ttr-yaml",
-    "onLanguage:yaml",
     "workspaceContains:**/ttr.yaml"
   ]
 }

@@ -89,6 +89,30 @@ describe('YAML lint input', { timeout: 30_000 }, () => {
         'Customer'
       );
     }));
+  it('resolves a marker-selected profile identity from the model root catalogue', () =>
+    workspace((root) => {
+      const model = join(root, 'model');
+      mkdirSync(join(model, 'profiles'));
+      cpSync(join(model, 'ttr-profile.yaml'), join(model, 'profiles/editor.yaml'));
+      const marker = join(model, 'ttr.yaml');
+      writeFileSync(marker, 'profile: editor-demo/1\ngrammar: ">=0.22 <1.0"\n');
+      const loader = new YamlWorkspaceLoader([root]);
+      const result = loader.load().get(uri(root, 'model/entities.yaml'));
+      expect(result).toMatchObject({
+        ast: {
+          definitions: expect.arrayContaining([expect.objectContaining({ name: 'Customer' })]),
+        },
+        errors: [],
+      });
+
+      const markerUri = uri(root, 'model/ttr.yaml');
+      const missing = loader.load(
+        new Map([[markerUri, 'profile: missing/1\ngrammar: ">=0.22 <1.0"\n']])
+      );
+      expect(missing.get(markerUri)?.errors).toEqual([
+        expect.objectContaining({ code: 'ys/profile-not-found' }),
+      ]);
+    }));
   it('CLI --profile reports ys/* on a negative tree and --fix preserves dialect bytes', () =>
     workspace((root) => {
       const file = join(root, 'model/entities.yaml'),
@@ -257,6 +281,56 @@ describe('YAML lint input', { timeout: 30_000 }, () => {
       ).toBe('error');
       expect(lintInputDiagnostics(diagnostics, recommendedConfig({}))[0].severity).toBe('warning');
     }));
+
+  it.each([
+    ['ignore', 'other', 'warning', 0],
+    ['error', 'ys/unknown-key', 'error', 1],
+  ] as const)(
+    'codes unknown: %s consistently in the loader and CLI',
+    (policy, code, severity, status) =>
+      workspace((root) => {
+        const profile = join(root, 'model/ttr-profile.yaml');
+        writeFileSync(profile, readFileSync(profile, 'utf8') + `\nunknown: ${policy}\n`);
+        const file = join(root, 'model/entities.yaml');
+        writeFileSync(file, readFileSync(file, 'utf8') + '    zzstray: 1\n');
+        const result = new YamlWorkspaceLoader([root])
+          .load()
+          .get(uri(root, 'model/entities.yaml'))!;
+        expect(lintInputDiagnostics(result.errors, recommendedConfig({}))).toEqual([
+          expect.objectContaining({
+            code,
+            severity,
+            message: policy === 'ignore' ? 'not in this profile' : 'Unconsumed key zzstray',
+          }),
+        ]);
+        let actualStatus = 0,
+          stdout = '';
+        try {
+          stdout = execFileSync(
+            'node',
+            [
+              resolve(__dirname, '../../dist/cli.js'),
+              join(root, 'model'),
+              '--profile',
+              '--rule',
+              code,
+              '--format',
+              'json',
+            ],
+            { encoding: 'utf8', stdio: 'pipe' }
+          );
+        } catch (error) {
+          const e = error as { status: number; stdout: string };
+          actualStatus = e.status;
+          stdout = e.stdout;
+        }
+        expect(actualStatus).toBe(status);
+        const diagnostics = JSON.parse(stdout);
+        expect(diagnostics).toContainEqual(expect.objectContaining({ code, severity }));
+        if (policy === 'ignore')
+          expect(diagnostics.some((d: { severity: string }) => d.severity === 'error')).toBe(false);
+      })
+  );
 
   it('keeps each warnings separate from required: warn, using Kotlin lint code other', () => {
     const root = resolve(__dirname, 'fixtures/yaml-values');

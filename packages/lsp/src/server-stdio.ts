@@ -24,7 +24,7 @@ createServerConnection(connection, {
     return loaderFor(roots).load(buffers);
   },
   yamlFilesChanged(changes) { return yamlLoader?.notify(changes) ?? true; },
-  yamlLanguage(uri, text, roots) { return loaderFor(roots).language(uri, text); },
+  yamlLanguage(uri, text, roots) { return loaderFor(roots).language(uri, text, false); },
   analyzeSqlBlock(value: string, dialect: SqlDialect) {
     const { tree } = parseSql(value, dialect);
     return tree ? extract(tree, dialect) : undefined;

@@ -476,7 +476,7 @@ export function createServerConnection(
     if (yamlRefreshTimer !== undefined) clearTimeout(yamlRefreshTimer);
     yamlRefreshTimer = setTimeout(() => { yamlRefreshTimer = undefined; refreshYamlDocuments(); }, 200);
   }
-  function refreshYamlDocuments(): void {
+  function refreshYamlDocuments({ publish = true }: { publish?: boolean } = {}): void {
     if (!opts.loadYamlDocuments) return;
     const buffers = new Map(documents.all().map(doc => [doc.uri, doc.getText()]));
     const next = opts.loadYamlDocuments(buffers, workspaceRoots);
@@ -503,6 +503,7 @@ export function createServerConnection(
       indexSqlReferences(uri, result.ast);
     }
     packageGraph = null; invalidateSymbols();
+    if (!publish) return;
     const projectDiagnostics = lintProject(getProjectDocuments(), getPackageGraph(), { manifest, symbols: projectSymbols, resolver }, lintConfig());
     for (const [uri, result] of next) publishDiagnostics(uri, result.text, projectDiagnostics);
   }
@@ -1111,7 +1112,9 @@ export function createServerConnection(
       // response, hence before any didOpen) so the first opened file already
       // sees the full project.
       await loadProjectIntoSymbols();
-      refreshYamlDocuments();
+      // The client's diagnostic handler is installed after the initialize response.
+      // onInitialized publishes the seeded diagnostics through refreshLintConfig.
+      refreshYamlDocuments({ publish: false });
     }
     return {
       capabilities: {

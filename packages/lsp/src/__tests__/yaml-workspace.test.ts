@@ -12,6 +12,23 @@ import { YamlWorkspaceLoader } from '@tatrman/lint/yaml';
 
 const cleanup: (() => void)[] = [];
 afterEach(() => { cleanup.splice(0).reverse().forEach(fn => fn()); });
+
+function desktopClient(root: string) {
+  const child = spawn(process.execPath, [new URL('../../dist/server-stdio.js', import.meta.url).pathname], { stdio: ['pipe', 'pipe', 'pipe'] });
+  const client = lsp.createConnection(new lsp.StreamMessageReader(child.stdout), new lsp.StreamMessageWriter(child.stdin));
+  cleanup.push(() => { client.dispose(); child.kill(); });
+  child.once('exit', () => client.dispose());
+  client.listen();
+  const rootUri = pathToFileURL(root).href;
+  const initialize = () => client.sendRequest('initialize', {
+    processId: null,
+    rootUri,
+    workspaceFolders: [{ uri: rootUri, name: 'models' }],
+    capabilities: {},
+  });
+  return { client, initialize };
+}
+
 async function workspace(shared = false, extra: ServerOptions = {}) {
   const root = mkdtempSync(join(tmpdir(), 's73-lsp-'));
   if (shared) {
@@ -129,15 +146,59 @@ describe('S7.3 demo-cs/1 mixed workspace', () => {
     const root = mkdtempSync(join(tmpdir(), 's73-stdio-'));
     cpSync(new URL('./fixtures/yaml-workspace/', import.meta.url), root, { recursive: true });
     cleanup.push(() => rmSync(root, { recursive: true, force: true }));
-    const child = spawn(process.execPath, [new URL('../../dist/server-stdio.js', import.meta.url).pathname], { stdio: ['pipe', 'pipe', 'pipe'] });
-    const client = lsp.createConnection(new lsp.StreamMessageReader(child.stdout), new lsp.StreamMessageWriter(child.stdin));
-    cleanup.push(() => { client.dispose(); child.kill(); });
-    child.once('exit', () => client.dispose());
-    client.listen();
-    await client.sendRequest('initialize', { processId: null, rootUri: pathToFileURL(root).href, workspaceFolders: [{ uri: pathToFileURL(root).href, name: 'models' }], capabilities: {} });
+    const { client, initialize } = desktopClient(root);
+    await initialize();
     const uri = (file: string) => pathToFileURL(join(root, file)).href;
     expect(JSON.stringify(await client.sendRequest('textDocument/documentSymbol', { textDocument: { uri: uri('model/entities.yaml') } }))).toContain('Customer');
     expect(await client.sendRequest('textDocument/definition', { textDocument: { uri: uri('model/relations.yaml') }, position: { line: 2, character: 15 } })).toMatchObject({ uri: uri('model/entities.yaml'), range: { start: { line: 1, character: 2 } } });
+    // Admission requests reuse discovered markers; the file watcher owns invalidation.
+    mkdirSync(join(root, 'model/nested'));
+    const request = {uri: uri('model/nested/e.yaml'), text: 'entity: {Nested: {popis: value}}'};
+    expect(await client.sendRequest('modeler/yamlLanguage', request)).toBe('ttr-yaml');
+    writeFileSync(join(root, 'model/nested/ttr.yaml'), 'other: plain YAML settings\n');
+    expect(await client.sendRequest('modeler/yamlLanguage', request)).toBe('ttr-yaml');
+    client.sendNotification('workspace/didChangeWatchedFiles', {changes: [{uri: uri('model/nested/ttr.yaml'), type: 1}]});
+    expect(await client.sendRequest('modeler/yamlLanguage', request)).toBe('yaml');
+  });
+
+  it('delivers existing YAML errors after client initialization and clears them after an edit', async () => {
+    const root = mkdtempSync(join(tmpdir(), 's74-stdio-'));
+    cleanup.push(() => rmSync(root, { recursive: true, force: true }));
+    cpSync(new URL('./fixtures/yaml-workspace/', import.meta.url), root, { recursive: true });
+    const file = join(root, 'model/entities.yaml');
+    const uri = pathToFileURL(file).href;
+    const clean = readFileSync(file, 'utf8');
+    const typo = clean.replace('popis:', 'typo:');
+    writeFileSync(file, typo);
+
+    const { client, initialize } = desktopClient(root);
+    await initialize();
+    // VS Code registers its diagnostics listener after the initialize response.
+    const diagnostics: lsp.Diagnostic[][] = [];
+    client.onNotification('textDocument/publishDiagnostics', (params: lsp.PublishDiagnosticsParams) => {
+      if (params.uri === uri) diagnostics.push(params.diagnostics);
+    });
+    await client.sendNotification('initialized', {});
+    await expect.poll(() => diagnostics, { timeout: 5000 }).toEqual([
+      [expect.objectContaining({
+        code: 'ys/unknown-key',
+        range: { start: { line: 2, character: 4 }, end: { line: 2, character: 8 } },
+      })],
+    ]);
+
+    await client.sendNotification('textDocument/didOpen', {
+      textDocument: { uri, languageId: 'ttr-yaml', version: 1, text: typo },
+    });
+    await client.sendRequest('modeler/reloadLintConfig');
+    expect(diagnostics).toHaveLength(1);
+    await client.sendNotification('textDocument/didChange', {
+      textDocument: { uri, version: 2 },
+      contentChanges: [{ text: clean }],
+    });
+    await expect.poll(() => diagnostics, { timeout: 5000 }).toHaveLength(2);
+    expect(diagnostics[1]).not.toContainEqual(expect.objectContaining({ code: 'ys/unknown-key' }));
+    await client.sendRequest('modeler/reloadLintConfig');
+    expect(diagnostics).toHaveLength(2);
   });
 
   it('uses the original shared demo-cs chain for default-string links, hover and symbols', async () => {
