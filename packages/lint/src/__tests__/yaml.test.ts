@@ -89,6 +89,30 @@ describe('YAML lint input', { timeout: 30_000 }, () => {
         'Customer'
       );
     }));
+  it('resolves a marker-selected profile identity from the model root catalogue', () =>
+    workspace((root) => {
+      const model = join(root, 'model');
+      mkdirSync(join(model, 'profiles'));
+      cpSync(join(model, 'ttr-profile.yaml'), join(model, 'profiles/editor.yaml'));
+      const marker = join(model, 'ttr.yaml');
+      writeFileSync(marker, 'profile: editor-demo/1\ngrammar: ">=0.22 <1.0"\n');
+      const loader = new YamlWorkspaceLoader([root]);
+      const result = loader.load().get(uri(root, 'model/entities.yaml'));
+      expect(result).toMatchObject({
+        ast: {
+          definitions: expect.arrayContaining([expect.objectContaining({ name: 'Customer' })]),
+        },
+        errors: [],
+      });
+
+      const markerUri = uri(root, 'model/ttr.yaml');
+      const missing = loader.load(
+        new Map([[markerUri, 'profile: missing/1\ngrammar: ">=0.22 <1.0"\n']])
+      );
+      expect(missing.get(markerUri)?.errors).toEqual([
+        expect.objectContaining({ code: 'ys/profile-not-found' }),
+      ]);
+    }));
   it('CLI --profile reports ys/* on a negative tree and --fix preserves dialect bytes', () =>
     workspace((root) => {
       const file = join(root, 'model/entities.yaml'),

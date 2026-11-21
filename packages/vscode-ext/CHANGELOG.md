@@ -3,7 +3,11 @@
 All notable changes to the `collite.ttr-modeler-vsc` extension. Versions track
 the grammar/IDE-support line owned by the `tatrman` repo.
 
-## Unreleased
+## 0.10.0
+
+- **Profiled YAML models.** A `ttr.yaml` workspace marker activates YAML model support and can select a named
+  profile from the model root's `profiles/` directory. Diagnostics, hover, symbols and go-to-definition use
+  the authored YAML positions.
 
 Grammar 0.17.1 — the cn semantics in the editor.
 

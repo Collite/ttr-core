@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Desktop adapter. Kept off the browser-safe lint entry point. */
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   parseYamlDocument,
@@ -388,9 +388,16 @@ export class YamlWorkspaceLoader {
           };
           const catalog = new Map<string, string>();
           // Identities resolve from the tree catalog, while CLI paths arrive absolute.
-          for (const catalogUri of typeof reference === 'string' && !/\.ya?ml$/.test(reference)
-            ? texts.keys()
-            : []) {
+          const markerProfile = treeDeclaration?.profile;
+          const needsCatalog =
+            typeof reference === 'string'
+              ? !/\.ya?ml$/.test(reference)
+              : markerProfile !== undefined &&
+                /^.+\/[0-9]+$/.test(markerProfile) &&
+                !markerProfile.startsWith('.') &&
+                !isAbsolute(markerProfile) &&
+                !ProfileResolver.isBundled(markerProfile);
+          for (const catalogUri of needsCatalog ? texts.keys() : []) {
             const path = pathOf(catalogUri);
             if (dirname(path) !== join(boundary, 'profiles')) continue;
             const profile = ProfileReader.read(dependencyRead(path), path);
