@@ -9,7 +9,6 @@ import org.tatrman.ttr.imports.ReaderInputException
 import org.tatrman.ttr.imports.ReaderRequest
 import org.tatrman.ttr.metadata.export.Hashes
 import org.tatrman.ttr.metadata.source.Captured
-import org.tatrman.ttr.metadata.source.LocalFsStorage
 import org.tatrman.ttr.profile.Bytewise
 import org.tatrman.ttr.profile.ForeignTree
 import org.tatrman.ttr.profile.ProfileException
@@ -159,7 +158,7 @@ object ImportSchemaCli {
             }
     }
 
-    /** Replay the source directory named by a reader header. Legacy captures have JSON inputs and no profile tree. */
+    /** Replay the source directory named by a reader header, using the importer's snapshot selection. */
     internal fun replaySnapshot(
         snapshot: Path,
         overlay: Path?,
@@ -168,10 +167,8 @@ object ImportSchemaCli {
     ): Lazy<Result<Map<String, String>>>? {
         val resolved = ImportProfile.shipped(profile) ?: return null
         return try {
-            if (!OpenMetadataSnapshots.hasManifest(snapshot)) {
-                if (SchemaSnapshots.legacyInputs(snapshot).isEmpty()) return null
-                val yaml = LocalFsStorage("reader-guard", snapshot).listFiles(listOf("yaml", "yml"))
-                if (yaml.any { Path.of(it.path) != overlay }) return null
+            if (!OpenMetadataSnapshots.hasManifest(snapshot) && SchemaSnapshots.legacyInputs(snapshot).isEmpty()) {
+                return null
             }
             lazy {
                 try {

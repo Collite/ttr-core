@@ -12,6 +12,7 @@ import org.tatrman.ttr.yaml.CanonicalDocument
 import org.tatrman.ttr.yaml.CanonicalYaml
 import org.tatrman.ttr.yaml.CanonicalYamlException
 import java.nio.file.Files
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
@@ -84,11 +85,18 @@ object GeneratedGuard {
             if (!snapshot.isDirectory()) continue
             val overlay = header.overlay?.let { directory.resolve(it.path).normalize() }
             val key = Triple(snapshot, overlay, header.profile)
-            if (key !in readers) readers[key] = reader(snapshot, overlay, header.profile)
-            val replay = readers[key]
-            if (replay != null) {
+            val form = GeneratedHeader.Form.of(file.name)
+            // Readers write TTRM. YAML keeps the profile-apply declaration checks, as do its companion sidecars.
+            val replay =
+                if (form == GeneratedHeader.Form.YAML) {
+                    null
+                } else {
+                    if (key !in readers) readers[key] = reader(snapshot, overlay, header.profile)
+                    readers[key]
+                }
+            if (replay != null && (!sidecar || !hasAppliedModel(file, header))) {
                 if (stale.isEmpty()) {
-                    readerEdit(file, text, sidecarHeader, replay.value)?.let { detail ->
+                    readerEdit(root, file, text, header, sidecarHeader, replay.value)?.let { detail ->
                         issues += issue("xm/generated-edited: $detail")
                     }
                 }
@@ -134,8 +142,10 @@ object GeneratedGuard {
     }
 
     private fun readerEdit(
+        root: Path,
         file: Path,
         text: String,
+        header: GeneratedHeader,
         sidecarHeader: String?,
         replay: Result<Map<String, String>>,
     ): String? {
@@ -150,17 +160,59 @@ object GeneratedGuard {
                 "the sidecar differs from a fresh generation of its inputs"
             }
         }
-        // The import output can be nested in the lint root. Use the longest matching generated path so one package
-        // cannot pass as another by carrying its body under the first package's path.
-        val fresh =
-            (0 until file.nameCount).firstNotNullOfOrNull { start ->
-                outputs[file.subpath(start, file.nameCount).joinToString("/")]
-            } ?: return "its inputs generate no document at this package and model path"
+        val relative = root.relativize(file)
+        val candidates =
+            (0 until relative.nameCount)
+                .map { start -> relative.subpath(start, relative.nameCount) }
+                .filter { path -> path.joinToString("/") in outputs }
+        if (candidates.isEmpty()) return "its inputs generate no document at this package and model path"
+        // If the import output is nested in the lint root, the same file may have multiple generated suffixes.
+        // Its package's sidecar lives at the import output root and carries the same provenance as the model.
+        val expected = lazy { header.resolvedFrom(file) }
+        val path =
+            candidates.singleOrNull()
+                ?: candidates.singleOrNull { candidate ->
+                    val prefixSize = relative.nameCount - candidate.nameCount
+                    val out = if (prefixSize == 0) root else root.resolve(relative.subpath(0, prefixSize))
+                    val pkg = candidate.parent?.joinToString(".").orEmpty()
+                    val sidecar = out.resolve("$pkg$SIDECAR")
+                    if (!sidecar.isRegularFile(NOFOLLOW_LINKS)) return@singleOrNull false
+                    Sidecar.provenance(sidecar.readText())?.resolvedFrom(sidecar) == expected.value
+                }
+                ?: return "its generated package path is ambiguous"
+        val fresh = outputs.getValue(path.joinToString("/"))
         return if (GeneratedHeader.body(fresh) == GeneratedHeader.body(text)) {
             null
         } else {
             "the body differs from a fresh generation of its inputs"
         }
+    }
+
+    /** Profile apply writes YAML and readers write TTRM, but their sidecars have the same form. */
+    private fun hasAppliedModel(
+        sidecar: Path,
+        header: GeneratedHeader,
+    ): Boolean {
+        val pkg = sidecar.name.removeSuffix(SIDECAR).replace('.', '/')
+        val directory = sidecar.resolveSibling(pkg)
+        if (!directory.isDirectory(NOFOLLOW_LINKS)) return false
+        val expected = header.resolvedFrom(sidecar)
+        return Files.list(directory).use { paths ->
+            paths.anyMatch { model ->
+                val form = GeneratedHeader.Form.of(model.name)
+                if (form != GeneratedHeader.Form.YAML || !model.isRegularFile(NOFOLLOW_LINKS)) return@anyMatch false
+                val line = Files.newBufferedReader(model).use { it.readLine() } ?: return@anyMatch false
+                GeneratedHeader.parse(line)?.resolvedFrom(model) == expected
+            }
+        }
+    }
+
+    private fun GeneratedHeader.resolvedFrom(file: Path): GeneratedHeader {
+        val directory = file.parent.toRealPath()
+        return copy(
+            snapshot = snapshot.copy(path = directory.resolve(snapshot.path).normalize().toString()),
+            overlay = overlay?.let { it.copy(path = directory.resolve(it.path).normalize().toString()) },
+        )
     }
 
     /** ✅R277-A: the document [profile] generated is not one the tree's own declarations give it. */
@@ -196,6 +248,18 @@ object GeneratedGuard {
             } catch (e: SerializationException) {
                 null
             } ?: ""
+        }
+
+        /** The writer puts provenance on its own line, so it can locate a model even if the sidecar body was edited. */
+        fun provenance(text: String): GeneratedHeader? {
+            val end = text.indexOf('\n', startIndex = 2)
+            val firstMember =
+                if (text.startsWith("{\n$KEY") && end >= 0) {
+                    text.substring(0, end).removeSuffix(",") + "\n}"
+                } else {
+                    text
+                }
+            return header(firstMember)?.let { GeneratedHeader.parse("# $it") }
         }
 
         /** [fresh] (written without a header) with [header] put back on its line, as `SourcesJsonWriter` writes it. */

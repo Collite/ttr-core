@@ -148,15 +148,20 @@ class OpenMetadataSnapshotSpec :
             "json",
         )
 
-        fun readerGuardCase(manifest: Boolean = true): Path {
+        fun readerGuardCase(
+            manifest: Boolean = true,
+            packages: Map<String, String> = mapOf("east" to "om.shop.sales.east", "west" to "om.shop.sales.west"),
+            out: String = "model",
+            companionYaml: Boolean = false,
+        ): Path {
             val work = Files.createTempDirectory("om-reader-guard")
             val sources = work.resolve("sources")
             val snapshots =
-                listOf("east", "west").associate { schema ->
+                packages.entries.associate { (schema, pkg) ->
                     val fqn = "shop.sales.$schema"
                     "$fqn.json" to
                         """
-                        {"package":"om.$fqn","data":[{"name":"orders","fullyQualifiedName":"$fqn.orders",
+                        {"package":"$pkg","data":[{"name":"orders","fullyQualifiedName":"$fqn.orders",
                         "description":"$schema orders","columns":[{"name":"id","dataType":"INT"}]}]}
                         """.trimIndent()
                 }
@@ -167,11 +172,15 @@ class OpenMetadataSnapshotSpec :
                 Files.createDirectory(sources)
                 snapshots.forEach { (name, text) -> sources.resolve(name).writeText(text) }
             }
-            withClueOutcome(importTables(work))
+            if (companionYaml) sources.resolve("notes.yaml").writeText("notes: capture companion\n")
+            withClueOutcome(importTables(work, out))
             return work
         }
 
-        fun strictLint(work: Path) = exec(work, "lint", "--root", "model", "--strict", "--format", "json")
+        fun strictLint(
+            work: Path,
+            root: String = "model",
+        ) = exec(work, "lint", "--root", root, "--strict", "--format", "json")
 
         fun guardIssues(result: CliOutcome): List<Pair<String, String>> =
             Json
@@ -203,6 +212,47 @@ class OpenMetadataSnapshotSpec :
                 withClueOutcome(lint)
                 guardIssues(lint) shouldBe emptyList()
             }
+        }
+
+        test("strict lint accepts legacy imports whose snapshot contains companion YAML") {
+            val work = readerGuardCase(manifest = false, companionYaml = true)
+            work.resolve("model/$eastModel").exists() shouldBe true
+            work.resolve("model/$eastSidecar").exists() shouldBe true
+            val lint = strictLint(work)
+            withClueOutcome(lint)
+            guardIssues(lint) shouldBe emptyList()
+        }
+
+        test("strict lint uses the actual output directory for overlapping package paths") {
+            val out = "multi/archive"
+            val work =
+                readerGuardCase(
+                    packages = mapOf("east" to "om.shop.sales.east", "west" to "archive.om.shop.sales.east"),
+                    out = out,
+                )
+            val east = work.resolve("$out/$eastModel")
+            val original = east.readText()
+            val archive = work.resolve("$out/archive/$eastModel").readText()
+            archive shouldContain "west orders"
+            for (root in listOf(out, "multi")) {
+                val lint = strictLint(work, root)
+                withClueOutcome(lint)
+                guardIssues(lint) shouldBe emptyList()
+            }
+
+            east.writeText(original.substringBefore('\n') + "\n" + GeneratedHeader.body(archive))
+            for ((root, path) in listOf(out to eastModel, "multi" to "archive/$eastModel")) {
+                val lint = strictLint(work, root)
+                lint.exitCode shouldBe 1
+                guardIssues(lint) shouldBe listOf(path to "xm/generated-edited")
+            }
+
+            east.writeText(original)
+            val sidecar = work.resolve("$out/$eastSidecar")
+            sidecar.writeText(sidecar.readText() + "invalid JSON")
+            val lint = strictLint(work, "multi")
+            lint.exitCode shouldBe 1
+            guardIssues(lint) shouldBe listOf("archive/$eastSidecar" to "xm/generated-edited")
         }
 
         test("strict lint locates a model body edit with its genuine header and leaves the other package clean") {
