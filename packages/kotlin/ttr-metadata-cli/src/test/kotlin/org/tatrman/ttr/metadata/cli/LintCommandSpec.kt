@@ -209,6 +209,12 @@ class LintCommandSpec :
             exec("profile", "check", "--root", "negative", "--strict").first shouldBe 1
             exec("profile", "apply", "--root", "tree", "--out", "out").first shouldBe 0
             files(work.resolve("out")).keys shouldBe appliedLinks
+            exec("lint", "--root", "out", "--strict").first shouldBe 0
+            val applied = work.resolve("out/demo/er.yaml")
+            applied.writeText(applied.readText() + "\n")
+            val (editedExit, edited) = exec("lint", "--root", "out", "--strict", "--format", "github")
+            editedExit shouldBe 1
+            edited shouldContain "file=out/demo/er.yaml,line=1,col=1::xm/generated-edited"
             exec("lint", "--codes").second shouldBe DiagnosticCodes.render()
             exec("lint").first shouldBe 2
         }

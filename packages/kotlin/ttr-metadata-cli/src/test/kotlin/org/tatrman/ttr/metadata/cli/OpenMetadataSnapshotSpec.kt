@@ -148,6 +148,98 @@ class OpenMetadataSnapshotSpec :
             "json",
         )
 
+        fun readerGuardCase(manifest: Boolean = true): Path {
+            val work = Files.createTempDirectory("om-reader-guard")
+            val sources = work.resolve("sources")
+            val snapshots =
+                listOf("east", "west").associate { schema ->
+                    val fqn = "shop.sales.$schema"
+                    "$fqn.json" to
+                        """
+                        {"package":"om.$fqn","data":[{"name":"orders","fullyQualifiedName":"$fqn.orders",
+                        "description":"$schema orders","columns":[{"name":"id","dataType":"INT"}]}]}
+                        """.trimIndent()
+                }
+            if (manifest) {
+                OpenMetadataSnapshots.write(sources, snapshots)
+            } else {
+                Files.createDirectory(sources)
+                snapshots.forEach { (name, text) -> sources.resolve(name).writeText(text) }
+            }
+            withClueOutcome(importTables(work))
+            return work
+        }
+
+        fun strictLint(work: Path) = exec(work, "lint", "--root", "model", "--strict", "--format", "json")
+
+        fun guardIssues(result: CliOutcome): List<Pair<String, String>> =
+            Json
+                .parseToJsonElement(result.stdout)
+                .jsonObject
+                .getValue("issues")
+                .jsonArray
+                .map { it.jsonObject }
+                .filter { it.getValue("code").jsonPrimitive.content == "generated-file" }
+                .map { issue ->
+                    issue.getValue("file").jsonPrimitive.content to
+                        issue.getValue("message").jsonPrimitive.content.substringBefore(':')
+                }
+
+        val eastModel = "om/shop/sales/east/db.ttrm"
+        val eastSidecar = "om.shop.sales.east.sources.json"
+
+        test("strict lint accepts both captured and legacy directory imports with genuine provenance") {
+            for (manifest in listOf(true, false)) {
+                val work = readerGuardCase(manifest)
+                val model = work.resolve("model/$eastModel")
+                val header = requireNotNull(GeneratedHeader.read(model.readText()))
+                model.parent.resolve(header.snapshot.path).toRealPath() shouldBe work.resolve("sources").toRealPath()
+                header.snapshot.sha256 shouldBe Hashes.tree(work.resolve("sources"))
+                val lint = strictLint(work)
+                withClueOutcome(lint)
+                guardIssues(lint) shouldBe emptyList()
+            }
+        }
+
+        test("strict lint locates a model body edit with its genuine header and leaves the other package clean") {
+            val work = readerGuardCase()
+            val model = work.resolve("model/$eastModel")
+            val original = model.readText()
+            original shouldContain "east orders"
+            model.writeText(original.replace("east orders", "edited orders"))
+            GeneratedHeader.read(model.readText()) shouldBe GeneratedHeader.read(original)
+            val lint = strictLint(work)
+            lint.exitCode shouldBe 1
+            guardIssues(lint) shouldBe listOf(eastModel to "xm/generated-edited")
+            lint.stdout shouldContain "the body differs from a fresh generation of its inputs"
+        }
+
+        test("strict lint catches a sidecar body edit with its genuine header") {
+            val work = readerGuardCase()
+            val sidecar = work.resolve("model/$eastSidecar")
+            val original = sidecar.readText()
+            original shouldContain "shop.sales.east.orders"
+            sidecar.writeText(original.replace("shop.sales.east.orders", "shop.sales.east.edited"))
+            val lint = strictLint(work)
+            lint.exitCode shouldBe 1
+            guardIssues(lint) shouldBe listOf(eastSidecar to "xm/generated-edited")
+        }
+
+        test("strict lint reports a changed directory snapshot only as stale") {
+            val work = readerGuardCase()
+            val source = work.resolve("sources/shop.sales.east.json")
+            source.writeText(source.readText().replace("east orders", "new source description"))
+            val lint = strictLint(work)
+            lint.exitCode shouldBe 1
+            guardIssues(lint).toSet() shouldBe
+                setOf(
+                    eastModel to "xm/generated-stale",
+                    "om/shop/sales/west/db.ttrm" to "xm/generated-stale",
+                    eastSidecar to "xm/generated-stale",
+                    "om.shop.sales.west.sources.json" to "xm/generated-stale",
+                )
+        }
+
         fun importGlossary(work: Path) =
             exec(
                 work,
