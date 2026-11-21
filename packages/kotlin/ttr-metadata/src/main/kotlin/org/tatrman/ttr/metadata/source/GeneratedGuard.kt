@@ -12,6 +12,7 @@ import org.tatrman.ttr.yaml.CanonicalDocument
 import org.tatrman.ttr.yaml.CanonicalYaml
 import org.tatrman.ttr.yaml.CanonicalYamlException
 import java.nio.file.Files
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
@@ -26,21 +27,33 @@ import kotlin.io.path.readText
  *
  * - `xm/generated-stale`: an input's recomputed SHA-256 differs from the header's, or the input is not found.
  * - `xm/generated-edited`: the header is malformed, or the body differs from a fresh generation of the named inputs
- *   (the snapshot tree applied with its own declarations, never an override; a `.ttrm` is that document rendered), or
+ *   (a profile-apply tree uses its own declarations; a reader snapshot uses its original reader), or
  *   the tree's own declarations do not give the document the header's profile (✅R277-A: a document an `apply
  *   --profile` override generated cannot be re-checked).
  *
  * Both are errors at the file head (line 1, column 1). Regeneration's own errors (an orphaned overlay key, a dropped
  * input) are reported where they arise, so a broken input is shown at its key. Inputs resolve against the generated
- * file's real directory (review-287 R1); each snapshot tree is hashed and regenerated once per check. `agents/` is never read (✅MW-44).
+ * file's real directory (review-287 R1). Input hashes and regeneration results are cached for the check.
+ * `agents/` is never read (✅MW-44).
  */
 object GeneratedGuard {
     fun check(
         root: Path,
         sourceId: String,
+    ): List<LoadWarning> = check(root, sourceId) { _, _, _ -> null }
+
+    /**
+     * CLI integration: [reader] recognizes a directory snapshot and supplies its files by output path. Its result is
+     * lazy so stale inputs are diagnosed without replaying a reader. A null result selects the profile-apply guard.
+     */
+    fun check(
+        root: Path,
+        sourceId: String,
+        reader: (snapshot: Path, overlay: Path?, profile: String) -> Lazy<Result<Map<String, String>>>?,
     ): List<LoadWarning> {
         val issues = mutableListOf<LoadWarning>()
         val runs = mutableMapOf<Path, Regeneration>()
+        val readers = mutableMapOf<Triple<Path, Path?, String>, Lazy<Result<Map<String, String>>>?>()
         // A tree is hashed once per check, however many generated files name it (review-277 F8).
         val hashes = mutableMapOf<Path, String?>()
         for (file in files(root)) {
@@ -70,6 +83,25 @@ object GeneratedGuard {
                 }
             stale.forEach { issues += issue("xm/generated-stale: $it") }
             if (!snapshot.isDirectory()) continue
+            val overlay = header.overlay?.let { directory.resolve(it.path).normalize() }
+            val key = Triple(snapshot, overlay, header.profile)
+            val form = GeneratedHeader.Form.of(file.name)
+            // Readers write TTRM. YAML keeps the profile-apply declaration checks, as do its companion sidecars.
+            val replay =
+                if (form == GeneratedHeader.Form.YAML) {
+                    null
+                } else {
+                    if (key !in readers) readers[key] = reader(snapshot, overlay, header.profile)
+                    readers[key]
+                }
+            if (replay != null && (!sidecar || !hasAppliedModel(file, header))) {
+                if (stale.isEmpty()) {
+                    readerEdit(root, file, text, header, sidecarHeader, replay.value)?.let { detail ->
+                        issues += issue("xm/generated-edited: $detail")
+                    }
+                }
+                continue
+            }
             val run = runs.getOrPut(snapshot) { Regeneration.of(snapshot, sourceId) }
             if (stale.isNotEmpty()) continue
 
@@ -109,6 +141,80 @@ object GeneratedGuard {
         return issues
     }
 
+    private fun readerEdit(
+        root: Path,
+        file: Path,
+        text: String,
+        header: GeneratedHeader,
+        sidecarHeader: String?,
+        replay: Result<Map<String, String>>,
+    ): String? {
+        val outputs = replay.getOrElse { return "cannot regenerate the reader's inputs: ${it.message}" }
+        if (sidecarHeader != null) {
+            val fresh = outputs[file.name] ?: return "its inputs generate no sidecar for this package"
+            // The reader writes the same first member as SourcesJsonWriter; restore the checked header before comparing.
+            val entries = "{\n" + fresh.substringAfter('\n').substringAfter('\n')
+            return if (Sidecar.withHeader(entries, sidecarHeader) == text) {
+                null
+            } else {
+                "the sidecar differs from a fresh generation of its inputs"
+            }
+        }
+        val relative = root.relativize(file)
+        val candidates =
+            (0 until relative.nameCount)
+                .map { start -> relative.subpath(start, relative.nameCount) }
+                .filter { path -> path.joinToString("/") in outputs }
+        if (candidates.isEmpty()) return "its inputs generate no document at this package and model path"
+        // If the import output is nested in the lint root, the same file may have multiple generated suffixes.
+        // Its package's sidecar lives at the import output root and carries the same provenance as the model.
+        val expected = lazy { header.resolvedFrom(file) }
+        val path =
+            candidates.singleOrNull()
+                ?: candidates.singleOrNull { candidate ->
+                    val prefixSize = relative.nameCount - candidate.nameCount
+                    val out = if (prefixSize == 0) root else root.resolve(relative.subpath(0, prefixSize))
+                    val pkg = candidate.parent?.joinToString(".").orEmpty()
+                    val sidecar = out.resolve("$pkg$SIDECAR")
+                    if (!sidecar.isRegularFile(NOFOLLOW_LINKS)) return@singleOrNull false
+                    Sidecar.provenance(sidecar.readText())?.resolvedFrom(sidecar) == expected.value
+                }
+                ?: return "its generated package path is ambiguous"
+        val fresh = outputs.getValue(path.joinToString("/"))
+        return if (GeneratedHeader.body(fresh) == GeneratedHeader.body(text)) {
+            null
+        } else {
+            "the body differs from a fresh generation of its inputs"
+        }
+    }
+
+    /** Profile apply writes YAML and readers write TTRM, but their sidecars have the same form. */
+    private fun hasAppliedModel(
+        sidecar: Path,
+        header: GeneratedHeader,
+    ): Boolean {
+        val pkg = sidecar.name.removeSuffix(SIDECAR).replace('.', '/')
+        val directory = sidecar.resolveSibling(pkg)
+        if (!directory.isDirectory(NOFOLLOW_LINKS)) return false
+        val expected = header.resolvedFrom(sidecar)
+        return Files.list(directory).use { paths ->
+            paths.anyMatch { model ->
+                val form = GeneratedHeader.Form.of(model.name)
+                if (form != GeneratedHeader.Form.YAML || !model.isRegularFile(NOFOLLOW_LINKS)) return@anyMatch false
+                val line = Files.newBufferedReader(model).use { it.readLine() } ?: return@anyMatch false
+                GeneratedHeader.parse(line)?.resolvedFrom(model) == expected
+            }
+        }
+    }
+
+    private fun GeneratedHeader.resolvedFrom(file: Path): GeneratedHeader {
+        val directory = file.parent.toRealPath()
+        return copy(
+            snapshot = snapshot.copy(path = directory.resolve(snapshot.path).normalize().toString()),
+            overlay = overlay?.let { it.copy(path = directory.resolve(it.path).normalize().toString()) },
+        )
+    }
+
     /** ✅R277-A: the document [profile] generated is not one the tree's own declarations give it. */
     private fun overridden(profile: String) =
         "xm/generated-edited: generated with profile $profile, which the tree's own declarations do not give this " +
@@ -142,6 +248,18 @@ object GeneratedGuard {
             } catch (e: SerializationException) {
                 null
             } ?: ""
+        }
+
+        /** The writer puts provenance on its own line, so it can locate a model even if the sidecar body was edited. */
+        fun provenance(text: String): GeneratedHeader? {
+            val end = text.indexOf('\n', startIndex = 2)
+            val firstMember =
+                if (text.startsWith("{\n$KEY") && end >= 0) {
+                    text.substring(0, end).removeSuffix(",") + "\n}"
+                } else {
+                    text
+                }
+            return header(firstMember)?.let { GeneratedHeader.parse("# $it") }
         }
 
         /** [fresh] (written without a header) with [header] put back on its line, as `SourcesJsonWriter` writes it. */

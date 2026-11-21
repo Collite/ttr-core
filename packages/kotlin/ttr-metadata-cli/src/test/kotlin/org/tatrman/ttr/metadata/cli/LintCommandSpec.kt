@@ -102,6 +102,30 @@ class LintCommandSpec :
             }
         }
 
+        test("apply keeps declaration checks when its profile shares a reader identity and the tree contains JSON") {
+            val work = Files.createTempDirectory("s35-mixed-inputs")
+            val tree = copy(links, work.resolve("tree"))
+            val profile = tree.resolve("profiles/overlay-inline.yaml")
+            profile.writeText(profile.readText().replace("demo-overlay-inline/1", "om-tables/1"))
+            tree.resolve("notes.json").writeText("{}\n")
+
+            val declared = work.resolve("declared")
+            run("profile", "apply", "--root", "$tree", "--out", "$declared").exitCode shouldBe 0
+            val lint = run("lint", "--root", "$declared", "--strict")
+            withClue(lint.stdout) { lint.exitCode shouldBe 0 }
+
+            Files.delete(tree.resolve("ttr.yaml"))
+            val override = work.resolve("override")
+            val applied = run("profile", "apply", "--root", "$tree", "--profile", "$profile", "--out", "$override")
+            applied.exitCode shouldBe 0
+            val overridden = run("lint", "--root", "$override", "--strict", "--format", "github")
+            overridden.exitCode shouldBe 1
+            for (path in listOf("demo.sources.json", "demo/er.yaml")) {
+                overridden.stdout shouldContain
+                    "file=$override/$path,line=1,col=1::xm/generated-edited generated with profile om-tables/1"
+            }
+        }
+
         test("check writes nothing and exits 1 with located diagnostics on the authored key") {
             val tree = copy(negative.resolve("tree"))
             val before = files(tree)
@@ -209,6 +233,12 @@ class LintCommandSpec :
             exec("profile", "check", "--root", "negative", "--strict").first shouldBe 1
             exec("profile", "apply", "--root", "tree", "--out", "out").first shouldBe 0
             files(work.resolve("out")).keys shouldBe appliedLinks
+            exec("lint", "--root", "out", "--strict").first shouldBe 0
+            val applied = work.resolve("out/demo/er.yaml")
+            applied.writeText(applied.readText() + "\n")
+            val (editedExit, edited) = exec("lint", "--root", "out", "--strict", "--format", "github")
+            editedExit shouldBe 1
+            edited shouldContain "file=out/demo/er.yaml,line=1,col=1::xm/generated-edited"
             exec("lint", "--codes").second shouldBe DiagnosticCodes.render()
             exec("lint").first shouldBe 2
         }

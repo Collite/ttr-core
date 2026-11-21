@@ -135,16 +135,7 @@ object ImportSchemaCli {
             val snapshots =
                 try {
                     OpenMetadataSnapshots.inputs(directory)?.let { return JsonFrontEnd.parse(it) }
-                    Files.list(directory).use { paths ->
-                        paths
-                            .filter { file ->
-                                val name = file.fileName.toString()
-                                !name.startsWith(".") &&
-                                    name.endsWith(".json") &&
-                                    Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)
-                            }.toList()
-                            .sortedWith(compareBy(Bytewise) { it.fileName.toString() })
-                    }
+                    legacyInputs(directory)
                 } catch (_: IOException) {
                     throw ReaderInputException("cannot list snapshot directory $directory")
                 } catch (_: UncheckedIOException) {
@@ -152,6 +143,58 @@ object ImportSchemaCli {
                 }
             if (snapshots.isEmpty()) throw ReaderInputException("no JSON snapshots in $directory")
             return JsonFrontEnd.parse(snapshots)
+        }
+
+        fun legacyInputs(directory: Path): List<Path> =
+            Files.list(directory).use { paths ->
+                paths
+                    .filter { file ->
+                        val name = file.fileName.toString()
+                        !name.startsWith(".") &&
+                            name.endsWith(".json") &&
+                            Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)
+                    }.toList()
+                    .sortedWith(compareBy(Bytewise) { it.fileName.toString() })
+            }
+    }
+
+    /** Replay the source directory named by a reader header, using the importer's snapshot selection. */
+    internal fun replaySnapshot(
+        snapshot: Path,
+        overlay: Path?,
+        profile: String,
+        out: Path,
+    ): Lazy<Result<Map<String, String>>>? {
+        val resolved = ImportProfile.shipped(profile) ?: return null
+        return try {
+            if (!OpenMetadataSnapshots.hasManifest(snapshot) && SchemaSnapshots.legacyInputs(snapshot).isEmpty()) {
+                return null
+            }
+            lazy {
+                try {
+                    val generated =
+                        OpenMetadataSnapshots.read(snapshot) {
+                            Reader.run(
+                                SchemaSnapshots,
+                                resolved,
+                                ReaderRequest(listOf(snapshot), out, MetadataVersion.value, overlay = overlay),
+                            )
+                        }
+                    Result.success(generated.files + generated.sidecars)
+                } catch (e: ReaderInputException) {
+                    Result.failure(e)
+                } catch (e: ProfileException) {
+                    Result.failure(e)
+                } catch (e: IOException) {
+                    Result.failure(e)
+                } catch (e: UncheckedIOException) {
+                    Result.failure(e)
+                }
+            }
+        } catch (e: IOException) {
+            lazy { Result.failure(e) }
+        } catch (e: UncheckedIOException) {
+            lazy { Result.failure(e) }
         }
     }
 
