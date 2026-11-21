@@ -162,6 +162,7 @@ class OpenMetadataSnapshotSpec :
                 }
             if (manifest) {
                 OpenMetadataSnapshots.write(sources, snapshots)
+                sources.resolve("unrelated.json").writeText("outside the capture manifest")
             } else {
                 Files.createDirectory(sources)
                 snapshots.forEach { (name, text) -> sources.resolve(name).writeText(text) }
@@ -182,7 +183,10 @@ class OpenMetadataSnapshotSpec :
                 .filter { it.getValue("code").jsonPrimitive.content == "generated-file" }
                 .map { issue ->
                     issue.getValue("file").jsonPrimitive.content to
-                        issue.getValue("message").jsonPrimitive.content.substringBefore(':')
+                        issue
+                            .getValue("message")
+                            .jsonPrimitive.content
+                            .substringBefore(':')
                 }
 
         val eastModel = "om/shop/sales/east/db.ttrm"
@@ -212,6 +216,12 @@ class OpenMetadataSnapshotSpec :
             lint.exitCode shouldBe 1
             guardIssues(lint) shouldBe listOf(eastModel to "xm/generated-edited")
             lint.stdout shouldContain "the body differs from a fresh generation of its inputs"
+
+            val west = work.resolve("model/om/shop/sales/west/db.ttrm").readText()
+            model.writeText(original.substringBefore('\n') + "\n" + GeneratedHeader.body(west))
+            val swapped = strictLint(work)
+            swapped.exitCode shouldBe 1
+            guardIssues(swapped) shouldBe listOf(eastModel to "xm/generated-edited")
         }
 
         test("strict lint catches a sidecar body edit with its genuine header") {
@@ -526,8 +536,9 @@ class OpenMetadataSnapshotSpec :
 
                 withClueOutcome(importLive(work, url))
                 durableInput(work)
-                val lint = exec(work, "lint", "--root", "model", "--strict")
-                (lint.stdout + lint.stderr) shouldNotContain "xm/generated-stale"
+                val lint = strictLint(work)
+                withClueOutcome(lint)
+                guardIssues(lint) shouldBe emptyList()
                 val repeat = importLive(work, url, "--dry-run")
                 withClueOutcome(repeat)
                 repeat.stderr shouldContain "No changes under model."

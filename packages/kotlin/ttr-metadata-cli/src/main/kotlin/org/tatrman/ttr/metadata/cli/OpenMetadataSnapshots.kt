@@ -22,6 +22,8 @@ internal object OpenMetadataSnapshots {
     private const val ATTRIBUTES = ".gitattributes"
     private val ENTRY = Regex("([a-f0-9]{64}) ([a-z0-9_]+(?:[.][a-z0-9_]+)*[.]json)")
 
+    fun hasManifest(directory: Path): Boolean = Files.exists(directory.resolve(MANIFEST), NOFOLLOW_LINKS)
+
     fun inputs(directory: Path): List<Path>? =
         manifest(directory)?.map { (name, hash) ->
             val path = directory.resolve(name)
@@ -142,7 +144,7 @@ internal object OpenMetadataSnapshots {
 
     private fun manifest(directory: Path): Map<String, String>? {
         val path = directory.resolve(MANIFEST)
-        if (!Files.exists(path, NOFOLLOW_LINKS)) return null
+        if (!hasManifest(directory)) return null
         if (!Files.isRegularFile(path, NOFOLLOW_LINKS)) {
             throw ReaderInputException("$MANIFEST is not a regular file in $directory")
         }

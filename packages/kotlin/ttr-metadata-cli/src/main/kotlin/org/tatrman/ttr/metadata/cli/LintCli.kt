@@ -362,7 +362,10 @@ object LintCli {
         target: Target,
         loaded: LoadReport,
     ): LoadReport {
-        val guard = GeneratedGuard.check(target.modelRoot, MetadataLoadCli.CHECKOUT_SOURCE)
+        val guard =
+            GeneratedGuard.check(target.modelRoot, MetadataLoadCli.CHECKOUT_SOURCE) { snapshot, overlay, profile ->
+                ImportSchemaCli.replaySnapshot(snapshot, overlay, profile, target.modelRoot)
+            }
         if (guard.isEmpty()) return loaded
         return loaded.copy(
             issues =

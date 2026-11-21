@@ -9,6 +9,7 @@ import org.tatrman.ttr.imports.ReaderInputException
 import org.tatrman.ttr.imports.ReaderRequest
 import org.tatrman.ttr.metadata.export.Hashes
 import org.tatrman.ttr.metadata.source.Captured
+import org.tatrman.ttr.metadata.source.LocalFsStorage
 import org.tatrman.ttr.profile.Bytewise
 import org.tatrman.ttr.profile.ForeignTree
 import org.tatrman.ttr.profile.ProfileException
@@ -135,16 +136,7 @@ object ImportSchemaCli {
             val snapshots =
                 try {
                     OpenMetadataSnapshots.inputs(directory)?.let { return JsonFrontEnd.parse(it) }
-                    Files.list(directory).use { paths ->
-                        paths
-                            .filter { file ->
-                                val name = file.fileName.toString()
-                                !name.startsWith(".") &&
-                                    name.endsWith(".json") &&
-                                    Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)
-                            }.toList()
-                            .sortedWith(compareBy(Bytewise) { it.fileName.toString() })
-                    }
+                    legacyInputs(directory)
                 } catch (_: IOException) {
                     throw ReaderInputException("cannot list snapshot directory $directory")
                 } catch (_: UncheckedIOException) {
@@ -152,6 +144,60 @@ object ImportSchemaCli {
                 }
             if (snapshots.isEmpty()) throw ReaderInputException("no JSON snapshots in $directory")
             return JsonFrontEnd.parse(snapshots)
+        }
+
+        fun legacyInputs(directory: Path): List<Path> =
+            Files.list(directory).use { paths ->
+                paths
+                    .filter { file ->
+                        val name = file.fileName.toString()
+                        !name.startsWith(".") &&
+                            name.endsWith(".json") &&
+                            Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)
+                    }.toList()
+                    .sortedWith(compareBy(Bytewise) { it.fileName.toString() })
+            }
+    }
+
+    /** Replay the source directory named by a reader header. Legacy captures have JSON inputs and no profile tree. */
+    internal fun replaySnapshot(
+        snapshot: Path,
+        overlay: Path?,
+        profile: String,
+        out: Path,
+    ): Lazy<Result<Map<String, String>>>? {
+        val resolved = ImportProfile.shipped(profile) ?: return null
+        return try {
+            if (!OpenMetadataSnapshots.hasManifest(snapshot)) {
+                if (SchemaSnapshots.legacyInputs(snapshot).isEmpty()) return null
+                val yaml = LocalFsStorage("reader-guard", snapshot).listFiles(listOf("yaml", "yml"))
+                if (yaml.any { Path.of(it.path) != overlay }) return null
+            }
+            lazy {
+                try {
+                    val generated =
+                        OpenMetadataSnapshots.read(snapshot) {
+                            Reader.run(
+                                SchemaSnapshots,
+                                resolved,
+                                ReaderRequest(listOf(snapshot), out, MetadataVersion.value, overlay = overlay),
+                            )
+                        }
+                    Result.success(generated.files + generated.sidecars)
+                } catch (e: ReaderInputException) {
+                    Result.failure(e)
+                } catch (e: ProfileException) {
+                    Result.failure(e)
+                } catch (e: IOException) {
+                    Result.failure(e)
+                } catch (e: UncheckedIOException) {
+                    Result.failure(e)
+                }
+            }
+        } catch (e: IOException) {
+            lazy { Result.failure(e) }
+        } catch (e: UncheckedIOException) {
+            lazy { Result.failure(e) }
         }
     }
 

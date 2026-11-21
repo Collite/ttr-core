@@ -26,21 +26,33 @@ import kotlin.io.path.readText
  *
  * - `xm/generated-stale`: an input's recomputed SHA-256 differs from the header's, or the input is not found.
  * - `xm/generated-edited`: the header is malformed, or the body differs from a fresh generation of the named inputs
- *   (the snapshot tree applied with its own declarations, never an override; a `.ttrm` is that document rendered), or
+ *   (a profile-apply tree uses its own declarations; a reader snapshot uses its original reader), or
  *   the tree's own declarations do not give the document the header's profile (✅R277-A: a document an `apply
  *   --profile` override generated cannot be re-checked).
  *
  * Both are errors at the file head (line 1, column 1). Regeneration's own errors (an orphaned overlay key, a dropped
  * input) are reported where they arise, so a broken input is shown at its key. Inputs resolve against the generated
- * file's real directory (review-287 R1); each snapshot tree is hashed and regenerated once per check. `agents/` is never read (✅MW-44).
+ * file's real directory (review-287 R1). Input hashes and regeneration results are cached for the check.
+ * `agents/` is never read (✅MW-44).
  */
 object GeneratedGuard {
     fun check(
         root: Path,
         sourceId: String,
+    ): List<LoadWarning> = check(root, sourceId) { _, _, _ -> null }
+
+    /**
+     * CLI integration: [reader] recognizes a directory snapshot and supplies its files by output path. Its result is
+     * lazy so stale inputs are diagnosed without replaying a reader. A null result selects the profile-apply guard.
+     */
+    fun check(
+        root: Path,
+        sourceId: String,
+        reader: (snapshot: Path, overlay: Path?, profile: String) -> Lazy<Result<Map<String, String>>>?,
     ): List<LoadWarning> {
         val issues = mutableListOf<LoadWarning>()
         val runs = mutableMapOf<Path, Regeneration>()
+        val readers = mutableMapOf<Triple<Path, Path?, String>, Lazy<Result<Map<String, String>>>?>()
         // A tree is hashed once per check, however many generated files name it (review-277 F8).
         val hashes = mutableMapOf<Path, String?>()
         for (file in files(root)) {
@@ -70,6 +82,18 @@ object GeneratedGuard {
                 }
             stale.forEach { issues += issue("xm/generated-stale: $it") }
             if (!snapshot.isDirectory()) continue
+            val overlay = header.overlay?.let { directory.resolve(it.path).normalize() }
+            val key = Triple(snapshot, overlay, header.profile)
+            if (key !in readers) readers[key] = reader(snapshot, overlay, header.profile)
+            val replay = readers[key]
+            if (replay != null) {
+                if (stale.isEmpty()) {
+                    readerEdit(file, text, sidecarHeader, replay.value)?.let { detail ->
+                        issues += issue("xm/generated-edited: $detail")
+                    }
+                }
+                continue
+            }
             val run = runs.getOrPut(snapshot) { Regeneration.of(snapshot, sourceId) }
             if (stale.isNotEmpty()) continue
 
@@ -107,6 +131,36 @@ object GeneratedGuard {
         // A regeneration's own errors once per run, where they arise (an orphaned overlay key, a dropped file).
         runs.values.forEach { issues += it.problems }
         return issues
+    }
+
+    private fun readerEdit(
+        file: Path,
+        text: String,
+        sidecarHeader: String?,
+        replay: Result<Map<String, String>>,
+    ): String? {
+        val outputs = replay.getOrElse { return "cannot regenerate the reader's inputs: ${it.message}" }
+        if (sidecarHeader != null) {
+            val fresh = outputs[file.name] ?: return "its inputs generate no sidecar for this package"
+            // The reader writes the same first member as SourcesJsonWriter; restore the checked header before comparing.
+            val entries = "{\n" + fresh.substringAfter('\n').substringAfter('\n')
+            return if (Sidecar.withHeader(entries, sidecarHeader) == text) {
+                null
+            } else {
+                "the sidecar differs from a fresh generation of its inputs"
+            }
+        }
+        // The import output can be nested in the lint root. Use the longest matching generated path so one package
+        // cannot pass as another by carrying its body under the first package's path.
+        val fresh =
+            (0 until file.nameCount).firstNotNullOfOrNull { start ->
+                outputs[file.subpath(start, file.nameCount).joinToString("/")]
+            } ?: return "its inputs generate no document at this package and model path"
+        return if (GeneratedHeader.body(fresh) == GeneratedHeader.body(text)) {
+            null
+        } else {
+            "the body differs from a fresh generation of its inputs"
+        }
     }
 
     /** ✅R277-A: the document [profile] generated is not one the tree's own declarations give it. */
