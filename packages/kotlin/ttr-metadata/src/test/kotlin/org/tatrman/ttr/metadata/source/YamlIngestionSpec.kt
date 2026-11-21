@@ -117,10 +117,54 @@ class YamlIngestionSpec :
             val source = YamlFileSource("s", 100, storage).load()
             source.errors.shouldBeEmpty()
             val mapping = source.mappings.filterIsInstance<Er2DbEntityMapping>().single()
+            mapping.entity shouldBe QualifiedName(SchemaCode.ER, "entity", "ActiveSale", "demo.reporting")
             mapping.target shouldBe MappingTarget.Table(table.copy(`package` = "demo.reporting"))
             val physical = source.tables.getValue(table.copy(`package` = ""))
             physical.qname.name shouldBe "sale"
             (mapping.whereFilter as WhereFilter.Sql).sql shouldBe "id = 1"
+        }
+
+        test("dialect bindings retain both qualified targets when packages share a physical table name") {
+            val sharedTables =
+                listOf("alpha" to "AlphaSale", "beta" to "BetaSale").flatMap { (pkg, entity) ->
+                    listOf(
+                        "$pkg/db.yaml" to
+                            """
+                            ttr: "0.22"
+                            package: $pkg
+                            model: db
+                            defs: [{kind: table, id: sale, properties: {}}]
+                            """,
+                        "$pkg/$pkg.sources.json" to
+                            """{"entries":[{"kind":"table","qname":"$pkg.db.dbo.sale","sourceName":"${pkg}Sale"}]}""",
+                        "$pkg/$pkg.yaml" to "sales: {$entity: {input: {from: ${pkg}Sale, where: 'id = 1'}}}",
+                    )
+                }
+            val storage =
+                storage(
+                    "ttr.yaml" to "profile: ./example.yaml\ngrammar: '>=0.22 <1.0'\n",
+                    "model.ignore" to "example.yaml\n",
+                    "example.yaml" to
+                        profile.replace(
+                            "mapping: {}, default: demo.reporting",
+                            "mapping: {alpha: alpha, beta: beta}",
+                        ),
+                    *sharedTables.toTypedArray(),
+                )
+            val applied = ProfileApply.run(storage)
+            applied.problems.shouldBeEmpty()
+            applied.files.getValue("alpha/binding.yaml") shouldContain "table: \"alpha.db.dbo.sale\""
+            applied.files.getValue("beta/binding.yaml") shouldContain "table: \"beta.db.dbo.sale\""
+
+            val source = YamlFileSource("s", 100, storage).load()
+            source.errors.shouldBeEmpty()
+            val bindings = source.mappings.filterIsInstance<Er2DbEntityMapping>().associateBy { it.entity.name }
+            val alpha = bindings.getValue("AlphaSale")
+            val beta = bindings.getValue("BetaSale")
+            alpha.target shouldBe MappingTarget.Table(table.copy(`package` = "alpha"))
+            beta.target shouldBe MappingTarget.Table(table.copy(`package` = "beta"))
+            (alpha.whereFilter as WhereFilter.Sql).sql shouldBe "id = 1"
+            (beta.whereFilter as WhereFilter.Sql).sql shouldBe "id = 1"
         }
 
         test("canonical bare, wrapped and quoted targets identify the same table") {
