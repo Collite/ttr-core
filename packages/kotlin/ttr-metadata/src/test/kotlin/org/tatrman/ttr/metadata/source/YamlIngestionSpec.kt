@@ -37,7 +37,7 @@ class YamlIngestionSpec :
             profile: example/1
             grammar: '>=0.22 <1.0'
             operations:
-              - {op: package, mapping: {}, default: demo}
+              - {op: package, mapping: {}, default: demo.reporting}
               - {op: kinds, at: /tables, mapping: {tables: table}}
               - {op: kinds, at: /sales, mapping: {sales: entity}}
               - {op: kinds, at: /sales, mapping: {sales: er2db_entity}}
@@ -51,7 +51,11 @@ class YamlIngestionSpec :
                 "ttr.yaml" to "profile: ./example.yaml\ngrammar: '>=0.22 <1.0'\n",
                 "model.ignore" to "example.yaml\n",
                 "example.yaml" to profile,
-                "demo/sales.yaml" to "tables: {sale: {}}\nsales: {ActiveSale: {input: {from: $target, where: 'id = 1'}}}\n",
+                "demo/reporting/sales.yaml" to
+                    """
+                    tables: {sale: {}}
+                    sales: {ActiveSale: {input: {from: $target, where: 'id = 1'}}}
+                    """,
             )
 
         test("an accepted scalar procedure is available in the typed snapshot and export") {
@@ -79,12 +83,11 @@ class YamlIngestionSpec :
             val loaded = MetadataLoader.of(SourceKind.YAML, storage).load()
             loaded.errors.shouldBeEmpty()
             val model = requireNotNull(loaded.model)
-            val entry = DefinitionSet.from(loaded.files, model, "0.22", model.version.value).entries.single {
-                it.def is ProcedureDef
-            }
+            val definitions = DefinitionSet.from(loaded.files, model, "0.22", model.version.value)
+            val entry = definitions.entries.single { it.def is ProcedureDef }
             entry.qname shouldBe "db.dbo.sale_total"
             entry.pkg shouldBe "demo"
-            val qname = QualifiedName(SchemaCode.DB, "dbo", "sale_total", "demo")
+            val qname = QualifiedName(SchemaCode.DB, "dbo", "sale_total")
             val procedure = model.objectByQname().getValue(qname) as DbProcedure
             procedure.description shouldBe "Calculate sales"
             procedure.tags shouldBe listOf("sales")
@@ -94,28 +97,45 @@ class YamlIngestionSpec :
                     DbProcedureParameter("total", "decimal", ParameterDirection.OUT),
                 )
             procedure.resultColumns.single().qname shouldBe qname.copy(name = "sale_total.total")
-            val exported = ModelToDefinitions.convert(model).files.flatMap { it.definitions }.filterIsInstance<ProcedureDef>()
-            exported.single().name shouldBe entry.def.name
-            exported.single().resultColumns.single().type?.name shouldBe "decimal"
+            val bundle = ModelToDefinitions.convert(model)
+            val exported =
+                bundle.files
+                    .flatMap { it.definitions }
+                    .filterIsInstance<ProcedureDef>()
+                    .single()
+            exported.name shouldBe entry.def.name
+            val exportedColumn = exported.resultColumns.single()
+            exportedColumn.type?.name shouldBe "decimal"
         }
 
         test("a dialect link delivers the existing physical table and SQL condition to the snapshot") {
             val storage = dialect("sale")
             val applied = ProfileApply.run(storage)
             applied.problems.shouldBeEmpty()
-            applied.files.getValue("demo/binding.yaml") shouldContain "table: \"demo.db.dbo.sale\""
+            applied.files.getValue("demo/reporting/binding.yaml") shouldContain "table: \"demo.reporting.db.dbo.sale\""
 
             val source = YamlFileSource("s", 100, storage).load()
             source.errors.shouldBeEmpty()
             val mapping = source.mappings.filterIsInstance<Er2DbEntityMapping>().single()
-            mapping.target shouldBe MappingTarget.Table(table)
-            source.tables.getValue(table.copy(`package` = "")).qname.name shouldBe "sale"
+            mapping.target shouldBe MappingTarget.Table(table.copy(`package` = "demo.reporting"))
+            val physical = source.tables.getValue(table.copy(`package` = ""))
+            physical.qname.name shouldBe "sale"
             (mapping.whereFilter as WhereFilter.Sql).sql shouldBe "id = 1"
         }
 
-        test("canonical bare targets and explicit ref values still identify the same table") {
+        test("canonical bare, wrapped and quoted targets identify the same table") {
             val storage =
                 storage(
+                    "demo/db.yaml" to
+                        """
+                        ttr: "0.22"
+                        package: demo
+                        model: db
+                        defs:
+                          - kind: table
+                            id: sale
+                            properties: {}
+                        """,
                     "demo/bindings.yaml" to
                         """
                         ttr: "0.22"
@@ -128,12 +148,25 @@ class YamlIngestionSpec :
                           - kind: er2db_entity
                             id: Wrapped
                             properties: {entity: er.entity.Wrapped, target: {table: {ref: demo.db.dbo.sale}}}
+                          - kind: er2db_entity
+                            id: Quoted
+                            properties: {entity: er.entity.Quoted, target: {table: "demo.db.dbo.sale"}}
+                          - kind: er2db_entity
+                            id: Missing
+                            properties: {entity: er.entity.Missing, target: {table: "other.db.dbo.sale"}}
                         """,
                 )
             val source = YamlFileSource("s", 100, storage).load()
             source.errors.shouldBeEmpty()
-            source.mappings.filterIsInstance<Er2DbEntityMapping>().map { it.target } shouldBe
-                listOf(MappingTarget.Table(table), MappingTarget.Table(table))
+            val targets =
+                source.mappings.filterIsInstance<Er2DbEntityMapping>().associate { it.entity.name to it.target }
+            targets shouldBe
+                mapOf(
+                    "Bare" to MappingTarget.Table(table),
+                    "Wrapped" to MappingTarget.Table(table),
+                    "Quoted" to MappingTarget.Table(table),
+                    "Missing" to MappingTarget.Table(QualifiedName(SchemaCode.DB, "dbo", "<unresolved>")),
+                )
         }
 
         test("a genuinely missing dialect target still reports the unresolved link") {
