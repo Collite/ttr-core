@@ -9,6 +9,7 @@ import org.tatrman.ttr.metadata.model.Cardinality
 import org.tatrman.ttr.metadata.model.DbColumn
 import org.tatrman.ttr.metadata.model.DbForeignKey
 import org.tatrman.ttr.metadata.model.DbProcedure
+import org.tatrman.ttr.metadata.model.DbProcedureParameter
 import org.tatrman.ttr.metadata.model.DbTable
 import org.tatrman.ttr.metadata.model.DbView
 import org.tatrman.ttr.metadata.model.Entity
@@ -22,6 +23,7 @@ import org.tatrman.ttr.metadata.model.LocalizedTextList
 import org.tatrman.ttr.metadata.model.MappingSource
 import org.tatrman.ttr.metadata.model.WhereFilter
 import org.tatrman.ttr.metadata.model.MappingTarget
+import org.tatrman.ttr.metadata.model.ParameterDirection
 import org.tatrman.ttr.metadata.model.Query
 import org.tatrman.ttr.metadata.model.QueryParameterDef
 import org.tatrman.ttr.metadata.model.Relation
@@ -47,6 +49,7 @@ import org.tatrman.ttr.parser.model.BindingColumnObject
 import org.tatrman.ttr.parser.model.BindingPropertyBareId
 import org.tatrman.ttr.parser.model.BindingPropertyBlock
 import org.tatrman.ttr.parser.model.PropertyValue
+import org.tatrman.ttr.parser.model.ProcedureDef
 import org.tatrman.ttr.parser.model.QueryDef
 import org.tatrman.ttr.parser.model.Reference as TtrReference
 import org.tatrman.ttr.parser.model.RelationDef
@@ -375,6 +378,7 @@ class FileBasedSource(
         val entities = mutableMapOf<QualifiedName, Entity>()
         val relations = mutableMapOf<QualifiedName, Relation>()
         val mappings = mutableListOf<org.tatrman.ttr.metadata.model.Mapping>()
+        val explicitBindingRefs = mutableMapOf<Int, ExplicitBindingRefs>()
         val queries = mutableMapOf<QualifiedName, Query>()
         val shortQueryTargets = mutableSetOf<String>()
         val unanchoredColumns = mutableMapOf<String, QualifiedName>()
@@ -598,6 +602,7 @@ class FileBasedSource(
                     drillMaps,
                     semanticsResolved,
                     shortQueryTargets,
+                    explicitBindingRefs,
                     unanchoredColumns,
                 )
             }
@@ -616,6 +621,7 @@ class FileBasedSource(
         }
 
         resolveShortQueryTargets(mappings, queries, shortQueryTargets)
+        resolveExplicitBindingRefs(mappings, explicitBindingRefs, loadedFiles)
         anchorToStandaloneEntityTables(mappings, unanchoredColumns)
 
         // Grammar 0.17 — the conceptual tier over the source as one project; its model-level `cn/…` errors and
@@ -906,6 +912,7 @@ class FileBasedSource(
         drillMaps: MutableMap<QualifiedName, org.tatrman.ttr.metadata.model.DrillMap>,
         semanticsResolved: Map<SourceLocation, ResolvedSemantics>,
         shortQueryTargets: MutableSet<String>,
+        explicitBindingRefs: MutableMap<Int, ExplicitBindingRefs>,
         unanchoredColumns: MutableMap<String, QualifiedName>,
     ) {
         when (def) {
@@ -960,6 +967,23 @@ class FileBasedSource(
                                 )
                             },
                         definitionSql = def.definitionSql ?: "",
+                    )
+            }
+            is ProcedureDef -> {
+                val qn = qname(schemaCode, namespace, def.name)
+                procedures[qn] =
+                    DbProcedure(
+                        internalId = idFor("db.procedure", qn),
+                        qname = qn,
+                        description = def.description ?: "",
+                        descriptionLocalized = def.descriptionLocalized.toLocalizedText(),
+                        tags = def.tags,
+                        sourceFile = sourceFile,
+                        parameters = def.parameters.mapNotNull(::procedureParameter),
+                        resultColumns =
+                            def.resultColumns.map { col ->
+                                ttrColumnToDbColumn(qn.copy(name = "${def.name}.${col.name}"), qn, col, sourceFile)
+                            },
                     )
             }
             is FkDef -> {
@@ -1166,13 +1190,19 @@ class FileBasedSource(
             }
             is Er2DbEntityDef -> {
                 val qn = qname("binding", "er2db_entity", def.name)
+                val entityRef = def.entity ?: return
+                val entity = refToQname(entityRef, "er", "entity")
+                var quotedTable: String? = null
                 val target =
                     when (val t = def.target) {
                         is TargetObjectValue -> {
                             val entries = t.obj.entries
                             when {
-                                entries.containsKey("table") ->
-                                    MappingTarget.Table(refToQname(entries["table"], "db", "dbo"))
+                                entries.containsKey("table") -> {
+                                    val value = entries["table"]
+                                    quotedTable = (value as? PropertyValue.StringValue)?.raw
+                                    MappingTarget.Table(refToQname(value, "db", "dbo"))
+                                }
                                 entries.containsKey("view") ->
                                     MappingTarget.View(refToQname(entries["view"], "db", "dbo"))
                                 entries.containsKey("query") ->
@@ -1185,6 +1215,10 @@ class FileBasedSource(
                             MappingTarget.Table(refToQname(t.ref, "db", "dbo"))
                         null -> null
                     } ?: return
+                val yamlEntity = entityRef.path.takeIf { reader is YamlTreeReader }
+                if (yamlEntity != null || quotedTable != null) {
+                    explicitBindingRefs[mappings.size] = ExplicitBindingRefs(yamlEntity, quotedTable)
+                }
                 mappings +=
                     Er2DbEntityMapping(
                         internalId = idFor("map.er2db_entity", qn),
@@ -1193,7 +1227,7 @@ class FileBasedSource(
                         descriptionLocalized = def.descriptionLocalized.toLocalizedText(),
                         tags = def.tags,
                         sourceFile = sourceFile,
-                        entity = def.entity?.path?.let { Reference.toQname(it, "er", "entity") } ?: return,
+                        entity = entity,
                         target = target,
                         whereFilter = def.whereFilter?.let(::whereFilterOf),
                     )
@@ -1681,6 +1715,15 @@ class FileBasedSource(
             }
         }
 
+    private fun procedureParameter(value: PropertyValue): DbProcedureParameter? {
+        val entries = (value as? PropertyValue.ObjectValue)?.entries ?: return null
+        val name = (entries["name"] as? PropertyValue.IdValue)?.ref?.path ?: return null
+        val type = (entries["type"] as? PropertyValue.IdValue)?.ref?.path ?: return null
+        val direction = (entries["direction"] as? PropertyValue.IdValue)?.ref?.path
+        val mode = ParameterDirection.entries.firstOrNull { it.name.equals(direction ?: "IN", ignoreCase = true) }
+        return mode?.let { DbProcedureParameter(name, type, it) }
+    }
+
     private fun ttrColumnToDbColumn(
         qn: QualifiedName,
         tableQn: QualifiedName,
@@ -1789,6 +1832,48 @@ class FileBasedSource(
             if (target == null || m.internalId !in shortQueryTargets || target in queries) return@replaceAll m
             val only = byName[target.name]?.singleOrNull() ?: return@replaceAll m
             (m as Er2DbEntityMapping).copy(target = MappingTarget.SqlQuery(only))
+        }
+    }
+
+    private data class ExplicitBindingRefs(
+        val yamlEntity: String?,
+        val quotedTable: String?,
+    )
+
+    // Profile links can carry dotted packages and emit target.table as a string. Use the declarations here because
+    // the typed snapshot keys are package-less and can collapse tables of the same physical name.
+    private fun resolveExplicitBindingRefs(
+        mappings: MutableList<org.tatrman.ttr.metadata.model.Mapping>,
+        refs: Map<Int, ExplicitBindingRefs>,
+        files: List<LoadedFile>,
+    ) {
+        if (refs.isEmpty()) return
+        val tables = mutableMapOf<String, QualifiedName>()
+        val entities = mutableMapOf<String, QualifiedName>()
+        for (file in files) {
+            val pkg = file.declaredPackage ?: file.computedPackage
+            for (def in file.definitions) {
+                if (def !is TableDef && def !is EntityDef) continue
+                val (schema, namespace) =
+                    if (file.schemaCode.isEmpty()) schemaNamespaceForKind(def) else file.schemaCode to file.namespace
+                val qn = qname(schema, namespace, def.name)
+                val local = qn.dotted()
+                if (def is TableDef) tables[local] = qn
+                if (pkg.isEmpty()) continue
+                val index = if (def is TableDef) tables else entities
+                index["$pkg.$local"] = qn.copy(`package` = pkg)
+            }
+        }
+        for ((index, ref) in refs) {
+            val entity = ref.yamlEntity?.let(entities::get)
+            val table = ref.quotedTable?.let(tables::get)
+            if (entity == null && table == null) continue
+            val mapping = mappings[index] as Er2DbEntityMapping
+            mappings[index] =
+                mapping.copy(
+                    entity = entity ?: mapping.entity,
+                    target = table?.let { MappingTarget.Table(it) } ?: mapping.target,
+                )
         }
     }
 
