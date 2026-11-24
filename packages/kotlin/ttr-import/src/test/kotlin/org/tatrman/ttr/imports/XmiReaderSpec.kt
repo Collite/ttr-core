@@ -279,11 +279,15 @@ class XmiReaderSpec :
             write(root, "model", generated)
             loadStrict(root.resolve("model"))
 
+            val id =
+                attribute
+                    .getValue("@xmi")
+                    .jsonObject
+                    .getValue("id")
+                    .jsonPrimitive.content
+            val property = "<ownedAttribute xmi:type=\"uml:Property\" xmi:id=\"$id\""
             root.resolve("sources/unknown.xmi").writeText(
-                String(
-                    exported.bytes,
-                    Charsets.UTF_8,
-                ).replaceFirst("<ownedAttribute ", "<ownedAttribute surprise=\"value\" "),
+                String(exported.bytes, Charsets.UTF_8).replace(property, "$property surprise=\"value\""),
             )
             val refused = shouldThrow<ProfileException> { run(root, "unknown.xmi", "ttr-mdg/1", null) }
             refused.code shouldBe "ys/unknown-key"
