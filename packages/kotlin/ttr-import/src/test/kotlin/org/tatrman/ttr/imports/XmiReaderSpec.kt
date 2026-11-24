@@ -20,6 +20,9 @@ import org.tatrman.ttr.metadata.LoadOptions
 import org.tatrman.ttr.metadata.MetadataLoader
 import org.tatrman.ttr.metadata.export.DefinitionGraph
 import org.tatrman.ttr.metadata.export.DefinitionSet
+import org.tatrman.ttr.metadata.export.ExportRequest
+import org.tatrman.ttr.metadata.export.ExportResult
+import org.tatrman.ttr.metadata.export.Exporter
 import org.tatrman.ttr.metadata.export.xmi.Uuid5
 import org.tatrman.ttr.metadata.export.xmi.XmiWriter
 import org.tatrman.ttr.metadata.source.BuiltinStockSource
@@ -199,6 +202,92 @@ class XmiReaderSpec :
             root.resolve("model/world").createDirectories()
             Files.copy(world.resolve("world/world.ttrm"), root.resolve("model/world/world.ttrm"))
             String(exportXmi(root.resolve("model")), Charsets.UTF_8) shouldBe String(exported, Charsets.UTF_8)
+        }
+
+        test("an ER attribute with a physical binding round-trips the carried ER facts") {
+            val root = workspace()
+            val world = root.resolve("world").createDirectories()
+            val er =
+                """
+                package inventory
+                model er
+                def entity bin { attributes: [def attribute capacity { type: int, optional: true }] }
+                def entity item { attributes: [def attribute sku { type: text }] }
+                def relation stored_in { from: item, to: bin, cardinality: { from: "0..*", to: "1" } }
+                """.trimIndent()
+            world
+                .resolve("inventory")
+                .createDirectories()
+                .resolve("er.ttrm")
+                .writeText(er)
+            world.resolve("storage").createDirectories().resolve("db.ttrm").writeText(
+                """
+                package storage
+                model db schema stock
+                def table bins { columns: [def column capacity { type: int }] }
+                """.trimIndent(),
+            )
+            world.resolve("mappings").createDirectories().resolve("binding.ttrm").writeText(
+                """
+                package mappings
+                model binding
+                def er2db_attribute bin_capacity {
+                    attribute: inventory.er.entity.bin.capacity
+                    target: { column: storage.db.stock.bins.capacity }
+                }
+                """.trimIndent(),
+            )
+            val loaded = loadStrict(world)
+            val set = DefinitionSet.from(loaded.files, loaded.model, "0.22", "inventory")
+            val exported =
+                Exporter().export(set, null, ExportRequest(models = setOf("er"), format = "xmi", profile = "ttr-mdg/1"))
+                    as ExportResult.Single
+            val elements =
+                Json
+                    .parseToJsonElement(XmiFrontEnd.tree(exported.bytes, "inventory.xmi"))
+                    .jsonObject
+                    .getValue("elements")
+                    .jsonObject.values
+                    .map { it.jsonObject }
+            val attribute =
+                elements
+                    .single { it["name"] == JsonPrimitive("bin") }
+                    .getValue("ownedAttribute")
+                    .jsonArray
+                    .single()
+                    .jsonObject
+            val grounding =
+                attribute
+                    .getValue("@outgoing")
+                    .jsonObject
+                    .getValue("grounds")
+                    .jsonArray
+                    .single()
+                    .jsonObject
+            grounding.getValue("@tags").jsonObject.getValue("via") shouldBe JsonPrimitive("er2db")
+
+            Files.write(root.resolve("sources/inventory.xmi"), exported.bytes)
+            val generated = run(root, "inventory.xmi", "ttr-mdg/1", null)
+            generated.files.keys shouldContainExactly listOf("inventory/er.ttrm")
+            val restored = body(generated.files.getValue("inventory/er.ttrm"))
+            ConformanceDump.dumpTree(CanonicalYaml.fromTtr(restored, "er.ttrm").ast) shouldBe
+                ConformanceDump.dumpTree(CanonicalYaml.fromTtr(er, "er.ttrm").ast)
+            reasons(generated) shouldContain
+                ("/elements/*/ownedAttribute/*/@outgoing/grounds" to "groundings are their own elements")
+            reasons(generated).map { it.second } shouldContain "kind mapping null (/@stereotypes = grounds)"
+            run(root, "inventory.xmi", "ttr-mdg/1", null).outputs() shouldBe generated.outputs()
+            write(root, "model", generated)
+            loadStrict(root.resolve("model"))
+
+            root.resolve("sources/unknown.xmi").writeText(
+                String(
+                    exported.bytes,
+                    Charsets.UTF_8,
+                ).replaceFirst("<ownedAttribute ", "<ownedAttribute surprise=\"value\" "),
+            )
+            val refused = shouldThrow<ProfileException> { run(root, "unknown.xmi", "ttr-mdg/1", null) }
+            refused.code shouldBe "ys/unknown-key"
+            refused.location.path shouldContain "/surprise"
         }
 
         test("tagged values survive; what the projection or the engine cannot carry is reported with a reason") {
