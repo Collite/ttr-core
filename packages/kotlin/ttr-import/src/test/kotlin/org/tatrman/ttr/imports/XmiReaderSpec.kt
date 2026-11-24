@@ -7,6 +7,7 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import kotlinx.serialization.json.Json
@@ -30,7 +31,13 @@ import org.tatrman.ttr.metadata.source.BuiltinStockSource
 import org.tatrman.ttr.metadata.source.FileBasedSource
 import org.tatrman.ttr.metadata.source.LocalFsStorage
 import org.tatrman.ttr.parser.conformance.ConformanceDump
+import org.tatrman.ttr.parser.model.DimensionDef
 import org.tatrman.ttr.profile.ProfileException
+import org.tatrman.ttr.semantics.MdReferenceRole
+import org.tatrman.ttr.semantics.ResolutionContext
+import org.tatrman.ttr.semantics.ResolutionResult
+import org.tatrman.ttr.semantics.Resolver
+import org.tatrman.ttr.semantics.SymbolTable
 import org.tatrman.ttr.semantics.conformance.SemanticsConformanceDump
 import org.tatrman.ttr.yaml.CanonicalYaml
 import java.nio.file.Files
@@ -312,19 +319,27 @@ class XmiReaderSpec :
                 """
                 package analytics
                 model md
-                def domain Code { type: text }
+                def domain LocalCode { type: text }
                 def dimension Stock {
                     key: code
-                    attributes: [def attribute code { domain: Code }, def attribute label { type: text }]
+                    attributes: [
+                        def attribute code { domain: LocalCode },
+                        def attribute externalCode { domain: catalog.types.md.domain.Code },
+                        def attribute label { type: text }
+                    ]
                 }
                 """.trimIndent(),
+            )
+            model.parent.resolve("catalog/types").createDirectories().resolve("md.ttrm").writeText(
+                "package catalog.types\nmodel md\ndef domain Code { type: int }",
             )
             val xmi = String(export(model.parent, "xmi"), Charsets.UTF_8)
             root.resolve("sources/domain.xmi").writeText(xmi)
             val result = run(root, "domain.xmi", "ttr-mdg/1", null)
             write(root, "model", result)
             val restored = body(result.files.getValue("analytics/md.ttrm"))
-            restored shouldContain "def attribute code { domain: Code"
+            restored shouldContain "def attribute code { domain: LocalCode"
+            restored shouldContain "def attribute externalCode { domain: catalog.types.md.domain.Code"
             restored shouldContain "def attribute label { type: text"
 
             fun attributes(path: Path): Map<String, JsonObject> {
@@ -343,7 +358,7 @@ class XmiReaderSpec :
                     }
             }
             val original = attributes(model.parent)
-            original.size shouldBe 2
+            original.size shouldBe 3
             attributes(root.resolve("model")) shouldBe original
 
             val type = Regex("""(<ownedAttribute [^>]*?) type="([^"]+)"/>""")
@@ -354,6 +369,48 @@ class XmiReaderSpec :
             root.resolve("sources/child-domains.xmi").writeText(childForm)
             body(run(root, "child-domains.xmi", "ttr-mdg/1", null).files.getValue("analytics/md.ttrm")) shouldBe
                 restored
+
+            for ((form, xml) in listOf("attribute" to xmi, "child" to childForm)) {
+                val input = "shadowed-$form.xmi"
+                // Preserve both XMI IDs and change only the name of the independent local domain.
+                root.resolve("sources/$input").writeText(xml.replace("name=\"LocalCode\"", "name=\"Code\""))
+                val generated = run(root, input, "ttr-mdg/1", null, out = form)
+                write(root, form, generated)
+                val loaded = loadStrict(root.resolve(form))
+                val symbols = SymbolTable()
+                for (file in loaded.files) {
+                    symbols.upsertDocument(
+                        file.storageFile.path,
+                        file.definitions,
+                        file.schemaCode,
+                        file.namespace,
+                        packageName = file.declaredPackage ?: file.computedPackage,
+                    )
+                }
+                val dimension =
+                    loaded.files
+                        .flatMap { it.definitions }
+                        .filterIsInstance<DimensionDef>()
+                        .single()
+                val resolver = Resolver(symbols)
+                for ((attribute, expected) in mapOf("code" to "analytics", "externalCode" to "catalog.types")) {
+                    val path =
+                        dimension.attributes
+                            .single { it.name == attribute }
+                            .domainRef!!
+                            .path
+                    val resolved =
+                        resolver.resolveReference(
+                            Resolver.Ref(path, path.split('.'), mdContext = MdReferenceRole.Domain),
+                            ResolutionContext("md", "", packageName = "analytics"),
+                        )
+                    (resolved as ResolutionResult.Resolved).symbol.qname shouldBe "$expected.md.domain.Code"
+                }
+            }
+            val flattened = run(root, "domain.xmi", "ttr-mdg/1", "combined", out = "flat")
+            body(flattened.files.getValue("combined/md.ttrm")) shouldContain "def attribute externalCode { domain: Code"
+            write(root, "flat", flattened)
+            loadStrict(root.resolve("flat"))
 
             val missing = type.find(xmi) ?: error("The fixture has no authored type")
             root.resolve("sources/unresolved-type.xmi").writeText(
@@ -431,8 +488,19 @@ class XmiReaderSpec :
             val eaConnector =
                 Regex("""<connector xmi:idref="$id">[\s\S]*?</connector>""").find(xmi)
                     ?: error("The fixture has no EA connector")
-            source.writeText(xmi.removeRange(eaConnector.range))
-            run(root, "associations.xmi", "ttr-mdg/1", null).files.keys shouldContainExactly listOf("inventory/er.ttrm")
+            val noEa = xmi.removeRange(eaConnector.range)
+            val ownedEndType = Regex("""(<ownedEnd [^>]*?) type="([^"]+)"([^>]*>)""")
+            val childEnds =
+                ownedEndType.replace(noEa) {
+                    "${it.groupValues[1]}${it.groupValues[3]}<type xmi:idref=\"${it.groupValues[2]}\"/>"
+                }
+            childEnds shouldNotBe noEa
+            for (umlEnds in listOf(noEa, childEnds)) {
+                source.writeText(umlEnds)
+                val withoutEa = run(root, "associations.xmi", "ttr-mdg/1", null)
+                withoutEa.files.keys shouldContainExactly listOf("inventory/er.ttrm")
+                report(withoutEa).getValue("ignored").jsonArray shouldContain entry
+            }
             val target =
                 physical
                     .getValue("@target")
@@ -453,6 +521,18 @@ class XmiReaderSpec :
                 partial.files.keys shouldContain "storage/er.ttrm"
                 partial.report.warnings.single { it.startsWith("xm/association-ends:") } shouldContain replacement
             }
+            val unresolvedEnds =
+                eaConnector.value
+                    .replace(Regex("""(<source xmi:idref=")[^"]+"""), "$1missing-source")
+                    .replace(Regex("""(<target xmi:idref=")[^"]+"""), "$1missing-target")
+            source.writeText(xmi.replaceRange(eaConnector.range, unresolvedEnds))
+            val unresolved = run(root, "associations.xmi", "ttr-mdg/1", null)
+            unresolved.files.keys shouldContainExactly listOf("inventory/er.ttrm")
+            report(unresolved).getValue("ignored").jsonArray shouldContain
+                JsonObject(entry + ("reason" to JsonPrimitive("XMI association has two unresolved EA endpoints")))
+            val warning = unresolved.report.warnings.single { it.startsWith("xm/association-ends:") }
+            warning shouldContain "associations.xmi ${entry.getValue("line").jsonPrimitive.int}:"
+            warning shouldContain "/elements/$id (missing-source, missing-target)"
             source.writeText(xmi.replaceFirst("name=\"bin\" visibility", "name=\"bin\" surprise=\"yes\" visibility"))
             val refused = shouldThrow<ProfileException> { run(root, "associations.xmi", "ttr-mdg/1", null) }
             refused.code shouldBe "ys/unknown-key"

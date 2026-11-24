@@ -104,12 +104,16 @@ object XmiFrontEnd : FrontEnd {
         parsePackages(files) { file, name -> tree(bytes(file), name) }
 
     /** Apply MDG type and association distinctions without changing the tree seen by other profiles. */
-    internal fun parseMdg(files: List<Path>): MdgInput {
+    internal fun parseMdg(
+        files: List<Path>,
+        flattenPackages: Boolean,
+    ): MdgInput {
         val ignored = mutableListOf<ImportReport.Ignored>()
         val warnings = mutableListOf<String>()
         val trees =
             parsePackages(files) { file, name ->
-                val builder = Builder(read(bytes(file, name), name), name, mdg = true)
+                val builder =
+                    Builder(read(bytes(file, name), name), name, mdg = true, flattenPackages = flattenPackages)
                 builder.json().also {
                     ignored += builder.ignored
                     warnings += builder.warnings
@@ -280,6 +284,7 @@ object XmiFrontEnd : FrontEnd {
         private val root: XNode,
         private val label: String,
         private val mdg: Boolean = false,
+        private val flattenPackages: Boolean = false,
     ) {
         val ignored = mutableListOf<ImportReport.Ignored>()
         val warnings = mutableListOf<String>()
@@ -293,6 +298,7 @@ object XmiFrontEnd : FrontEnd {
         private val diagrams = mutableListOf<XNode>()
         private val model: XNode?
         private val elements = mutableListOf<Element>()
+        private val packagesById: Map<String, String>
 
         /** A collected `packagedElement`: its `xmi:id`, node and package path. */
         private class Element(
@@ -311,6 +317,7 @@ object XmiFrontEnd : FrontEnd {
             index(root)
             model = root.children.firstOrNull { it.name == "uml:Model" }
             model?.let { collect(it, emptyList()) }
+            packagesById = if (mdg) elements.associate { it.id to it.pkg } else emptyMap()
             // Every stereotype application before any extension, so an application's value wins wherever EA put its
             // extension (review-372 F7).
             val others = root.children.filter { it.name != "uml:Model" && it.name != "xmi:Documentation" }
@@ -461,7 +468,7 @@ object XmiFrontEnd : FrontEnd {
             ends[connector.id]?.get(end)?.ref
                 ?: connector.node.attr(dependency).takeIf { connector.node.attr("xmi:type") == "uml:Dependency" }
 
-        private fun isPhysicalAssociation(element: Element): Boolean {
+        private fun omitAssociation(element: Element): Boolean {
             val node = element.node
             if (!mdg ||
                 node.attr("xmi:type") != "uml:Association" ||
@@ -477,7 +484,14 @@ object XmiFrontEnd : FrontEnd {
                 } else {
                     node.children
                         .filter { it.name == "ownedEnd" }
-                        .map { it.attr("type") }
+                        .map { end ->
+                            val attribute = end.attr("type")
+                            val child = end.children.firstOrNull { it.name == "type" }
+                            if (attribute != null && child != null) {
+                                fail(label, end.line, end.column, "type is written both as an attribute and as a child")
+                            }
+                            attribute ?: child?.attr("xmi:idref")
+                        }
                 }
             if (endIds.size != 2) return false
             val tableEnds =
@@ -486,23 +500,20 @@ object XmiFrontEnd : FrontEnd {
                         byId[it]?.attr("xmi:type") == "uml:Class"
                 }
             val path = "/elements/" + element.id.replace("~", "~0").replace("/", "~1")
-            if (tableEnds == 2) {
-                ignored +=
-                    ImportReport.Ignored(
-                        label,
-                        node.line,
-                        node.column,
-                        path,
-                        "physical XMI association has table endpoints outside logical ER import",
-                        node.attr("name"),
-                    )
-                return true
-            }
-            if (tableEnds == 1) {
-                warnings += "xm/association-ends: cannot classify both ends as physical — " +
+            val unresolved = endIds.count { it != null && it !in byId }
+            if (unresolved > 0 || tableEnds == 1) {
+                val detail = if (unresolved > 0) "unresolved endpoint reference" else "mixed table and other endpoints"
+                warnings += "xm/association-ends: ${node.attr("name") ?: element.id}: $detail — " +
                     "$label ${node.line}:${node.column} $path (${endIds.joinToString { it ?: "<missing>" }})"
             }
-            return false
+            val reason =
+                when {
+                    tableEnds == 2 -> "physical XMI association has table endpoints outside logical ER import"
+                    ea != null && unresolved == 2 -> "XMI association has two unresolved EA endpoints"
+                    else -> return false
+                }
+            ignored += ImportReport.Ignored(label, node.line, node.column, path, reason, node.attr("name"))
+            return true
         }
 
         // ---- JSON text, positioned ----
@@ -554,7 +565,7 @@ object XmiFrontEnd : FrontEnd {
             out.append("}, ")
             key("elements")
             out.append("{")
-            elements.filterNot(::isPhysicalAssociation).forEachIndexed { i, e ->
+            elements.filterNot(::omitAssociation).forEachIndexed { i, e ->
                 if (i > 0) out.append(", ")
                 at(e.node.line)
                 key(e.id)
@@ -591,8 +602,8 @@ object XmiFrontEnd : FrontEnd {
         private fun element(
             node: XNode,
             pkg: String?,
-            mdgAttribute: Boolean = false,
-            mdgTypeElement: Boolean = false,
+            mdgAttributePackage: String? = null,
+            mdgTypePackage: String? = null,
         ) {
             out.append("{")
             var first = true
@@ -661,16 +672,16 @@ object XmiFrontEnd : FrontEnd {
                 if (k == "xmi:id" || k == "xmi:type") continue
                 sep()
                 if (k == "xmi:idref") {
-                    referenceFields(v, node.takeIf { mdgTypeElement })
+                    referenceFields(v, node, mdgTypePackage)
                     continue
                 }
                 key(k)
-                if (mdgAttribute && k == "type") {
+                if (mdgAttributePackage != null && k == "type") {
                     out.append("{")
-                    referenceFields(v, node)
+                    referenceFields(v, node, mdgAttributePackage)
                     out.append("}")
                 } else if (k != "name" && v in byId) {
-                    ref(v)
+                    ref(v, node)
                 } else {
                     string(v)
                 }
@@ -700,8 +711,9 @@ object XmiFrontEnd : FrontEnd {
                     element(
                         child,
                         null,
-                        mdgAttribute = mdg && name == "ownedAttribute" && "dimension" in stereotypes[id].orEmpty(),
-                        mdgTypeElement = mdgAttribute && name == "type",
+                        mdgAttributePackage =
+                            pkg.takeIf { mdg && name == "ownedAttribute" && "dimension" in stereotypes[id].orEmpty() },
+                        mdgTypePackage = mdgAttributePackage.takeIf { name == "type" },
                     )
                 }
                 out.append("]")
@@ -709,23 +721,27 @@ object XmiFrontEnd : FrontEnd {
             out.append("}")
         }
 
-        private fun ref(id: String) {
+        private fun ref(
+            id: String,
+            node: XNode,
+        ) {
             out.append("{")
-            referenceFields(id)
+            referenceFields(id, node)
             out.append("}")
         }
 
         private fun referenceFields(
             id: String,
-            mdgType: XNode? = null,
+            node: XNode,
+            mdgTypePackage: String? = null,
         ) {
             val target = byId[id]
             val name = target?.attr("name")
-            if (mdgType != null && name.isNullOrEmpty()) {
+            if (mdgTypePackage != null && name.isNullOrEmpty()) {
                 fail(
                     label,
-                    mdgType.line,
-                    mdgType.column,
+                    node.line,
+                    node.column,
                     "MD attribute type '$id' does not resolve to a named UML element",
                 )
             }
@@ -734,11 +750,22 @@ object XmiFrontEnd : FrontEnd {
             if (name != null) {
                 out.append(", ")
                 val domain =
-                    mdgType != null &&
+                    mdgTypePackage != null &&
                         target.attr("xmi:type") == "uml:DataType" &&
                         "domain" in stereotypes[id].orEmpty()
                 key(if (domain) "@domain" else "@name")
-                string(name)
+                val targetPackage = packagesById[id]
+                string(
+                    if (domain &&
+                        !flattenPackages &&
+                        !targetPackage.isNullOrEmpty() &&
+                        targetPackage != mdgTypePackage
+                    ) {
+                        "${targetPackage.replace('/', '.')}.md.domain.$name"
+                    } else {
+                        name
+                    },
+                )
             }
         }
 
@@ -790,7 +817,7 @@ object XmiFrontEnd : FrontEnd {
             end(element, "target", "supplier")?.let { t ->
                 out.append(", ")
                 key("@target")
-                ref(t)
+                ref(t, node)
             }
             out.append("}")
         }

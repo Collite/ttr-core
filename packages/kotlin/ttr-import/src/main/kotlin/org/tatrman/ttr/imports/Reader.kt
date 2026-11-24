@@ -92,7 +92,7 @@ object Reader {
         val parsed = if (frontEnd === PdmFrontEnd) PdmFrontEnd.parseReported(request.inputs) else null
         val mdg =
             if (frontEnd === XmiFrontEnd && profile.identity == "ttr-mdg/1") {
-                XmiFrontEnd.parseMdg(request.inputs)
+                XmiFrontEnd.parseMdg(request.inputs, flattenPackages = request.packageName != null)
             } else {
                 null
             }
