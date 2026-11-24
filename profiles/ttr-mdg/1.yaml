@@ -79,6 +79,8 @@ operations:
   - {op: ignore, in: attribute, at: /type/$ref, reason: 'type: the UML type, by name'}
   - {op: ignore, in: attribute, at: /type/0/$ref, reason: 'type: the UML type, by name'}
   - {op: values, in: attribute, at: /@tags/nullable, to: {kind: attribute, property: optional}, mapping: {'true': true, 'false': false}}
+  # A physical attribute binding also appears as a standalone «grounds» dependency.
+  - {op: ignore, in: attribute, at: /@outgoing/grounds, reason: groundings are their own elements}
   - {op: rename, in: relation, at: /@properties/documentation, to: {kind: relation, property: description}}
   - {op: shape, in: relation, at: /@source, to: {kind: relation, property: from}, template: {ref: {input: /@name}}, required: warn}
   - {op: shape, in: relation, at: /@target, to: {kind: relation, property: to}, template: {ref: {input: /@name}}, required: warn}
