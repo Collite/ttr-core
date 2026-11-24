@@ -16,6 +16,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.int
 import org.tatrman.ttr.metadata.LoadOptions
 import org.tatrman.ttr.metadata.MetadataLoader
 import org.tatrman.ttr.metadata.export.DefinitionGraph
@@ -127,6 +128,16 @@ class XmiReaderSpec :
             val loaded = loadStrict(model)
             val set = DefinitionSet.from(loaded.files, loaded.model, "0.22", "s53")
             return XmiWriter.write(DefinitionGraph.build(set), set)
+        }
+
+        fun export(
+            model: Path,
+            format: String,
+        ): ByteArray {
+            val loaded = loadStrict(model)
+            val set = DefinitionSet.from(loaded.files, loaded.model, "0.22", "xmi-controls")
+            val request = ExportRequest(format = format, profile = "ttr-mdg/1".takeIf { format == "xmi" })
+            return (Exporter().export(set, null, request) as ExportResult.Single).bytes
         }
 
         fun body(text: String) = text.lines().filterNot { it.startsWith("// generated-from:") }.joinToString("\n")
@@ -290,6 +301,160 @@ class XmiReaderSpec :
                 String(exported.bytes, Charsets.UTF_8).replace(property, "$property surprise=\"value\""),
             )
             val refused = shouldThrow<ProfileException> { run(root, "unknown.xmi", "ttr-mdg/1", null) }
+            refused.code shouldBe "ys/unknown-key"
+            refused.location.path shouldContain "/surprise"
+        }
+
+        test("MDG preserves a named domain and a primitive in both XMI reference forms") {
+            val root = workspace()
+            val model = root.resolve("source/analytics").createDirectories()
+            model.resolve("md.ttrm").writeText(
+                """
+                package analytics
+                model md
+                def domain Code { type: text }
+                def dimension Stock {
+                    key: code
+                    attributes: [def attribute code { domain: Code }, def attribute label { type: text }]
+                }
+                """.trimIndent(),
+            )
+            val xmi = String(export(model.parent, "xmi"), Charsets.UTF_8)
+            root.resolve("sources/domain.xmi").writeText(xmi)
+            val result = run(root, "domain.xmi", "ttr-mdg/1", null)
+            write(root, "model", result)
+            val restored = body(result.files.getValue("analytics/md.ttrm"))
+            restored shouldContain "def attribute code { domain: Code"
+            restored shouldContain "def attribute label { type: text"
+
+            fun attributes(path: Path): Map<String, JsonObject> {
+                val definitions =
+                    Json
+                        .parseToJsonElement(String(export(path, "defs.json"), Charsets.UTF_8))
+                        .jsonObject
+                        .getValue("definitions")
+                        .jsonObject
+                return definitions
+                    .filterValues { it.jsonObject["kind"] == JsonPrimitive("attribute") }
+                    .mapValues {
+                        it.value.jsonObject
+                            .getValue("properties")
+                            .jsonObject
+                    }
+            }
+            val original = attributes(model.parent)
+            original.size shouldBe 2
+            attributes(root.resolve("model")) shouldBe original
+
+            val type = Regex("""(<ownedAttribute [^>]*?) type="([^"]+)"/>""")
+            val childForm =
+                type.replace(xmi) {
+                    "${it.groupValues[1]}><type xmi:idref=\"${it.groupValues[2]}\"/></ownedAttribute>"
+                }
+            root.resolve("sources/child-domains.xmi").writeText(childForm)
+            body(run(root, "child-domains.xmi", "ttr-mdg/1", null).files.getValue("analytics/md.ttrm")) shouldBe
+                restored
+
+            val missing = type.find(xmi) ?: error("The fixture has no authored type")
+            root.resolve("sources/unresolved-type.xmi").writeText(
+                xmi.replaceRange(
+                    missing.range,
+                    "${missing.groupValues[1]} type=\"missing-type\"/>",
+                ),
+            )
+            val refused = shouldThrow<ProfileException> { run(root, "unresolved-type.xmi", "ttr-mdg/1", null) }
+            refused.code shouldBe "ys/profile-invalid"
+            refused.location.file shouldBe "unresolved-type.xmi"
+            refused.location.line shouldBe xmi.substring(0, missing.range.first).count { it == '\n' } + 1
+            refused.message.orEmpty() shouldContain "MD attribute type 'missing-type' does not resolve"
+        }
+
+        test("MDG records the physical association and retains its identically named logical control") {
+            val root = workspace()
+            val model = root.resolve("source")
+            model.resolve("storage").createDirectories().resolve("db.ttrm").writeText(
+                """
+                package storage
+                model db schema stock
+                def table bins { primaryKey: [id], columns: [def column id { type: int }] }
+                def table items { columns: [def column bin_id { type: int }] }
+                def fk stored_in { from: [storage.db.stock.items.bin_id], to: [storage.db.stock.bins.id] }
+                """.trimIndent(),
+            )
+            model.resolve("inventory").createDirectories().resolve("er.ttrm").writeText(
+                """
+                package inventory
+                model er
+                def entity item { attributes: [def attribute id { type: int }] }
+                def entity bin { attributes: [def attribute id { type: int }] }
+                def relation stored_in { from: item, to: bin, cardinality: { from: "0..*", to: "1" } }
+                """.trimIndent(),
+            )
+            val xmi = String(export(model, "xmi"), Charsets.UTF_8)
+            val source = root.resolve("sources/associations.xmi").also { it.writeText(xmi) }
+            val originalTree =
+                Json
+                    .parseToJsonElement(
+                        XmiFrontEnd.tree(xmi.toByteArray(), "associations.xmi"),
+                    ).jsonObject
+            val elements = originalTree.getValue("elements").jsonObject
+            val named = elements.values.map { it.jsonObject }.filter { it["name"] == JsonPrimitive("stored_in") }
+            named.size shouldBe 2
+            named.map { it["@stereotypes"] }.distinct().size shouldBe 1
+            val physical = named.single { it.getValue("@source").jsonObject["@name"] == JsonPrimitive("items") }
+            val id =
+                physical
+                    .getValue("@xmi")
+                    .jsonObject
+                    .getValue("id")
+                    .jsonPrimitive.content
+            val result = run(root, "associations.xmi", "ttr-mdg/1", null)
+            result.files.keys shouldContainExactly listOf("inventory/er.ttrm")
+            body(result.files.getValue("inventory/er.ttrm")) shouldContain
+                "def relation stored_in { from: item, to: bin"
+            write(root, "model", result)
+            loadStrict(root.resolve("model"))
+            val entry =
+                report(result)
+                    .getValue("ignored")
+                    .jsonArray
+                    .map { it.jsonObject }
+                    .single { it["path"] == JsonPrimitive("/elements/$id") }
+            entry["file"] shouldBe JsonPrimitive("associations.xmi")
+            entry.getValue("line").jsonPrimitive.int shouldBe xmi.lineSequence().indexOfFirst {
+                it.contains("xmi:id=\"$id\"")
+            } + 1
+            entry["reason"] shouldBe
+                JsonPrimitive("physical XMI association has table endpoints outside logical ER import")
+            run(root, "associations.xmi", "ttr-mdg/1", null).outputs() shouldBe result.outputs()
+
+            val eaConnector =
+                Regex("""<connector xmi:idref="$id">[\s\S]*?</connector>""").find(xmi)
+                    ?: error("The fixture has no EA connector")
+            source.writeText(xmi.removeRange(eaConnector.range))
+            run(root, "associations.xmi", "ttr-mdg/1", null).files.keys shouldContainExactly listOf("inventory/er.ttrm")
+            val target =
+                physical
+                    .getValue("@target")
+                    .jsonObject
+                    .getValue("\$ref")
+                    .jsonPrimitive.content
+            val logical = (named - physical).single()
+            val entity =
+                logical
+                    .getValue("@target")
+                    .jsonObject
+                    .getValue("\$ref")
+                    .jsonPrimitive.content
+            for (replacement in listOf("missing-end", entity)) {
+                val mutated = eaConnector.value.replace("xmi:idref=\"$target\"", "xmi:idref=\"$replacement\"")
+                source.writeText(xmi.replaceRange(eaConnector.range, mutated))
+                val partial = run(root, "associations.xmi", "ttr-mdg/1", null)
+                partial.files.keys shouldContain "storage/er.ttrm"
+                partial.report.warnings.single { it.startsWith("xm/association-ends:") } shouldContain replacement
+            }
+            source.writeText(xmi.replaceFirst("name=\"bin\" visibility", "name=\"bin\" surprise=\"yes\" visibility"))
+            val refused = shouldThrow<ProfileException> { run(root, "associations.xmi", "ttr-mdg/1", null) }
             refused.code shouldBe "ys/unknown-key"
             refused.location.path shouldContain "/surprise"
         }

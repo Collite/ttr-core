@@ -90,7 +90,13 @@ object Reader {
         val input = snapshot(request.inputs)
         val provenance = retainedSnapshot ?: input
         val parsed = if (frontEnd === PdmFrontEnd) PdmFrontEnd.parseReported(request.inputs) else null
-        val trees = parsed?.trees ?: frontEnd.parse(request.inputs)
+        val mdg =
+            if (frontEnd === XmiFrontEnd && profile.identity == "ttr-mdg/1") {
+                XmiFrontEnd.parseMdg(request.inputs)
+            } else {
+                null
+            }
+        val trees = parsed?.trees ?: mdg?.trees ?: frontEnd.parse(request.inputs)
         val result =
             ProfileEngine.apply(
                 trees,
@@ -125,6 +131,7 @@ object Reader {
                 .map(::warning)
                 .toMutableList()
         warnings += parsed?.warnings.orEmpty()
+        warnings += mdg?.warnings.orEmpty()
         // T4: synonyms → one `lexicon` document per package and locale, beside the engine's documents.
         val grammar =
             result.documents
@@ -166,7 +173,7 @@ object Reader {
                 delta.removed,
                 delta.emptied,
                 delta.emptiedFiles,
-                frontEndIgnored = parsed?.ignored.orEmpty(),
+                frontEndIgnored = parsed?.ignored.orEmpty() + mdg?.ignored.orEmpty(),
             ),
         )
     }

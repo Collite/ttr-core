@@ -74,8 +74,11 @@ operations:
   # er — entities, their attributes, relations with cardinality.
   - {op: rename, in: entity, at: /@properties/documentation, to: {kind: entity, property: description}}
   # A reference in both XMI forms (✅R372-A): the attribute form `type="X"` and EA's child form `<type xmi:idref="X"/>`.
+  # For MD attributes the reader exposes the name of a domain-stereotyped UML DataType at @domain.
   - {op: rename, in: attribute, at: /type/@name, to: {kind: attribute, property: type}}
   - {op: rename, in: attribute, at: /type/0/@name, to: {kind: attribute, property: type}}
+  - {op: rename, in: attribute, at: /type/@domain, to: {kind: attribute, property: domain}}
+  - {op: rename, in: attribute, at: /type/0/@domain, to: {kind: attribute, property: domain}}
   - {op: ignore, in: attribute, at: /type/$ref, reason: 'type: the UML type, by name'}
   - {op: ignore, in: attribute, at: /type/0/$ref, reason: 'type: the UML type, by name'}
   - {op: values, in: attribute, at: /@tags/nullable, to: {kind: attribute, property: optional}, mapping: {'true': true, 'false': false}}
