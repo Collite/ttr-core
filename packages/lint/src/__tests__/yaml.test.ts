@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { ProfileEngine } from '@tatrman/profile';
-import { YamlWorkspaceLoader } from '../yaml.js';
+import { YamlWorkspaceLoader } from '../yaml-node.js';
 import { lintInputDiagnostics } from '../runner.js';
 import { recommendedConfig } from '../config.js';
 import { RULES } from '../registry.js';

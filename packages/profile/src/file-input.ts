@@ -1,5 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
-import { closeSync, fstatSync, openSync, readSync } from 'node:fs';
+import {
+  closeSync,
+  existsSync,
+  fstatSync,
+  openSync,
+  readSync,
+  readdirSync,
+  realpathSync,
+  statSync,
+} from 'node:fs';
+import * as path from 'node:path';
+import type { ProfileFiles } from './workspace-files.js';
 import { ProfileException } from './loading.js';
 
 export const MAX_PROFILE_FILE_BYTES = 24_000_000;
@@ -83,3 +94,12 @@ export function readProfileFile(path: string, label = path): string {
     invalid(label, decoder.decode(bytes.subarray(0, offset)), 'Malformed UTF-8 in profile');
   return decoder.decode(bytes);
 }
+
+export const diskProfileFiles: ProfileFiles = {
+  path,
+  realpath: realpathSync,
+  isFile: (file) => statSync(file).isFile(),
+  exists: existsSync,
+  entries: (directory) => readdirSync(directory, { withFileTypes: true }),
+  read: readProfileFile,
+};

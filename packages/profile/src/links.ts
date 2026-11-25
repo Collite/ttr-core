@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 import { parseAllDocuments } from 'yaml';
-import { readdirSync, realpathSync, existsSync, statSync } from 'node:fs';
-import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import {
   ForeignTree,
   JsonPointer,
@@ -10,7 +8,7 @@ import {
   Coordinates,
   type Json,
 } from './input.js';
-import { readProfileFile } from './file-input.js';
+import { diskProfileFiles } from './file-input.js';
 import { ProfileException, type ProfileSpan, type ProfileDefinition } from './loading.js';
 import type { Record, RecordPlan, CanonicalBuilder, SourceEntry } from './engine.js';
 import { ProfileVocabulary } from './vocabulary.js';
@@ -64,10 +62,11 @@ const span = (file: string, path = ''): ProfileSpan => ({
 });
 const object = isRecord;
 export const SourcesJsonReader = {
-  read(root: string): LinkEntry[] {
+  read(root: string, workspace = diskProfileFiles): LinkEntry[] {
+    const { basename, relative, resolve, sep } = workspace.path;
     let top: string;
     try {
-      top = realpathSync(root);
+      top = workspace.realpath(root);
     } catch {
       throw new ProfileException(
         'ys/profile-invalid',
@@ -78,7 +77,7 @@ export const SourcesJsonReader = {
     const files: string[] = [];
     const walk = (directory: string) => {
       try {
-        for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        for (const entry of workspace.entries(directory)) {
           const file = resolve(directory, entry.name);
           if (entry.isDirectory()) {
             if (
@@ -111,7 +110,7 @@ export const SourcesJsonReader = {
       };
       let value: Json;
       try {
-        value = JSON.parse(readProfileFile(resolve(top, file), file)) as Json;
+        value = JSON.parse(workspace.read(resolve(top, file), file)) as Json;
       } catch (error) {
         return invalid(`Cannot read sidecar JSON: ${String(error)}`);
       }
@@ -190,7 +189,8 @@ export class LinkIndex {
     plans: RecordPlan[],
     packages: Map<RecordPlan, string>,
     root?: string,
-    sourceName?: JsonPointer
+    sourceName?: JsonPointer,
+    files = diskProfileFiles
   ): LinkIndex {
     return new LinkIndex(
       plans.flatMap((plan) =>
@@ -207,7 +207,7 @@ export class LinkIndex {
           };
         })
       ),
-      () => (root ? SourcesJsonReader.read(root) : [])
+      () => (root ? SourcesJsonReader.read(root, files) : [])
     );
   }
 }
@@ -230,13 +230,13 @@ export interface RenameEntry {
   since: string;
 }
 export const Renames = {
-  read(root?: string): RenameEntry[] {
+  read(root?: string, files = diskProfileFiles): RenameEntry[] {
     if (!root) return [];
-    const file = resolve(root, 'renames.yaml');
-    if (!existsSync(file) || !statSync(file).isFile()) return [];
+    const file = files.path.resolve(root, 'renames.yaml');
+    if (!files.exists(file) || !files.isFile(file)) return [];
     let source: string;
     try {
-      source = readProfileFile(file, 'renames.yaml');
+      source = files.read(file, 'renames.yaml');
     } catch (error) {
       if (error instanceof ProfileException) throw error;
       throw new ProfileException(
@@ -317,7 +317,8 @@ export const OverlayApplier = {
     entries: OverlayEntry[],
     index: LinkIndex,
     builder: CanonicalBuilder,
-    root?: string
+    root?: string,
+    files = diskProfileFiles
   ): Overridden[] {
     let renames: RenameEntry[] | undefined;
     const overridden: Overridden[] = [];
@@ -350,7 +351,7 @@ export const OverlayApplier = {
         target = named[0];
       }
       if (!target) {
-        renames ??= Renames.read(root);
+        renames ??= Renames.read(root, files);
         const rename = renames.find((r) => r.from === entry.key);
         throw new ProfileException(
           'xm/overlay-orphan',
@@ -415,7 +416,7 @@ export function jsonEqual(a: Json | undefined, b: Json | undefined): boolean {
 }
 /** Confined path overlays and inline overlays retain separate key and value positions. */
 export const OverlayLoader = {
-  load(profile: ProfileDefinition, root?: string): OverlayEntry[] {
+  load(profile: ProfileDefinition, root?: string, files = diskProfileFiles): OverlayEntry[] {
     const overlay = profile.overlay;
     if (overlay === undefined || overlay === null) return [];
     const entries = (
@@ -463,6 +464,7 @@ export const OverlayLoader = {
       );
     if (typeof overlay !== 'string')
       throw new ProfileException('ys/profile-invalid', at, 'Overlay must be a mapping or path');
+    const { dirname, isAbsolute, relative, resolve, sep } = files.path;
     const fileLabel = profile.locations.get('')!.file;
     const declaring = isAbsolute(fileLabel)
       ? fileLabel
@@ -477,13 +479,13 @@ export const OverlayLoader = {
       );
     let boundary: string, file: string;
     try {
-      boundary = realpathSync(root ?? dirname(declaring));
-      file = realpathSync(resolve(dirname(declaring), overlay));
+      boundary = files.realpath(root ?? dirname(declaring));
+      file = files.realpath(resolve(dirname(declaring), overlay));
     } catch {
       throw new ProfileException('ys/profile-not-found', at, `Overlay not found: ${overlay}`);
     }
     const rel = relative(boundary, file);
-    if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel) || !statSync(file).isFile())
+    if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel) || !files.isFile(file))
       throw new ProfileException(
         'ys/profile-not-found',
         at,
@@ -491,7 +493,7 @@ export const OverlayLoader = {
       );
     let source: string;
     try {
-      source = readProfileFile(file);
+      source = files.read(file);
     } catch (error) {
       if (error instanceof ProfileException) throw error;
       throw new ProfileException('ys/profile-not-found', at, `Overlay not found: ${overlay}`);

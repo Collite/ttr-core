@@ -28,24 +28,45 @@ import path from 'node:path';
  * Grammar 0.20 (CN-P8 review-175, 2026-10-28): the base reached ≈ 681 KB gz — the things-in-time parser rules and
  * the semantic layer's P8 lints (the IDENT word rule, `per:` coverage, same-row participant paths, dotted `from:`
  * references); still no SQL parser. Ceiling 720 KB: a parser leak (≈ +400 KB) still trips it.
+ *
+ * Profile and canonical YAML support (P7 S7.4b) adds standalone validators.
+ * The minified bundle is about 1049 KiB gzipped. Check SQL parser exclusion
+ * directly against esbuild's emitted inputs and keep 51 KiB of size headroom.
  */
-const CEILING_BYTES = 720 * 1024;
+const CEILING_BYTES = 1100 * 1024;
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const bundle = path.resolve(here, '../../dist/server-browser.js');
+const metafile = path.resolve(here, '../../dist/browser-worker-meta.json');
+
+interface WorkerMetafile {
+  outputs: Record<string, { inputs: Record<string, { bytesInOutput: number }> }>;
+}
 
 describe('browser Worker bundle size (S0.3 / E11)', () => {
-  it('server-browser.js gzips under the 720 KB ceiling (no parser leak)', () => {
+  it('keeps the generated SQL parsers and parser service out of the Worker', () => {
+    const meta: WorkerMetafile = JSON.parse(readFileSync(metafile, 'utf8'));
+    const inputs = meta.outputs['dist/server-browser.js'].inputs;
+    const parsers = Object.entries(inputs)
+      .filter(
+        ([file, { bytesInOutput }]) =>
+          bytesInOutput > 0 &&
+          /(?:^|\/)sql\/dist\/(?:generated\/.*Parser[^/]*|parser-service)\.js$/.test(file)
+      )
+      .map(([file]) => file);
+    expect(parsers).toEqual([]);
+  });
+
+  it('keeps the gzipped Worker within its size budget', () => {
     if (!existsSync(bundle)) {
       throw new Error(
-        `dist/server-browser.js missing — run \`pnpm --filter @tatrman/lsp build\` before this test`,
+        `dist/server-browser.js missing — run \`pnpm --filter @tatrman/lsp build\` before this test`
       );
     }
     const gz = gzipSync(readFileSync(bundle)).length;
     expect(
       gz,
-      `browser bundle is ${(gz / 1024).toFixed(0)} KB gz (ceiling ${CEILING_BYTES / 1024} KB) — ` +
-        `did a SQL parser get imported into server.ts? Use @tatrman/sql/lexers, not @tatrman/sql.`,
+      `browser bundle is ${(gz / 1024).toFixed(0)} KiB gz (ceiling ${CEILING_BYTES / 1024} KiB)`
     ).toBeLessThan(CEILING_BYTES);
   });
 });

@@ -10,7 +10,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./node-only": {
+      "types": "./dist/file-input.d.ts",
+      "import": "./dist/file-input.js"
     }
+  },
+  "browser": {
+    "./dist/file-input.js": "./dist/no-disk-files.js"
   },
   "scripts": {
     "prebuild": "node scripts/generate-resources.mjs",

@@ -11,8 +11,12 @@
       "types": "./dist/index.d.ts"
     },
     "./yaml": {
-      "import": "./dist/yaml.js",
-      "types": "./dist/yaml.d.ts"
+      "import": "./dist/yaml-node.js",
+      "types": "./dist/yaml-node.d.ts"
+    },
+    "./yaml-browser": {
+      "types": "./dist/yaml-browser.d.ts",
+      "import": "./dist/yaml-browser.js"
     }
   },
   "scripts": {
@@ -26,6 +30,7 @@
     "@tatrman/parser": "workspace:*",
     "@tatrman/semantics": "workspace:*",
     "commander": "^13.0.0",
+    "pathe": "2.0.3",
     "smol-toml": "^1.6.1",
     "@tatrman/profile": "workspace:*"
   },

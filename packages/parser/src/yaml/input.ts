@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import { isAlias, isMap, isNode, isScalar, isSeq, parseAllDocuments, type Node } from 'yaml';
-import Ajv2020Module from 'ajv/dist/2020.js';
-import type { ErrorObject, ValidateFunction } from 'ajv';
+import type { ErrorObject } from 'ajv';
 import type { SourceLocation } from '../ast.js';
 import { codePointTable, lineOf } from '../coordinates.js';
 import { decimalText } from './numbers.js';
-import { canonicalSchema } from '../generated/canonical-yaml.js';
+import { validateCanonicalYaml } from '../generated/validate-canonical-yaml.js';
 import { DiagnosticCode } from '../diagnostics.js';
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
@@ -31,11 +30,6 @@ export class YamlFailure extends Error {
     super(message);
   }
 }
-type AjvConstructor = new (options: object) => { compile(schema: object): ValidateFunction };
-const Ajv = ((Ajv2020Module as unknown as { default?: AjvConstructor }).default ??
-  Ajv2020Module) as AjvConstructor;
-let validator: ValidateFunction | undefined;
-
 /** UTF-16 is confined to the YAML library boundary; public coordinates count code points. */
 export class YamlCoordinates {
   readonly points: Uint32Array;
@@ -186,12 +180,9 @@ export class YamlInput {
   }
 
   validate(): void {
-    validator ??= new Ajv({ allErrors: true, strict: false, ownProperties: true }).compile(
-      canonicalSchema as object
-    );
-    if (validator(this.value)) return;
+    if (validateCanonicalYaml(this.value)) return;
     // Prefer the most specific vocabulary error over the enclosing union failures.
-    const errors = validator.errors ?? [];
+    const errors = validateCanonicalYaml.errors ?? [];
     const error = [...errors].sort(
       (a, b) => this.errorPath(b).length - this.errorPath(a).length
     )[0];

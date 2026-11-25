@@ -3,7 +3,7 @@
 import { Command } from 'commander';
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, resolve, isAbsolute } from 'node:path';
-import { YamlWorkspaceLoader } from './yaml.js';
+import { YamlWorkspaceLoader } from './yaml-node.js';
 import { fileURLToPath } from 'node:url';
 import { parseString } from '@tatrman/parser';
 import type { Document } from '@tatrman/parser';

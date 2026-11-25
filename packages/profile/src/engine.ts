@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { diskProfileFiles } from './file-input.js';
 import {
   parseYamlDocument,
   type SourceLocation,
@@ -806,9 +807,10 @@ export class ProfileEngine {
     profile: ProfileDefinition[],
     root?: string,
     perFile = false,
-    sourceName?: string
+    sourceName?: string,
+    files = diskProfileFiles
   ): ApplyResult {
-    const overlays = profile.flatMap((p) => OverlayLoader.load(p, root));
+    const overlays = profile.flatMap((p) => OverlayLoader.load(p, root, files));
     const ops = profile.flatMap((p) => p.operations).map((op) => new PlannedOp(op));
     const ignored: Ignored[] = [];
     const codes: { [key: string]: string } = {};
@@ -898,7 +900,8 @@ export class ProfileEngine {
       plans,
       packages,
       root,
-      sourceName ? new JsonPointer(sourceName) : undefined
+      sourceName ? new JsonPointer(sourceName) : undefined,
+      files
     );
     const unknown = [...profile].reverse().find((p) => p.unknown !== undefined)?.unknown ?? 'error';
     for (const plan of plans) {
@@ -973,7 +976,7 @@ export class ProfileEngine {
       }
       plan.warnings.push(...plan.consumption.check(plan.tree.root, plan.records, unknown));
     }
-    const overridden = OverlayApplier.apply(overlays, index, builder, root);
+    const overridden = OverlayApplier.apply(overlays, index, builder, root, files);
     return new ApplyResult(
       builder.documents(),
       distinct(ignored),
