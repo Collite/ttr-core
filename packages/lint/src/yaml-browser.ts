@@ -98,6 +98,11 @@ export class BrowserYamlWorkspace {
     return this.loader.load(local);
   }
 
+  dependsOnBuffer(uri: string): boolean {
+    const file = virtualPath(uri);
+    return file !== undefined && this.loader.dependsOnPath(file);
+  }
+
   language(uri: string, text: string): 'ttr-yaml' | 'yaml' {
     return virtualPath(uri) === undefined ? 'yaml' : this.loader.language(uri, text, false);
   }

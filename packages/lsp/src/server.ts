@@ -128,6 +128,7 @@ import type { ModelerEditParams, ModelerEditResult } from './hosted-protocol.js'
 export interface ServerOptions {
   /** YAML workspace hooks for disk-backed and in-memory hosts. */
   yamlFilesChanged?: (changes: readonly {uri: string; type: number}[]) => boolean;
+  isYamlDependency?: (uri: string) => boolean;
   yamlLanguage?: (uri: string, text: string, roots: readonly string[]) => 'ttr-yaml' | 'yaml';
   loadYamlDocuments?: (buffers: ReadonlyMap<string, string>, roots: readonly string[]) => Map<string, ParseResult & { text: string }>;
 
@@ -1043,6 +1044,7 @@ export function createServerConnection(
   documents.onDidChangeContent((event: TextDocumentChangeEvent<TextDocument>) => {
     const uri = event.document.uri;
     if (isYamlInput(uri) && opts.loadYamlDocuments) { scheduleYamlRefresh(); return; }
+    if (opts.isYamlDependency?.(uri)) scheduleYamlRefresh();
     const pending = pendingTexts.get(uri) ?? [];
     const acknowledged = pending.indexOf(event.document.getText());
     if (acknowledged >= 0 && acknowledged < pending.length - 1) {
@@ -1058,6 +1060,7 @@ export function createServerConnection(
   documents.onDidClose((event: TextDocumentChangeEvent<TextDocument>) => {
     const uri = event.document.uri;
     if (isYamlInput(uri) && opts.loadYamlDocuments) { scheduleYamlRefresh(); return; }
+    if (opts.isYamlDependency?.(uri)) scheduleYamlRefresh();
     editDocs.delete(uri);
     pendingTexts.delete(uri);
     const disk = diskDocs.get(uri);
@@ -1453,6 +1456,7 @@ export function createServerConnection(
   });
 
   connection.onRequest('modeler/getPackageGraph', () => {
+    flushBrowserYamlRefresh();
     const pkgGraph = getPackageGraph();
     return getPackageGraphFromCache(pkgGraph);
   });

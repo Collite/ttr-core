@@ -5,7 +5,7 @@ import { createContext, runInContext } from 'node:vm';
 import { setImmediate } from 'node:timers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser } from 'playwright-core';
-import type { GetGraphResponse, ModelGraph } from '@tatrman/lsp';
+import type { GetGraphResponse, ModelGraph, PackageGraphResponse } from '@tatrman/lsp';
 import type { PublishDiagnosticsParams } from 'vscode-languageserver-protocol';
 
 const workerFile =
@@ -206,11 +206,11 @@ async function workspace() {
   return {
     close,
     diagnostics: (path: string) => diagnostics.get(uri(path)),
-    open(path: string, text: string) {
+    open(path: string, text: string, languageId = /\.ttr[mg]$/.test(path) ? 'ttr' : 'yaml') {
       notify('textDocument/didOpen', {
         textDocument: {
           uri: uri(path),
-          languageId: /\.ttr[mg]$/.test(path) ? 'ttr' : 'yaml',
+          languageId,
           version: 1,
           text,
         },
@@ -222,8 +222,12 @@ async function workspace() {
         contentChanges: [{ text }],
       });
     },
+    closeDocument(path: string) {
+      notify('textDocument/didClose', { textDocument: { uri: uri(path) } });
+    },
     finishLoad: () => request('modeler/setProjectRoot', { projectRoot: root, manifest: '' }),
     namedGraph: () => request<GetGraphResponse>('modeler/getGraph', { uri: uri(graphPath) }),
+    packageGraph: () => request<PackageGraphResponse>('modeler/getPackageGraph', {}),
     graph: () =>
       request<ModelGraph>('modeler/getModelGraph', {
         textDocument: { uri: root },
@@ -333,6 +337,50 @@ describe('packaged browser worker YAML', () => {
       expect((await ws.graph()).nodes[0]?.qname).toBe('demo.er.entity.Supplier');
       ws.change(profilePath, baseProfile.replace('default: demo', 'default: revised'));
       expect((await ws.graph()).nodes[0]?.qname).toBe('revised.er.entity.Supplier');
+    } finally {
+      await ws.close();
+    }
+  });
+
+  it('refreshes the graph when a path-based overlay buffer changes or closes', async () => {
+    const ws = await workspace();
+    const overlayPath = 'model/profiles/overlay.txt';
+    const overlay = (label: string) =>
+      `demo.er.entity.Customer:\n  displayLabel: {en: ${label}}\n`;
+    try {
+      openTree(ws);
+      ws.change(profilePath, baseProfile + '\noverlay: overlay.txt\n');
+      ws.open(overlayPath, overlay('Before'), 'plaintext');
+      await ws.finishLoad();
+      expect((await ws.graph()).nodes[0]?.label).toBe('Before');
+
+      ws.change(overlayPath, overlay('After'));
+      expect((await ws.graph()).nodes[0]?.label).toBe('After');
+
+      ws.closeDocument(overlayPath);
+      // Closing the overlay must schedule diagnostics even without a graph request.
+      await expect.poll(() => ws.diagnostics(profilePath)).toContainEqual(
+        expect.objectContaining({ code: 'ys/profile-not-found' })
+      );
+      expect((await ws.graph()).nodes).toEqual([]);
+
+      ws.open(overlayPath, overlay('Reopened'), 'plaintext');
+      expect((await ws.graph()).nodes[0]?.label).toBe('Reopened');
+    } finally {
+      await ws.close();
+    }
+  });
+
+  it('refreshes the package graph on the first request after an inherited profile edit', async () => {
+    const ws = await workspace();
+    try {
+      openTree(ws);
+      await ws.finishLoad();
+      const packages = async () => (await ws.packageGraph()).packages.map(({ name }) => name);
+      expect(await packages()).toEqual(['demo']);
+
+      ws.change(profilePath, baseProfile.replace('default: demo', 'default: revised'));
+      expect(await packages()).toEqual(['revised']);
     } finally {
       await ws.close();
     }

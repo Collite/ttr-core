@@ -21,6 +21,7 @@ function loaderFor(roots: readonly string[]): BrowserYamlWorkspace {
 
 createServerConnection(connection, {
   loadYamlDocuments: (buffers, roots) => loaderFor(roots).load(buffers),
+  isYamlDependency: (uri) => workspace?.dependsOnBuffer(uri) ?? false,
   yamlLanguage: (uri, text, roots) => loaderFor(roots).language(uri, text),
   layoutStore: new Map<string, LayoutFile>(),
 });

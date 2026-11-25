@@ -60,6 +60,15 @@ export class YamlWorkspaceLoader {
   >();
   private lastResults = new Set<string>();
   private readonly groupDependencies = new Set<string>();
+
+  dependsOnPath(file: string): boolean {
+    const physical = this.physicalPath(file);
+    return this.groupDependencies.has(physical) ||
+      [...this.chains.values()].some((c) =>
+        [...c.dependencies.keys()].some((path) => this.physicalPath(path) === physical)
+      );
+  }
+
   /** Disk notifications invalidate only affected dependencies; create/delete also invalidates the walk. */
   notify(changes: readonly { uri: string; type: number }[]): boolean {
     const { pathOf } = this.host;
@@ -74,11 +83,8 @@ export class YamlWorkspaceLoader {
       }
       if (
         this.lastResults.has(change.uri) ||
-        this.groupDependencies.has(this.physicalPath(file)) ||
         /(?:^|[/\\])(?:ttr\.yaml|model\.ignore|renames\.yaml)$/.test(file) ||
-        [...this.chains.values()].some((c) =>
-          [...c.dependencies.keys()].some((p) => this.physicalPath(p) === this.physicalPath(file))
-        ) ||
+        this.dependsOnPath(file) ||
         (change.type !== 2 && this.marker(file, (p) => this.host.read(p)) !== undefined)
       )
         relevant = true;
