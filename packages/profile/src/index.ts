@@ -3,3 +3,4 @@ export * from './input.js';
 export * from './loading.js';
 export * from './engine.js';
 export { diagnosticCodes } from './generated/resources.js';
+export type { ProfileFiles, WorkspaceEntry } from './workspace-files.js';

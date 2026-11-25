@@ -1,17 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
-import { realpathSync, statSync } from 'node:fs';
-import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
-import Ajv2020Module from 'ajv/dist/2020.js';
 import type { ErrorObject, ValidateFunction } from 'ajv';
+import {
+  validateProfileDefinition,
+  validateTreeDeclaration,
+} from './generated/validate-profile.js';
 import { ForeignData, isRecord, pointer, type Json, type RecordValue } from './input.js';
 import { NumericScalar, schemaTypeMessage } from './scalars.js';
-import { readProfileFile } from './file-input.js';
-import {
-  profileSchema,
-  runningGrammar,
-  canonicalMetadata,
-  canonicalProfileText,
-} from './generated/resources.js';
+import { diskProfileFiles } from './file-input.js';
+import type { ProfileFiles } from './workspace-files.js';
+import { runningGrammar, canonicalMetadata, canonicalProfileText } from './generated/resources.js';
 
 export interface ProfileSpan {
   file: string;
@@ -120,34 +117,15 @@ export class GrammarRange {
   }
 }
 
-type AjvConstructor = new (options: object) => { compile(schema: object): ValidateFunction };
-const Ajv = ((Ajv2020Module as unknown as { default?: AjvConstructor }).default ??
-  Ajv2020Module) as AjvConstructor;
-const validators = new Map<number, ValidateFunction>();
 function invalid(data: ForeignData, path: string, detail: string, key = true): never {
   throw new ProfileException('ys/profile-invalid', data.span(path, key), detail);
 }
 function validate(
   data: ForeignData,
-  branch: number,
+  validator: ValidateFunction,
   value: Json = data.value,
   prefix = ''
 ): RecordValue {
-  let validator = validators.get(branch);
-  if (!validator) {
-    const root = profileSchema as unknown as { oneOf: object[]; [key: string]: unknown };
-    const { oneOf, ...rest } = root;
-    validator = new Ajv({
-      allErrors: true,
-      strict: false,
-      ownProperties: true,
-      verbose: true,
-    }).compile({
-      ...rest,
-      ...oneOf[branch],
-    });
-    validators.set(branch, validator);
-  }
   if (!validator(JSON.parse(JSON.stringify(value)))) {
     const errorPath = (e: ErrorObject) =>
       e.keyword === 'additionalProperties'
@@ -181,7 +159,7 @@ function range(data: ForeignData, value: string, path: string): GrammarRange {
 export class ProfileReader {
   static read(source: string, file = '<profile>'): ProfileDefinition {
     const data = new ForeignData(source, file);
-    const value = validate(data, 1);
+    const value = validate(data, validateProfileDefinition);
     const operations = value.operations as RecordValue[];
     operations.forEach((op, index) => {
       const to = isRecord(op.to) ? op.to : undefined;
@@ -257,7 +235,7 @@ export type FileHeader =
   | { type: 'declared'; declaration: ProfileDeclaration };
 export class DeclarationReader {
   private static declaration(data: ForeignData, value: Json, prefix: string): ProfileDeclaration {
-    const object = validate(data, 0, value, prefix);
+    const object = validate(data, validateTreeDeclaration, value, prefix);
     return {
       profile: object.profile as string,
       grammarRange: range(data, object.grammar as string, `${prefix}/grammar`),
@@ -308,12 +286,14 @@ export function confinedFile(
   ref: string,
   at: ProfileSpan,
   boundary: string,
-  candidate: (() => string) | string
+  candidate: (() => string) | string,
+  files: ProfileFiles = diskProfileFiles
 ): string {
   try {
-    const real = realpathSync(typeof candidate === 'string' ? candidate : candidate());
+    const { relative, isAbsolute, sep } = files.path;
+    const real = files.realpath(typeof candidate === 'string' ? candidate : candidate());
     const rel = relative(boundary, real);
-    if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel) || !statSync(real).isFile())
+    if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel) || !files.isFile(real))
       throw new ProfileException(
         'ys/profile-not-found',
         at,
@@ -348,9 +328,10 @@ export class ProfileResolver {
     root: string,
     catalog: ReadonlyMap<string, string> | Record<string, string> = new Map(),
     private readonly shipped: (identity: string) => string | null | undefined = () => null,
-    private readonly readFile: (file: string) => string = readProfileFile
+    private readonly readFile?: (file: string) => string,
+    private readonly files: ProfileFiles = diskProfileFiles
   ) {
-    this.root = realpathSync(root);
+    this.root = files.realpath(root);
     this.catalog = catalog instanceof Map ? new Map(catalog) : new Map(Object.entries(catalog));
   }
   static readonly SHIPPED_LABEL = '<shipped>/profiles/';
@@ -380,6 +361,7 @@ export class ProfileResolver {
     reference: string | ProfileDeclaration | null,
     declaringFile?: string
   ): ProfileDefinition[] {
+    const { resolve } = this.files.path;
     if (reference === null) return this.resolve('canonical/1', resolve(this.root, 'ttr.yaml'));
     if (typeof reference !== 'string') {
       checkRange(reference.grammarRange, reference.grammarLocation);
@@ -400,6 +382,8 @@ export class ProfileResolver {
     declaringFile: string,
     location: ProfileSpan
   ): ProfileDefinition[] {
+    const { dirname, isAbsolute, resolve } = this.files.path;
+
     const chain: ProfileDefinition[] = [],
       visiting = new Set<string>();
     const visit = (
@@ -425,12 +409,19 @@ export class ProfileResolver {
       }
       let path: string | undefined;
       if (!bundled && shippedText == null)
-        path = confinedFile('Profile', ref, at, this.root, () => {
-          if (this.catalog.has(ref)) return resolve(this.root, this.catalog.get(ref)!);
-          if (!ref.startsWith('.') && !isAbsolute(ref) && !/\.ya?ml$/.test(ref))
-            throw new ProfileException('ys/profile-not-found', at, `No catalog entry for ${ref}`);
-          return resolve(dirname(resolve(this.root, from)), ref);
-        });
+        path = confinedFile(
+          'Profile',
+          ref,
+          at,
+          this.root,
+          () => {
+            if (this.catalog.has(ref)) return resolve(this.root, this.catalog.get(ref)!);
+            if (!ref.startsWith('.') && !isAbsolute(ref) && !/\.ya?ml$/.test(ref))
+              throw new ProfileException('ys/profile-not-found', at, `No catalog entry for ${ref}`);
+            return resolve(dirname(resolve(this.root, from)), ref);
+          },
+          this.files
+        );
       const key = path ?? `${ProfileResolver.SHIPPED_LABEL}${ref}`;
       if (visiting.has(key))
         throw new ProfileException('ys/profile-cycle', at, `Profile cycle through ${ref}`);
@@ -444,7 +435,7 @@ export class ProfileResolver {
       else {
         let source: string;
         try {
-          source = this.readFile(path!);
+          source = this.readFile ? this.readFile(path!) : this.files.read(path!);
         } catch (error) {
           if (error instanceof ProfileException) throw error;
           throw new ProfileException('ys/profile-not-found', at, `Cannot read profile ${ref}`);

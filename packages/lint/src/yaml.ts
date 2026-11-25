@@ -1,8 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-/** Desktop adapter. Kept off the browser-safe lint entry point. */
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   parseYamlDocument,
   type ParseResult,
@@ -24,21 +20,25 @@ import {
   type ProfileDefinition,
   type ProfileDeclaration,
   type ProfileSpan,
+  type ProfileFiles,
 } from '@tatrman/profile';
 
 export const isYamlFile = (uri: string): boolean => /\.ya?ml$/i.test(uri);
-const fileUri = (file: string): string =>
-  file.startsWith('file:') ? file : pathToFileURL(file).href;
-const pathOf = (uri: string): string =>
-  uri.startsWith('file:') ? fileURLToPath(uri) : resolve(uri);
 const empty = (uri: string): ParseResult => ({ sourceFile: uri, errors: [] });
+
+interface YamlWorkspaceHost {
+  files: ProfileFiles;
+  pathOf(uri: string): string;
+  fileUri(path: string): string;
+  read(path: string): string | undefined;
+  invalidate?(path: string): void;
+}
 
 /** Nearest marker discovery is cached per workspace; invalidate on profile or marker changes. */
 export class YamlWorkspaceLoader {
   private markerSignature = '';
   private files?: string[];
   private sidecars: string[] = [];
-  private readonly disk = new Map<string, { stamp: string; text: string }>();
   private readonly headers = new Map<
     string,
     { text: string; header: ReturnType<typeof DeclarationReader.header> }
@@ -62,47 +62,29 @@ export class YamlWorkspaceLoader {
   private readonly groupDependencies = new Set<string>();
   /** Disk notifications invalidate only affected dependencies; create/delete also invalidates the walk. */
   notify(changes: readonly { uri: string; type: number }[]): boolean {
+    const { pathOf } = this.host;
     let relevant = false;
     for (const change of changes) {
       const file = pathOf(change.uri);
-      if (!this.roots.some((root) => file.startsWith(root + sep))) continue;
-      this.disk.delete(file);
+      if (!this.roots.some((root) => this.inside(root, file))) continue;
+      this.host.invalidate?.(file);
       if (change.type !== 2) {
         this.files = undefined;
         this.markers.clear();
       }
       if (
         this.lastResults.has(change.uri) ||
-        this.groupDependencies.has(physicalPath(file)) ||
+        this.groupDependencies.has(this.physicalPath(file)) ||
         /(?:^|[/\\])(?:ttr\.yaml|model\.ignore|renames\.yaml)$/.test(file) ||
         [...this.chains.values()].some((c) =>
-          [...c.dependencies.keys()].some((p) => physicalPath(p) === physicalPath(file))
+          [...c.dependencies.keys()].some((p) => this.physicalPath(p) === this.physicalPath(file))
         ) ||
-        (change.type !== 2 && this.marker(file, (p) => this.read(p)) !== undefined)
+        (change.type !== 2 && this.marker(file, (p) => this.host.read(p)) !== undefined)
       )
         relevant = true;
     }
 
     return relevant;
-  }
-  private read(file: string): string | undefined {
-    try {
-      const stat = statSync(file);
-      const stamp = `${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}`;
-      const cached = this.disk.get(file);
-      if (cached?.stamp === stamp) return cached.text;
-      const text = new TextDecoder('utf-8', { fatal: true }).decode(readFileSync(file));
-      this.disk.set(file, { stamp, text });
-      return text;
-    } catch (error) {
-      if (!existsSync(file)) return undefined;
-      if (!(error instanceof TypeError)) throw error;
-      throw new ProfileException(
-        'ys/profile-invalid',
-        { file, line: 1, column: 1, endLine: 1, endColumn: 1, path: '' },
-        'Malformed UTF-8'
-      );
-    }
   }
   private header(text: string, file: string) {
     const cached = this.headers.get(file);
@@ -113,28 +95,30 @@ export class YamlWorkspaceLoader {
   }
   /** The desktop host asks this same admission path; it never parses a second header grammar. */
   language(uri: string, text: string, refreshMarkers = true): 'ttr-yaml' | 'yaml' {
+    const { pathOf } = this.host;
+    const { dirname } = this.host.files.path;
     if (refreshMarkers) this.markers.clear();
     const file = pathOf(uri);
     if (
       !isYamlFile(file) ||
       /\/ttr\.yaml$/.test(file) ||
       [...this.chains.values()].some((c) =>
-        c.chain.some((p) => !p.file.startsWith('<') && physicalPath(p.file) === physicalPath(file))
+        c.chain.some((p) => !p.file.startsWith('<') && this.physicalPath(p.file) === this.physicalPath(file))
       )
     )
       return 'yaml';
-    const marker = this.marker(file, (p) => this.read(p));
+    const marker = this.marker(file, (p) => this.host.read(p));
     const boundary = marker
       ? dirname(marker)
       : this.roots
-          .filter((root) => file.startsWith(root + sep))
+          .filter((root) => this.inside(root, file))
           .sort((a, b) => b.length - a.length)[0];
-    if (boundary && this.excluded(file, boundary, (p) => this.read(p))) return 'yaml';
+    if (boundary && this.excluded(file, boundary, (p) => this.host.read(p))) return 'yaml';
     try {
       const header = this.header(text, file);
       if (header.type !== 'absent') return 'ttr-yaml';
       if (marker) {
-        const data = new ForeignData(this.read(marker)!, marker).value;
+        const data = new ForeignData(this.host.read(marker)!, marker).value;
         if (isRecord(data) && data.profile !== undefined) return 'ttr-yaml';
       }
     } catch {
@@ -147,6 +131,7 @@ export class YamlWorkspaceLoader {
     root: string,
     read: (file: string) => string | undefined
   ): boolean {
+    const { relative, join, sep } = this.host.files.path;
     const path = relative(root, file).split(sep).join('/');
     const parts = path.split('/');
     if (
@@ -184,24 +169,26 @@ export class YamlWorkspaceLoader {
   private readonly markers = new Map<string, string | undefined>();
   private readonly roots: string[];
   constructor(
-    roots: string[],
+    roots: readonly string[],
+    private readonly host: YamlWorkspaceHost,
     private readonly profile?: string | boolean
   ) {
-    this.roots = roots.map(pathOf);
+    this.roots = roots.map(host.pathOf);
   }
   invalidate(): void {
     this.markers.clear();
     this.files = undefined;
   }
   private marker(file: string, read: (file: string) => string | undefined): string | undefined {
+    const { dirname, join } = this.host.files.path;
     let directory = dirname(file);
     const boundary = this.roots
-      .filter((root) => directory === root || directory.startsWith(root + sep))
+      .filter((root) => directory === root || this.inside(root, directory))
       .sort((a, b) => b.length - a.length)[0];
     if (!boundary) return undefined;
     const visited: string[] = [];
     let found: string | undefined;
-    while (directory === boundary || directory.startsWith(boundary + sep)) {
+    while (directory === boundary || this.inside(boundary, directory)) {
       if (this.markers.has(directory)) {
         found = this.markers.get(directory);
         break;
@@ -221,9 +208,11 @@ export class YamlWorkspaceLoader {
   load(
     buffers: ReadonlyMap<string, string> = new Map()
   ): Map<string, ParseResult & { text: string }> {
+    const { pathOf, fileUri, files } = this.host;
+    const { dirname, isAbsolute, join, relative, resolve, sep } = files.path;
     const texts = new Map<string, string>();
     const aliases = new Map<string, string>();
-    const physical = physicalPath;
+    const physical = (file: string) => this.physicalPath(file);
     for (const uri of buffers.keys())
       if (uri.startsWith('file:')) aliases.set(physical(pathOf(uri)), uri);
     const uriOf = (file: string): string =>
@@ -231,15 +220,15 @@ export class YamlWorkspaceLoader {
     const read = (file: string): string | undefined => {
       const uri = uriOf(file);
       if (buffers.has(uri)) return buffers.get(uri);
-      return this.read(file);
+      return this.host.read(file);
     };
     const found: string[] = [];
     const sidecars: string[] = [];
     const walk = (directory: string, inTree = false): void => {
-      inTree ||= existsSync(join(directory, 'ttr.yaml')) || typeof this.profile === 'string';
+      inTree ||= files.exists(join(directory, 'ttr.yaml')) || typeof this.profile === 'string';
       let entries;
       try {
-        entries = readdirSync(directory, { withFileTypes: true });
+        entries = files.entries(directory);
       } catch {
         return;
       }
@@ -325,7 +314,7 @@ export class YamlWorkspaceLoader {
         const boundary = marker
           ? dirname(marker)
           : (this.roots
-              .filter((root) => file.startsWith(root + sep))
+              .filter((root) => this.inside(root, file))
               .sort((a, b) => b.length - a.length)[0] ?? dirname(file));
         if (this.excluded(file, boundary, read)) continue;
         const text = read(file) ?? '';
@@ -403,7 +392,7 @@ export class YamlWorkspaceLoader {
             const profile = ProfileReader.read(dependencyRead(path), path);
             catalog.set(`${profile.name}/${profile.major}`, path);
           }
-          const resolver = new ProfileResolver(boundary, catalog, () => null, dependencyRead);
+          const resolver = new ProfileResolver(boundary, catalog, () => null, dependencyRead, files);
           const chain =
             typeof reference === 'string'
               ? resolver.resolve(reference, reference)
@@ -462,11 +451,11 @@ export class YamlWorkspaceLoader {
     };
     this.groupDependencies.clear();
     for (const [key, group] of groups) {
-      const sidecars = this.sidecars.filter((file) => file.startsWith(group.root + sep));
-      for (const file of sidecars) this.groupDependencies.add(physicalPath(file));
+      const sidecars = this.sidecars.filter((file) => this.inside(group.root, file));
+      for (const file of sidecars) this.groupDependencies.add(this.physicalPath(file));
       for (const profile of group.chain) {
         if (typeof profile.overlay === 'string')
-          this.groupDependencies.add(physicalPath(resolve(dirname(profile.file), profile.overlay)));
+          this.groupDependencies.add(this.physicalPath(resolve(dirname(profile.file), profile.overlay)));
       }
       const signature = JSON.stringify(
         [
@@ -497,7 +486,7 @@ export class YamlWorkspaceLoader {
       let pending = group.trees.filter((tree) => !excluded.has(tree.label));
       while (pending.length) {
         try {
-          const applied = ProfileEngine.apply(pending, group.chain, group.root, true);
+          const applied = ProfileEngine.apply(pending, group.chain, group.root, true, undefined, files);
           const targets = new Set(applied.sources.map((source) => source.qname));
           for (const document of applied.documents) {
             const uri = uriOf(join(group.root, document.file!));
@@ -545,13 +534,16 @@ export class YamlWorkspaceLoader {
     this.lastResults = new Set(out.keys());
     return new Map([...out].map(([uri, result]) => [uri, { ...result, text: safeRead(uri) }]));
   }
-}
-
-function physicalPath(file: string): string {
-  try {
-    return realpathSync(file);
-  } catch {
-    return resolve(file);
+  private inside(root: string, file: string): boolean {
+    const { sep } = this.host.files.path;
+    return file.startsWith(root.endsWith(sep) ? root : root + sep);
+  }
+  private physicalPath(file: string): string {
+    try {
+      return this.host.files.realpath(file);
+    } catch {
+      return this.host.files.path.resolve(file);
+    }
   }
 }
 

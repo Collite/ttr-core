@@ -302,16 +302,22 @@ export function getGraph(
   documents: Map<string, string>,
   preferredLang = 'en',
 ): GetGraphResponse | null {
-  const content = documents.get(uri);
-  if (content === undefined) return null;
-  const result = parseString(content, uri);
-  const graph = result.ast?.graph;
-  if (!result.ast || !graph) return null;
+  if (!documents.has(uri)) return null;
+  return getGraphFromAsts(uri, parseAllDocs(documents), preferredLang);
+}
 
+/** The LSP already has canonical ASTs for both text and YAML documents. */
+export function getGraphFromAsts(
+  uri: string,
+  allDocs: ReadonlyMap<string, Document>,
+  preferredLang: string,
+): GetGraphResponse | null {
+  const ast = allDocs.get(uri);
+  if (!ast?.graph) return null;
+  const graph = ast.graph;
   const schema = graph.schema ?? 'er';
   const objectSet = new Set(graph.objects);
 
-  const allDocs = parseAllDocs(documents);
   const qnameToDef = buildQnameToDef([...allDocs.values()]);
   const mdContext = buildMdContext([...allDocs.values()]);
 
@@ -343,7 +349,7 @@ export function getGraph(
     edges: graph.layout?.edges ?? {},
   };
 
-  const imports = result.ast.imports.map((imp) => imp.target);
+  const imports = ast.imports.map((imp) => imp.target);
 
   return { schema, nodes, edges, layout, missingObjects, imports };
 }

@@ -100,7 +100,7 @@ import {
 } from '@tatrman/semantics';
 import { findSqlRefAtOffset, sqlCompletionContext, sqlScopeFromTokens } from './sql-features.js';
 import { buildProjectModelGraph, emptyLayout, buildSymbolDetail, memberRefsOf, type LayoutFile, type RenderableSchemaCode } from './model-graph.js';
-import { listGraphs, getGraph, getPackageGraphFromCache, buildBindingMap } from './graph-methods.js';
+import { listGraphs, getGraphFromAsts, getPackageGraphFromCache, buildBindingMap } from './graph-methods.js';
 import { buildAddObjectEdit, buildRemoveObjectEdit, buildCreateGraphEdit, buildSetLayoutEdit, buildRenameSymbolEdit, buildRenamePackageEdit, type WorkspaceEdit } from '@tatrman/edit';
 import { getReferenceCompletions, extractQueryPrefix } from './completion-reference.js';
 import {
@@ -126,7 +126,7 @@ import { synthesize, type EditOp, type EditArgs } from '@tatrman/edit';
 import type { ModelerEditParams, ModelerEditResult } from './hosted-protocol.js';
 
 export interface ServerOptions {
-  /** Desktop YAML adapter; the browser host retains its existing file-map contract. */
+  /** YAML workspace hooks for disk-backed and in-memory hosts. */
   yamlFilesChanged?: (changes: readonly {uri: string; type: number}[]) => boolean;
   yamlLanguage?: (uri: string, text: string, roots: readonly string[]) => 'ttr-yaml' | 'yaml';
   loadYamlDocuments?: (buffers: ReadonlyMap<string, string>, roots: readonly string[]) => Map<string, ParseResult & { text: string }>;
@@ -411,6 +411,8 @@ export function createServerConnection(
   const pendingTexts = new Map<string, string[]>();
   const yamlResults = new Map<string, ParseResult>();
   const isYaml = (uri: string): boolean => /\.ya?ml$/i.test(uri);
+  const isYamlInput = (uri: string): boolean => isYaml(uri) ||
+    Boolean(opts.layoutStore && (uri.endsWith('/model.ignore') || uri.endsWith('.sources.json')));
   const isTtr = (uri: string): boolean => /\.ttr[mg]$/.test(uri) || yamlResults.has(uri);
   function refuseDialectLocation(name: string, uri: string, line: number): never {
     throw new ResponseError(ErrorCodes.InvalidParams, `Cannot rename '${name}': ${uri.split('/').pop()}:${line} is a dialect YAML file, and the editor does not rewrite dialect files (MW-26). Edit it first, then rename.`);
@@ -471,15 +473,22 @@ export function createServerConnection(
     return result.ast;
   }
 
+  const yamlRoots = () => opts.layoutStore && authoringRootUri ? [authoringRootUri] : workspaceRoots;
   let yamlRefreshTimer: ReturnType<typeof setTimeout> | undefined;
   function scheduleYamlRefresh(): void {
     if (yamlRefreshTimer !== undefined) clearTimeout(yamlRefreshTimer);
     yamlRefreshTimer = setTimeout(() => { yamlRefreshTimer = undefined; refreshYamlDocuments(); }, 200);
   }
+  function flushBrowserYamlRefresh(publish = true): void {
+    if (!opts.layoutStore || yamlRefreshTimer === undefined) return;
+    clearTimeout(yamlRefreshTimer);
+    yamlRefreshTimer = undefined;
+    refreshYamlDocuments({ publish });
+  }
   function refreshYamlDocuments({ publish = true }: { publish?: boolean } = {}): void {
     if (!opts.loadYamlDocuments) return;
     const buffers = new Map(documents.all().map(doc => [doc.uri, doc.getText()]));
-    const next = opts.loadYamlDocuments(buffers, workspaceRoots);
+    const next = opts.loadYamlDocuments(buffers, yamlRoots());
     const changed = new Set<string>();
     for (const [uri, result] of yamlResults) {
       if (next.get(uri)?.ast === result.ast && next.get(uri)?.text === getDocument(uri)?.getText() && next.has(uri)) continue;
@@ -1033,7 +1042,7 @@ export function createServerConnection(
 
   documents.onDidChangeContent((event: TextDocumentChangeEvent<TextDocument>) => {
     const uri = event.document.uri;
-    if (isYaml(uri) && opts.loadYamlDocuments) { scheduleYamlRefresh(); return; }
+    if (isYamlInput(uri) && opts.loadYamlDocuments) { scheduleYamlRefresh(); return; }
     const pending = pendingTexts.get(uri) ?? [];
     const acknowledged = pending.indexOf(event.document.getText());
     if (acknowledged >= 0 && acknowledged < pending.length - 1) {
@@ -1048,7 +1057,7 @@ export function createServerConnection(
 
   documents.onDidClose((event: TextDocumentChangeEvent<TextDocument>) => {
     const uri = event.document.uri;
-    if (isYaml(uri) && opts.loadYamlDocuments) { scheduleYamlRefresh(); return; }
+    if (isYamlInput(uri) && opts.loadYamlDocuments) { scheduleYamlRefresh(); return; }
     editDocs.delete(uri);
     pendingTexts.delete(uri);
     const disk = diskDocs.get(uri);
@@ -1228,7 +1237,10 @@ export function createServerConnection(
       }
     }
   });
-  connection.onRequest('modeler/yamlLanguage', (params: {uri: string; text: string}) => opts.yamlLanguage?.(params.uri, params.text, workspaceRoots) ?? 'yaml');
+  connection.onRequest('modeler/yamlLanguage', (params: {uri: string; text: string}) => {
+    flushBrowserYamlRefresh();
+    return opts.yamlLanguage?.(params.uri, params.text, yamlRoots()) ?? 'yaml';
+  });
 
   connection.onRequest('modeler/reloadLintConfig', async () => {
     await refreshLintConfig();
@@ -1321,6 +1333,7 @@ export function createServerConnection(
   // it is order-independent with respect to didOpen.
   connection.onRequest('modeler/setProjectRoot', async (params: { projectRoot: string; manifest?: string; deferDiagnostics?: boolean }) => {
     deferDocumentDiagnostics = params.deferDiagnostics === true;
+    const previousRoot = authoringRootUri;
     authoringRootUri = params.projectRoot.startsWith('file://') ? params.projectRoot.replace(/\/$/, '') : undefined;
     const root = params.projectRoot.startsWith('file://')
       ? new URL(params.projectRoot).pathname
@@ -1364,12 +1377,18 @@ export function createServerConnection(
     for (const doc of cachedDocuments()) {
       updateSymbolTable(doc.uri, doc.getText());
     }
+    if (opts.layoutStore && opts.loadYamlDocuments && previousRoot !== authoringRootUri &&
+        documents.all().some((doc) => isYamlInput(doc.uri))) scheduleYamlRefresh();
     // Re-reads `.ttrlint.toml` under the new root and re-publishes all open docs.
-    if (!deferDocumentDiagnostics) await refreshLintConfig();
+    if (!deferDocumentDiagnostics) {
+      flushBrowserYamlRefresh(false);
+      await refreshLintConfig();
+    }
     return { ok: true, projectRoot: root, manifest };
   });
 
   connection.onRequest('modeler/listSchemaSubjects', () => {
+    flushBrowserYamlRefresh();
     const symbols = projectSymbols.all();
     // Legacy cnc entities use ER canonical symbol kinds, but their canvas is still the cnc model.
     const cncFiles = new Set([...getProjectDocuments()].filter(([, ast]) => ast.modelDirective?.modelCode === 'cnc').map(([uri]) => uri));
@@ -1387,6 +1406,7 @@ export function createServerConnection(
       return { schemaCode: params.schema, nodes: [], edges: [] };
     }
 
+    flushBrowserYamlRefresh();
     const allDocs = cachedDocuments();
     const asts: Document[] = [];
     const packages = new Map<Document, string>();
@@ -1400,6 +1420,7 @@ export function createServerConnection(
   });
 
   connection.onRequest('modeler/listGraphs', (_params: { projectRoot: string }) => {
+    flushBrowserYamlRefresh();
     const docMap = new Map<string, string>();
     for (const doc of cachedDocuments()) docMap.set(doc.uri, doc.getText());
     const allDocs: import('@tatrman/parser').Document[] = [];
@@ -1427,9 +1448,8 @@ export function createServerConnection(
   });
 
   connection.onRequest('modeler/getGraph', (_params: { uri: string; preferredLanguage?: string }) => {
-    const docMap = new Map<string, string>();
-    for (const doc of cachedDocuments()) docMap.set(doc.uri, doc.getText());
-    return getGraph(_params.uri, docMap, _params.preferredLanguage || manifest.preferredLanguage);
+    flushBrowserYamlRefresh();
+    return getGraphFromAsts(_params.uri, getProjectDocuments(), _params.preferredLanguage || manifest.preferredLanguage);
   });
 
   connection.onRequest('modeler/getPackageGraph', () => {
